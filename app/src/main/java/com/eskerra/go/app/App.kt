@@ -1,12 +1,11 @@
 package com.eskerra.go.app
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -15,12 +14,18 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.WorkspaceConfig
+import com.eskerra.go.core.usecase.CreateInboxNote
+import com.eskerra.go.core.usecase.LoadEditableNote
+import com.eskerra.go.core.usecase.LoadGitStatusSummary
 import com.eskerra.go.core.usecase.LoadInboxSummaries
 import com.eskerra.go.core.usecase.LoadNoteForReading
+import com.eskerra.go.core.usecase.SaveNote
 import com.eskerra.go.data.git.FakeGitGateway
 import com.eskerra.go.data.workspace.FakeWorkspace
-import com.eskerra.go.feature.add.AddScreen
 import com.eskerra.go.feature.dashboard.DashboardScreen
+import com.eskerra.go.feature.editor.CreateInboxScreen
+import com.eskerra.go.feature.editor.NoteEditorScreen
+import com.eskerra.go.feature.editor.NoteEditorUiState
 import com.eskerra.go.feature.inbox.InboxScreen
 import com.eskerra.go.feature.menu.MenuScreen
 import com.eskerra.go.feature.note.NoteScreen
@@ -37,11 +42,18 @@ fun App(
     config: WorkspaceConfig,
     filesDir: File,
     loadInboxSummaries: LoadInboxSummaries,
-    loadNoteForReading: LoadNoteForReading
+    loadNoteForReading: LoadNoteForReading,
+    createInboxNote: CreateInboxNote,
+    loadEditableNote: LoadEditableNote,
+    saveNote: SaveNote,
+    loadGitStatusSummary: LoadGitStatusSummary
 ) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
+    val markInboxNotesChanged = {
+        navController.markInboxNotesChanged()
+    }
 
     AppShell(
         currentRoute = currentRoute,
@@ -57,7 +69,7 @@ fun App(
             startDestination = AppRoute.INBOX,
             modifier = contentModifier
         ) {
-            composable(AppRoute.INBOX) {
+            composable(AppRoute.INBOX) { entry ->
                 val inboxViewModel: InboxViewModel = viewModel(
                     factory = InboxViewModel.factory(
                         config = config,
@@ -66,6 +78,15 @@ fun App(
                     )
                 )
                 val inboxState by inboxViewModel.uiState.collectAsState()
+
+                LaunchedEffect(currentRoute) {
+                    val notesChanged = entry.savedStateHandle.remove<Boolean>(
+                        NOTES_CHANGED_KEY
+                    ) == true
+                    if (currentRoute == AppRoute.INBOX && notesChanged) {
+                        inboxViewModel.refresh()
+                    }
+                }
 
                 InboxScreen(
                     state = inboxState,
@@ -76,16 +97,30 @@ fun App(
                 )
             }
 
-            composable(AppRoute.ADD) {
-                var title by rememberSaveable { mutableStateOf("") }
-                var body by rememberSaveable { mutableStateOf("") }
-                AddScreen(
-                    title = title,
-                    body = body,
-                    onTitleChange = { title = it },
-                    onBodyChange = { body = it },
-                    // Intentionally not persisted in this UI-only step.
-                    onSave = { _, _ -> }
+            composable(AppRoute.CREATE_INBOX) {
+                val createViewModel: CreateInboxNoteViewModel = viewModel(
+                    factory = CreateInboxNoteViewModel.factory(
+                        config = config,
+                        filesDir = filesDir,
+                        createInboxNote = createInboxNote
+                    )
+                )
+                val createState by createViewModel.uiState.collectAsState()
+
+                LaunchedEffect(createViewModel) {
+                    createViewModel.createdNoteId.collect { noteId ->
+                        if (noteId != null) {
+                            markInboxNotesChanged()
+                            navController.navigate(AppRoute.editor(noteId)) {
+                                popUpTo(AppRoute.CREATE_INBOX) { inclusive = true }
+                            }
+                        }
+                    }
+                }
+
+                CreateInboxScreen(
+                    state = createState,
+                    onRetry = createViewModel::retry
                 )
             }
 
@@ -131,12 +166,57 @@ fun App(
                     state = readerState,
                     onRetry = noteReaderViewModel::retry,
                     onBack = { navController.popBackStack() },
+                    onEdit = { navController.navigate(AppRoute.editor(noteId)) },
                     onResolvedWikiLinkClick = { targetId: NoteId ->
                         navController.navigate(AppRoute.note(targetId))
                     }
                 )
             }
+
+            composable(
+                route = AppRoute.EDITOR_PATTERN,
+                arguments = listOf(
+                    navArgument(AppRoute.EDITOR_ARG) { type = NavType.StringType }
+                )
+            ) { entry ->
+                val raw = entry.arguments?.getString(AppRoute.EDITOR_ARG).orEmpty()
+                val noteId = AppRoute.decodeEditorNoteId(raw)
+                val editorViewModel: NoteEditorViewModel = viewModel(
+                    factory = NoteEditorViewModel.factory(
+                        config = config,
+                        filesDir = filesDir,
+                        noteId = noteId,
+                        loadEditableNote = loadEditableNote,
+                        saveNote = saveNote,
+                        loadGitStatusSummary = loadGitStatusSummary
+                    )
+                )
+                val editorState by editorViewModel.uiState.collectAsState()
+
+                LaunchedEffect(editorState) {
+                    val content = editorState as? NoteEditorUiState.Content
+                    if (content?.saveMessage == NoteEditorViewModel.SAVED_MESSAGE) {
+                        markInboxNotesChanged()
+                    }
+                }
+
+                NoteEditorScreen(
+                    state = editorState,
+                    onBack = { navController.popBackStack() },
+                    onDraftChange = editorViewModel::updateDraft,
+                    onSave = editorViewModel::save,
+                    onRetry = editorViewModel::retry
+                )
+            }
         }
+    }
+}
+
+private const val NOTES_CHANGED_KEY = "notesChanged"
+
+private fun NavHostController.markInboxNotesChanged() {
+    runCatching {
+        getBackStackEntry(AppRoute.INBOX).savedStateHandle[NOTES_CHANGED_KEY] = true
     }
 }
 

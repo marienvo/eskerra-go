@@ -46,6 +46,7 @@ class NoteReaderViewModel(
                         title = document.note.title,
                         noteId = document.note.id,
                         path = document.content.path.value,
+                        canEdit = document.note.isInbox,
                         document = document
                     )
                 },

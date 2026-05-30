@@ -10,6 +10,7 @@ sealed interface NoteReaderUiState {
         val title: String,
         val noteId: NoteId,
         val path: String,
+        val canEdit: Boolean,
         val document: NoteReaderDocument
     ) : NoteReaderUiState
 
