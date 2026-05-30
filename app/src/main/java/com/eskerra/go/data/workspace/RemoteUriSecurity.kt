@@ -21,7 +21,10 @@ object RemoteUriSecurity {
         val trimmed = uri.trim()
         if (trimmed.isEmpty()) return false
         return try {
-            !URI(trimmed).userInfo.isNullOrEmpty()
+            val parsed = URI(trimmed)
+            !parsed.userInfo.isNullOrEmpty() ||
+                parsed.rawAuthority?.contains("@") == true ||
+                AUTHORITY_WITH_USERINFO.containsMatchIn(trimmed)
         } catch (_: URISyntaxException) {
             AUTHORITY_WITH_USERINFO.containsMatchIn(trimmed)
         }

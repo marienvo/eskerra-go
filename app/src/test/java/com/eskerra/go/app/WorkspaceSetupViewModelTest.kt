@@ -1,5 +1,9 @@
 package com.eskerra.go.app
 
+import com.eskerra.go.core.model.WorkspaceConfig
+import com.eskerra.go.data.workspace.WorkspacePaths
+import com.eskerra.go.data.workspace.WorkspaceSetupCompletion
+import com.eskerra.go.data.workspace.WorkspaceSetupMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -60,5 +64,48 @@ class WorkspaceSetupViewModelTest {
         viewModel.submit { }
 
         assertEquals("", viewModel.uiState.credential)
+    }
+
+    @Test
+    fun submit_initializeLocalDoesNotForwardHiddenCredential() = runBlocking {
+        val filesDir = temp.newFolder("files")
+        val setupCompletion = RecordingWorkspaceSetupCompletion()
+        val viewModel = WorkspaceSetupViewModel(
+            setupCompletion = setupCompletion,
+            filesDir = filesDir,
+            recoveryMessage = null
+        )
+        viewModel.onModeChange(WorkspaceSetupMode.Clone)
+        viewModel.onCredentialChange("pat-12345")
+        viewModel.onModeChange(WorkspaceSetupMode.InitializeLocal)
+
+        viewModel.submit { }
+
+        assertEquals("", viewModel.uiState.credential)
+        assertEquals(null, setupCompletion.lastCredential)
+    }
+
+    private class RecordingWorkspaceSetupCompletion : WorkspaceSetupCompletion {
+        var lastCredential: String? = null
+
+        override suspend fun completeAndPersist(
+            mode: WorkspaceSetupMode,
+            name: String,
+            branch: String,
+            remoteUri: String?,
+            credential: String?,
+            filesDir: java.io.File
+        ): Result<WorkspaceConfig> {
+            lastCredential = credential
+            return Result.success(
+                WorkspaceConfig(
+                    name = name.trim().ifBlank { "Notes" },
+                    relativePath = WorkspacePaths.DEFAULT_RELATIVE_PATH,
+                    remoteUri = null,
+                    branch = "master",
+                    setupCompletedAtEpochMs = 1_700_000_000_000L
+                )
+            )
+        }
     }
 }

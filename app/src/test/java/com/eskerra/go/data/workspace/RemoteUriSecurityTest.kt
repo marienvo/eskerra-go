@@ -34,6 +34,24 @@ class RemoteUriSecurityTest {
     }
 
     @Test
+    fun containsEmbeddedCredentials_detectsFileAuthorityWithToken() {
+        assertTrue(
+            RemoteUriSecurity.containsEmbeddedCredentials(
+                "file://mysecrettoken@/tmp/repo.git"
+            )
+        )
+    }
+
+    @Test
+    fun containsEmbeddedCredentials_detectsFileAuthorityWithUserAndPassword() {
+        assertTrue(
+            RemoteUriSecurity.containsEmbeddedCredentials(
+                "file://user:mysecrettoken@/tmp/repo.git"
+            )
+        )
+    }
+
+    @Test
     fun containsEmbeddedCredentials_allowsFileRemote() {
         assertFalse(
             RemoteUriSecurity.containsEmbeddedCredentials("file:///tmp/example.git")
