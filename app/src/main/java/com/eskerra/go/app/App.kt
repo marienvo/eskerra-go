@@ -20,6 +20,8 @@ import com.eskerra.go.core.usecase.LoadEditableNote
 import com.eskerra.go.core.usecase.LoadGitStatusSummary
 import com.eskerra.go.core.usecase.LoadInboxSummaries
 import com.eskerra.go.core.usecase.LoadNoteForReading
+import com.eskerra.go.core.usecase.LoadSyncStatus
+import com.eskerra.go.core.usecase.ManualSyncNow
 import com.eskerra.go.core.usecase.SaveNote
 import com.eskerra.go.feature.dashboard.DashboardScreen
 import com.eskerra.go.feature.editor.CreateInboxScreen
@@ -29,6 +31,7 @@ import com.eskerra.go.feature.menu.MenuScreen
 import com.eskerra.go.feature.note.NoteScreen
 import com.eskerra.go.feature.podcasts.PodcastItem
 import com.eskerra.go.feature.podcasts.PodcastsScreen
+import com.eskerra.go.feature.sync.SyncScreen
 import java.io.File
 
 /**
@@ -44,7 +47,9 @@ fun App(
     createInboxNote: CreateInboxNote,
     loadEditableNote: LoadEditableNote,
     saveNote: SaveNote,
-    loadGitStatusSummary: LoadGitStatusSummary
+    loadGitStatusSummary: LoadGitStatusSummary,
+    loadSyncStatus: LoadSyncStatus,
+    manualSyncNow: ManualSyncNow
 ) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -136,8 +141,31 @@ fun App(
 
             composable(AppRoute.MENU) {
                 MenuScreen(
-                    items = fakeMenuItems,
-                    onItemClick = { }
+                    items = menuItems,
+                    onItemClick = { item ->
+                        when (item) {
+                            MENU_SYNC -> navController.navigate(AppRoute.SYNC)
+                        }
+                    }
+                )
+            }
+
+            composable(AppRoute.SYNC) {
+                val syncViewModel: SyncViewModel = viewModel(
+                    factory = SyncViewModel.factory(
+                        config = config,
+                        filesDir = filesDir,
+                        loadSyncStatus = loadSyncStatus,
+                        manualSyncNow = manualSyncNow,
+                        onSyncSuccess = markInboxNotesChanged
+                    )
+                )
+                val syncState by syncViewModel.uiState.collectAsState()
+
+                SyncScreen(
+                    state = syncState,
+                    onSyncNow = syncViewModel::syncNow,
+                    onRetry = syncViewModel::refreshStatus
                 )
             }
 
@@ -249,8 +277,14 @@ private val fakePodcasts: List<PodcastItem> = listOf(
     PodcastItem(title = "Compose in practice", author = "Android Cafe")
 )
 
-private val fakeMenuItems: List<String> = listOf(
-    "Settings",
-    "Workspaces",
-    "About"
+private const val MENU_SYNC = "Sync"
+private const val MENU_SETTINGS = "Settings"
+private const val MENU_WORKSPACES = "Workspaces"
+private const val MENU_ABOUT = "About"
+
+private val menuItems: List<String> = listOf(
+    MENU_SYNC,
+    MENU_SETTINGS,
+    MENU_WORKSPACES,
+    MENU_ABOUT
 )

@@ -17,6 +17,8 @@ import com.eskerra.go.core.usecase.LoadEditableNote
 import com.eskerra.go.core.usecase.LoadGitStatusSummary
 import com.eskerra.go.core.usecase.LoadInboxSummaries
 import com.eskerra.go.core.usecase.LoadNoteForReading
+import com.eskerra.go.core.usecase.LoadSyncStatus
+import com.eskerra.go.core.usecase.ManualSyncNow
 import com.eskerra.go.core.usecase.SaveNote
 import com.eskerra.go.data.workspace.WorkspaceSetupCompletion
 import com.eskerra.go.data.workspace.WorkspaceStore
@@ -38,7 +40,9 @@ fun AppRoot(
     createInboxNote: CreateInboxNote,
     loadEditableNote: LoadEditableNote,
     saveNote: SaveNote,
-    loadGitStatusSummary: LoadGitStatusSummary
+    loadGitStatusSummary: LoadGitStatusSummary,
+    loadSyncStatus: LoadSyncStatus,
+    manualSyncNow: ManualSyncNow
 ) {
     EskerraGoTheme {
         val gateViewModel: AppGateViewModel = viewModel(
@@ -97,7 +101,9 @@ fun AppRoot(
                 createInboxNote = createInboxNote,
                 loadEditableNote = loadEditableNote,
                 saveNote = saveNote,
-                loadGitStatusSummary = loadGitStatusSummary
+                loadGitStatusSummary = loadGitStatusSummary,
+                loadSyncStatus = loadSyncStatus,
+                manualSyncNow = manualSyncNow
             )
         }
     }

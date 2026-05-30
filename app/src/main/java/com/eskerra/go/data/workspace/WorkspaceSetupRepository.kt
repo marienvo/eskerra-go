@@ -77,12 +77,12 @@ class DefaultWorkspaceSetupRepository(private val gitRepository: WorkspaceGitRep
         RemoteUriSecurity.validateNoEmbeddedCredentials(uri).getOrElse { error ->
             return Result.failure(error)
         }
-        if (!isSupportedRemoteUri(uri)) {
+        if (!RemoteUriSecurity.isSupportedRemoteScheme(uri)) {
             return Result.failure(
                 WorkspaceSetupException(WorkspaceSetupError.UnsupportedRemoteScheme)
             )
         }
-        val httpsToken = if (isHttpsRemoteUri(uri)) {
+        val httpsToken = if (uri.startsWith("https://", ignoreCase = true)) {
             if (credential.isBlank()) {
                 return Result.failure(
                     WorkspaceSetupException(WorkspaceSetupError.MissingCredential)
@@ -178,13 +178,4 @@ class DefaultWorkspaceSetupRepository(private val gitRepository: WorkspaceGitRep
     }
 
     private fun sanitizeRemoteUri(uri: String): String = uri.trim()
-
-    private fun isHttpsRemoteUri(uri: String): Boolean =
-        uri.startsWith("https://", ignoreCase = true)
-
-    private fun isFileRemoteUri(uri: String): Boolean =
-        uri.startsWith("file://") || uri.startsWith("file:/")
-
-    private fun isSupportedRemoteUri(uri: String): Boolean =
-        isFileRemoteUri(uri) || isHttpsRemoteUri(uri)
 }

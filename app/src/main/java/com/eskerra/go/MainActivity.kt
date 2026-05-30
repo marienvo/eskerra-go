@@ -10,9 +10,12 @@ import com.eskerra.go.core.usecase.LoadEditableNote
 import com.eskerra.go.core.usecase.LoadGitStatusSummary
 import com.eskerra.go.core.usecase.LoadInboxSummaries
 import com.eskerra.go.core.usecase.LoadNoteForReading
+import com.eskerra.go.core.usecase.LoadSyncStatus
+import com.eskerra.go.core.usecase.ManualSyncNow
 import com.eskerra.go.core.usecase.SaveNote
 import com.eskerra.go.data.credentials.AndroidKeystoreTokenCipher
 import com.eskerra.go.data.credentials.EncryptedCredentialStore
+import com.eskerra.go.data.git.JGitRemoteSyncRepository
 import com.eskerra.go.data.git.JGitWorkspaceRepository
 import com.eskerra.go.data.notes.FileNoteContentRepository
 import com.eskerra.go.data.notes.FileNoteRegistryRepository
@@ -64,6 +67,15 @@ class MainActivity : ComponentActivity() {
             loadGitStatusSummary = loadGitStatusSummary
         )
 
+        val remoteSyncRepository = JGitRemoteSyncRepository(gitRepository)
+        val loadSyncStatus = LoadSyncStatus(remoteSyncRepository)
+        val manualSyncNow = ManualSyncNow(
+            remoteSyncRepository = remoteSyncRepository,
+            credentialStore = credentialStore,
+            registryRepository = noteRegistryRepository,
+            loadSyncStatus = loadSyncStatus
+        )
+
         setContent {
             AppRoot(
                 workspaceStore = workspaceStore,
@@ -74,7 +86,9 @@ class MainActivity : ComponentActivity() {
                 createInboxNote = createInboxNote,
                 loadEditableNote = loadEditableNote,
                 saveNote = saveNote,
-                loadGitStatusSummary = loadGitStatusSummary
+                loadGitStatusSummary = loadGitStatusSummary,
+                loadSyncStatus = loadSyncStatus,
+                manualSyncNow = manualSyncNow
             )
         }
     }
