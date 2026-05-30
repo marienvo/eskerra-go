@@ -40,12 +40,17 @@ object WikiLinkResolver {
         link: WikiLink,
         notes: List<NoteSummary>
     ): WikiLinkResolution {
-        val exactMatches = notes.filter { normalizePath(it.id.value) == normalizedTarget }
+        val canonicalTarget = canonicalizePathSegments(normalizedTarget)
+        val exactMatches =
+            notes.filter { canonicalizePathSegments(normalizePath(it.id.value)) == canonicalTarget }
         exactMatches.toResolution(link)?.let { return it }
 
-        val extensionlessTarget = dropExtension(normalizedTarget)
+        val extensionlessTarget = dropExtension(canonicalTarget)
         val extensionlessMatches =
-            notes.filter { dropExtension(normalizePath(it.id.value)) == extensionlessTarget }
+            notes.filter {
+                dropExtension(canonicalizePathSegments(normalizePath(it.id.value))) ==
+                    extensionlessTarget
+            }
         return extensionlessMatches.toResolution(link)
             ?: MissingWikiLink(link, MissingWikiLinkReason.NoMatch)
     }
@@ -57,7 +62,8 @@ object WikiLinkResolver {
     ): WikiLinkResolution {
         val matches =
             notes.filter { note ->
-                note.title == target || filenameStem(note.id.value) == target
+                note.title.equals(target, ignoreCase = true) ||
+                    filenameStem(note.id.value).equals(target, ignoreCase = true)
             }.distinctBy { it.id.value }
 
         return matches.toResolution(link) ?: MissingWikiLink(link, MissingWikiLinkReason.NoMatch)
@@ -72,6 +78,9 @@ object WikiLinkResolver {
     private fun normalizeTarget(raw: String): String = raw.replace('\\', '/')
 
     private fun normalizePath(path: String): String = path.replace('\\', '/')
+
+    private fun canonicalizePathSegments(path: String): String =
+        path.split('/').filter { it.isNotEmpty() && it != "." }.joinToString("/")
 
     private fun hasPathTraversal(normalizedTarget: String): Boolean {
         if (normalizedTarget.startsWith("/")) {

@@ -5,6 +5,7 @@ Eskerra Go PoC proves:
 - Inbox list from markdown files
 - Add creates editable inbox note
 - Markdown reader supports clickable wiki links
+- Wiki links resolve by note title or filename stem case-insensitively; path-like targets stay case-sensitive and normalize `.` path segments for registry lookup
 - Non-inbox notes are read-only
 - Floating shell navigation exists
 

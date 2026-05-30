@@ -3,6 +3,9 @@ package com.eskerra.go.core.model
 /**
  * A `[[wiki link]]` parsed out of note content. [target] is the note this link
  * points to; [displayText] is what the reader shows.
+ *
+ * @param sourceRange Inclusive character indices in the source markdown.
+ *   `markdown.substring(sourceRange)` yields the full `[[...]]` token.
  */
 data class WikiLink(
     val target: String,

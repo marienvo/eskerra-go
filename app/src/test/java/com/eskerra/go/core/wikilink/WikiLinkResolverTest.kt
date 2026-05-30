@@ -91,6 +91,17 @@ class WikiLinkResolverTest {
     }
 
     @Test
+    fun resolve_byTitle_ignoresCase() {
+        val registry = registryOf(note("Notes/plan.md", "Project Plan"))
+        val link = WikiLink("project plan", "project plan", 0..0, true)
+
+        val resolution = WikiLinkResolver.resolve(link, registry)
+
+        assertTrue(resolution is ResolvedWikiLink)
+        assertEquals("Notes/plan.md", (resolution as ResolvedWikiLink).note.id.value)
+    }
+
+    @Test
     fun resolve_byFilenameStem_returnsResolved() {
         val registry = registryOf(note("Notes/project-plan.md", "Project Plan"))
         val link = WikiLink("project-plan", "project-plan", 0..0, true)
@@ -99,6 +110,35 @@ class WikiLinkResolverTest {
 
         assertTrue(resolution is ResolvedWikiLink)
         assertEquals("Notes/project-plan.md", (resolution as ResolvedWikiLink).note.id.value)
+    }
+
+    @Test
+    fun resolve_byFilenameStem_ignoresCase() {
+        val registry = registryOf(note("Notes/Project-Plan.md", "Project Plan"))
+        val link = WikiLink("project-plan", "project-plan", 0..0, true)
+
+        val resolution = WikiLinkResolver.resolve(link, registry)
+
+        assertTrue(resolution is ResolvedWikiLink)
+        assertEquals("Notes/Project-Plan.md", (resolution as ResolvedWikiLink).note.id.value)
+    }
+
+    @Test
+    fun resolve_duplicateTitleIgnoresCase_returnsAmbiguous() {
+        val registry =
+            registryOf(
+                note("Inbox/daily-a.md", "Daily"),
+                note("Archive/daily-b.md", "daily")
+            )
+        val link = WikiLink("DAILY", "DAILY", 0..0, true)
+
+        val resolution = WikiLinkResolver.resolve(link, registry)
+
+        assertTrue(resolution is AmbiguousWikiLink)
+        assertEquals(
+            listOf("Archive/daily-b.md", "Inbox/daily-a.md"),
+            (resolution as AmbiguousWikiLink).candidates.map { it.id.value }
+        )
     }
 
     @Test
@@ -254,6 +294,28 @@ class WikiLinkResolverTest {
 
         assertTrue(resolution is ResolvedWikiLink)
         assertEquals("Inbox/hello.md", (resolution as ResolvedWikiLink).note.id.value)
+    }
+
+    @Test
+    fun resolve_pathWithDotSegment_resolvesToCanonicalNote() {
+        val registry = registryOf(note("Inbox/note.md", "Note"))
+        val link = WikiLink("Inbox/./note.md", "Note", 0..0, true)
+
+        val resolution = WikiLinkResolver.resolve(link, registry)
+
+        assertTrue(resolution is ResolvedWikiLink)
+        assertEquals("Inbox/note.md", (resolution as ResolvedWikiLink).note.id.value)
+    }
+
+    @Test
+    fun resolve_pathWithMultipleDotSegments_resolves() {
+        val registry = registryOf(note("Inbox/foo/bar.md", "Bar"))
+        val link = WikiLink("Inbox/foo/./bar.md", "Bar", 0..0, true)
+
+        val resolution = WikiLinkResolver.resolve(link, registry)
+
+        assertTrue(resolution is ResolvedWikiLink)
+        assertEquals("Inbox/foo/bar.md", (resolution as ResolvedWikiLink).note.id.value)
     }
 
     private fun note(path: String, title: String): NoteSummary = NoteSummary(

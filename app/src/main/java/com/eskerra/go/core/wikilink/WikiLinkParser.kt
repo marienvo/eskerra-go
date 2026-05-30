@@ -4,7 +4,8 @@ import com.eskerra.go.core.model.WikiLink
 
 /**
  * Scans raw markdown text for `[[wiki link]]` tokens. Does not understand markdown
- * fences, escapes, or nested links.
+ * fences, escapes, or nested links. Each [WikiLink.sourceRange] is inclusive on both
+ * ends so `markdown.substring(sourceRange)` reproduces the full token.
  */
 object WikiLinkParser {
 
