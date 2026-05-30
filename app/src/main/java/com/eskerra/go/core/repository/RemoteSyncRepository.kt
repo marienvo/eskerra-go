@@ -31,4 +31,19 @@ interface RemoteSyncRepository {
         workspaceStatus: GitWorkspaceStatus,
         comparison: RemoteBranchComparison?
     ): SyncStatusSummary
+
+    /** Configure or update `origin` with a sanitized URL (no embedded credentials). */
+    fun configureSanitizedOrigin(workingDir: File, remoteUri: String): Result<Unit>
+
+    /**
+     * Read-only remote probe via ls-remote. Does not open the local repo for fetch,
+     * does not change `.git/config`, and does not update remote-tracking refs.
+     */
+    fun probeRemoteConnection(remoteUri: String, branch: String, httpsToken: String?): Result<Unit>
+
+    /** Removes sanitized `origin` metadata from the local repository. */
+    fun clearSanitizedOrigin(workingDir: File): Result<Unit>
+
+    /** Returns the sanitized `origin` URL from `.git/config`, or null when unset. */
+    fun readOriginUrl(workingDir: File): Result<String?>
 }

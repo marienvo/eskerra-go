@@ -4,6 +4,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
@@ -15,14 +18,19 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.WorkspaceConfig
+import com.eskerra.go.core.usecase.ClearRemoteSyncSettings
 import com.eskerra.go.core.usecase.CreateInboxNote
 import com.eskerra.go.core.usecase.LoadEditableNote
 import com.eskerra.go.core.usecase.LoadGitStatusSummary
 import com.eskerra.go.core.usecase.LoadInboxSummaries
 import com.eskerra.go.core.usecase.LoadNoteForReading
+import com.eskerra.go.core.usecase.LoadRemoteSyncSettings
 import com.eskerra.go.core.usecase.LoadSyncStatus
 import com.eskerra.go.core.usecase.ManualSyncNow
 import com.eskerra.go.core.usecase.SaveNote
+import com.eskerra.go.core.usecase.SaveRemoteSyncSettings
+import com.eskerra.go.core.usecase.TestRemoteConnection
+import com.eskerra.go.core.usecase.UpdateSyncToken
 import com.eskerra.go.feature.dashboard.DashboardScreen
 import com.eskerra.go.feature.editor.CreateInboxScreen
 import com.eskerra.go.feature.editor.NoteEditorScreen
@@ -32,6 +40,7 @@ import com.eskerra.go.feature.note.NoteScreen
 import com.eskerra.go.feature.podcasts.PodcastItem
 import com.eskerra.go.feature.podcasts.PodcastsScreen
 import com.eskerra.go.feature.sync.SyncScreen
+import com.eskerra.go.feature.sync.SyncSettingsScreen
 import java.io.File
 
 /**
@@ -49,8 +58,15 @@ fun App(
     saveNote: SaveNote,
     loadGitStatusSummary: LoadGitStatusSummary,
     loadSyncStatus: LoadSyncStatus,
-    manualSyncNow: ManualSyncNow
+    manualSyncNow: ManualSyncNow,
+    loadRemoteSyncSettings: LoadRemoteSyncSettings,
+    saveRemoteSyncSettings: SaveRemoteSyncSettings,
+    updateSyncToken: UpdateSyncToken,
+    clearRemoteSyncSettings: ClearRemoteSyncSettings,
+    testRemoteConnection: TestRemoteConnection,
+    onConfigUpdated: (WorkspaceConfig) -> Unit
 ) {
+    var currentConfig by remember(config) { mutableStateOf(config) }
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
@@ -74,8 +90,9 @@ fun App(
         ) {
             composable(AppRoute.INBOX) { entry ->
                 val inboxViewModel: InboxViewModel = viewModel(
+                    key = currentConfig.remoteUri,
                     factory = InboxViewModel.factory(
-                        config = config,
+                        config = currentConfig,
                         filesDir = filesDir,
                         loadInboxSummaries = loadInboxSummaries
                     )
@@ -103,7 +120,7 @@ fun App(
             composable(AppRoute.CREATE_INBOX) {
                 val createViewModel: CreateInboxNoteViewModel = viewModel(
                     factory = CreateInboxNoteViewModel.factory(
-                        config = config,
+                        config = currentConfig,
                         filesDir = filesDir,
                         createInboxNote = createInboxNote
                     )
@@ -133,7 +150,7 @@ fun App(
 
             composable(AppRoute.DASHBOARD) {
                 DashboardScreen(
-                    workspaceName = config.name,
+                    workspaceName = currentConfig.name,
                     noteCount = PLACEHOLDER_NOTE_COUNT,
                     gitStatus = PLACEHOLDER_GIT_STATUS
                 )
@@ -145,6 +162,7 @@ fun App(
                     onItemClick = { item ->
                         when (item) {
                             MENU_SYNC -> navController.navigate(AppRoute.SYNC)
+                            MENU_SETTINGS -> navController.navigate(AppRoute.SYNC_SETTINGS)
                         }
                     }
                 )
@@ -152,8 +170,9 @@ fun App(
 
             composable(AppRoute.SYNC) {
                 val syncViewModel: SyncViewModel = viewModel(
+                    key = currentConfig.syncViewModelKey(),
                     factory = SyncViewModel.factory(
-                        config = config,
+                        config = currentConfig,
                         filesDir = filesDir,
                         loadSyncStatus = loadSyncStatus,
                         manualSyncNow = manualSyncNow,
@@ -165,7 +184,37 @@ fun App(
                 SyncScreen(
                     state = syncState,
                     onSyncNow = syncViewModel::syncNow,
-                    onRetry = syncViewModel::refreshStatus
+                    onRetry = syncViewModel::refreshStatus,
+                    onOpenSettings = { navController.navigate(AppRoute.SYNC_SETTINGS) }
+                )
+            }
+
+            composable(AppRoute.SYNC_SETTINGS) {
+                val settingsViewModel: SyncSettingsViewModel = viewModel(
+                    key = currentConfig.syncViewModelKey(),
+                    factory = SyncSettingsViewModel.factory(
+                        config = currentConfig,
+                        filesDir = filesDir,
+                        loadRemoteSyncSettings = loadRemoteSyncSettings,
+                        saveRemoteSyncSettings = saveRemoteSyncSettings,
+                        clearRemoteSyncSettings = clearRemoteSyncSettings,
+                        testRemoteConnection = testRemoteConnection,
+                        onConfigUpdated = { updated ->
+                            currentConfig = updated
+                            onConfigUpdated(updated)
+                        }
+                    )
+                )
+                val settingsState by settingsViewModel.uiState.collectAsState()
+
+                SyncSettingsScreen(
+                    state = settingsState,
+                    onRemoteUriChange = settingsViewModel::onRemoteUriChange,
+                    onBranchChange = settingsViewModel::onBranchChange,
+                    onReplacementTokenChange = settingsViewModel::onReplacementTokenChange,
+                    onSave = settingsViewModel::saveSettings,
+                    onTestConnection = settingsViewModel::testConnection,
+                    onClear = settingsViewModel::clearSettings
                 )
             }
 
@@ -179,7 +228,7 @@ fun App(
                 val noteId = AppRoute.decodeNoteId(raw)
                 val noteReaderViewModel: NoteReaderViewModel = viewModel(
                     factory = NoteReaderViewModel.factory(
-                        config = config,
+                        config = currentConfig,
                         filesDir = filesDir,
                         noteId = noteId,
                         loadNoteForReading = loadNoteForReading
@@ -214,7 +263,7 @@ fun App(
                 val noteId = AppRoute.decodeEditorNoteId(raw)
                 val editorViewModel: NoteEditorViewModel = viewModel(
                     factory = NoteEditorViewModel.factory(
-                        config = config,
+                        config = currentConfig,
                         filesDir = filesDir,
                         noteId = noteId,
                         loadEditableNote = loadEditableNote,
@@ -242,6 +291,9 @@ fun App(
         }
     }
 }
+
+/** ViewModel key for sync screens; includes branch so branch-only updates recreate VMs. */
+private fun WorkspaceConfig.syncViewModelKey(): String = "${remoteUri.orEmpty()}:$branch"
 
 private const val NOTES_CHANGED_KEY = "notesChanged"
 internal const val NOTE_CONTENT_CHANGED_KEY = "noteContentChanged"

@@ -5,14 +5,19 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import com.eskerra.go.app.AppRoot
+import com.eskerra.go.core.usecase.ClearRemoteSyncSettings
 import com.eskerra.go.core.usecase.CreateInboxNote
 import com.eskerra.go.core.usecase.LoadEditableNote
 import com.eskerra.go.core.usecase.LoadGitStatusSummary
 import com.eskerra.go.core.usecase.LoadInboxSummaries
 import com.eskerra.go.core.usecase.LoadNoteForReading
+import com.eskerra.go.core.usecase.LoadRemoteSyncSettings
 import com.eskerra.go.core.usecase.LoadSyncStatus
 import com.eskerra.go.core.usecase.ManualSyncNow
 import com.eskerra.go.core.usecase.SaveNote
+import com.eskerra.go.core.usecase.SaveRemoteSyncSettings
+import com.eskerra.go.core.usecase.TestRemoteConnection
+import com.eskerra.go.core.usecase.UpdateSyncToken
 import com.eskerra.go.data.credentials.AndroidKeystoreTokenCipher
 import com.eskerra.go.data.credentials.EncryptedCredentialStore
 import com.eskerra.go.data.git.JGitRemoteSyncRepository
@@ -21,6 +26,7 @@ import com.eskerra.go.data.notes.FileNoteContentRepository
 import com.eskerra.go.data.notes.FileNoteRegistryRepository
 import com.eskerra.go.data.notes.FileNoteWriteRepository
 import com.eskerra.go.data.workspace.DataStoreWorkspaceStore
+import com.eskerra.go.data.workspace.DefaultRemoteSyncSettingsRepository
 import com.eskerra.go.data.workspace.DefaultWorkspaceSetupCompletion
 import com.eskerra.go.data.workspace.DefaultWorkspaceSetupRepository
 
@@ -76,6 +82,17 @@ class MainActivity : ComponentActivity() {
             loadSyncStatus = loadSyncStatus
         )
 
+        val remoteSyncSettingsRepository = DefaultRemoteSyncSettingsRepository(
+            workspaceStore = workspaceStore,
+            credentialStore = credentialStore,
+            remoteSyncRepository = remoteSyncRepository
+        )
+        val loadRemoteSyncSettings = LoadRemoteSyncSettings(remoteSyncSettingsRepository)
+        val saveRemoteSyncSettings = SaveRemoteSyncSettings(remoteSyncSettingsRepository)
+        val updateSyncToken = UpdateSyncToken(remoteSyncSettingsRepository)
+        val clearRemoteSyncSettings = ClearRemoteSyncSettings(remoteSyncSettingsRepository)
+        val testRemoteConnection = TestRemoteConnection(remoteSyncSettingsRepository)
+
         setContent {
             AppRoot(
                 workspaceStore = workspaceStore,
@@ -88,7 +105,12 @@ class MainActivity : ComponentActivity() {
                 saveNote = saveNote,
                 loadGitStatusSummary = loadGitStatusSummary,
                 loadSyncStatus = loadSyncStatus,
-                manualSyncNow = manualSyncNow
+                manualSyncNow = manualSyncNow,
+                loadRemoteSyncSettings = loadRemoteSyncSettings,
+                saveRemoteSyncSettings = saveRemoteSyncSettings,
+                updateSyncToken = updateSyncToken,
+                clearRemoteSyncSettings = clearRemoteSyncSettings,
+                testRemoteConnection = testRemoteConnection
             )
         }
     }

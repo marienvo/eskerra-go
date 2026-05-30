@@ -9,6 +9,7 @@ import org.eclipse.jgit.api.TransportCommand
 import org.eclipse.jgit.api.TransportConfigCallback
 import org.eclipse.jgit.lib.PersonIdent
 import org.eclipse.jgit.transport.RemoteRefUpdate
+import org.eclipse.jgit.transport.URIish
 
 /**
  * JGit-backed [WorkspaceGitRepository] for the Step 2 spike.
@@ -160,6 +161,39 @@ class JGitWorkspaceRepository(
                 .call()
             if (!result.isSuccessful) {
                 error("pull was not a fast-forward: ${result.mergeResult?.mergeStatus}")
+            }
+        }
+    }
+
+    override fun configureSanitizedOrigin(workingDir: File, remoteUri: String): Result<Unit> =
+        runCatching {
+            Git.open(workingDir).use { git ->
+                val remotes = git.remoteList().call().map { it.name }
+                if (ORIGIN in remotes) {
+                    git.remoteSetUrl()
+                        .setRemoteName(ORIGIN)
+                        .setRemoteUri(URIish(remoteUri))
+                        .call()
+                } else {
+                    git.remoteAdd()
+                        .setName(ORIGIN)
+                        .setUri(URIish(remoteUri))
+                        .call()
+                }
+            }
+        }
+
+    override fun readOriginUrl(workingDir: File): Result<String?> = runCatching {
+        Git.open(workingDir).use { git ->
+            git.repository.config.getString("remote", ORIGIN, "url")
+        }
+    }
+
+    override fun clearSanitizedOrigin(workingDir: File): Result<Unit> = runCatching {
+        Git.open(workingDir).use { git ->
+            val hasOrigin = git.remoteList().call().any { it.name == ORIGIN }
+            if (hasOrigin) {
+                git.remoteRemove().setRemoteName(ORIGIN).call()
             }
         }
     }

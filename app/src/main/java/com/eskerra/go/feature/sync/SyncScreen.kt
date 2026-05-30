@@ -27,6 +27,7 @@ fun SyncScreen(
     state: SyncUiState,
     onSyncNow: () -> Unit,
     onRetry: () -> Unit,
+    onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -60,12 +61,25 @@ fun SyncScreen(
                     remoteUri = state.remoteUri,
                     branch = state.branch
                 )
+                if (state.remoteUri == null) {
+                    Text(
+                        text = "Configure remote sync before syncing.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
                 Button(
                     onClick = onSyncNow,
                     modifier = Modifier.fillMaxWidth(),
                     enabled = state.remoteUri != null
                 ) {
                     Text("Sync now")
+                }
+                Button(
+                    onClick = onOpenSettings,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Remote sync settings")
                 }
             }
 

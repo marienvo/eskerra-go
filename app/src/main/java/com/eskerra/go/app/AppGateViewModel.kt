@@ -35,6 +35,13 @@ class AppGateViewModel(private val workspaceStore: WorkspaceStore, private val f
         _gateState.value = AppGateState.Ready(config)
     }
 
+    /** Updates in-memory config after remote sync settings change. */
+    fun updateReadyConfig(config: WorkspaceConfig) {
+        if (_gateState.value is AppGateState.Ready) {
+            _gateState.value = AppGateState.Ready(config)
+        }
+    }
+
     companion object {
         fun factory(workspaceStore: WorkspaceStore, filesDir: File): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {

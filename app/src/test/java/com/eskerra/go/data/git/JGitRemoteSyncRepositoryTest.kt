@@ -155,6 +155,53 @@ class JGitRemoteSyncRepositoryTest {
         assertEquals(SyncStatusState.DirtyLocalChanges, summary.state)
     }
 
+    @Test
+    fun configureSanitizedOrigin_setsUrlWithoutCredentials() {
+        val dir = temp.newFolder("workspace")
+        gitRepo.initOrOpen(dir).getOrThrow()
+        val remoteUri = newBareRemoteUri("origin.git")
+
+        remoteSync.configureSanitizedOrigin(dir, remoteUri).getOrThrow()
+
+        val configText = File(dir, ".git/config").readText()
+        assertTrue(configText.contains("[remote \"origin\"]"))
+        val urlLine = configText.lines().first { it.trim().startsWith("url =") }
+        assertTrue(urlLine.contains("file:"))
+        assertFalse(urlLine.contains("@"))
+    }
+
+    @Test
+    fun readOriginUrl_returnsConfiguredOrigin() {
+        val dir = temp.newFolder("workspace")
+        gitRepo.initOrOpen(dir).getOrThrow()
+        val remoteUri = newBareRemoteUri("origin-read.git")
+        remoteSync.configureSanitizedOrigin(dir, remoteUri).getOrThrow()
+
+        val originUrl = remoteSync.readOriginUrl(dir).getOrThrow()
+
+        requireNotNull(originUrl)
+        assertTrue(originUrl.contains("file:"))
+        assertTrue(originUrl.contains("origin-read.git"))
+    }
+
+    @Test
+    fun probeRemoteConnection_listsRemoteWithoutLocalFetch() {
+        val remoteUri = newBareRemoteUri("remote-probe.git")
+        val branch = seedRemote(remoteUri)
+
+        remoteSync.probeRemoteConnection(remoteUri, branch, null).getOrThrow()
+    }
+
+    @Test
+    fun probeRemoteConnection_unknownBranchFails() {
+        val remoteUri = newBareRemoteUri("remote-missing.git")
+        seedRemote(remoteUri)
+
+        val result = remoteSync.probeRemoteConnection(remoteUri, "missing-branch", null)
+
+        assertTrue(result.isFailure)
+    }
+
     private fun seedRemote(remoteUri: String): String {
         val producer = temp.newFolder("seed-producer")
         gitRepo.cloneFrom(remoteUri, producer).getOrThrow()

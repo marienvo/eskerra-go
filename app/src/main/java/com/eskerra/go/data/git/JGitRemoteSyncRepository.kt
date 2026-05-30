@@ -107,6 +107,33 @@ class JGitRemoteSyncRepository(
             }
         }
 
+    override fun configureSanitizedOrigin(workingDir: File, remoteUri: String): Result<Unit> =
+        gitRepository.configureSanitizedOrigin(workingDir, remoteUri)
+
+    override fun probeRemoteConnection(
+        remoteUri: String,
+        branch: String,
+        httpsToken: String?
+    ): Result<Unit> = runCatching {
+        val lsRemote = Git.lsRemoteRepository().setRemote(remoteUri)
+        httpsToken?.let { token ->
+            lsRemote.setTransportConfigCallback(
+                HttpsTokenCredentialsProviderFactory.transportConfigCallback(token)
+            )
+        }
+        val refs = lsRemote.call()
+        val branchRef = "refs/heads/$branch"
+        if (refs.none { it.name == branchRef }) {
+            error("remote branch not found: $branch")
+        }
+    }
+
+    override fun clearSanitizedOrigin(workingDir: File): Result<Unit> =
+        gitRepository.clearSanitizedOrigin(workingDir)
+
+    override fun readOriginUrl(workingDir: File): Result<String?> =
+        gitRepository.readOriginUrl(workingDir)
+
     override fun buildStatusSummary(
         workspaceStatus: GitWorkspaceStatus,
         comparison: RemoteBranchComparison?

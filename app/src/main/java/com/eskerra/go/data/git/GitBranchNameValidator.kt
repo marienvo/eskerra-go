@@ -2,9 +2,12 @@ package com.eskerra.go.data.git
 
 import com.eskerra.go.data.workspace.WorkspaceSetupError
 import com.eskerra.go.data.workspace.WorkspaceSetupException
+import org.eclipse.jgit.lib.Repository
 
 /** Conservative branch-name validation before any JGit remote call. */
 object GitBranchNameValidator {
+
+    private const val HEADS_PREFIX = "refs/heads/"
 
     fun validate(branch: String): Result<Unit> {
         if (branch.trim().isEmpty()) {
@@ -28,10 +31,19 @@ object GitBranchNameValidator {
         if (branch.startsWith("/")) {
             return invalidBranch()
         }
+        if (branch.endsWith("/") || branch.endsWith(".")) {
+            return invalidBranch()
+        }
         if (branch.endsWith(".lock")) {
             return invalidBranch()
         }
         if (looksLikeRefspec(branch)) {
+            return invalidBranch()
+        }
+        if (containsInvalidRefSyntax(branch)) {
+            return invalidBranch()
+        }
+        if (!Repository.isValidRefName("$HEADS_PREFIX$branch")) {
             return invalidBranch()
         }
         return Result.success(Unit)
@@ -42,4 +54,12 @@ object GitBranchNameValidator {
 
     private fun looksLikeRefspec(branch: String): Boolean =
         branch.contains(':') || branch.startsWith("refs/") || branch.contains('^')
+
+    private fun containsInvalidRefSyntax(branch: String): Boolean = branch == "@" ||
+        branch.contains("@{") ||
+        branch.contains('~') ||
+        branch.contains('?') ||
+        branch.contains('*') ||
+        branch.contains('[') ||
+        branch.contains('@')
 }

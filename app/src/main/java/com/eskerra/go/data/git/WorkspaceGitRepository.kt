@@ -73,4 +73,16 @@ interface WorkspaceGitRepository : WorkspaceGitStatusRepository {
 
     /** Push the current branch to the configured `origin` remote. */
     fun push(workingDir: File): Result<Unit>
+
+    /**
+     * Configure or update `origin` with a sanitized [remoteUri] only. Credentials
+     * must be supplied separately through transport callbacks, never in the URL.
+     */
+    fun configureSanitizedOrigin(workingDir: File, remoteUri: String): Result<Unit>
+
+    /** Removes the `origin` remote without deleting the repository or working tree. */
+    fun clearSanitizedOrigin(workingDir: File): Result<Unit>
+
+    /** Returns the sanitized `origin` URL from `.git/config`, or null when unset. */
+    fun readOriginUrl(workingDir: File): Result<String?>
 }

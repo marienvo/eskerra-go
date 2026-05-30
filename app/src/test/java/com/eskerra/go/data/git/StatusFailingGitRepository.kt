@@ -35,4 +35,13 @@ class StatusFailingGitRepository(
         delegate.pullFastForwardOnly(workingDir)
 
     override fun push(workingDir: File): Result<Unit> = delegate.push(workingDir)
+
+    override fun configureSanitizedOrigin(workingDir: File, remoteUri: String): Result<Unit> =
+        delegate.configureSanitizedOrigin(workingDir, remoteUri)
+
+    override fun clearSanitizedOrigin(workingDir: File): Result<Unit> =
+        delegate.clearSanitizedOrigin(workingDir)
+
+    override fun readOriginUrl(workingDir: File): Result<String?> =
+        delegate.readOriginUrl(workingDir)
 }

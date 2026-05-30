@@ -8,7 +8,8 @@ import java.io.File
 class FailingRemoteSyncRepository(
     private val delegate: RemoteSyncRepository = JGitRemoteSyncRepository(),
     private val fetchError: Throwable? = null,
-    private val pushError: Throwable? = null
+    private val pushError: Throwable? = null,
+    private val probeError: Throwable? = null
 ) : RemoteSyncRepository by delegate {
 
     override fun fetch(workingDir: File, httpsToken: String?): Result<Unit> {
@@ -19,6 +20,15 @@ class FailingRemoteSyncRepository(
     override fun push(workingDir: File, branch: String, httpsToken: String?): Result<Unit> {
         pushError?.let { return Result.failure(it) }
         return delegate.push(workingDir, branch, httpsToken)
+    }
+
+    override fun probeRemoteConnection(
+        remoteUri: String,
+        branch: String,
+        httpsToken: String?
+    ): Result<Unit> {
+        probeError?.let { return Result.failure(it) }
+        return delegate.probeRemoteConnection(remoteUri, branch, httpsToken)
     }
 }
 

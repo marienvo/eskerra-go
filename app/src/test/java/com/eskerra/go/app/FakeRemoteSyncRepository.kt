@@ -64,6 +64,19 @@ class FakeRemoteSyncRepository(
         workspaceStatus: GitWorkspaceStatus,
         comparison: RemoteBranchComparison?
     ): SyncStatusSummary = fixedStatus
+
+    override fun configureSanitizedOrigin(workingDir: File, remoteUri: String): Result<Unit> =
+        Result.success(Unit)
+
+    override fun probeRemoteConnection(
+        remoteUri: String,
+        branch: String,
+        httpsToken: String?
+    ): Result<Unit> = Result.success(Unit)
+
+    override fun clearSanitizedOrigin(workingDir: File): Result<Unit> = Result.success(Unit)
+
+    override fun readOriginUrl(workingDir: File): Result<String?> = Result.success(null)
 }
 
 class FakeRegistryRepository : NoteRegistryRepository {

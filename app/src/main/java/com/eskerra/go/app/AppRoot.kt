@@ -12,14 +12,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.eskerra.go.core.usecase.ClearRemoteSyncSettings
 import com.eskerra.go.core.usecase.CreateInboxNote
 import com.eskerra.go.core.usecase.LoadEditableNote
 import com.eskerra.go.core.usecase.LoadGitStatusSummary
 import com.eskerra.go.core.usecase.LoadInboxSummaries
 import com.eskerra.go.core.usecase.LoadNoteForReading
+import com.eskerra.go.core.usecase.LoadRemoteSyncSettings
 import com.eskerra.go.core.usecase.LoadSyncStatus
 import com.eskerra.go.core.usecase.ManualSyncNow
 import com.eskerra.go.core.usecase.SaveNote
+import com.eskerra.go.core.usecase.SaveRemoteSyncSettings
+import com.eskerra.go.core.usecase.TestRemoteConnection
+import com.eskerra.go.core.usecase.UpdateSyncToken
 import com.eskerra.go.data.workspace.WorkspaceSetupCompletion
 import com.eskerra.go.data.workspace.WorkspaceStore
 import com.eskerra.go.feature.setup.WorkspaceSetupScreen
@@ -42,7 +47,12 @@ fun AppRoot(
     saveNote: SaveNote,
     loadGitStatusSummary: LoadGitStatusSummary,
     loadSyncStatus: LoadSyncStatus,
-    manualSyncNow: ManualSyncNow
+    manualSyncNow: ManualSyncNow,
+    loadRemoteSyncSettings: LoadRemoteSyncSettings,
+    saveRemoteSyncSettings: SaveRemoteSyncSettings,
+    updateSyncToken: UpdateSyncToken,
+    clearRemoteSyncSettings: ClearRemoteSyncSettings,
+    testRemoteConnection: TestRemoteConnection
 ) {
     EskerraGoTheme {
         val gateViewModel: AppGateViewModel = viewModel(
@@ -103,7 +113,13 @@ fun AppRoot(
                 saveNote = saveNote,
                 loadGitStatusSummary = loadGitStatusSummary,
                 loadSyncStatus = loadSyncStatus,
-                manualSyncNow = manualSyncNow
+                manualSyncNow = manualSyncNow,
+                loadRemoteSyncSettings = loadRemoteSyncSettings,
+                saveRemoteSyncSettings = saveRemoteSyncSettings,
+                updateSyncToken = updateSyncToken,
+                clearRemoteSyncSettings = clearRemoteSyncSettings,
+                testRemoteConnection = testRemoteConnection,
+                onConfigUpdated = gateViewModel::updateReadyConfig
             )
         }
     }

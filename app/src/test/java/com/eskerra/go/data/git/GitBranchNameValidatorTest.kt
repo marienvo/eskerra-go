@@ -72,4 +72,16 @@ class GitBranchNameValidatorTest {
         val result = GitBranchNameValidator.validate("feature/my-work")
         assertTrue(result.isSuccess)
     }
+
+    @Test
+    fun validate_rejectsInvalidGitRefSyntax() {
+        assertTrue(GitBranchNameValidator.validate("main/").isFailure)
+        assertTrue(GitBranchNameValidator.validate("main.").isFailure)
+        assertTrue(GitBranchNameValidator.validate("main@{upstream}").isFailure)
+        assertTrue(GitBranchNameValidator.validate("main~1").isFailure)
+        assertTrue(GitBranchNameValidator.validate("main?").isFailure)
+        assertTrue(GitBranchNameValidator.validate("main*").isFailure)
+        assertTrue(GitBranchNameValidator.validate("main[").isFailure)
+        assertTrue(GitBranchNameValidator.validate("@").isFailure)
+    }
 }
