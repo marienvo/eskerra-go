@@ -84,6 +84,13 @@ class DefaultRemoteSyncSettingsRepository(
                 return@withContext Result.failure(mapGitFailure(error, trimmedBranch))
             }
 
+        remoteSyncRepository
+            .ensureLocalBranch(workspaceDir, trimmedBranch, httpsToken)
+            .getOrElse { error ->
+                restoreOrigin(workspaceDir, previousOriginUrl)
+                return@withContext Result.failure(mapGitFailure(error, trimmedBranch))
+            }
+
         val updated = config.copy(
             remoteUri = sanitizedUri,
             branch = trimmedBranch

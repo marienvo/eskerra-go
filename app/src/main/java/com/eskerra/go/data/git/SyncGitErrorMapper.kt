@@ -13,6 +13,8 @@ object SyncGitErrorMapper {
         val syncError: SyncError = when {
             isAuthenticationError(text) -> SyncError.AuthenticationFailed
             isRemoteUnavailableError(text) -> SyncError.RemoteUnavailable
+            isLocalBranchNotFound(text) -> SyncError.LocalBranchNotFound(branchName(text, branch))
+            isRemoteBranchNotFound(text) -> SyncError.RemoteBranchNotFound(branchName(text, branch))
             isPushRejected(text) -> SyncError.PushRejected
             isDiverged(text) -> SyncError.Diverged
             isConflictRisk(text) -> SyncError.ConflictRisk
@@ -42,4 +44,16 @@ object SyncGitErrorMapper {
         message.contains("manual", ignoreCase = true) ||
             message.contains("unmerged", ignoreCase = true) ||
             message.contains("MERGING", ignoreCase = true)
+
+    private fun isLocalBranchNotFound(message: String): Boolean =
+        message.contains("local branch not found", ignoreCase = true)
+
+    private fun isRemoteBranchNotFound(message: String): Boolean =
+        message.contains("remote branch not found", ignoreCase = true) ||
+            message.contains("remote tracking branch not found", ignoreCase = true)
+
+    private fun branchName(message: String, fallback: String): String {
+        val suffix = message.substringAfterLast(':').trim()
+        return suffix.ifBlank { fallback }.ifBlank { "branch" }
+    }
 }

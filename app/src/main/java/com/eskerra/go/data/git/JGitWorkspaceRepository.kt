@@ -48,7 +48,11 @@ class JGitWorkspaceRepository(
         if (entries != null && entries.isNotEmpty()) {
             error("workingDir is not empty and not a Git repository: $workingDir")
         }
-        Git.init().setDirectory(workingDir).call().close()
+        Git.init()
+            .setDirectory(workingDir)
+            .setInitialBranch("main")
+            .call()
+            .close()
     }
 
     override fun cloneFrom(

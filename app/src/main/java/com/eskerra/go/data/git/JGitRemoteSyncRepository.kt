@@ -54,6 +54,12 @@ class JGitRemoteSyncRepository(
         }
     }
 
+    override fun ensureLocalBranch(
+        workingDir: File,
+        branch: String,
+        httpsToken: String?
+    ): Result<Unit> = GitLocalBranchAlignment.ensure(workingDir, branch, httpsToken)
+
     override fun compareWithRemote(
         workingDir: File,
         branch: String

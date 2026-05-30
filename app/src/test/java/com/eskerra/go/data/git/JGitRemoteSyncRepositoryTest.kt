@@ -193,6 +193,39 @@ class JGitRemoteSyncRepositoryTest {
     }
 
     @Test
+    fun ensureLocalBranch_createsTrackingBranchWhenLocalHeadDiffers() {
+        val remoteUri = newBareRemoteUri("remote-ensure.git")
+        val branch = seedRemote(remoteUri)
+
+        val consumer = temp.newFolder("consumer-init")
+        org.eclipse.jgit.api.Git.init()
+            .setDirectory(consumer)
+            .setInitialBranch("master")
+            .call()
+            .close()
+        assertEquals("master", gitRepo.status(consumer).getOrThrow().branch)
+
+        remoteSync.configureSanitizedOrigin(consumer, remoteUri).getOrThrow()
+        remoteSync.ensureLocalBranch(consumer, branch, null).getOrThrow()
+
+        assertEquals(branch, gitRepo.status(consumer).getOrThrow().branch)
+        val comparison = remoteSync.compareWithRemote(consumer, branch).getOrThrow()
+        assertFalse(comparison.remoteBranchMissing)
+    }
+
+    @Test
+    fun ensureLocalBranch_checkoutsExistingLocalBranch() {
+        val remoteUri = newBareRemoteUri("remote-checkout.git")
+        val branch = seedRemote(remoteUri)
+        val consumer = temp.newFolder("consumer")
+        gitRepo.cloneFrom(remoteUri, consumer).getOrThrow()
+
+        remoteSync.ensureLocalBranch(consumer, branch, null).getOrThrow()
+
+        assertEquals(branch, gitRepo.status(consumer).getOrThrow().branch)
+    }
+
+    @Test
     fun probeRemoteConnection_unknownBranchFails() {
         val remoteUri = newBareRemoteUri("remote-missing.git")
         seedRemote(remoteUri)

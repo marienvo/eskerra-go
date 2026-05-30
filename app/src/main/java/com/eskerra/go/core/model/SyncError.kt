@@ -49,6 +49,11 @@ sealed interface SyncError {
         override fun message() = "Branch \"$branch\" was not found on the remote."
     }
 
+    data class LocalBranchNotFound(val branch: String) : SyncError {
+        override fun message() =
+            "Branch \"$branch\" is not checked out locally. Update sync settings or fetch the remote branch."
+    }
+
     data object Diverged : SyncError {
         override fun message() =
             "Sync stopped because local and remote histories have diverged. Manual Git repair is required for this PoC."

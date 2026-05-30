@@ -59,7 +59,8 @@ fun SyncScreen(
                 StatusCard(
                     status = state.status,
                     remoteUri = state.remoteUri,
-                    branch = state.branch
+                    branch = state.branch,
+                    checkedOutBranch = state.status.branch
                 )
                 if (state.remoteUri == null) {
                     Text(
@@ -121,7 +122,8 @@ fun SyncScreen(
                     StatusCard(
                         status = status,
                         remoteUri = null,
-                        branch = status.branch.orEmpty()
+                        branch = status.branch.orEmpty(),
+                        checkedOutBranch = status.branch
                     )
                 }
                 Text(
@@ -137,15 +139,32 @@ fun SyncScreen(
 }
 
 @Composable
-private fun StatusCard(status: SyncStatusSummary, remoteUri: String?, branch: String) {
+private fun StatusCard(
+    status: SyncStatusSummary,
+    remoteUri: String?,
+    branch: String,
+    checkedOutBranch: String? = null
+) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(text = "Branch", style = MaterialTheme.typography.labelMedium)
+            val mismatch = checkedOutBranch != null &&
+                branch.isNotBlank() &&
+                checkedOutBranch.isNotBlank() &&
+                branch != checkedOutBranch
             Text(
                 text = branch.ifBlank { "—" },
                 style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(bottom = 8.dp)
+                modifier = Modifier.padding(bottom = if (mismatch) 4.dp else 8.dp)
             )
+            if (mismatch) {
+                Text(
+                    text = "Checked out on \"$checkedOutBranch\". Sync uses \"$branch\".",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+            }
             if (remoteUri != null) {
                 Text(text = "Remote", style = MaterialTheme.typography.labelMedium)
                 Text(

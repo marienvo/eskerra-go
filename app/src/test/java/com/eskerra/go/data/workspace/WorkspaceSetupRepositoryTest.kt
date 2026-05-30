@@ -42,7 +42,7 @@ class WorkspaceSetupRepositoryTest {
         assertEquals("Local Notes", config.name)
         assertEquals(WorkspacePaths.DEFAULT_RELATIVE_PATH, config.relativePath)
         assertNull(config.remoteUri)
-        assertTrue(config.branch.isNotBlank())
+        assertEquals("main", config.branch)
 
         val workspaceDir = File(filesDir, WorkspacePaths.DEFAULT_RELATIVE_PATH)
         assertTrue(WorkspacePaths.isValidGitWorkspace(workspaceDir))

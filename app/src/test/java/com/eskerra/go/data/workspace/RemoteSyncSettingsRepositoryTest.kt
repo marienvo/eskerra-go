@@ -96,6 +96,37 @@ class RemoteSyncSettingsRepositoryTest {
     }
 
     @Test
+    fun saveSettings_alignsLocalCheckoutToConfiguredBranch() = runTest {
+        val filesDir = temp.newFolder("files")
+        val remote = preparedRemote()
+        val workspaceDir = File(filesDir, WorkspacePaths.DEFAULT_RELATIVE_PATH)
+        workspaceDir.mkdirs()
+        org.eclipse.jgit.api.Git.init()
+            .setDirectory(workspaceDir)
+            .setInitialBranch("master")
+            .call()
+            .close()
+        val config = WorkspaceConfig(
+            name = "Notes",
+            relativePath = WorkspacePaths.DEFAULT_RELATIVE_PATH,
+            remoteUri = null,
+            branch = "master",
+            setupCompletedAtEpochMs = 0L
+        )
+
+        val result = repository().saveSettings(
+            config = config,
+            remoteUri = remote.remoteUri,
+            branch = remote.branch,
+            replacementToken = null,
+            filesDir = filesDir
+        )
+
+        assertTrue(result.isSuccess)
+        assertEquals(remote.branch, gitRepo.status(workspaceDir).getOrThrow().branch)
+    }
+
+    @Test
     fun saveSettings_httpsRemote_persistsSanitizedUrlAndBranch() = runTest {
         val filesDir = temp.newFolder("files")
         val workspaceStore = FakeWorkspaceStore()

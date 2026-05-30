@@ -40,6 +40,12 @@ class FakeRemoteSyncRepository(
 
     override fun fetch(workingDir: File, httpsToken: String?): Result<Unit> = Result.success(Unit)
 
+    override fun ensureLocalBranch(
+        workingDir: File,
+        branch: String,
+        httpsToken: String?
+    ): Result<Unit> = Result.success(Unit)
+
     override fun compareWithRemote(
         workingDir: File,
         branch: String

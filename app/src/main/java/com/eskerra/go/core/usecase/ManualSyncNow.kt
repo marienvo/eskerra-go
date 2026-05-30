@@ -85,6 +85,12 @@ class ManualSyncNow(
             return Result.failure(SyncException(SyncError.NonInboxLocalChanges))
         }
 
+        remoteSyncRepository
+            .ensureLocalBranch(workspaceDir, branch, httpsToken)
+            .getOrElse { error ->
+                return Result.failure(SyncGitErrorMapper.mapFailure(error, branch))
+            }
+
         var committed = false
         var commitId: String? = null
         if (partition.inboxPaths.isNotEmpty()) {

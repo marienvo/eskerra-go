@@ -40,6 +40,11 @@ sealed interface RemoteSyncSettingsError {
         override fun message() = "Branch \"$branch\" was not found on the remote."
     }
 
+    data class LocalBranchNotFound(val branch: String) : RemoteSyncSettingsError {
+        override fun message() =
+            "Branch \"$branch\" is not available locally. Check the branch name and remote."
+    }
+
     data object MetadataSaveFailed : RemoteSyncSettingsError {
         override fun message() = "Could not save remote sync settings."
     }
@@ -63,6 +68,7 @@ sealed interface RemoteSyncSettingsError {
             SyncError.AuthenticationFailed -> AuthenticationFailed
             SyncError.RemoteUnavailable -> RemoteUnavailable
             is SyncError.RemoteBranchNotFound -> RemoteBranchNotFound(error.branch)
+            is SyncError.LocalBranchNotFound -> LocalBranchNotFound(error.branch)
             is SyncError.GitFailed -> GitFailed(error.safeMessage)
             else -> GitFailed("Remote sync settings failed.")
         }
