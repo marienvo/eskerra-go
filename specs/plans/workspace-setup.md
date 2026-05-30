@@ -30,6 +30,12 @@ is unchanged.
 
 HTTPS credentials and Android Keystore are deferred in Step 3.
 
+## Persistence failure rollback
+
+If credential or metadata persistence fails after Git setup succeeds,
+`DefaultWorkspaceSetupCompletion` removes the workspace directory (and any saved
+credential) so the user can retry setup without clearing app data.
+
 ## Boundaries
 
 - One workspace only; path is fixed to `workspace/` under app-private storage

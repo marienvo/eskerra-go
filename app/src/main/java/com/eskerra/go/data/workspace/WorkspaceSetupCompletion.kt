@@ -44,6 +44,7 @@ class DefaultWorkspaceSetupCompletion(
         var credentialWasSaved = false
         if (trimmedCredential.isNotEmpty()) {
             credentialStore.saveToken(config.relativePath, trimmedCredential).getOrElse { error ->
+                rollbackWorkspace(filesDir, config)
                 return Result.failure(
                     WorkspaceSetupException(
                         WorkspaceSetupError.CredentialSaveFailed(error.message)
@@ -53,6 +54,7 @@ class DefaultWorkspaceSetupCompletion(
             credentialWasSaved = true
         } else {
             credentialStore.clear(config.relativePath).getOrElse { error ->
+                rollbackWorkspace(filesDir, config)
                 return Result.failure(
                     WorkspaceSetupException(
                         WorkspaceSetupError.CredentialSaveFailed(error.message)
@@ -65,12 +67,25 @@ class DefaultWorkspaceSetupCompletion(
             workspaceStore.save(config)
             Result.success(config)
         } catch (error: Exception) {
-            if (credentialWasSaved) {
-                credentialStore.clear(config.relativePath)
-            }
+            rollbackAfterMetadataSaveFailure(filesDir, config, credentialWasSaved)
             Result.failure(
                 WorkspaceSetupException(WorkspaceSetupError.MetadataSaveFailed(error.message))
             )
         }
+    }
+
+    private suspend fun rollbackAfterMetadataSaveFailure(
+        filesDir: java.io.File,
+        config: WorkspaceConfig,
+        credentialWasSaved: Boolean
+    ) {
+        if (credentialWasSaved) {
+            credentialStore.clear(config.relativePath)
+        }
+        rollbackWorkspace(filesDir, config)
+    }
+
+    private fun rollbackWorkspace(filesDir: java.io.File, config: WorkspaceConfig) {
+        WorkspacePaths.removeWorkspaceDirectory(filesDir, config.relativePath)
     }
 }

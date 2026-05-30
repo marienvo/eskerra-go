@@ -56,4 +56,10 @@ object WorkspacePaths {
         }
         return Result.success(Unit)
     }
+
+    fun removeWorkspaceDirectory(filesDir: File, relativePath: String) {
+        resolve(filesDir, relativePath).getOrNull()
+            ?.takeIf { it.exists() }
+            ?.deleteRecursively()
+    }
 }
