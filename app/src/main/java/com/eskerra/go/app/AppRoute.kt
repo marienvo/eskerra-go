@@ -1,6 +1,5 @@
 package com.eskerra.go.app
 
-import android.net.Uri
 import com.eskerra.go.core.model.NoteId
 
 /**
@@ -19,8 +18,8 @@ object AppRoute {
     const val NOTE_PATTERN = "note/{$NOTE_ARG}"
 
     /** Builds a concrete note route, encoding the id for safe use in a URL path. */
-    fun note(id: NoteId): String = "note/${Uri.encode(id.value)}"
+    fun note(id: NoteId): String = "note/${NoteRouteCodec.encode(id.value)}"
 
     /** Decodes the raw route argument back into a [NoteId]. */
-    fun decodeNoteId(raw: String): NoteId = NoteId(Uri.decode(raw))
+    fun decodeNoteId(raw: String): NoteId = NoteId(NoteRouteCodec.decode(raw))
 }
