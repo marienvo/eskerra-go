@@ -48,6 +48,13 @@ class WorkspaceSetupErrorTest {
     }
 
     @Test
+    fun credentialBearingRemoteUri_hasStableMessageWithoutUrl() {
+        val message = WorkspaceSetupError.CredentialBearingRemoteUri.message()
+        assertTrue(message.contains("username"))
+        assertFalse(message.contains("@"))
+    }
+
+    @Test
     fun userFacingMessagesDoNotIncludeRawDetails() {
         val rawDetail = "/tmp/private/token-secret.git"
         val errors = listOf(

@@ -5,8 +5,10 @@ import java.io.File
 
 /**
  * PoC credential store. Tokens live in a dedicated app-private directory and are
- * never written to workspace DataStore metadata. Production would add Keystore-backed
- * encryption; this implementation keeps the seam explicit and testable.
+ * never written to workspace DataStore metadata.
+ *
+ * Security follow-up: tokens are plaintext on disk under [CREDENTIALS_DIR]. Before
+ * real credentials, migrate to Android Keystore-backed encryption (or EncryptedFile).
  */
 class AppPrivateCredentialStore(private val filesDir: File) : CredentialStore {
 

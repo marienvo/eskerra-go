@@ -178,4 +178,50 @@ class WorkspaceSetupCompletionTest {
         )
         assertFalse(saved.remoteUri?.contains("pat-12345") == true)
     }
+
+    @Test
+    fun completeAndPersist_rejectsCredentialBearingRemoteBeforePersist() = runTest {
+        val filesDir = temp.newFolder("files")
+        val workspaceStore = FakeWorkspaceStore()
+        val credentialStore = FakeCredentialStore()
+        val workspaceDir = workspaceDir(filesDir)
+
+        val result = completion(workspaceStore, credentialStore).completeAndPersist(
+            mode = WorkspaceSetupMode.Clone,
+            name = "Notes",
+            branch = "main",
+            remoteUri = "https://mysecrettoken@example.com/repo.git",
+            credential = "pat-12345",
+            filesDir = filesDir
+        )
+
+        assertTrue(result.isFailure)
+        val error = result.exceptionOrNull() as WorkspaceSetupException
+        assertTrue(error.error is WorkspaceSetupError.CredentialBearingRemoteUri)
+        assertFalse(error.error.message().contains("mysecrettoken"))
+        assertFalse(error.error.message().contains("pat-12345"))
+        assertNull(workspaceStore.read())
+        assertTrue(credentialStore.tokens.isEmpty())
+        assertFalse(WorkspacePaths.isValidGitWorkspace(workspaceDir))
+    }
+
+    @Test
+    fun completeAndPersist_tokenNotWrittenToGitConfig() = runTest {
+        val filesDir = temp.newFolder("files")
+        val workspaceStore = FakeWorkspaceStore()
+        val credentialStore = FakeCredentialStore()
+
+        completion(workspaceStore, credentialStore).completeAndPersist(
+            mode = WorkspaceSetupMode.InitializeLocal,
+            name = "Notes",
+            branch = "",
+            remoteUri = null,
+            credential = "pat-12345",
+            filesDir = filesDir
+        )
+
+        val gitConfig = File(workspaceDir(filesDir), ".git/config")
+        assertTrue(gitConfig.isFile)
+        assertFalse(gitConfig.readText().contains("pat-12345"))
+    }
 }

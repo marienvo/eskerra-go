@@ -58,7 +58,7 @@ class WorkspaceSetupViewModel(
             )
             result.fold(
                 onSuccess = { config ->
-                    uiState = uiState.copy(isSubmitting = false)
+                    uiState = uiState.copy(isSubmitting = false, credential = "")
                     onSuccess(config)
                 },
                 onFailure = { error ->

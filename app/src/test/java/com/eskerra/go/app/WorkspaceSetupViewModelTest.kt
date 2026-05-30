@@ -6,6 +6,7 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -43,5 +44,21 @@ class WorkspaceSetupViewModelTest {
         assertTrue(
             viewModel.uiState.errorMessage?.startsWith("Could not save workspace settings") == true
         )
+    }
+
+    @Test
+    fun submit_success_clearsCredentialFromUiState() = runBlocking {
+        val filesDir = temp.newFolder("files")
+        val viewModel = WorkspaceSetupViewModel(
+            setupCompletion = SuccessWorkspaceSetupCompletion(),
+            filesDir = filesDir,
+            recoveryMessage = null
+        )
+        viewModel.onNameChange("Notes")
+        viewModel.onCredentialChange("pat-12345")
+
+        viewModel.submit { }
+
+        assertEquals("", viewModel.uiState.credential)
     }
 }

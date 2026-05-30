@@ -150,4 +150,25 @@ class JGitWorkspaceLocalTest {
         assertTrue(result.isFailure)
         assertFalse(escapeTarget.exists())
     }
+
+    @Test
+    fun writeFile_rejectsGitSegmentPaths() {
+        val dir = temp.newFolder("workspace")
+        repo.initOrOpen(dir).getOrThrow()
+
+        val blockedPaths = listOf(
+            ".git/config",
+            ".git/hooks/pre-commit",
+            "notes/.git/config",
+            "nested/.git/HEAD"
+        )
+
+        blockedPaths.forEach { relativePath ->
+            val result = repo.writeFile(dir, relativePath, "nope")
+            assertTrue("expected failure for $relativePath", result.isFailure)
+        }
+
+        assertFalse(File(dir, "notes/.git/config").exists())
+        assertFalse(File(dir, "nested/.git/HEAD").exists())
+    }
 }

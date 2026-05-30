@@ -21,6 +21,10 @@ sealed class WorkspaceSetupError {
             "Only file:// remotes are supported in this step. HTTPS auth is not wired yet."
     }
 
+    data object CredentialBearingRemoteUri : WorkspaceSetupError() {
+        override fun message() = "Remote URL must not include embedded username or password."
+    }
+
     data class BranchNotFound(val branch: String) : WorkspaceSetupError() {
         override fun message() = "Branch \"$branch\" was not found on the remote."
     }

@@ -67,6 +67,9 @@ class DefaultWorkspaceSetupRepository(private val gitRepository: WorkspaceGitRep
         if (uri.isBlank()) {
             return Result.failure(WorkspaceSetupException(WorkspaceSetupError.BlankRemoteUri))
         }
+        RemoteUriSecurity.validateNoEmbeddedCredentials(uri).getOrElse { error ->
+            return Result.failure(error)
+        }
         if (!isFileRemoteUri(uri)) {
             return Result.failure(
                 WorkspaceSetupException(WorkspaceSetupError.UnsupportedRemoteScheme)

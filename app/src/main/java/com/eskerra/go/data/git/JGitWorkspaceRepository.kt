@@ -95,11 +95,12 @@ class JGitWorkspaceRepository(
                 "relativePath must be relative: $relativePath"
             }
             val segments = relativePath.split('/', '\\')
-            require(
-                segments.none {
-                    it == ".."
-                }
-            ) { "relativePath must not contain '..': $relativePath" }
+            require(segments.none { it == ".." }) {
+                "relativePath must not contain '..': $relativePath"
+            }
+            require(segments.none { it == ".git" }) {
+                "relativePath must not contain '.git' segment: $relativePath"
+            }
 
             val base = workingDir.canonicalFile
             val target = File(base, relativePath).canonicalFile
