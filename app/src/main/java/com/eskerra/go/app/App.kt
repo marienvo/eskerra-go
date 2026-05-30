@@ -1,18 +1,22 @@
 package com.eskerra.go.app
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.data.git.FakeGitGateway
 import com.eskerra.go.data.notes.FakeNotes
+import com.eskerra.go.data.notes.LoadInboxSummaries
 import com.eskerra.go.data.workspace.FakeWorkspace
 import com.eskerra.go.feature.add.AddScreen
 import com.eskerra.go.feature.dashboard.DashboardScreen
@@ -21,6 +25,7 @@ import com.eskerra.go.feature.menu.MenuScreen
 import com.eskerra.go.feature.note.NoteScreen
 import com.eskerra.go.feature.podcasts.PodcastItem
 import com.eskerra.go.feature.podcasts.PodcastsScreen
+import java.io.File
 
 /**
  * Root composable. Owns the navigation graph and is the only layer that reads
@@ -28,7 +33,7 @@ import com.eskerra.go.feature.podcasts.PodcastsScreen
  * the stateless feature screens, which never touch the data layer themselves.
  */
 @Composable
-fun App() {
+fun App(config: WorkspaceConfig, filesDir: File, loadInboxSummaries: LoadInboxSummaries) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
@@ -48,9 +53,18 @@ fun App() {
             modifier = contentModifier
         ) {
             composable(AppRoute.INBOX) {
+                val inboxViewModel: InboxViewModel = viewModel(
+                    factory = InboxViewModel.factory(
+                        config = config,
+                        filesDir = filesDir,
+                        loadInboxSummaries = loadInboxSummaries
+                    )
+                )
+                val inboxState by inboxViewModel.uiState.collectAsState()
+
                 InboxScreen(
-                    notes = FakeNotes.inboxSummaries(),
-                    onOpenNote = { id -> navController.navigate(AppRoute.note(id)) }
+                    state = inboxState,
+                    onRetry = inboxViewModel::refresh
                 )
             }
 

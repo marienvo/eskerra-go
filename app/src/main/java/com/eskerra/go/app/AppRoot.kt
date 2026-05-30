@@ -12,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.eskerra.go.data.notes.LoadInboxSummaries
 import com.eskerra.go.data.workspace.WorkspaceSetupCompletion
 import com.eskerra.go.data.workspace.WorkspaceStore
 import com.eskerra.go.feature.setup.WorkspaceSetupScreen
@@ -26,7 +27,8 @@ import java.io.File
 fun AppRoot(
     workspaceStore: WorkspaceStore,
     setupCompletion: WorkspaceSetupCompletion,
-    filesDir: File
+    filesDir: File,
+    loadInboxSummaries: LoadInboxSummaries
 ) {
     EskerraGoTheme {
         val gateViewModel: AppGateViewModel = viewModel(
@@ -77,7 +79,11 @@ fun AppRoot(
                 )
             }
 
-            is AppGateState.Ready -> App()
+            is AppGateState.Ready -> App(
+                config = gate.config,
+                filesDir = filesDir,
+                loadInboxSummaries = loadInboxSummaries
+            )
         }
     }
 }

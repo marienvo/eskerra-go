@@ -1,0 +1,125 @@
+package com.eskerra.go.app
+
+import com.eskerra.go.core.model.NoteId
+import com.eskerra.go.core.model.NoteSummary
+import com.eskerra.go.core.model.WorkspaceConfig
+import com.eskerra.go.data.notes.FakeNoteRegistryRepository
+import com.eskerra.go.data.notes.LoadInboxSummaries
+import com.eskerra.go.data.workspace.WorkspacePaths
+import com.eskerra.go.feature.inbox.InboxUiState
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
+import org.junit.Before
+import org.junit.Rule
+import org.junit.Test
+import org.junit.rules.TemporaryFolder
+
+class InboxViewModelTest {
+
+    @get:Rule
+    val temp = TemporaryFolder()
+
+    private val config = WorkspaceConfig(
+        name = "My Notes",
+        relativePath = WorkspacePaths.DEFAULT_RELATIVE_PATH,
+        remoteUri = null,
+        branch = "master",
+        setupCompletedAtEpochMs = 1_700_000_000_000L
+    )
+
+    @Before
+    fun setUpMainDispatcher() {
+        Dispatchers.setMain(UnconfinedTestDispatcher())
+    }
+
+    @After
+    fun tearDownMainDispatcher() {
+        Dispatchers.resetMain()
+    }
+
+    @Test
+    fun init_withInboxNotes_movesToContent() = runTest {
+        val filesDir = temp.newFolder("files")
+        val note = NoteSummary(
+            id = NoteId("Inbox/hello.md"),
+            title = "Hello",
+            snippet = "Body",
+            isInbox = true
+        )
+        val repository = FakeNoteRegistryRepository.withInboxNotes(note)
+        val viewModel = InboxViewModel(
+            config = config,
+            filesDir = filesDir,
+            loadInboxSummaries = LoadInboxSummaries(repository)
+        )
+
+        val state = viewModel.uiState.value as InboxUiState.Content
+        assertEquals(listOf(note), state.notes)
+        assertSame(config, repository.lastConfig)
+        assertSame(filesDir, repository.lastFilesDir)
+    }
+
+    @Test
+    fun init_withNoInboxNotes_movesToEmpty() = runTest {
+        val filesDir = temp.newFolder("files")
+        val repository = FakeNoteRegistryRepository()
+        val viewModel = InboxViewModel(
+            config = config,
+            filesDir = filesDir,
+            loadInboxSummaries = LoadInboxSummaries(repository)
+        )
+
+        assertEquals(InboxUiState.Empty, viewModel.uiState.value)
+    }
+
+    @Test
+    fun init_whenLoadFails_movesToError() = runTest {
+        val filesDir = temp.newFolder("files")
+        val repository = FakeNoteRegistryRepository.failing()
+        val viewModel = InboxViewModel(
+            config = config,
+            filesDir = filesDir,
+            loadInboxSummaries = LoadInboxSummaries(repository)
+        )
+
+        assertEquals(
+            InboxUiState.Error(InboxViewModel.SCAN_ERROR_MESSAGE),
+            viewModel.uiState.value
+        )
+    }
+
+    @Test
+    fun refresh_retriesLoad() = runTest {
+        val filesDir = temp.newFolder("files")
+        val repository = FakeNoteRegistryRepository.failing()
+        val viewModel = InboxViewModel(
+            config = config,
+            filesDir = filesDir,
+            loadInboxSummaries = LoadInboxSummaries(repository)
+        )
+        assertEquals(1, repository.refreshCount)
+
+        val note = NoteSummary(
+            id = NoteId("Inbox/retry.md"),
+            title = "Retry",
+            snippet = "",
+            isInbox = true
+        )
+        repository.setResult(
+            Result.success(
+                com.eskerra.go.core.model.NoteRegistry.fromNotes(listOf(note))
+            )
+        )
+        viewModel.refresh()
+
+        val state = viewModel.uiState.value as InboxUiState.Content
+        assertEquals(listOf(note), state.notes)
+        assertEquals(2, repository.refreshCount)
+    }
+}
