@@ -226,6 +226,43 @@ class JGitRemoteSyncRepositoryTest {
     }
 
     @Test
+    fun ensureLocalBranch_localBranchWithoutRemoteTracking_fails() {
+        val bare = TestGitRepos.initBareRemote(File(temp.root, "remote-develop.git"))
+        val remoteUri = TestGitRepos.fileUri(bare)
+        val producer = temp.newFolder("producer")
+        org.eclipse.jgit.api.Git.init()
+            .setDirectory(producer)
+            .setInitialBranch("develop")
+            .call()
+            .close()
+        gitRepo.writeFile(producer, "Inbox/seed.md", "# Seed\n").getOrThrow()
+        gitRepo.stageAll(producer).getOrThrow()
+        gitRepo.commit(producer, "Seed").getOrThrow()
+        org.eclipse.jgit.api.Git.open(producer).use { git ->
+            git.remoteAdd()
+                .setName("origin")
+                .setUri(org.eclipse.jgit.transport.URIish(remoteUri))
+                .call()
+            git.push().setRemote("origin").add("develop").call()
+        }
+
+        val consumer = temp.newFolder("consumer-init")
+        org.eclipse.jgit.api.Git.init()
+            .setDirectory(consumer)
+            .setInitialBranch("main")
+            .call()
+            .close()
+        remoteSync.configureSanitizedOrigin(consumer, remoteUri).getOrThrow()
+
+        val result = remoteSync.ensureLocalBranch(consumer, "main", null)
+
+        assertTrue(result.isFailure)
+        assertTrue(
+            result.exceptionOrNull()?.message.orEmpty().contains("remote branch not found: main")
+        )
+    }
+
+    @Test
     fun probeRemoteConnection_reconcilesLegacyMasterToMainOnRemote() {
         val remoteUri = newBareRemoteUri("remote-main-only.git")
         val branch = seedRemote(remoteUri)

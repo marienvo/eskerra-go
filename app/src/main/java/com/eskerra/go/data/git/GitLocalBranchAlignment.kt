@@ -36,6 +36,10 @@ internal object GitLocalBranchAlignment {
 
             val localRef = repository.exactRef("refs/heads/$effectiveBranch")
             if (localRef != null) {
+                val trackingRef = "refs/remotes/$ORIGIN_REMOTE/$effectiveBranch"
+                if (repository.exactRef(trackingRef) == null) {
+                    error("remote branch not found: $effectiveBranch")
+                }
                 if (repository.branch != effectiveBranch) {
                     git.checkout().setName(effectiveBranch).call()
                 }
