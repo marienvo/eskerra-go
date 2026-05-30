@@ -46,15 +46,6 @@ class DefaultWorkspaceSetupCompletion(
         } else {
             ""
         }
-        val trimmedRemoteUri = remoteUri?.trim().orEmpty()
-        if (mode == WorkspaceSetupMode.Clone &&
-            trimmedRemoteUri.startsWith("https://", ignoreCase = true) &&
-            trimmedCredential.isEmpty()
-        ) {
-            return Result.failure(
-                WorkspaceSetupException(WorkspaceSetupError.MissingCredential)
-            )
-        }
         var credentialWasSaved = false
         if (trimmedCredential.isNotEmpty()) {
             credentialStore.saveToken(config.relativePath, trimmedCredential).getOrElse { _ ->

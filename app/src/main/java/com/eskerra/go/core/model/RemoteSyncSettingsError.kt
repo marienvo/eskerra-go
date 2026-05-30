@@ -12,6 +12,10 @@ sealed interface RemoteSyncSettingsError {
         override fun message() = "Enter an access token for HTTPS remotes."
     }
 
+    data object RemoteUrlChangedRequiresCredential : RemoteSyncSettingsError {
+        override fun message() = "Enter a new access token when changing the remote URL."
+    }
+
     data object InvalidRemoteUri : RemoteSyncSettingsError {
         override fun message() = "Remote URL must not include embedded username or password."
     }

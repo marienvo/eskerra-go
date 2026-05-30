@@ -27,8 +27,10 @@ object SyncGitErrorMapper {
     private fun isPushRejected(message: String): Boolean =
         message.contains("push rejected", ignoreCase = true) ||
             message.contains("non-fast-forward", ignoreCase = true) ||
-            message.contains("rejected", ignoreCase = true) &&
-            message.contains("remote", ignoreCase = true)
+            (
+                message.contains("rejected", ignoreCase = true) &&
+                    message.contains("remote", ignoreCase = true)
+                )
 
     private fun isDiverged(message: String): Boolean =
         message.contains("diverged", ignoreCase = true) ||
@@ -37,8 +39,10 @@ object SyncGitErrorMapper {
 
     private fun isConflictRisk(message: String): Boolean =
         message.contains("conflict", ignoreCase = true) ||
-            message.contains("merge", ignoreCase = true) &&
-            message.contains("failed", ignoreCase = true)
+            (
+                message.contains("merge", ignoreCase = true) &&
+                    message.contains("failed", ignoreCase = true)
+                )
 
     private fun isManualIntervention(message: String): Boolean =
         message.contains("manual", ignoreCase = true) ||

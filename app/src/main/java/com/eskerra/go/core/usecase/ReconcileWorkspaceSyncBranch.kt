@@ -54,7 +54,7 @@ class ReconcileWorkspaceSyncBranch(
         }
 
         val httpsToken = readHttpsToken(config, remoteUri).getOrElse { error ->
-            return error as Result<WorkspaceConfig>
+            return Result.failure(error)
         }
 
         val effectiveBranch = remoteSyncRepository

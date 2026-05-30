@@ -70,6 +70,7 @@ class DefaultRemoteSyncSettingsRepository(
         val httpsToken = resolveHttpsToken(
             relativePath = config.relativePath,
             remoteUri = sanitizedUri,
+            previousRemoteUri = config.remoteUri,
             replacementToken = replacementToken?.trim().orEmpty()
         ).getOrElse { return@withContext Result.failure(it) }
 
@@ -191,8 +192,8 @@ class DefaultRemoteSyncSettingsRepository(
             val httpsToken = resolveHttpsToken(
                 relativePath = config.relativePath,
                 remoteUri = sanitizedUri,
-                replacementToken = replacementToken,
-                requireStoredCredential = remoteUri == null && branch == null
+                previousRemoteUri = config.remoteUri,
+                replacementToken = replacementToken
             ).getOrElse { return@withContext Result.failure(it) }
 
             remoteSyncRepository
@@ -207,8 +208,8 @@ class DefaultRemoteSyncSettingsRepository(
     private suspend fun resolveHttpsToken(
         relativePath: String,
         remoteUri: String,
-        replacementToken: String? = null,
-        requireStoredCredential: Boolean = false
+        previousRemoteUri: String? = null,
+        replacementToken: String? = null
     ): Result<String?> {
         if (!remoteUri.startsWith("https://", ignoreCase = true)) {
             return Result.success(null)
@@ -217,6 +218,14 @@ class DefaultRemoteSyncSettingsRepository(
         if (trimmedReplacement.isNotEmpty()) {
             return Result.success(trimmedReplacement)
         }
+        val previousTrimmed = previousRemoteUri?.trim().orEmpty()
+        if (previousTrimmed.isNotEmpty() && previousTrimmed != remoteUri.trim()) {
+            return Result.failure(
+                RemoteSyncSettingsException(
+                    RemoteSyncSettingsError.RemoteUrlChangedRequiresCredential
+                )
+            )
+        }
         val stored = credentialStore.readToken(relativePath).getOrElse {
             return Result.failure(
                 RemoteSyncSettingsException(RemoteSyncSettingsError.CredentialSaveFailed)
@@ -224,11 +233,6 @@ class DefaultRemoteSyncSettingsRepository(
         }
         if (!stored.isNullOrBlank()) {
             return Result.success(stored)
-        }
-        if (requireStoredCredential) {
-            return Result.failure(
-                RemoteSyncSettingsException(RemoteSyncSettingsError.MissingCredential)
-            )
         }
         return Result.failure(
             RemoteSyncSettingsException(RemoteSyncSettingsError.MissingCredential)

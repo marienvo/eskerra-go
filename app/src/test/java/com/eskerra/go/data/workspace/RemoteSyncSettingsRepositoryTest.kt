@@ -394,6 +394,78 @@ class RemoteSyncSettingsRepositoryTest {
     }
 
     @Test
+    fun saveSettings_httpsRemoteUrlChangedWithoutNewToken_rejectsStoredTokenReuse() = runTest {
+        val filesDir = temp.newFolder("files")
+        val config = localConfig(filesDir).copy(
+            remoteUri = "https://github.com/example/repo-a.git",
+            branch = "main"
+        )
+        credentials.saveToken(config.relativePath, "stored-token").getOrThrow()
+
+        val result = repository().saveSettings(
+            config = config,
+            remoteUri = "https://github.com/example/repo-b.git",
+            branch = "main",
+            replacementToken = null,
+            filesDir = filesDir
+        )
+
+        assertTrue(result.isFailure)
+        assertTrue(
+            (result.exceptionOrNull() as RemoteSyncSettingsException).error is
+                RemoteSyncSettingsError.RemoteUrlChangedRequiresCredential
+        )
+    }
+
+    @Test
+    fun testConnection_httpsRemoteUrlChangedWithoutNewToken_rejectsStoredTokenReuse() = runTest {
+        val filesDir = temp.newFolder("files")
+        val config = localConfig(filesDir).copy(
+            remoteUri = "https://github.com/example/repo-a.git",
+            branch = "main"
+        )
+        credentials.saveToken(config.relativePath, "stored-token").getOrThrow()
+
+        val result = repository().testConnection(
+            config = config,
+            filesDir = filesDir,
+            remoteUri = "https://github.com/example/repo-b.git",
+            branch = "main",
+            replacementToken = null
+        )
+
+        assertTrue(result.isFailure)
+        assertTrue(
+            (result.exceptionOrNull() as RemoteSyncSettingsException).error is
+                RemoteSyncSettingsError.RemoteUrlChangedRequiresCredential
+        )
+    }
+
+    @Test
+    fun saveSettings_sameRemoteUrlReusesStoredToken() = runTest {
+        val filesDir = temp.newFolder("files")
+        val remote = preparedRemote()
+        val workspaceStore = FakeWorkspaceStore()
+        val config = localConfig(filesDir).copy(
+            remoteUri = remote.remoteUri,
+            branch = remote.branch
+        )
+        credentials.saveToken(config.relativePath, "stored-token").getOrThrow()
+        workspaceStore.save(config)
+
+        val result = repository(workspaceStore).saveSettings(
+            config = config,
+            remoteUri = remote.remoteUri,
+            branch = remote.branch,
+            replacementToken = null,
+            filesDir = filesDir
+        )
+
+        assertTrue(result.isSuccess)
+        assertEquals("stored-token", credentials.readToken(config.relativePath).getOrThrow())
+    }
+
+    @Test
     fun manualSync_reportsSetupRequiredWhenRemoteMissing() = runTest {
         val filesDir = temp.newFolder("files")
         val config = localConfig(filesDir)

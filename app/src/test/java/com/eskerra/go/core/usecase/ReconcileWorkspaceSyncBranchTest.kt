@@ -1,5 +1,7 @@
 package com.eskerra.go.core.usecase
 
+import com.eskerra.go.core.model.SyncError
+import com.eskerra.go.core.model.SyncException
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.data.credentials.FakeCredentialStore
 import com.eskerra.go.data.git.JGitRemoteSyncRepository
@@ -59,6 +61,33 @@ class ReconcileWorkspaceSyncBranchTest {
         assertEquals("main", result.getOrThrow().branch)
         assertEquals("main", store.read()?.branch)
         assertEquals("main", gitRepo.status(workspaceDir).getOrThrow().branch)
+    }
+
+    @Test
+    fun invoke_httpsRemoteWithoutStoredToken_returnsMissingCredential() = runTest {
+        val filesDir = temp.newFolder("files")
+        val workspaceDir = File(filesDir, WorkspacePaths.DEFAULT_RELATIVE_PATH)
+        workspaceDir.mkdirs()
+        gitRepo.initOrOpen(workspaceDir).getOrThrow()
+
+        val config = WorkspaceConfig(
+            name = "Notes",
+            relativePath = WorkspacePaths.DEFAULT_RELATIVE_PATH,
+            remoteUri = "https://github.com/example/notes.git",
+            branch = "main",
+            setupCompletedAtEpochMs = 0L
+        )
+
+        val result = ReconcileWorkspaceSyncBranch(
+            workspaceStore = store,
+            credentialStore = FakeCredentialStore(),
+            remoteSyncRepository = remoteSync
+        )(config, filesDir)
+
+        assertTrue(result.isFailure)
+        assertTrue(
+            (result.exceptionOrNull() as SyncException).error is SyncError.MissingCredential
+        )
     }
 
     private data class PreparedRemote(val remoteUri: String, val branch: String)

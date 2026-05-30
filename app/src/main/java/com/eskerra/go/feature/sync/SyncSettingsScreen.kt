@@ -105,6 +105,16 @@ fun SyncSettingsScreen(
                     enabled = !state.isSaving && !state.isTesting && !state.isClearing,
                     modifier = Modifier.fillMaxWidth()
                 )
+                if (state.editRemoteUri.trim().startsWith("https://", ignoreCase = true) &&
+                    state.displayedRemoteUri?.trim()?.isNotEmpty() == true &&
+                    state.editRemoteUri.trim() != state.displayedRemoteUri.trim()
+                ) {
+                    Text(
+                        text = "Changing the remote URL requires a new access token.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 OutlinedTextField(
                     value = state.replacementToken,
                     onValueChange = onReplacementTokenChange,
