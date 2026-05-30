@@ -40,17 +40,15 @@ class AppGateViewModelTest {
     }
 
     @Test
-    fun refreshGate_withNoConfig_movesToNeedsSetup() = runTest {
+    fun init_withNoConfig_movesToNeedsSetup() = runTest {
         val filesDir = temp.newFolder("files")
         val viewModel = AppGateViewModel(FakeWorkspaceStore(), filesDir)
-
-        viewModel.refreshGate()
 
         assertEquals(AppGateState.NeedsSetup(), viewModel.gateState.value)
     }
 
     @Test
-    fun refreshGate_withValidConfig_movesToReady() = runTest {
+    fun init_withValidConfig_movesToReady() = runTest {
         val filesDir = temp.newFolder("files")
         val workspaceDir = File(filesDir, WorkspacePaths.DEFAULT_RELATIVE_PATH)
         workspaceDir.mkdirs()
@@ -59,8 +57,6 @@ class AppGateViewModelTest {
         val store = FakeWorkspaceStore()
         store.save(config)
         val viewModel = AppGateViewModel(store, filesDir)
-
-        viewModel.refreshGate()
 
         assertEquals(AppGateState.Ready(config), viewModel.gateState.value)
     }
@@ -78,7 +74,7 @@ class AppGateViewModelTest {
     }
 
     @Test
-    fun refreshGate_afterPersistedConfig_skipsSetup() = runTest {
+    fun init_afterPersistedConfig_skipsSetup() = runTest {
         val filesDir = temp.newFolder("files")
         val workspaceDir = File(filesDir, WorkspacePaths.DEFAULT_RELATIVE_PATH)
         workspaceDir.mkdirs()
@@ -87,8 +83,6 @@ class AppGateViewModelTest {
         val store = FakeWorkspaceStore()
         store.save(config)
         val viewModel = AppGateViewModel(store, filesDir)
-
-        viewModel.refreshGate()
 
         assertEquals(AppGateState.Ready(config), viewModel.gateState.value)
     }

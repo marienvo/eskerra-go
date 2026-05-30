@@ -1,5 +1,6 @@
 package com.eskerra.go.data.credentials
 
+import com.eskerra.go.data.workspace.WorkspacePaths
 import java.io.File
 
 /**
@@ -9,8 +10,10 @@ import java.io.File
  */
 class AppPrivateCredentialStore(private val filesDir: File) : CredentialStore {
 
-    private fun tokenFile(relativePath: String): File =
-        File(File(filesDir, CREDENTIALS_DIR), "$relativePath.token")
+    private fun tokenFile(relativePath: String): File {
+        WorkspacePaths.validateRelativePath(relativePath).getOrThrow()
+        return File(File(filesDir, CREDENTIALS_DIR), "$relativePath.token")
+    }
 
     override suspend fun saveToken(relativePath: String, token: String): Result<Unit> =
         runCatching {

@@ -25,7 +25,7 @@ class AppGateViewModel(private val workspaceStore: WorkspaceStore, private val f
         }
     }
 
-    suspend fun refreshGate() {
+    private suspend fun refreshGate() {
         val config = workspaceStore.read()
         _gateState.value = resolveAppGateState(config, filesDir)
     }
