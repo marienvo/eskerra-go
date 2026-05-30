@@ -100,8 +100,22 @@ Build the debug APK:
 ./gradlew :app:assembleDebug
 ```
 
-Install/run it from Android Studio, or install the generated debug APK with
-standard Android tooling.
+Build, install on a connected phone or emulator, and launch the app in one
+step:
+
+```bash
+./scripts/install-debug.sh
+```
+
+Or with Gradle only (installs but does not launch):
+
+```bash
+JAVA_HOME=/usr/lib/jvm/java-17-temurin-jdk ./gradlew :app:installDebug
+```
+
+Prerequisites for device install: USB debugging enabled on the phone (or an
+emulator running), `adb` on your PATH, and exactly one authorized device
+connected. You can also install/run from Android Studio.
 
 If the Gradle wrapper JAR is missing in a fresh local checkout, regenerate it
 once with Gradle 8.9+ running on JDK 17:
