@@ -1,0 +1,12 @@
+#!/usr/bin/env sh
+# Blocks direct commits to main (same policy as notebox Husky hook).
+# Enable: git config core.hooksPath scripts/githooks
+branch="$(git symbolic-ref --short HEAD 2>/dev/null)" || exit 0
+[ "$branch" = "main" ] || exit 0
+
+if [ -f "$(git rev-parse --git-path MERGE_HEAD 2>/dev/null)" ]; then
+  exit 0
+fi
+
+echo "pre-commit: Direct commits to 'main' are not allowed. Work on a branch, then merge."
+exit 1

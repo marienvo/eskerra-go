@@ -1,0 +1,14 @@
+---
+description: Require clean tests, linting, and type checks after changes
+alwaysApply: true
+---
+
+<!-- AUTO-SYNCED from notebox — do not edit here. Canonical: notebox/.cursor/rules/shared/quality.mdc -->
+<!-- Re-run: notebox/scripts/sync-shared-conventions.sh -->
+
+
+# Quality Gate
+
+- After each change set, run the relevant test, lint, and type-check commands.
+- Resolve all errors before considering work complete.
+- Do not leave known failing quality checks in the branch.
