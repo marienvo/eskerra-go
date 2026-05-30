@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.eskerra.go.data.git.JGitWorkspaceLocalTest" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-05-30T10:50:08" hostname="fedora" time="0.165">
+  <properties/>
+  <testcase name="writeFile_rejectsAbsolutePath" classname="com.eskerra.go.data.git.JGitWorkspaceLocalTest" time="0.115"/>
+  <testcase name="writeFile_rejectsParentTraversalSegments" classname="com.eskerra.go.data.git.JGitWorkspaceLocalTest" time="0.001"/>
+  <testcase name="initOrOpen_initializesEmptyDirectory" classname="com.eskerra.go.data.git.JGitWorkspaceLocalTest" time="0.002"/>
+  <testcase name="initOrOpen_failsWhenDirectoryMissing" classname="com.eskerra.go.data.git.JGitWorkspaceLocalTest" time="0.0"/>
+  <testcase name="initOrOpen_failsForNonEmptyNonRepoDirectory" classname="com.eskerra.go.data.git.JGitWorkspaceLocalTest" time="0.001"/>
+  <testcase name="writeFile_rejectsBlankPath" classname="com.eskerra.go.data.git.JGitWorkspaceLocalTest" time="0.001"/>
+  <testcase name="writeFile_writesContentInsideWorkingDir" classname="com.eskerra.go.data.git.JGitWorkspaceLocalTest" time="0.002"/>
+  <testcase name="status_reportsCleanThenDirtyThenCleanAcrossCommit" classname="com.eskerra.go.data.git.JGitWorkspaceLocalTest" time="0.041"/>
+  <testcase name="writeFile_rejectsNestedTraversalSegments" classname="com.eskerra.go.data.git.JGitWorkspaceLocalTest" time="0.001"/>
+  <testcase name="initOrOpen_opensExistingRepository" classname="com.eskerra.go.data.git.JGitWorkspaceLocalTest" time="0.001"/>
+  <testcase name="initOrOpen_failsWhenPathIsAFile" classname="com.eskerra.go.data.git.JGitWorkspaceLocalTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[SLF4J: Failed to load class "org.slf4j.impl.StaticLoggerBinder".
+SLF4J: Defaulting to no-operation (NOP) logger implementation
+SLF4J: See http://www.slf4j.org/codes.html#StaticLoggerBinder for further details.
+]]></system-err>
+</testsuite>

@@ -28,11 +28,11 @@ interface WorkspaceGitRepository {
 
     /**
      * Clone [remoteUri] (a local `file://` bare repo in the spike) into
-     * [workingDir].
+     * [workingDir], optionally checking out [branch].
      *
      * Fails (writing nothing) when [workingDir] already exists and is not empty.
      */
-    fun cloneFrom(remoteUri: String, workingDir: File): Result<Unit>
+    fun cloneFrom(remoteUri: String, workingDir: File, branch: String? = null): Result<Unit>
 
     /** Read the working tree status of the repository at [workingDir]. */
     fun status(workingDir: File): Result<GitWorkspaceStatus>

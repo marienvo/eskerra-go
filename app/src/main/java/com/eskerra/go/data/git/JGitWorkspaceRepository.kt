@@ -47,7 +47,8 @@ class JGitWorkspaceRepository(
         Git.init().setDirectory(workingDir).call().close()
     }
 
-    override fun cloneFrom(remoteUri: String, workingDir: File): Result<Unit> = runCatching {
+    override fun cloneFrom(remoteUri: String, workingDir: File, branch: String?): Result<Unit> =
+        runCatching {
         if (workingDir.exists()) {
             if (!workingDir.isDirectory) {
                 error("workingDir exists but is not a directory: $workingDir")
@@ -57,10 +58,13 @@ class JGitWorkspaceRepository(
                 error("clone target is not empty: $workingDir")
             }
         }
-        Git.cloneRepository()
+        val clone = Git.cloneRepository()
             .setURI(remoteUri)
             .setDirectory(workingDir)
-            .withTransportConfig()
+        if (!branch.isNullOrBlank()) {
+            clone.setBranch(branch)
+        }
+        clone.withTransportConfig()
             .call()
             .close()
     }
@@ -119,6 +123,7 @@ class JGitWorkspaceRepository(
                 .setMessage(message)
                 .setAuthor(identity)
                 .setCommitter(identity)
+                .setSign(false)
                 .call()
             commit.name()
         }
