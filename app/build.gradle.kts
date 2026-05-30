@@ -14,6 +14,8 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0"
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
@@ -38,6 +40,16 @@ android {
     buildFeatures {
         compose = true
     }
+
+    packaging {
+        resources {
+            // JGit bundles service descriptors and metadata that collide when merged.
+            excludes += "META-INF/DEPENDENCIES"
+            excludes += "META-INF/INDEX.LIST"
+            excludes += "META-INF/*.txt"
+            excludes += "META-INF/jgit-*"
+        }
+    }
 }
 
 dependencies {
@@ -52,6 +64,14 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation(libs.androidx.material.icons.extended)
     implementation(libs.androidx.navigation.compose)
+
+    implementation(libs.jgit)
+
+    testImplementation(libs.junit)
+
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.core)
 
     debugImplementation(libs.androidx.ui.tooling)
 }
