@@ -39,8 +39,27 @@ git config core.hooksPath scripts/githooks
 
 ## Commands
 
+Gradle requires **Java 17** (CI uses Temurin 17). If the default JDK is newer, set `JAVA_HOME` first — for example `JAVA_HOME=/usr/lib/jvm/temurin-17-jdk`.
+
+### Quality gate (before marking work complete)
+
+Run these in order; resolve all failures before finishing. Matches the CI verify job in `.github/workflows/android-ci.yml`.
+
+```bash
+# Minimum gate for Kotlin/UI or Gradle script changes
+JAVA_HOME=/usr/lib/jvm/temurin-17-jdk ./gradlew :app:ktlintCheck :app:lintDebug
+
+# Full gate when domain, data, or logic changed
+JAVA_HOME=/usr/lib/jvm/temurin-17-jdk ./gradlew :app:ktlintCheck :app:lintDebug :app:testDebugUnitTest
+```
+
+Do not rely on CI to catch ktlint or Android lint violations.
+
+### Other commands
+
 ```bash
 ./gradlew :app:assembleDebug
-./gradlew :app:testDebugUnitTest
 ./gradlew :app:connectedDebugAndroidTest
 ```
+
+Use `assembleDebug` only when building the APK is the goal. `connectedDebugAndroidTest` requires a device or emulator and is not part of the standard quality gate.

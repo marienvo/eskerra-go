@@ -21,3 +21,15 @@ Rules:
 - No multi-workspace support in the PoC.
 - Prefer small files. New files over 250 lines need justification.
 - Every feature slice must include at least one unit test for domain/data behavior.
+
+## Quality gate
+
+After changes under `app/src/**` or `*.gradle.kts`, run before marking work complete:
+
+1. `:app:ktlintCheck`
+2. `:app:lintDebug`
+3. `:app:testDebugUnitTest` when domain, data, or logic changed
+
+Use Java 17 for Gradle (set `JAVA_HOME` if the default JDK is newer). Resolve all violations; do not defer to CI.
+
+KtLint uses Android Studio style: keep short parameter lists on one line when they fit. Use `:app:ktlintFormat` only after reviewing the diff.

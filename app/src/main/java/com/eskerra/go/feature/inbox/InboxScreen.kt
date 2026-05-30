@@ -23,11 +23,7 @@ import com.eskerra.go.core.model.NoteSummary
  * about where the notes come from.
  */
 @Composable
-fun InboxScreen(
-    state: InboxUiState,
-    onRetry: () -> Unit,
-    modifier: Modifier = Modifier
-) {
+fun InboxScreen(state: InboxUiState, onRetry: () -> Unit, modifier: Modifier = Modifier) {
     when (state) {
         InboxUiState.Loading -> InboxLoading(modifier)
         InboxUiState.Empty -> InboxEmpty(modifier)
@@ -102,10 +98,7 @@ private fun InboxError(message: String, onRetry: () -> Unit, modifier: Modifier 
 }
 
 @Composable
-private fun InboxContent(
-    notes: List<NoteSummary>,
-    modifier: Modifier = Modifier
-) {
+private fun InboxContent(notes: List<NoteSummary>, modifier: Modifier = Modifier) {
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
