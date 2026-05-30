@@ -13,6 +13,12 @@ import java.io.File
 interface RemoteSyncRepository {
     fun status(workingDir: File): Result<GitWorkspaceStatus>
 
+    /** Paths staged in the index (cached vs HEAD). */
+    fun readStagedPaths(workingDir: File): Result<Set<String>>
+
+    /** True when merge, rebase, cherry-pick, or revert is in progress. */
+    fun requiresManualIntervention(workingDir: File): Boolean
+
     fun partitionChanges(changedPaths: Set<String>): SyncChangePartition
 
     fun stageInboxChanges(workingDir: File): Result<Unit>

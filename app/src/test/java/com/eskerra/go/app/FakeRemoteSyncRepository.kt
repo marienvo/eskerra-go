@@ -30,6 +30,10 @@ class FakeRemoteSyncRepository(
         )
     )
 
+    override fun readStagedPaths(workingDir: File): Result<Set<String>> = Result.success(emptySet())
+
+    override fun requiresManualIntervention(workingDir: File): Boolean = false
+
     override fun partitionChanges(changedPaths: Set<String>): SyncChangePartition =
         SyncChangePartition(emptySet(), emptySet(), emptySet())
 

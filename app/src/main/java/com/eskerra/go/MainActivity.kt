@@ -5,6 +5,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import com.eskerra.go.app.AppRoot
+import com.eskerra.go.core.usecase.BuildSafeSyncDiagnostic
+import com.eskerra.go.core.usecase.BuildSyncPreflight
 import com.eskerra.go.core.usecase.ClearRemoteSyncSettings
 import com.eskerra.go.core.usecase.CreateInboxNote
 import com.eskerra.go.core.usecase.LoadEditableNote
@@ -15,6 +17,7 @@ import com.eskerra.go.core.usecase.LoadRemoteSyncSettings
 import com.eskerra.go.core.usecase.LoadSyncStatus
 import com.eskerra.go.core.usecase.ManualSyncNow
 import com.eskerra.go.core.usecase.ReconcileWorkspaceSyncBranch
+import com.eskerra.go.core.usecase.RecordLastSyncAttempt
 import com.eskerra.go.core.usecase.SaveNote
 import com.eskerra.go.core.usecase.SaveRemoteSyncSettings
 import com.eskerra.go.core.usecase.TestRemoteConnection
@@ -76,6 +79,15 @@ class MainActivity : ComponentActivity() {
 
         val remoteSyncRepository = JGitRemoteSyncRepository(gitRepository)
         val loadSyncStatus = LoadSyncStatus(remoteSyncRepository)
+        val buildSyncPreflight = BuildSyncPreflight(
+            remoteSyncRepository = remoteSyncRepository,
+            credentialStore = credentialStore
+        )
+        val buildSafeSyncDiagnostic = BuildSafeSyncDiagnostic(
+            buildSyncPreflight = buildSyncPreflight,
+            lastSyncStatusStore = workspaceStore
+        )
+        val recordLastSyncAttempt = RecordLastSyncAttempt(workspaceStore)
         val reconcileWorkspaceSyncBranch = ReconcileWorkspaceSyncBranch(
             workspaceStore = workspaceStore,
             credentialStore = credentialStore,
@@ -112,7 +124,10 @@ class MainActivity : ComponentActivity() {
                 saveNote = saveNote,
                 loadGitStatusSummary = loadGitStatusSummary,
                 loadSyncStatus = loadSyncStatus,
+                buildSyncPreflight = buildSyncPreflight,
+                buildSafeSyncDiagnostic = buildSafeSyncDiagnostic,
                 manualSyncNow = manualSyncNow,
+                recordLastSyncAttempt = recordLastSyncAttempt,
                 loadRemoteSyncSettings = loadRemoteSyncSettings,
                 saveRemoteSyncSettings = saveRemoteSyncSettings,
                 updateSyncToken = updateSyncToken,

@@ -3,12 +3,20 @@ package com.eskerra.go.app
 import com.eskerra.go.core.model.SyncStatusState
 import com.eskerra.go.core.model.SyncStatusSummary
 import com.eskerra.go.core.model.WorkspaceConfig
+import com.eskerra.go.core.usecase.BuildSafeSyncDiagnostic
+import com.eskerra.go.core.usecase.BuildSyncPreflight
+import com.eskerra.go.core.usecase.FailingNoteRegistryRepository
 import com.eskerra.go.core.usecase.LoadSyncStatus
 import com.eskerra.go.core.usecase.ManualSyncNow
+import com.eskerra.go.core.usecase.RecordLastSyncAttempt
+import com.eskerra.go.data.credentials.FakeCredentialStore
 import com.eskerra.go.data.git.JGitWorkspaceRepository
+import com.eskerra.go.data.notes.FakeNoteRegistryRepository
+import com.eskerra.go.data.workspace.FakeWorkspaceStore
 import com.eskerra.go.data.workspace.WorkspacePaths
 import com.eskerra.go.feature.sync.SyncUiState
 import java.io.File
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -17,6 +25,7 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -44,33 +53,14 @@ class SyncViewModelTest {
         val ioDispatcher = StandardTestDispatcher(testScheduler)
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         try {
-            val status = SyncStatusSummary(
-                state = SyncStatusState.Clean,
-                branch = "main",
-                changedCount = 0,
-                aheadCount = 0,
-                behindCount = 0,
-                message = "Up to date."
-            )
-            val fakeRemote = FakeRemoteSyncRepository(status)
-            val viewModel = SyncViewModel(
-                config = testConfig(),
-                filesDir = filesDir,
-                loadSyncStatus = LoadSyncStatus(fakeRemote, ioDispatcher),
-                manualSyncNow = ManualSyncNow(
-                    remoteSyncRepository = fakeRemote,
-                    credentialStore = com.eskerra.go.data.credentials.FakeCredentialStore(),
-                    registryRepository = FakeRegistryRepository(),
-                    loadSyncStatus = LoadSyncStatus(fakeRemote, ioDispatcher),
-                    dispatcher = ioDispatcher
-                )
-            )
+            val viewModel = createViewModel(ioDispatcher)
 
             advanceUntilIdle()
 
             val state = viewModel.uiState.value
             assertTrue(state is SyncUiState.Ready)
-            assertEquals(status, (state as SyncUiState.Ready).status)
+            assertNotNull((state as SyncUiState.Ready).preflight)
+            assertNotNull(state.diagnostic)
         } finally {
             Dispatchers.resetMain()
         }
@@ -81,29 +71,9 @@ class SyncViewModelTest {
         val ioDispatcher = StandardTestDispatcher(testScheduler)
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         try {
-            val status = SyncStatusSummary(
-                state = SyncStatusState.Clean,
-                branch = "main",
-                changedCount = 0,
-                aheadCount = 0,
-                behindCount = 0,
-                message = "Up to date."
-            )
-            val fakeRemote = FakeRemoteSyncRepository(status)
             var inboxRefreshed = false
-            val viewModel = SyncViewModel(
-                config = testConfig(),
-                filesDir = filesDir,
-                loadSyncStatus = LoadSyncStatus(fakeRemote, ioDispatcher),
-                manualSyncNow = ManualSyncNow(
-                    remoteSyncRepository = fakeRemote,
-                    credentialStore = com.eskerra.go.data.credentials.FakeCredentialStore(),
-                    registryRepository = FakeRegistryRepository(),
-                    loadSyncStatus = LoadSyncStatus(fakeRemote, ioDispatcher),
-                    dispatcher = ioDispatcher
-                ),
-                onSyncSuccess = { inboxRefreshed = true }
-            )
+            val viewModel = createViewModel(ioDispatcher, onSyncSuccess = { inboxRefreshed = true })
+
             advanceUntilIdle()
 
             viewModel.syncNow()
@@ -114,6 +84,83 @@ class SyncViewModelTest {
         } finally {
             Dispatchers.resetMain()
         }
+    }
+
+    @Test
+    fun doubleSyncNow_startsOnlyOneSync() = runTest {
+        val ioDispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            val slowRegistry = FakeNoteRegistryRepository()
+            slowRegistry.setRefreshDelayMs(1_000)
+            val viewModel = createViewModel(ioDispatcher, registry = slowRegistry)
+
+            advanceUntilIdle()
+
+            viewModel.syncNow()
+            viewModel.syncNow()
+            advanceUntilIdle()
+
+            assertEquals(1, slowRegistry.refreshCount)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun registryRefreshFailure_emitsSuccessWithWarning() = runTest {
+        val ioDispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            val failingRegistry = FailingNoteRegistryRepository(FakeNoteRegistryRepository())
+            val viewModel = createViewModel(ioDispatcher, registry = failingRegistry)
+
+            advanceUntilIdle()
+            viewModel.syncNow()
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            assertTrue(state is SyncUiState.Success)
+            assertNotNull((state as SyncUiState.Success).warningMessage)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    private fun createViewModel(
+        ioDispatcher: CoroutineDispatcher,
+        registry: com.eskerra.go.core.repository.NoteRegistryRepository = FakeRegistryRepository(),
+        onSyncSuccess: () -> Unit = {}
+    ): SyncViewModel {
+        val status = SyncStatusSummary(
+            state = SyncStatusState.Clean,
+            branch = "main",
+            changedCount = 0,
+            aheadCount = 0,
+            behindCount = 0,
+            message = "Up to date."
+        )
+        val fakeRemote = FakeRemoteSyncRepository(status)
+        val credentials = FakeCredentialStore()
+        val lastSyncStore = FakeWorkspaceStore()
+        val buildPreflight = BuildSyncPreflight(fakeRemote, credentials, ioDispatcher)
+        val buildDiagnostic = BuildSafeSyncDiagnostic(buildPreflight, lastSyncStore, ioDispatcher)
+        return SyncViewModel(
+            config = testConfig(),
+            filesDir = filesDir,
+            loadSyncStatus = LoadSyncStatus(fakeRemote, ioDispatcher),
+            buildSyncPreflight = buildPreflight,
+            buildSafeSyncDiagnostic = buildDiagnostic,
+            manualSyncNow = ManualSyncNow(
+                remoteSyncRepository = fakeRemote,
+                credentialStore = credentials,
+                registryRepository = registry,
+                loadSyncStatus = LoadSyncStatus(fakeRemote, ioDispatcher),
+                dispatcher = ioDispatcher
+            ),
+            recordLastSyncAttempt = RecordLastSyncAttempt(lastSyncStore),
+            onSyncSuccess = onSyncSuccess
+        )
     }
 
     private fun testConfig(): WorkspaceConfig {

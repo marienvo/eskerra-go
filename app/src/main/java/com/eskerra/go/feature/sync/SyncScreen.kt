@@ -14,7 +14,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.eskerra.go.core.model.SafeSyncDiagnostic
+import com.eskerra.go.core.model.SyncAttemptOutcome
+import com.eskerra.go.core.model.SyncPreflightSummary
 import com.eskerra.go.core.model.SyncProgressStep
+import com.eskerra.go.core.model.SyncRecoveryAction
 import com.eskerra.go.core.model.SyncStatusState
 import com.eskerra.go.core.model.SyncStatusSummary
 
@@ -62,6 +66,8 @@ fun SyncScreen(
                     branch = state.branch,
                     checkedOutBranch = state.status.branch
                 )
+                PreflightCard(preflight = state.preflight)
+                DiagnosticCard(diagnostic = state.diagnostic)
                 if (state.remoteUri == null) {
                     Text(
                         text = "Configure remote sync before syncing.",
@@ -72,7 +78,7 @@ fun SyncScreen(
                 Button(
                     onClick = onSyncNow,
                     modifier = Modifier.fillMaxWidth(),
-                    enabled = state.remoteUri != null
+                    enabled = state.remoteUri != null && state.preflight.canSync
                 ) {
                     Text("Sync now")
                 }
@@ -81,6 +87,12 @@ fun SyncScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text("Remote sync settings")
+                }
+                Button(
+                    onClick = onRetry,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Refresh status")
                 }
             }
 
@@ -112,6 +124,13 @@ fun SyncScreen(
                     text = successMessage(state),
                     color = MaterialTheme.colorScheme.primary
                 )
+                state.warningMessage?.let { warning ->
+                    Text(
+                        text = warning,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
                 Button(onClick = onRetry, modifier = Modifier.fillMaxWidth()) {
                     Text("Refresh status")
                 }
@@ -130,11 +149,96 @@ fun SyncScreen(
                     text = state.message,
                     color = MaterialTheme.colorScheme.error
                 )
+                RecoveryHint(recoveryAction = state.recoveryAction)
                 Button(onClick = onSyncNow, modifier = Modifier.fillMaxWidth()) {
                     Text("Try again")
                 }
+                Button(onClick = onRetry, modifier = Modifier.fillMaxWidth()) {
+                    Text("Refresh status")
+                }
+                if (state.recoveryAction.suggestOpenSettings) {
+                    Button(onClick = onOpenSettings, modifier = Modifier.fillMaxWidth()) {
+                        Text("Open sync settings")
+                    }
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun PreflightCard(preflight: SyncPreflightSummary) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(text = "Preflight", style = MaterialTheme.typography.labelMedium)
+            Text(
+                text = preflight.userMessage,
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (preflight.canSync) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.error
+                },
+                modifier = Modifier.padding(top = 4.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun DiagnosticCard(diagnostic: SafeSyncDiagnostic) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(text = "Diagnostics", style = MaterialTheme.typography.labelMedium)
+            diagnostic.sanitizedRemote?.let { remote ->
+                Text(
+                    text = "Remote: $remote",
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+            diagnostic.branch?.let { branch ->
+                Text(
+                    text = "Branch: $branch",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+            Text(
+                text = "Inbox changes: ${diagnostic.inboxChangeCount}, " +
+                    "other changes: ${diagnostic.nonInboxChangeCount}",
+                style = MaterialTheme.typography.bodySmall
+            )
+            if (diagnostic.aheadCount > 0 || diagnostic.behindCount > 0) {
+                Text(
+                    text = "Ahead: ${diagnostic.aheadCount}, behind: ${diagnostic.behindCount}",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+            diagnostic.lastSync?.let { last ->
+                Text(
+                    text = "Last sync: ${lastSyncOutcomeLabel(last.outcome)}" +
+                        last.errorCategory?.let { " ($it)" }.orEmpty(),
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RecoveryHint(recoveryAction: SyncRecoveryAction) {
+    Text(
+        text = recoveryAction.hint,
+        style = MaterialTheme.typography.bodyMedium,
+        modifier = Modifier.padding(top = 4.dp)
+    )
+    if (recoveryAction.localNotesAvailable) {
+        Text(
+            text = "Local notes remain available.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.primary
+        )
     }
 }
 
@@ -187,6 +291,12 @@ private fun StatusCard(
             }
         }
     }
+}
+
+private fun lastSyncOutcomeLabel(outcome: SyncAttemptOutcome): String = when (outcome) {
+    SyncAttemptOutcome.Success -> "Success"
+    SyncAttemptOutcome.PartialSuccess -> "Partial success"
+    SyncAttemptOutcome.Failed -> "Failed"
 }
 
 private fun statusLabel(status: SyncStatusSummary): String = when (status.state) {

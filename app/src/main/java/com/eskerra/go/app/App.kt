@@ -18,6 +18,8 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.WorkspaceConfig
+import com.eskerra.go.core.usecase.BuildSafeSyncDiagnostic
+import com.eskerra.go.core.usecase.BuildSyncPreflight
 import com.eskerra.go.core.usecase.ClearRemoteSyncSettings
 import com.eskerra.go.core.usecase.CreateInboxNote
 import com.eskerra.go.core.usecase.LoadEditableNote
@@ -27,6 +29,7 @@ import com.eskerra.go.core.usecase.LoadNoteForReading
 import com.eskerra.go.core.usecase.LoadRemoteSyncSettings
 import com.eskerra.go.core.usecase.LoadSyncStatus
 import com.eskerra.go.core.usecase.ManualSyncNow
+import com.eskerra.go.core.usecase.RecordLastSyncAttempt
 import com.eskerra.go.core.usecase.SaveNote
 import com.eskerra.go.core.usecase.SaveRemoteSyncSettings
 import com.eskerra.go.core.usecase.TestRemoteConnection
@@ -58,7 +61,10 @@ fun App(
     saveNote: SaveNote,
     loadGitStatusSummary: LoadGitStatusSummary,
     loadSyncStatus: LoadSyncStatus,
+    buildSyncPreflight: BuildSyncPreflight,
+    buildSafeSyncDiagnostic: BuildSafeSyncDiagnostic,
     manualSyncNow: ManualSyncNow,
+    recordLastSyncAttempt: RecordLastSyncAttempt,
     loadRemoteSyncSettings: LoadRemoteSyncSettings,
     saveRemoteSyncSettings: SaveRemoteSyncSettings,
     updateSyncToken: UpdateSyncToken,
@@ -175,7 +181,10 @@ fun App(
                         config = currentConfig,
                         filesDir = filesDir,
                         loadSyncStatus = loadSyncStatus,
+                        buildSyncPreflight = buildSyncPreflight,
+                        buildSafeSyncDiagnostic = buildSafeSyncDiagnostic,
                         manualSyncNow = manualSyncNow,
+                        recordLastSyncAttempt = recordLastSyncAttempt,
                         onSyncSuccess = markInboxNotesChanged,
                         onConfigUpdated = { updated ->
                             currentConfig = updated

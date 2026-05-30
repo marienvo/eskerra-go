@@ -72,8 +72,30 @@ sealed interface SyncError {
         override fun message() = "Sync stopped because the repository needs manual Git repair."
     }
 
+    data object SyncAlreadyRunning : SyncError {
+        override fun message() = "Sync is already in progress."
+    }
+
+    data object NonInboxStagedChanges : SyncError {
+        override fun message() =
+            "Sync stopped because non-Inbox/ files are staged. Resolve them with Git before syncing."
+    }
+
+    data object RegistryRefreshFailed : SyncError {
+        override fun message() =
+            "Sync updated the repository, but the note list could not refresh. Local notes are still available."
+    }
+
     data class GitFailed(val safeMessage: String) : SyncError {
         override fun message() = safeMessage
+    }
+
+    /** Stable category name for persisted last-sync metadata (non-secret). */
+    fun categoryName(): String = when (this) {
+        is RemoteBranchNotFound -> "RemoteBranchNotFound"
+        is LocalBranchNotFound -> "LocalBranchNotFound"
+        is GitFailed -> "GitFailed"
+        else -> this::class.simpleName.orEmpty()
     }
 }
 

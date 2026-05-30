@@ -12,6 +12,10 @@ import com.eskerra.go.data.notes.FileNoteRegistryRepository
 import com.eskerra.go.data.notes.MarkdownNoteScanner
 import com.eskerra.go.data.workspace.WorkspacePaths
 import java.io.File
+import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -335,6 +339,129 @@ class ManualSyncNowTest {
 
         assertTrue(steps.contains(com.eskerra.go.core.model.SyncProgressStep.ValidatingWorkspace))
         assertTrue(steps.contains(com.eskerra.go.core.model.SyncProgressStep.Complete))
+    }
+
+    @Test
+    fun syncRefuses_preStagedNonInboxFile() = runTest {
+        val setup = cloneSeededWorkspace()
+        gitRepo.writeFile(setup.workspaceDir, "Projects/staged.md", "staged").getOrThrow()
+        org.eclipse.jgit.api.Git.open(setup.workspaceDir).use { git ->
+            git.add().addFilepattern("Projects/staged.md").call()
+        }
+
+        val result = manualSync(setup.config, setup.filesDir)
+
+        assertTrue(result.isFailure)
+        val error = (result.exceptionOrNull() as SyncException).error
+        assertTrue(
+            error is SyncError.NonInboxStagedChanges || error is SyncError.NonInboxLocalChanges
+        )
+    }
+
+    @Test
+    fun syncAllows_preStagedInboxFile() = runTest {
+        val setup = cloneSeededWorkspace()
+        gitRepo.writeFile(setup.workspaceDir, "Inbox/staged-only.md", "staged").getOrThrow()
+        org.eclipse.jgit.api.Git.open(setup.workspaceDir).use { git ->
+            git.add().addFilepattern("Inbox/staged-only.md").call()
+        }
+
+        val result = manualSync(setup.config, setup.filesDir)
+
+        assertTrue(result.isSuccess)
+    }
+
+    @Test
+    fun syncCommit_containsOnlyInboxPaths() = runTest {
+        val setup = cloneSeededWorkspace()
+        gitRepo.writeFile(setup.workspaceDir, "Inbox/only-inbox.md", "# Only inbox\n").getOrThrow()
+
+        manualSync(setup.config, setup.filesDir).getOrThrow()
+
+        org.eclipse.jgit.api.Git.open(setup.workspaceDir).use { git ->
+            val commit = git.log().call()
+                .first { it.fullMessage.contains(ManualSyncNow.INBOX_COMMIT_MESSAGE) }
+            val parent = commit.parents.firstOrNull()
+                ?: error("Expected sync commit to have a parent")
+            val reader = git.repository.newObjectReader()
+            val oldTree = org.eclipse.jgit.treewalk.CanonicalTreeParser().apply {
+                reset(reader, parent.tree)
+            }
+            val newTree = org.eclipse.jgit.treewalk.CanonicalTreeParser().apply {
+                reset(reader, commit.tree)
+            }
+            val diffs = git.diff()
+                .setOldTree(oldTree)
+                .setNewTree(newTree)
+                .call()
+            val changedPaths = diffs.mapNotNull { entry ->
+                when (entry.changeType) {
+                    org.eclipse.jgit.diff.DiffEntry.ChangeType.DELETE ->
+                        entry.oldPath.takeIf { it != "/dev/null" }
+                    else -> entry.newPath.takeIf { it != "/dev/null" }
+                }
+            }
+            assertTrue(changedPaths.isNotEmpty())
+            assertTrue(changedPaths.all { it == "Inbox" || it.startsWith("Inbox/") })
+        }
+    }
+
+    @Test
+    fun mergeInProgress_blocksSync() = runTest {
+        val setup = cloneSeededWorkspace()
+        File(setup.workspaceDir, ".git/MERGE_HEAD").writeText("deadbeef")
+
+        val result = manualSync(setup.config, setup.filesDir)
+
+        assertTrue(result.isFailure)
+        assertTrue(
+            (result.exceptionOrNull() as SyncException).error
+                is SyncError.ManualInterventionRequired
+        )
+    }
+
+    @Test
+    fun concurrentSync_secondReturnsAlreadyRunning() = runTest {
+        val setup = cloneSeededWorkspace()
+        val slowRegistry = com.eskerra.go.data.notes.FakeNoteRegistryRepository()
+        slowRegistry.setRefreshDelayMs(10_000)
+        val testDispatcher = kotlinx.coroutines.test.StandardTestDispatcher(testScheduler)
+        val slowSync = ManualSyncNow(
+            remoteSyncRepository = remoteSync,
+            credentialStore = credentials,
+            registryRepository = slowRegistry,
+            loadSyncStatus = loadSyncStatus,
+            dispatcher = testDispatcher
+        )
+        val first = launch(testDispatcher) { slowSync(setup.config, setup.filesDir) }
+        testScheduler.runCurrent()
+        val second = async(testDispatcher) { slowSync(setup.config, setup.filesDir) }
+        testScheduler.runCurrent()
+
+        assertTrue(second.isCompleted)
+        val secondResult = second.getCompleted()
+        assertTrue(secondResult.isFailure)
+        assertTrue(
+            (secondResult.exceptionOrNull() as SyncException).error is SyncError.SyncAlreadyRunning
+        )
+        first.cancel()
+    }
+
+    @Test
+    fun registryRefreshFailure_returnsPartialSuccess() = runTest {
+        val setup = cloneSeededWorkspace()
+        val failingRegistry = FailingNoteRegistryRepository(registry)
+        val partialSync = ManualSyncNow(
+            remoteSyncRepository = remoteSync,
+            credentialStore = credentials,
+            registryRepository = failingRegistry,
+            loadSyncStatus = loadSyncStatus
+        )
+
+        val result = partialSync(setup.config, setup.filesDir)
+
+        assertTrue(result.isSuccess)
+        assertFalse(result.getOrThrow().registryRefreshed)
     }
 
     private data class WorkspaceSetup(

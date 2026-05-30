@@ -15,6 +15,7 @@ import com.eskerra.go.data.workspace.WorkspacePaths
 import java.io.File
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
 
 /**
@@ -30,21 +31,30 @@ class ManualSyncNow(
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO
 ) {
 
+    private val syncMutex = Mutex()
+
     suspend operator fun invoke(
         config: WorkspaceConfig,
         filesDir: File,
         onProgress: (SyncProgressStep) -> Unit = {}
     ): Result<SyncResult> = withContext(dispatcher) {
-        val resolvedConfig = reconcileWorkspaceSyncBranch
-            ?.invoke(config, filesDir)
-            ?.getOrElse { return@withContext Result.failure(it) }
-            ?: config
-        sync(resolvedConfig, filesDir, onProgress).map { result ->
-            if (resolvedConfig != config) {
-                result.copy(updatedConfig = resolvedConfig)
-            } else {
-                result
+        if (!syncMutex.tryLock()) {
+            return@withContext Result.failure(SyncException(SyncError.SyncAlreadyRunning))
+        }
+        try {
+            val resolvedConfig = reconcileWorkspaceSyncBranch
+                ?.invoke(config, filesDir)
+                ?.getOrElse { return@withContext Result.failure(it) }
+                ?: config
+            sync(resolvedConfig, filesDir, onProgress).map { result ->
+                if (resolvedConfig != config) {
+                    result.copy(updatedConfig = resolvedConfig)
+                } else {
+                    result
+                }
             }
+        } finally {
+            syncMutex.unlock()
         }
     }
 
@@ -60,6 +70,10 @@ class ManualSyncNow(
         }
         if (!workspaceDir.isDirectory || !WorkspacePaths.isValidGitWorkspace(workspaceDir)) {
             return Result.failure(SyncException(SyncError.WorkspaceUnavailable))
+        }
+
+        if (remoteSyncRepository.requiresManualIntervention(workspaceDir)) {
+            return Result.failure(SyncException(SyncError.ManualInterventionRequired))
         }
 
         val remoteUri = config.remoteUri?.trim().orEmpty()
@@ -88,13 +102,11 @@ class ManualSyncNow(
             return Result.failure(SyncGitErrorMapper.mapFailure(error, branch))
         }
 
+        validateWorkingTreePaths(workspaceDir, workspaceStatus.changedPaths).getOrElse { error ->
+            return Result.failure(error)
+        }
+
         val partition = remoteSyncRepository.partitionChanges(workspaceStatus.changedPaths)
-        if (partition.unsafePaths.isNotEmpty()) {
-            return Result.failure(SyncException(SyncError.UnsafeLocalPath))
-        }
-        if (partition.nonInboxPaths.isNotEmpty()) {
-            return Result.failure(SyncException(SyncError.NonInboxLocalChanges))
-        }
 
         val effectiveBranch = remoteSyncRepository
             .ensureLocalBranch(workspaceDir, branch, httpsToken)
@@ -105,10 +117,24 @@ class ManualSyncNow(
         var committed = false
         var commitId: String? = null
         if (partition.inboxPaths.isNotEmpty()) {
+            validateWorkingTreePaths(
+                workspaceDir,
+                remoteSyncRepository.status(workspaceDir).getOrElse { error ->
+                    return Result.failure(SyncGitErrorMapper.mapFailure(error, branch))
+                }.changedPaths
+            ).getOrElse { error ->
+                return Result.failure(error)
+            }
+
             onProgress(SyncProgressStep.CommittingInboxChanges)
             remoteSyncRepository.stageInboxChanges(workspaceDir).getOrElse { error ->
                 return Result.failure(SyncGitErrorMapper.mapFailure(error, branch))
             }
+
+            validateStagedPaths(workspaceDir).getOrElse { error ->
+                return Result.failure(error)
+            }
+
             commitId = remoteSyncRepository.commitStaged(
                 workingDir = workspaceDir,
                 message = INBOX_COMMIT_MESSAGE
@@ -170,11 +196,7 @@ class ManualSyncNow(
         }
 
         onProgress(SyncProgressStep.RefreshingNotes)
-        registryRepository.refresh(config, filesDir).getOrElse {
-            return Result.failure(
-                SyncException(SyncError.GitFailed("Could not refresh note registry after sync."))
-            )
-        }
+        val registryRefreshed = registryRepository.refresh(config, filesDir).isSuccess
 
         onProgress(SyncProgressStep.Complete)
         val status = loadSyncStatus(config, filesDir)
@@ -184,9 +206,39 @@ class ManualSyncNow(
                 committed = committed,
                 commitId = commitId,
                 pushed = pushed,
-                pulled = pulled
+                pulled = pulled,
+                registryRefreshed = registryRefreshed
             )
         )
+    }
+
+    private fun validateWorkingTreePaths(
+        workspaceDir: File,
+        changedPaths: Set<String>
+    ): Result<Unit> {
+        validateStagedPaths(workspaceDir).getOrElse { return Result.failure(it) }
+        val partition = remoteSyncRepository.partitionChanges(changedPaths)
+        if (partition.unsafePaths.isNotEmpty()) {
+            return Result.failure(SyncException(SyncError.UnsafeLocalPath))
+        }
+        if (partition.nonInboxPaths.isNotEmpty()) {
+            return Result.failure(SyncException(SyncError.NonInboxLocalChanges))
+        }
+        return Result.success(Unit)
+    }
+
+    private fun validateStagedPaths(workspaceDir: File): Result<Unit> {
+        val stagedPaths = remoteSyncRepository.readStagedPaths(workspaceDir).getOrElse { error ->
+            return Result.failure(SyncGitErrorMapper.mapFailure(error))
+        }
+        val stagedPartition = remoteSyncRepository.partitionChanges(stagedPaths)
+        if (stagedPartition.unsafePaths.isNotEmpty()) {
+            return Result.failure(SyncException(SyncError.UnsafeLocalPath))
+        }
+        if (stagedPartition.nonInboxPaths.isNotEmpty()) {
+            return Result.failure(SyncException(SyncError.NonInboxStagedChanges))
+        }
+        return Result.success(Unit)
     }
 
     private suspend fun readHttpsToken(

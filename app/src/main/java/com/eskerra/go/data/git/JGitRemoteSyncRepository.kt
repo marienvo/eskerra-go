@@ -31,6 +31,12 @@ class JGitRemoteSyncRepository(
     override fun status(workingDir: File): Result<GitWorkspaceStatus> =
         gitRepository.status(workingDir)
 
+    override fun readStagedPaths(workingDir: File): Result<Set<String>> =
+        GitIndexInspector.readStagedPaths(workingDir)
+
+    override fun requiresManualIntervention(workingDir: File): Boolean =
+        GitRepoStateInspector.requiresManualIntervention(workingDir)
+
     override fun partitionChanges(changedPaths: Set<String>): SyncChangePartition =
         SyncPathClassifier.partition(changedPaths)
 

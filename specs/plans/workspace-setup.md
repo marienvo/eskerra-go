@@ -10,7 +10,7 @@ and Step 2 Git spike.
   DataStore persistence
 - `data/workspace/WorkspacePaths.kt` - fixed `workspace/` path under `filesDir`
   with validation (no absolute paths, no `..`)
-- `data/credentials/CredentialStore.kt` + `AppPrivateCredentialStore.kt` - credential seam (not in DataStore)
+- `data/credentials/CredentialStore.kt` + `EncryptedCredentialStore.kt` (Keystore-backed) — credential seam (not in DataStore)
 - `data/workspace/WorkspaceSetupCompletion.kt` - Git setup + metadata/credential persistence as one result
 - `data/workspace/AppGateResolver.kt` - pure launch gate logic
 - `app/AppGateViewModel.kt` + `app/AppRoot.kt` - stable root gate
