@@ -1,6 +1,7 @@
 package com.eskerra.go.data.workspace
 
 import com.eskerra.go.core.model.WorkspaceConfig
+import com.eskerra.go.data.git.GitBranchNameValidator
 import com.eskerra.go.data.git.WorkspaceGitRepository
 import java.io.File
 import kotlinx.coroutines.Dispatchers
@@ -13,6 +14,7 @@ interface WorkspaceSetupRepository {
         name: String,
         branch: String,
         remoteUri: String?,
+        credential: String?,
         filesDir: File
     ): Result<WorkspaceConfig>
 }
@@ -25,10 +27,10 @@ class DefaultWorkspaceSetupRepository(private val gitRepository: WorkspaceGitRep
         name: String,
         branch: String,
         remoteUri: String?,
+        credential: String?,
         filesDir: File
     ): Result<WorkspaceConfig> = withContext(Dispatchers.IO) {
         val trimmedName = name.trim()
-        val trimmedBranch = branch.trim()
         if (trimmedName.isBlank()) {
             return@withContext Result.failure(
                 WorkspaceSetupException(WorkspaceSetupError.BlankName)
@@ -38,20 +40,24 @@ class DefaultWorkspaceSetupRepository(private val gitRepository: WorkspaceGitRep
             filesDir,
             WorkspacePaths.DEFAULT_RELATIVE_PATH
         )
-        val workspaceDir = workspaceDirResult.getOrElse { error ->
+        val workspaceDir = workspaceDirResult.getOrElse { _ ->
             return@withContext Result.failure(
-                WorkspaceSetupException(WorkspaceSetupError.StorageFailed(error.message))
+                WorkspaceSetupException(WorkspaceSetupError.StorageFailed)
             )
         }
 
         when (mode) {
             WorkspaceSetupMode.Clone -> {
-                if (trimmedBranch.isBlank()) {
-                    return@withContext Result.failure(
-                        WorkspaceSetupException(WorkspaceSetupError.BlankBranch)
-                    )
+                GitBranchNameValidator.validate(branch).getOrElse { error ->
+                    return@withContext Result.failure(error)
                 }
-                completeClone(trimmedName, trimmedBranch, remoteUri, workspaceDir)
+                completeClone(
+                    trimmedName,
+                    branch,
+                    remoteUri,
+                    credential?.trim().orEmpty(),
+                    workspaceDir
+                )
             }
             WorkspaceSetupMode.InitializeLocal -> completeInit(trimmedName, workspaceDir)
         }
@@ -61,6 +67,7 @@ class DefaultWorkspaceSetupRepository(private val gitRepository: WorkspaceGitRep
         name: String,
         branch: String,
         remoteUri: String?,
+        credential: String,
         workspaceDir: File
     ): Result<WorkspaceConfig> {
         val uri = remoteUri?.trim().orEmpty()
@@ -70,24 +77,45 @@ class DefaultWorkspaceSetupRepository(private val gitRepository: WorkspaceGitRep
         RemoteUriSecurity.validateNoEmbeddedCredentials(uri).getOrElse { error ->
             return Result.failure(error)
         }
-        if (!isFileRemoteUri(uri)) {
+        if (!isSupportedRemoteUri(uri)) {
             return Result.failure(
                 WorkspaceSetupException(WorkspaceSetupError.UnsupportedRemoteScheme)
             )
         }
+        val httpsToken = if (isHttpsRemoteUri(uri)) {
+            if (credential.isBlank()) {
+                return Result.failure(
+                    WorkspaceSetupException(WorkspaceSetupError.MissingCredential)
+                )
+            }
+            credential
+        } else {
+            null
+        }
+        val sanitizedUri = sanitizeRemoteUri(uri)
 
-        WorkspacePaths.ensureEmptyDirectory(workspaceDir).getOrElse { error ->
+        WorkspacePaths.ensureEmptyDirectory(workspaceDir).getOrElse { _ ->
             return Result.failure(
-                WorkspaceSetupException(WorkspaceSetupError.StorageFailed(error.message))
+                WorkspaceSetupException(WorkspaceSetupError.StorageFailed)
             )
         }
 
-        gitRepository.cloneFrom(uri, workspaceDir, branch).getOrElse { error ->
+        gitRepository.cloneFrom(
+            remoteUri = sanitizedUri,
+            workingDir = workspaceDir,
+            branch = branch,
+            httpsToken = httpsToken
+        ).getOrElse { error ->
             cleanupOnFailure(workspaceDir)
             return Result.failure(mapCloneFailure(error, branch))
         }
 
-        return buildConfig(name, uri, workspaceDir, validateBranch = branch).also { result ->
+        return buildConfig(
+            name,
+            sanitizedUri,
+            workspaceDir,
+            validateBranch = branch
+        ).also { result ->
             if (result.isFailure) cleanupOnFailure(workspaceDir)
         }
     }
@@ -95,14 +123,14 @@ class DefaultWorkspaceSetupRepository(private val gitRepository: WorkspaceGitRep
     private fun completeInit(name: String, workspaceDir: File): Result<WorkspaceConfig> {
         WorkspacePaths.ensureEmptyDirectory(workspaceDir).getOrElse { error ->
             return Result.failure(
-                WorkspaceSetupException(WorkspaceSetupError.StorageFailed(error.message))
+                WorkspaceSetupException(WorkspaceSetupError.StorageFailed)
             )
         }
 
-        gitRepository.initOrOpen(workspaceDir).getOrElse { error ->
+        gitRepository.initOrOpen(workspaceDir).getOrElse { _ ->
             cleanupOnFailure(workspaceDir)
             return Result.failure(
-                WorkspaceSetupException(WorkspaceSetupError.InitFailed(error.message))
+                WorkspaceSetupException(WorkspaceSetupError.InitFailed)
             )
         }
 
@@ -122,9 +150,9 @@ class DefaultWorkspaceSetupRepository(private val gitRepository: WorkspaceGitRep
         workspaceDir: File,
         validateBranch: String?
     ): Result<WorkspaceConfig> {
-        val status = gitRepository.status(workspaceDir).getOrElse { error ->
+        val status = gitRepository.status(workspaceDir).getOrElse { _ ->
             return Result.failure(
-                WorkspaceSetupException(WorkspaceSetupError.StorageFailed(error.message))
+                WorkspaceSetupException(WorkspaceSetupError.StorageFailed)
             )
         }
         if (validateBranch != null && status.branch != validateBranch) {
@@ -149,6 +177,14 @@ class DefaultWorkspaceSetupRepository(private val gitRepository: WorkspaceGitRep
         }
     }
 
+    private fun sanitizeRemoteUri(uri: String): String = uri.trim()
+
+    private fun isHttpsRemoteUri(uri: String): Boolean =
+        uri.startsWith("https://", ignoreCase = true)
+
     private fun isFileRemoteUri(uri: String): Boolean =
         uri.startsWith("file://") || uri.startsWith("file:/")
+
+    private fun isSupportedRemoteUri(uri: String): Boolean =
+        isFileRemoteUri(uri) || isHttpsRemoteUri(uri)
 }

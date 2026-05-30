@@ -50,27 +50,33 @@ class JGitWorkspaceRepository(
         Git.init().setDirectory(workingDir).call().close()
     }
 
-    override fun cloneFrom(remoteUri: String, workingDir: File, branch: String?): Result<Unit> =
-        runCatching {
-            if (workingDir.exists()) {
-                if (!workingDir.isDirectory) {
-                    error("workingDir exists but is not a directory: $workingDir")
-                }
-                val entries = workingDir.listFiles()
-                if (entries != null && entries.isNotEmpty()) {
-                    error("clone target is not empty: $workingDir")
-                }
+    override fun cloneFrom(
+        remoteUri: String,
+        workingDir: File,
+        branch: String?,
+        httpsToken: String?
+    ): Result<Unit> = runCatching {
+        if (workingDir.exists()) {
+            if (!workingDir.isDirectory) {
+                error("workingDir exists but is not a directory: $workingDir")
             }
-            val clone = Git.cloneRepository()
-                .setURI(remoteUri)
-                .setDirectory(workingDir)
-            if (!branch.isNullOrBlank()) {
-                clone.setBranch(branch)
+            val entries = workingDir.listFiles()
+            if (entries != null && entries.isNotEmpty()) {
+                error("clone target is not empty: $workingDir")
             }
-            clone.withTransportConfig()
-                .call()
-                .close()
         }
+        val clone = Git.cloneRepository()
+            .setURI(remoteUri)
+            .setDirectory(workingDir)
+        if (!branch.isNullOrBlank()) {
+            clone.setBranch(branch)
+        }
+        val callback = httpsToken?.let {
+            HttpsTokenCredentialsProviderFactory.transportConfigCallback(it)
+        } ?: transportConfigCallback
+        callback?.let { clone.setTransportConfigCallback(it) }
+        clone.call().close()
+    }
 
     override fun status(workingDir: File): Result<GitWorkspaceStatus> = runCatching {
         Git.open(workingDir).use { git ->

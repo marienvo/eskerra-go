@@ -29,12 +29,19 @@ interface WorkspaceGitRepository : WorkspaceGitStatusRepository {
     fun initOrOpen(workingDir: File): Result<Unit>
 
     /**
-     * Clone [remoteUri] (a local `file://` bare repo in the spike) into
-     * [workingDir], optionally checking out [branch].
+     * Clone [remoteUri] into [workingDir], optionally checking out [branch].
+     *
+     * For HTTPS remotes, pass [httpsToken] so auth uses an in-memory credential
+     * provider instead of embedding credentials in the URL.
      *
      * Fails (writing nothing) when [workingDir] already exists and is not empty.
      */
-    fun cloneFrom(remoteUri: String, workingDir: File, branch: String? = null): Result<Unit>
+    fun cloneFrom(
+        remoteUri: String,
+        workingDir: File,
+        branch: String? = null,
+        httpsToken: String? = null
+    ): Result<Unit>
 
     /** Read the working tree status of the repository at [workingDir]. */
     override fun status(workingDir: File): Result<GitWorkspaceStatus>

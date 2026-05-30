@@ -17,8 +17,19 @@ sealed class WorkspaceSetupError {
     }
 
     data object UnsupportedRemoteScheme : WorkspaceSetupError() {
-        override fun message() =
-            "Only file:// remotes are supported in this step. HTTPS auth is not wired yet."
+        override fun message() = "Only file:// and https:// remotes are supported in this step."
+    }
+
+    data object MissingCredential : WorkspaceSetupError() {
+        override fun message() = "Enter an access token for HTTPS remotes."
+    }
+
+    data object InvalidBranch : WorkspaceSetupError() {
+        override fun message() = "Enter a valid branch name."
+    }
+
+    data object RemoteUnavailable : WorkspaceSetupError() {
+        override fun message() = "Remote is unavailable. Check the URL and try again."
     }
 
     data object CredentialBearingRemoteUri : WorkspaceSetupError() {
@@ -29,31 +40,31 @@ sealed class WorkspaceSetupError {
         override fun message() = "Branch \"$branch\" was not found on the remote."
     }
 
-    data class InvalidRepository(val detail: String?) : WorkspaceSetupError() {
+    data object InvalidRepository : WorkspaceSetupError() {
         override fun message() = "Repository not found or invalid."
     }
 
-    data class AuthenticationFailed(val detail: String?) : WorkspaceSetupError() {
+    data object AuthenticationFailed : WorkspaceSetupError() {
         override fun message() = "Authentication failed."
     }
 
-    data class CloneFailed(val detail: String?) : WorkspaceSetupError() {
+    data object CloneFailed : WorkspaceSetupError() {
         override fun message() = "Clone failed."
     }
 
-    data class InitFailed(val detail: String?) : WorkspaceSetupError() {
+    data object InitFailed : WorkspaceSetupError() {
         override fun message() = "Initialize failed."
     }
 
-    data class StorageFailed(val detail: String?) : WorkspaceSetupError() {
+    data object StorageFailed : WorkspaceSetupError() {
         override fun message() = "Storage setup failed."
     }
 
-    data class MetadataSaveFailed(val detail: String?) : WorkspaceSetupError() {
+    data object MetadataSaveFailed : WorkspaceSetupError() {
         override fun message() = "Could not save workspace settings."
     }
 
-    data class CredentialSaveFailed(val detail: String?) : WorkspaceSetupError() {
+    data object CredentialSaveFailed : WorkspaceSetupError() {
         override fun message() = "Could not save credentials."
     }
 }
@@ -65,9 +76,10 @@ fun mapCloneFailure(error: Throwable, branch: String): WorkspaceSetupException {
     return WorkspaceSetupException(
         when {
             isBranchRefError(text, branch) -> WorkspaceSetupError.BranchNotFound(branch)
-            isAuthenticationError(text) -> WorkspaceSetupError.AuthenticationFailed(error.message)
-            isInvalidRepositoryError(text) -> WorkspaceSetupError.InvalidRepository(error.message)
-            else -> WorkspaceSetupError.CloneFailed(error.message)
+            isAuthenticationError(text) -> WorkspaceSetupError.AuthenticationFailed
+            isRemoteUnavailableError(text) -> WorkspaceSetupError.RemoteUnavailable
+            isInvalidRepositoryError(text) -> WorkspaceSetupError.InvalidRepository
+            else -> WorkspaceSetupError.CloneFailed
         }
     )
 }
@@ -122,3 +134,11 @@ internal fun isAuthenticationError(message: String): Boolean =
         message.contains("401", ignoreCase = false) ||
         message.contains("403", ignoreCase = false) ||
         message.contains("credentials", ignoreCase = true)
+
+internal fun isRemoteUnavailableError(message: String): Boolean =
+    message.contains("Connection refused", ignoreCase = true) ||
+        message.contains("Connection timed out", ignoreCase = true) ||
+        message.contains("UnknownHost", ignoreCase = true) ||
+        message.contains("Network is unreachable", ignoreCase = true) ||
+        message.contains("unable to access", ignoreCase = true) ||
+        message.contains("Could not resolve host", ignoreCase = true)

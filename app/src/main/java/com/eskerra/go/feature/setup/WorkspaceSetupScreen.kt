@@ -69,7 +69,7 @@ fun WorkspaceSetupScreen(
             onSelect = { onModeChange(WorkspaceSetupMode.InitializeLocal) }
         )
         SetupModeOption(
-            label = "Clone from file:// remote",
+            label = "Clone from remote",
             selected = state.mode == WorkspaceSetupMode.Clone,
             onSelect = { onModeChange(WorkspaceSetupMode.Clone) }
         )
@@ -100,9 +100,9 @@ fun WorkspaceSetupScreen(
             OutlinedTextField(
                 value = state.remoteUri,
                 onValueChange = onRemoteUriChange,
-                label = { Text("Remote URI (file:// only)") },
+                label = { Text("Remote URI") },
                 supportingText = {
-                    Text("HTTPS auth is not wired yet. Use file:// for this PoC.")
+                    Text("Use file:// for local bare repos or https:// for hosted remotes.")
                 },
                 singleLine = true,
                 enabled = !state.isSubmitting,
@@ -112,9 +112,11 @@ fun WorkspaceSetupScreen(
             OutlinedTextField(
                 value = state.credential,
                 onValueChange = onCredentialChange,
-                label = { Text("Access token (optional)") },
+                label = { Text("Access token") },
                 supportingText = {
-                    Text("Stored separately from workspace settings via CredentialStore.")
+                    Text(
+                        "Required for HTTPS remotes. Stored separately via CredentialStore."
+                    )
                 },
                 singleLine = true,
                 enabled = !state.isSubmitting,
@@ -143,7 +145,15 @@ fun WorkspaceSetupScreen(
                 enabled = state.name.isNotBlank() &&
                     (
                         state.mode != WorkspaceSetupMode.Clone ||
-                            (state.branch.isNotBlank() && state.remoteUri.isNotBlank())
+                            (
+                                state.branch.isNotBlank() &&
+                                    state.remoteUri.isNotBlank() &&
+                                    (
+                                        !state.remoteUri.trim()
+                                            .startsWith("https://", ignoreCase = true) ||
+                                            state.credential.isNotBlank()
+                                        )
+                                )
                         ),
                 modifier = Modifier.fillMaxWidth()
             ) {

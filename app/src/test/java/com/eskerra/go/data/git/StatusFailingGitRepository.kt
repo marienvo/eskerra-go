@@ -11,8 +11,12 @@ class StatusFailingGitRepository(
 
     override fun initOrOpen(workingDir: File): Result<Unit> = delegate.initOrOpen(workingDir)
 
-    override fun cloneFrom(remoteUri: String, workingDir: File, branch: String?): Result<Unit> =
-        delegate.cloneFrom(remoteUri, workingDir, branch)
+    override fun cloneFrom(
+        remoteUri: String,
+        workingDir: File,
+        branch: String?,
+        httpsToken: String?
+    ): Result<Unit> = delegate.cloneFrom(remoteUri, workingDir, branch, httpsToken)
 
     override fun status(workingDir: File): Result<GitWorkspaceStatus> =
         Result.failure(statusFailure)

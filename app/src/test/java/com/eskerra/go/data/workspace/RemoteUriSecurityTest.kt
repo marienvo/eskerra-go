@@ -59,6 +59,13 @@ class RemoteUriSecurityTest {
     }
 
     @Test
+    fun containsEmbeddedCredentials_allowsSanitizedHttpsRemote() {
+        assertFalse(
+            RemoteUriSecurity.containsEmbeddedCredentials("https://example.com/org/repo.git")
+        )
+    }
+
+    @Test
     fun validateNoEmbeddedCredentials_returnsTypedError() {
         val result = RemoteUriSecurity.validateNoEmbeddedCredentials(
             "https://mysecrettoken@example.com/repo.git"

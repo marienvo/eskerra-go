@@ -22,7 +22,12 @@ class RemoteCallingGitRepository(
 
     override fun initOrOpen(workingDir: File): Result<Unit> = delegate.initOrOpen(workingDir)
 
-    override fun cloneFrom(remoteUri: String, workingDir: File, branch: String?): Result<Unit> {
+    override fun cloneFrom(
+        remoteUri: String,
+        workingDir: File,
+        branch: String?,
+        httpsToken: String?
+    ): Result<Unit> {
         cloneCallCount += 1
         return Result.failure(IllegalStateException("clone should not run offline"))
     }

@@ -4,13 +4,12 @@ import com.eskerra.go.data.workspace.WorkspacePaths
 import java.io.File
 
 /**
- * Legacy PoC plaintext credential store kept for migration tests only.
+ * Stores workspace tokens as encrypted bytes under app-private storage.
  *
- * Production wiring must use [EncryptedCredentialStore] with
- * [AndroidKeystoreTokenCipher].
+ * Tokens are never written to workspace DataStore metadata or Git config.
  */
-@Deprecated("Use EncryptedCredentialStore with AndroidKeystoreTokenCipher")
-class AppPrivateCredentialStore(private val filesDir: File) : CredentialStore {
+class EncryptedCredentialStore(private val filesDir: File, private val tokenCipher: TokenCipher) :
+    CredentialStore {
 
     private fun tokenFile(relativePath: String): File {
         WorkspacePaths.validateRelativePath(relativePath).getOrThrow()
@@ -21,12 +20,16 @@ class AppPrivateCredentialStore(private val filesDir: File) : CredentialStore {
         runCatching {
             val file = tokenFile(relativePath)
             file.parentFile?.mkdirs()
-            file.writeText(token)
+            file.writeBytes(tokenCipher.encrypt(token))
         }
 
     override suspend fun readToken(relativePath: String): Result<String?> = runCatching {
         val file = tokenFile(relativePath)
-        if (!file.isFile) null else file.readText()
+        if (!file.isFile) {
+            null
+        } else {
+            tokenCipher.decrypt(file.readBytes())
+        }
     }
 
     override suspend fun clear(relativePath: String): Result<Unit> = runCatching {

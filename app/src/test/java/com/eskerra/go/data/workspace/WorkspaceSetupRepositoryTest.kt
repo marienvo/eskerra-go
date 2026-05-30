@@ -1,5 +1,6 @@
 package com.eskerra.go.data.workspace
 
+import com.eskerra.go.data.git.CredentialRecordingGitRepository
 import com.eskerra.go.data.git.JGitWorkspaceRepository
 import com.eskerra.go.data.git.StatusFailingGitRepository
 import com.eskerra.go.data.git.TestGitRepos
@@ -32,6 +33,7 @@ class WorkspaceSetupRepositoryTest {
             name = "Local Notes",
             branch = "",
             remoteUri = null,
+            credential = null,
             filesDir = filesDir
         )
 
@@ -57,6 +59,7 @@ class WorkspaceSetupRepositoryTest {
             name = "Local Notes",
             branch = "",
             remoteUri = null,
+            credential = null,
             filesDir = filesDir
         )
 
@@ -85,6 +88,7 @@ class WorkspaceSetupRepositoryTest {
             name = "Cloned Notes",
             branch = remoteBranch,
             remoteUri = remoteUri,
+            credential = null,
             filesDir = filesDir
         )
 
@@ -106,6 +110,7 @@ class WorkspaceSetupRepositoryTest {
             name = "Remote Notes",
             branch = "main",
             remoteUri = "https://mysecrettoken@example.com/repo.git",
+            credential = "pat-12345",
             filesDir = filesDir
         )
 
@@ -125,6 +130,7 @@ class WorkspaceSetupRepositoryTest {
             name = "Remote Notes",
             branch = "main",
             remoteUri = "ssh://git@example.com/repo.git",
+            credential = null,
             filesDir = filesDir
         )
 
@@ -143,6 +149,7 @@ class WorkspaceSetupRepositoryTest {
             name = "Remote Notes",
             branch = "main",
             remoteUri = "file://user:mysecrettoken@/tmp/repo.git",
+            credential = null,
             filesDir = filesDir
         )
 
@@ -154,7 +161,7 @@ class WorkspaceSetupRepositoryTest {
     }
 
     @Test
-    fun clone_rejectsNonFileUri() = runTest {
+    fun clone_httpsRequiresToken() = runTest {
         val filesDir = filesDir()
 
         val result = repository.completeSetup(
@@ -162,6 +169,25 @@ class WorkspaceSetupRepositoryTest {
             name = "Remote Notes",
             branch = "main",
             remoteUri = "https://example.com/repo.git",
+            credential = null,
+            filesDir = filesDir
+        )
+
+        assertTrue(result.isFailure)
+        val error = result.exceptionOrNull() as WorkspaceSetupException
+        assertTrue(error.error is WorkspaceSetupError.MissingCredential)
+    }
+
+    @Test
+    fun clone_rejectsUnsupportedScheme() = runTest {
+        val filesDir = filesDir()
+
+        val result = repository.completeSetup(
+            mode = WorkspaceSetupMode.Clone,
+            name = "Remote Notes",
+            branch = "main",
+            remoteUri = "git@example.com:repo.git",
+            credential = "token",
             filesDir = filesDir
         )
 
@@ -179,6 +205,7 @@ class WorkspaceSetupRepositoryTest {
             name = "Remote Notes",
             branch = "main",
             remoteUri = null,
+            credential = null,
             filesDir = filesDir
         )
 
@@ -196,6 +223,7 @@ class WorkspaceSetupRepositoryTest {
             name = "Remote Notes",
             branch = "   ",
             remoteUri = "file:///tmp/example.git",
+            credential = null,
             filesDir = filesDir
         )
 
@@ -213,6 +241,7 @@ class WorkspaceSetupRepositoryTest {
             name = "   ",
             branch = "",
             remoteUri = null,
+            credential = null,
             filesDir = filesDir
         )
 
@@ -241,6 +270,7 @@ class WorkspaceSetupRepositoryTest {
             name = "Cloned Notes",
             branch = "missing-branch",
             remoteUri = remoteUri,
+            credential = null,
             filesDir = filesDir
         )
 
@@ -263,6 +293,7 @@ class WorkspaceSetupRepositoryTest {
             name = "Remote Notes",
             branch = "master",
             remoteUri = missingUri,
+            credential = null,
             filesDir = filesDir
         )
 
@@ -272,5 +303,115 @@ class WorkspaceSetupRepositoryTest {
             "expected InvalidRepository but was ${error.error}",
             error.error is WorkspaceSetupError.InvalidRepository
         )
+    }
+
+    @Test
+    fun clone_rejectsLeadingAndTrailingBranchWhitespace() = runTest {
+        val filesDir = filesDir()
+
+        val result = repository.completeSetup(
+            mode = WorkspaceSetupMode.Clone,
+            name = "Remote Notes",
+            branch = " main ",
+            remoteUri = "https://example.com/repo.git",
+            credential = "token",
+            filesDir = filesDir
+        )
+
+        assertTrue(result.isFailure)
+        val error = result.exceptionOrNull() as WorkspaceSetupException
+        assertTrue(error.error is WorkspaceSetupError.InvalidBranch)
+    }
+
+    @Test
+    fun clone_rejectsUnsafeBranchNames() = runTest {
+        val filesDir = filesDir()
+        val unsafeBranches = listOf(
+            "feature..fix",
+            "/main",
+            "main.lock",
+            "refs/heads/main",
+            "main:origin/main"
+        )
+
+        unsafeBranches.forEach { branch ->
+            val result = repository.completeSetup(
+                mode = WorkspaceSetupMode.Clone,
+                name = "Remote Notes",
+                branch = branch,
+                remoteUri = "https://example.com/repo.git",
+                credential = "token",
+                filesDir = filesDir
+            )
+            assertTrue("branch '$branch' should be rejected", result.isFailure)
+            val error = result.exceptionOrNull() as WorkspaceSetupException
+            assertTrue(error.error is WorkspaceSetupError.InvalidBranch)
+        }
+    }
+
+    @Test
+    fun clone_httpsPassesTokenThroughCredentialProviderNotUrl() = runTest {
+        val filesDir = filesDir()
+        val bare = TestGitRepos.initBareRemote(File(temp.root, "https-remote.git"))
+        val localRemoteUri = TestGitRepos.fileUri(bare)
+        val producer = temp.newFolder("producer")
+        gitRepository.cloneFrom(localRemoteUri, producer).getOrThrow()
+        gitRepository.writeFile(producer, "notes/seed.md", "# Seed\n").getOrThrow()
+        gitRepository.stageAll(producer).getOrThrow()
+        gitRepository.commit(producer, "Seed").getOrThrow()
+        gitRepository.push(producer).getOrThrow()
+        val remoteBranch = gitRepository.status(producer).getOrThrow().branch
+
+        val recordingGit = CredentialRecordingGitRepository()
+        recordingGit.simulatedLocalRemoteUri = localRemoteUri
+        val httpsRepository = DefaultWorkspaceSetupRepository(recordingGit)
+        val httpsUri = "https://example.com/org/repo.git"
+        val token = "secret-https-token"
+
+        val result = httpsRepository.completeSetup(
+            mode = WorkspaceSetupMode.Clone,
+            name = "HTTPS Notes",
+            branch = remoteBranch,
+            remoteUri = httpsUri,
+            credential = token,
+            filesDir = filesDir
+        )
+
+        assertTrue(result.isSuccess)
+        assertEquals(httpsUri, recordingGit.lastCloneRemoteUri)
+        assertEquals(token, recordingGit.lastCloneHttpsToken)
+        assertFalse(recordingGit.lastCloneRemoteUri!!.contains(token))
+        val config = result.getOrThrow()
+        assertEquals(httpsUri, config.remoteUri)
+        assertFalse(config.remoteUri!!.contains(token))
+
+        val gitConfig = File(filesDir, "workspace/.git/config")
+        assertTrue(gitConfig.isFile)
+        assertFalse(gitConfig.readText().contains(token))
+    }
+
+    @Test
+    fun clone_authFailureDoesNotExposeToken() = runTest {
+        val filesDir = filesDir()
+        val recordingGit = CredentialRecordingGitRepository()
+        recordingGit.cloneFailure = RuntimeException(
+            "Authentication failed for https://example.com/repo.git"
+        )
+        val httpsRepository = DefaultWorkspaceSetupRepository(recordingGit)
+        val token = "secret-auth-token"
+
+        val result = httpsRepository.completeSetup(
+            mode = WorkspaceSetupMode.Clone,
+            name = "HTTPS Notes",
+            branch = "main",
+            remoteUri = "https://example.com/repo.git",
+            credential = token,
+            filesDir = filesDir
+        )
+
+        assertTrue(result.isFailure)
+        val error = result.exceptionOrNull() as WorkspaceSetupException
+        assertTrue(error.error is WorkspaceSetupError.AuthenticationFailed)
+        assertFalse(error.error.message().contains(token))
     }
 }

@@ -8,5 +8,8 @@ class FailingCredentialStore : CredentialStore {
     override suspend fun saveToken(relativePath: String, token: String): Result<Unit> =
         Result.failure(saveFailure)
 
+    override suspend fun readToken(relativePath: String): Result<String?> =
+        Result.failure(saveFailure)
+
     override suspend fun clear(relativePath: String): Result<Unit> = Result.failure(clearFailure)
 }

@@ -11,7 +11,8 @@ import com.eskerra.go.core.usecase.LoadGitStatusSummary
 import com.eskerra.go.core.usecase.LoadInboxSummaries
 import com.eskerra.go.core.usecase.LoadNoteForReading
 import com.eskerra.go.core.usecase.SaveNote
-import com.eskerra.go.data.credentials.AppPrivateCredentialStore
+import com.eskerra.go.data.credentials.AndroidKeystoreTokenCipher
+import com.eskerra.go.data.credentials.EncryptedCredentialStore
 import com.eskerra.go.data.git.JGitWorkspaceRepository
 import com.eskerra.go.data.notes.FileNoteContentRepository
 import com.eskerra.go.data.notes.FileNoteRegistryRepository
@@ -27,7 +28,10 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         val workspaceStore = DataStoreWorkspaceStore(applicationContext)
-        val credentialStore = AppPrivateCredentialStore(filesDir)
+        val credentialStore = EncryptedCredentialStore(
+            filesDir = filesDir,
+            tokenCipher = AndroidKeystoreTokenCipher()
+        )
         val gitRepository = JGitWorkspaceRepository()
         val setupCompletion = DefaultWorkspaceSetupCompletion(
             setupRepository = DefaultWorkspaceSetupRepository(gitRepository),
