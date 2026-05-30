@@ -103,7 +103,14 @@ class DefaultWorkspaceSetupRepository(private val gitRepository: WorkspaceGitRep
             )
         }
 
-        return buildConfig(name, remoteUri = null, workspaceDir, validateBranch = null)
+        return buildConfig(
+            name,
+            remoteUri = null,
+            workspaceDir,
+            validateBranch = null
+        ).also { result ->
+            if (result.isFailure) cleanupOnFailure(workspaceDir)
+        }
     }
 
     private fun buildConfig(

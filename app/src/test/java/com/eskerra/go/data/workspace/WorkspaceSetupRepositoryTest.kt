@@ -1,6 +1,7 @@
 package com.eskerra.go.data.workspace
 
 import com.eskerra.go.data.git.JGitWorkspaceRepository
+import com.eskerra.go.data.git.StatusFailingGitRepository
 import com.eskerra.go.data.git.TestGitRepos
 import java.io.File
 import kotlinx.coroutines.test.runTest
@@ -43,6 +44,26 @@ class WorkspaceSetupRepositoryTest {
 
         val workspaceDir = File(filesDir, WorkspacePaths.DEFAULT_RELATIVE_PATH)
         assertTrue(WorkspacePaths.isValidGitWorkspace(workspaceDir))
+    }
+
+    @Test
+    fun initializeLocal_buildConfigFailure_cleansUpWorkspaceDirectory() = runTest {
+        val filesDir = filesDir()
+        val workspaceDir = File(filesDir, WorkspacePaths.DEFAULT_RELATIVE_PATH)
+        val repository = DefaultWorkspaceSetupRepository(StatusFailingGitRepository())
+
+        val result = repository.completeSetup(
+            mode = WorkspaceSetupMode.InitializeLocal,
+            name = "Local Notes",
+            branch = "",
+            remoteUri = null,
+            filesDir = filesDir
+        )
+
+        assertTrue(result.isFailure)
+        val error = result.exceptionOrNull() as WorkspaceSetupException
+        assertTrue(error.error is WorkspaceSetupError.StorageFailed)
+        assertFalse(workspaceDir.exists())
     }
 
     @Test
