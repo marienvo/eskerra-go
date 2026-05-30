@@ -2,6 +2,7 @@ package com.eskerra.go.data.workspace
 
 import com.eskerra.go.app.AppGateState
 import com.eskerra.go.core.model.WorkspaceConfig
+import com.eskerra.go.data.git.JGitWorkspaceRepository
 import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -38,7 +39,23 @@ class AppGateResolverTest {
         val state = resolveAppGateState(config, filesDir)
 
         assertTrue(state is AppGateState.NeedsSetup)
-        assertTrue((state as AppGateState.NeedsSetup).recoveryMessage != null)
+        assertEquals(
+            "Stored workspace path is invalid. Set up again to recover.",
+            (state as AppGateState.NeedsSetup).recoveryMessage
+        )
+    }
+
+    @Test
+    fun missingWorkspaceDirectory_returnsNeedsSetupWithRecoveryMessage() {
+        val filesDir = temp.newFolder("files")
+
+        val state = resolveAppGateState(validConfig, filesDir)
+
+        assertTrue(state is AppGateState.NeedsSetup)
+        assertEquals(
+            "Workspace files are missing. Set up again to recover.",
+            (state as AppGateState.NeedsSetup).recoveryMessage
+        )
     }
 
     @Test
@@ -50,7 +67,23 @@ class AppGateResolverTest {
 
         assertTrue(state is AppGateState.NeedsSetup)
         assertEquals(
-            "Workspace repository is missing or invalid",
+            "Workspace repository is missing or invalid. Set up again to recover.",
+            (state as AppGateState.NeedsSetup).recoveryMessage
+        )
+    }
+
+    @Test
+    fun emptyGitDirectory_returnsNeedsSetup() {
+        val filesDir = temp.newFolder("files")
+        val workspaceDir = File(filesDir, WorkspacePaths.DEFAULT_RELATIVE_PATH)
+        workspaceDir.mkdirs()
+        File(workspaceDir, ".git").mkdir()
+
+        val state = resolveAppGateState(validConfig, filesDir)
+
+        assertTrue(state is AppGateState.NeedsSetup)
+        assertEquals(
+            "Workspace repository is missing or invalid. Set up again to recover.",
             (state as AppGateState.NeedsSetup).recoveryMessage
         )
     }
@@ -60,7 +93,7 @@ class AppGateResolverTest {
         val filesDir = temp.newFolder("files")
         val workspaceDir = File(filesDir, WorkspacePaths.DEFAULT_RELATIVE_PATH)
         workspaceDir.mkdirs()
-        File(workspaceDir, ".git").mkdir()
+        JGitWorkspaceRepository().initOrOpen(workspaceDir).getOrThrow()
 
         val state = resolveAppGateState(validConfig, filesDir)
 

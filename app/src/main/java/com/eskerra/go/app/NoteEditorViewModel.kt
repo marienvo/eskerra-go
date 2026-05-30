@@ -119,8 +119,10 @@ class NoteEditorViewModel(
         return when (contentError) {
             NoteContentError.InvalidNoteId -> NoteEditorUiState.InvalidNoteId
             NoteContentError.NotFound -> NoteEditorUiState.NotFound
-            NoteContentError.InvalidWorkspacePath,
-            NoteContentError.WorkspaceMissing,
+            NoteContentError.InvalidWorkspacePath ->
+                NoteEditorUiState.Error(WORKSPACE_UNAVAILABLE_MESSAGE)
+            NoteContentError.WorkspaceMissing ->
+                NoteEditorUiState.Error(WORKSPACE_MISSING_MESSAGE)
             is NoteContentError.ReadFailed,
             null -> NoteEditorUiState.Error(LOAD_ERROR_MESSAGE)
         }
@@ -132,17 +134,19 @@ class NoteEditorViewModel(
             SaveNoteError.ReadOnlyNote -> "This note is read-only."
             SaveNoteError.NotFound -> "This note is no longer in the workspace."
             SaveNoteError.InvalidNoteId -> "This note path is not valid."
-            SaveNoteError.InvalidWorkspacePath,
-            SaveNoteError.WorkspaceMissing,
-            is SaveNoteError.WriteFailed,
-            is SaveNoteError.RegistryRefreshFailed,
-            null -> SAVE_ERROR_MESSAGE
+            SaveNoteError.InvalidWorkspacePath -> WORKSPACE_UNAVAILABLE_MESSAGE
+            SaveNoteError.WorkspaceMissing -> WORKSPACE_MISSING_MESSAGE
+            is SaveNoteError.RegistryRefreshFailed -> REGISTRY_REFRESH_ERROR_MESSAGE
+            is SaveNoteError.WriteFailed, null -> SAVE_ERROR_MESSAGE
         }
     }
 
     companion object {
         const val LOAD_ERROR_MESSAGE = "Could not open this note."
         const val SAVE_ERROR_MESSAGE = "Could not save this note."
+        const val REGISTRY_REFRESH_ERROR_MESSAGE = "Note saved, but the list could not refresh."
+        const val WORKSPACE_UNAVAILABLE_MESSAGE = "Workspace is not available."
+        const val WORKSPACE_MISSING_MESSAGE = "Workspace files are missing."
         const val SAVED_MESSAGE = "Saved"
 
         fun factory(

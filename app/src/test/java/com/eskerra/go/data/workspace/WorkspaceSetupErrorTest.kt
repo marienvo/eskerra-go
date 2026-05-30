@@ -48,6 +48,26 @@ class WorkspaceSetupErrorTest {
     }
 
     @Test
+    fun userFacingMessagesDoNotIncludeRawDetails() {
+        val rawDetail = "/tmp/private/token-secret.git"
+        val errors = listOf(
+            WorkspaceSetupError.InvalidRepository(rawDetail),
+            WorkspaceSetupError.AuthenticationFailed(rawDetail),
+            WorkspaceSetupError.CloneFailed(rawDetail),
+            WorkspaceSetupError.InitFailed(rawDetail),
+            WorkspaceSetupError.StorageFailed(rawDetail),
+            WorkspaceSetupError.MetadataSaveFailed(rawDetail),
+            WorkspaceSetupError.CredentialSaveFailed(rawDetail)
+        )
+
+        errors.forEach { error ->
+            val message = error.message()
+            assertFalse("Message must not expose raw detail: $message", message.contains(rawDetail))
+            assertFalse("Message must not expose secret text: $message", message.contains("secret"))
+        }
+    }
+
+    @Test
     fun isBranchRefError_rejectsGenericPathNotFound() {
         assertFalse(isBranchRefError("No such file or directory", branch = "main"))
     }

@@ -12,6 +12,7 @@ import com.eskerra.go.data.notes.FakeNoteRegistryRepository
 import com.eskerra.go.data.notes.FakeNoteWriteRepository
 import com.eskerra.go.data.workspace.WorkspacePaths
 import com.eskerra.go.feature.editor.NoteEditorUiState
+import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -153,6 +154,39 @@ class NoteEditorViewModelTest {
 
         val state = viewModel.uiState.value as NoteEditorUiState.Content
         assertFalse(state.note.canEdit)
+    }
+
+    @Test
+    fun gitStatusFailureDoesNotBlockEditorLoad() = runTest {
+        val filesDir = temp.newFolder("files")
+        val workspaceDir = File(filesDir, WorkspacePaths.DEFAULT_RELATIVE_PATH)
+        workspaceDir.mkdirs()
+        JGitWorkspaceRepository().initOrOpen(workspaceDir).getOrThrow()
+
+        val noteId = NoteId("Inbox/First.md")
+        val registry = FakeNoteRegistryRepository.withInboxNotes(summary(noteId, "First"))
+        val content = FakeNoteContentRepository.withContent(noteId, "# First")
+        val gitRepository = com.eskerra.go.data.git.StatusFailingGitRepository()
+        val viewModel = NoteEditorViewModel(
+            config = config,
+            filesDir = filesDir,
+            noteId = noteId,
+            loadEditableNote = LoadEditableNote(registry, content),
+            saveNote = SaveNote(
+                writeRepository = FakeNoteWriteRepository(),
+                registryRepository = registry,
+                loadGitStatusSummary = LoadGitStatusSummary(gitRepository)
+            ),
+            loadGitStatusSummary = LoadGitStatusSummary(gitRepository)
+        )
+
+        val state = viewModel.uiState.value as NoteEditorUiState.Content
+        assertEquals("# First", state.draftMarkdown)
+        assertEquals(
+            com.eskerra.go.core.model.GitStatusSummary.State.Error,
+            state.gitStatus.state
+        )
+        assertEquals("Git status unavailable", state.gitStatus.formatLabel())
     }
 
     @Test

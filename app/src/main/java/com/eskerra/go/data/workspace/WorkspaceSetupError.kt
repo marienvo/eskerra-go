@@ -26,36 +26,31 @@ sealed class WorkspaceSetupError {
     }
 
     data class InvalidRepository(val detail: String?) : WorkspaceSetupError() {
-        override fun message() = detail?.let { "Repository not found or invalid: $it" }
-            ?: "Repository not found or invalid."
+        override fun message() = "Repository not found or invalid."
     }
 
     data class AuthenticationFailed(val detail: String?) : WorkspaceSetupError() {
-        override fun message() =
-            detail?.let { "Authentication failed: $it" } ?: "Authentication failed."
+        override fun message() = "Authentication failed."
     }
 
     data class CloneFailed(val detail: String?) : WorkspaceSetupError() {
-        override fun message() = detail?.let { "Clone failed: $it" } ?: "Clone failed."
+        override fun message() = "Clone failed."
     }
 
     data class InitFailed(val detail: String?) : WorkspaceSetupError() {
-        override fun message() = detail?.let { "Initialize failed: $it" } ?: "Initialize failed."
+        override fun message() = "Initialize failed."
     }
 
     data class StorageFailed(val detail: String?) : WorkspaceSetupError() {
-        override fun message() =
-            detail?.let { "Storage setup failed: $it" } ?: "Storage setup failed."
+        override fun message() = "Storage setup failed."
     }
 
     data class MetadataSaveFailed(val detail: String?) : WorkspaceSetupError() {
-        override fun message() = detail?.let { "Could not save workspace settings: $it" }
-            ?: "Could not save workspace settings."
+        override fun message() = "Could not save workspace settings."
     }
 
     data class CredentialSaveFailed(val detail: String?) : WorkspaceSetupError() {
-        override fun message() =
-            detail?.let { "Could not save credentials: $it" } ?: "Could not save credentials."
+        override fun message() = "Could not save credentials."
     }
 }
 

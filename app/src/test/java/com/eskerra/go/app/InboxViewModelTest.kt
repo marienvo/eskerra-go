@@ -5,6 +5,7 @@ import com.eskerra.go.core.model.NoteSummary
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.usecase.LoadInboxSummaries
 import com.eskerra.go.data.notes.FakeNoteRegistryRepository
+import com.eskerra.go.data.notes.NoteIndexError
 import com.eskerra.go.data.workspace.WorkspacePaths
 import com.eskerra.go.feature.inbox.InboxUiState
 import kotlinx.coroutines.Dispatchers
@@ -17,6 +18,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -94,6 +96,58 @@ class InboxViewModelTest {
             InboxUiState.Error(InboxViewModel.SCAN_ERROR_MESSAGE),
             viewModel.uiState.value
         )
+    }
+
+    @Test
+    fun init_whenWorkspaceMissing_mapsToMissingMessage() = runTest {
+        val filesDir = temp.newFolder("files")
+        val repository = FakeNoteRegistryRepository.failing(NoteIndexError.WorkspaceMissing(null))
+        val viewModel = InboxViewModel(
+            config = config,
+            filesDir = filesDir,
+            loadInboxSummaries = LoadInboxSummaries(repository)
+        )
+
+        assertEquals(
+            InboxUiState.Error(InboxViewModel.WORKSPACE_MISSING_MESSAGE),
+            viewModel.uiState.value
+        )
+    }
+
+    @Test
+    fun init_whenInvalidWorkspacePath_mapsToUnavailableMessage() = runTest {
+        val filesDir = temp.newFolder("files")
+        val repository = FakeNoteRegistryRepository.failing(
+            NoteIndexError.InvalidWorkspacePath(null)
+        )
+        val viewModel = InboxViewModel(
+            config = config,
+            filesDir = filesDir,
+            loadInboxSummaries = LoadInboxSummaries(repository)
+        )
+
+        assertEquals(
+            InboxUiState.Error(InboxViewModel.WORKSPACE_UNAVAILABLE_MESSAGE),
+            viewModel.uiState.value
+        )
+    }
+
+    @Test
+    fun emptyStateIsDistinctFromScanFailure() = runTest {
+        val filesDir = temp.newFolder("files")
+        val emptyViewModel = InboxViewModel(
+            config = config,
+            filesDir = filesDir,
+            loadInboxSummaries = LoadInboxSummaries(FakeNoteRegistryRepository())
+        )
+        val failingViewModel = InboxViewModel(
+            config = config,
+            filesDir = filesDir,
+            loadInboxSummaries = LoadInboxSummaries(FakeNoteRegistryRepository.failing())
+        )
+
+        assertEquals(InboxUiState.Empty, emptyViewModel.uiState.value)
+        assertTrue(failingViewModel.uiState.value is InboxUiState.Error)
     }
 
     @Test

@@ -124,6 +124,40 @@ class NoteReaderViewModelTest {
     }
 
     @Test
+    fun invalidNoteIdStateForBlankPath() = runTest {
+        val viewModel = NoteReaderViewModel(
+            config = config,
+            filesDir = temp.newFolder("files"),
+            noteId = NoteId(""),
+            loadNoteForReading = LoadNoteForReading(
+                FakeNoteRegistryRepository(),
+                FakeNoteContentRepository()
+            )
+        )
+
+        assertEquals(NoteReaderUiState.InvalidNoteId, viewModel.uiState.value)
+    }
+
+    @Test
+    fun workspaceMissingMapsToSafeMessage() = runTest {
+        val noteId = NoteId("Inbox/First.md")
+        val registry = FakeNoteRegistryRepository.failing(
+            com.eskerra.go.data.notes.NoteIndexError.WorkspaceMissing(null)
+        )
+        val viewModel = NoteReaderViewModel(
+            config = config,
+            filesDir = temp.newFolder("files"),
+            noteId = noteId,
+            loadNoteForReading = LoadNoteForReading(registry, FakeNoteContentRepository())
+        )
+
+        assertEquals(
+            NoteReaderUiState.Error(NoteReaderViewModel.WORKSPACE_MISSING_MESSAGE),
+            viewModel.uiState.value
+        )
+    }
+
+    @Test
     fun retryReloadsAfterFailure() = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
         Dispatchers.setMain(dispatcher)

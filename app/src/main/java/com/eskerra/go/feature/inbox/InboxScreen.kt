@@ -62,7 +62,7 @@ private fun InboxEmpty(modifier: Modifier = Modifier) {
         contentAlignment = Alignment.Center
     ) {
         Text(
-            text = "No inbox notes yet.",
+            text = "No inbox notes yet. Tap Add to create one.",
             style = MaterialTheme.typography.bodyLarge
         )
     }

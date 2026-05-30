@@ -20,8 +20,6 @@ import com.eskerra.go.core.usecase.LoadGitStatusSummary
 import com.eskerra.go.core.usecase.LoadInboxSummaries
 import com.eskerra.go.core.usecase.LoadNoteForReading
 import com.eskerra.go.core.usecase.SaveNote
-import com.eskerra.go.data.git.FakeGitGateway
-import com.eskerra.go.data.workspace.FakeWorkspace
 import com.eskerra.go.feature.dashboard.DashboardScreen
 import com.eskerra.go.feature.editor.CreateInboxScreen
 import com.eskerra.go.feature.editor.NoteEditorScreen
@@ -129,11 +127,10 @@ fun App(
             }
 
             composable(AppRoute.DASHBOARD) {
-                val workspace = FakeWorkspace.current
                 DashboardScreen(
-                    workspaceName = workspace.name,
-                    noteCount = workspace.noteCount,
-                    gitStatus = FakeGitGateway.status
+                    workspaceName = config.name,
+                    noteCount = PLACEHOLDER_NOTE_COUNT,
+                    gitStatus = PLACEHOLDER_GIT_STATUS
                 )
             }
 
@@ -219,6 +216,9 @@ private fun NavHostController.markInboxNotesChanged() {
         getBackStackEntry(AppRoute.INBOX).savedStateHandle[NOTES_CHANGED_KEY] = true
     }
 }
+
+private const val PLACEHOLDER_NOTE_COUNT = 0
+private const val PLACEHOLDER_GIT_STATUS = "Placeholder — not connected"
 
 private val fakePodcasts: List<PodcastItem> = listOf(
     PodcastItem(title = "Note-taking, deeply", author = "Eskerra FM"),

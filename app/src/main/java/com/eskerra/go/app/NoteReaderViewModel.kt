@@ -62,8 +62,10 @@ class NoteReaderViewModel(
         return when (contentError) {
             NoteContentError.InvalidNoteId -> NoteReaderUiState.InvalidNoteId
             NoteContentError.NotFound -> NoteReaderUiState.NotFound
-            NoteContentError.InvalidWorkspacePath,
-            NoteContentError.WorkspaceMissing,
+            NoteContentError.InvalidWorkspacePath ->
+                NoteReaderUiState.Error(WORKSPACE_UNAVAILABLE_MESSAGE)
+            NoteContentError.WorkspaceMissing ->
+                NoteReaderUiState.Error(WORKSPACE_MISSING_MESSAGE)
             is NoteContentError.ReadFailed,
             null -> NoteReaderUiState.Error(READ_ERROR_MESSAGE)
         }
@@ -71,6 +73,8 @@ class NoteReaderViewModel(
 
     companion object {
         const val READ_ERROR_MESSAGE = "Could not open this note."
+        const val WORKSPACE_UNAVAILABLE_MESSAGE = "Workspace is not available."
+        const val WORKSPACE_MISSING_MESSAGE = "Workspace files are missing."
 
         fun factory(
             config: WorkspaceConfig,
