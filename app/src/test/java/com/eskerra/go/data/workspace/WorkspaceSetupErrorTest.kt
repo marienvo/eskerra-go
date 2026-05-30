@@ -84,6 +84,16 @@ class WorkspaceSetupErrorTest {
     }
 
     @Test
+    fun mapCloneFailure_mapsRemoteBranchNotFoundToBranchNotFound() {
+        val error = mapCloneFailure(
+            RuntimeException("remote branch not found: main"),
+            branch = "master"
+        )
+        assertTrue(error.error is WorkspaceSetupError.BranchNotFound)
+        assertTrue(error.error.message().contains("main"))
+    }
+
+    @Test
     fun mapCloneFailure_mapsRemoteUnavailableErrors() {
         val error = mapCloneFailure(
             RuntimeException("Connection timed out: connect"),

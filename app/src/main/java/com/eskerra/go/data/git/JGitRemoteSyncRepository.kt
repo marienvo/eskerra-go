@@ -58,7 +58,7 @@ class JGitRemoteSyncRepository(
         workingDir: File,
         branch: String,
         httpsToken: String?
-    ): Result<Unit> = GitLocalBranchAlignment.ensure(workingDir, branch, httpsToken)
+    ): Result<String> = GitLocalBranchAlignment.ensure(workingDir, branch, httpsToken)
 
     override fun compareWithRemote(
         workingDir: File,
@@ -121,17 +121,7 @@ class JGitRemoteSyncRepository(
         branch: String,
         httpsToken: String?
     ): Result<Unit> = runCatching {
-        val lsRemote = Git.lsRemoteRepository().setRemote(remoteUri)
-        httpsToken?.let { token ->
-            lsRemote.setTransportConfigCallback(
-                HttpsTokenCredentialsProviderFactory.transportConfigCallback(token)
-            )
-        }
-        val refs = lsRemote.call()
-        val branchRef = "refs/heads/$branch"
-        if (refs.none { it.name == branchRef }) {
-            error("remote branch not found: $branch")
-        }
+        GitRemoteBranchProbe.resolveRemoteBranch(remoteUri, branch, httpsToken).getOrThrow()
     }
 
     override fun clearSanitizedOrigin(workingDir: File): Result<Unit> =

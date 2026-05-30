@@ -21,6 +21,7 @@ import com.eskerra.go.core.usecase.LoadNoteForReading
 import com.eskerra.go.core.usecase.LoadRemoteSyncSettings
 import com.eskerra.go.core.usecase.LoadSyncStatus
 import com.eskerra.go.core.usecase.ManualSyncNow
+import com.eskerra.go.core.usecase.ReconcileWorkspaceSyncBranch
 import com.eskerra.go.core.usecase.SaveNote
 import com.eskerra.go.core.usecase.SaveRemoteSyncSettings
 import com.eskerra.go.core.usecase.TestRemoteConnection
@@ -52,13 +53,15 @@ fun AppRoot(
     saveRemoteSyncSettings: SaveRemoteSyncSettings,
     updateSyncToken: UpdateSyncToken,
     clearRemoteSyncSettings: ClearRemoteSyncSettings,
-    testRemoteConnection: TestRemoteConnection
+    testRemoteConnection: TestRemoteConnection,
+    reconcileWorkspaceSyncBranch: ReconcileWorkspaceSyncBranch
 ) {
     EskerraGoTheme {
         val gateViewModel: AppGateViewModel = viewModel(
             factory = AppGateViewModel.factory(
                 workspaceStore = workspaceStore,
-                filesDir = filesDir
+                filesDir = filesDir,
+                reconcileWorkspaceSyncBranch = reconcileWorkspaceSyncBranch
             )
         )
         val gateState by gateViewModel.gateState.collectAsState()

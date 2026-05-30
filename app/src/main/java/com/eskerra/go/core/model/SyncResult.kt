@@ -6,5 +6,6 @@ data class SyncResult(
     val committed: Boolean,
     val commitId: String?,
     val pushed: Boolean,
-    val pulled: Boolean
+    val pulled: Boolean,
+    val updatedConfig: WorkspaceConfig? = null
 )

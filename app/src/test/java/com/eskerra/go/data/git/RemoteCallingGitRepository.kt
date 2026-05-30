@@ -32,6 +32,12 @@ class RemoteCallingGitRepository(
         return Result.failure(IllegalStateException("clone should not run offline"))
     }
 
+    override fun resolveCloneBranch(
+        remoteUri: String,
+        branch: String,
+        httpsToken: String?
+    ): Result<String> = delegate.resolveCloneBranch(remoteUri, branch, httpsToken)
+
     override fun status(workingDir: File): Result<GitWorkspaceStatus> = delegate.status(workingDir)
 
     override fun writeFile(workingDir: File, relativePath: String, content: String): Result<Unit> =

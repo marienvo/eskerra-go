@@ -84,7 +84,7 @@ class DefaultRemoteSyncSettingsRepository(
                 return@withContext Result.failure(mapGitFailure(error, trimmedBranch))
             }
 
-        remoteSyncRepository
+        val effectiveBranch = remoteSyncRepository
             .ensureLocalBranch(workspaceDir, trimmedBranch, httpsToken)
             .getOrElse { error ->
                 restoreOrigin(workspaceDir, previousOriginUrl)
@@ -93,7 +93,7 @@ class DefaultRemoteSyncSettingsRepository(
 
         val updated = config.copy(
             remoteUri = sanitizedUri,
-            branch = trimmedBranch
+            branch = effectiveBranch
         )
         try {
             workspaceStore.save(updated)
@@ -156,31 +156,33 @@ class DefaultRemoteSyncSettingsRepository(
         Result.success(cleared)
     }
 
-    override suspend fun testConnection(config: WorkspaceConfig, filesDir: File): Result<Unit> {
+    override suspend fun testConnection(
+        config: WorkspaceConfig,
+        filesDir: File,
+        remoteUri: String?,
+        branch: String?,
+        replacementToken: String?
+    ): Result<Unit> {
         return withContext(Dispatchers.IO) {
-            resolveWorkspace(filesDir, config.relativePath).getOrElse {
-                return@withContext Result.failure(it)
-            }
-
-            val remoteUri = config.remoteUri?.trim().orEmpty()
-            if (remoteUri.isBlank()) {
+            val sanitizedUri = (remoteUri ?: config.remoteUri)?.trim().orEmpty()
+            if (sanitizedUri.isBlank()) {
                 return@withContext Result.failure(
                     RemoteSyncSettingsException(RemoteSyncSettingsError.MissingRemoteUri)
                 )
             }
-            if (RemoteUriSecurity.containsEmbeddedCredentials(remoteUri)) {
+            if (RemoteUriSecurity.containsEmbeddedCredentials(sanitizedUri)) {
                 return@withContext Result.failure(
                     RemoteSyncSettingsException(RemoteSyncSettingsError.InvalidRemoteUri)
                 )
             }
-            if (!RemoteUriSecurity.isSupportedRemoteScheme(remoteUri)) {
+            if (!RemoteUriSecurity.isSupportedRemoteScheme(sanitizedUri)) {
                 return@withContext Result.failure(
                     RemoteSyncSettingsException(RemoteSyncSettingsError.UnsupportedRemoteScheme)
                 )
             }
 
-            val branch = config.branch.trim()
-            if (GitBranchNameValidator.validate(branch).isFailure) {
+            val trimmedBranch = (branch ?: config.branch).trim()
+            if (GitBranchNameValidator.validate(trimmedBranch).isFailure) {
                 return@withContext Result.failure(
                     RemoteSyncSettingsException(RemoteSyncSettingsError.InvalidBranch)
                 )
@@ -188,14 +190,15 @@ class DefaultRemoteSyncSettingsRepository(
 
             val httpsToken = resolveHttpsToken(
                 relativePath = config.relativePath,
-                remoteUri = remoteUri,
-                requireStoredCredential = true
+                remoteUri = sanitizedUri,
+                replacementToken = replacementToken,
+                requireStoredCredential = remoteUri == null && branch == null
             ).getOrElse { return@withContext Result.failure(it) }
 
             remoteSyncRepository
-                .probeRemoteConnection(remoteUri, branch, httpsToken)
+                .probeRemoteConnection(sanitizedUri, trimmedBranch, httpsToken)
                 .getOrElse { error ->
-                    return@withContext Result.failure(mapGitFailure(error, branch))
+                    return@withContext Result.failure(mapGitFailure(error, trimmedBranch))
                 }
             Result.success(Unit)
         }

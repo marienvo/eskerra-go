@@ -100,21 +100,28 @@ class DefaultWorkspaceSetupRepository(private val gitRepository: WorkspaceGitRep
             )
         }
 
+        val effectiveBranch = gitRepository
+            .resolveCloneBranch(sanitizedUri, branch, httpsToken)
+            .getOrElse { error ->
+                cleanupOnFailure(workspaceDir)
+                return Result.failure(mapCloneFailure(error, branch))
+            }
+
         gitRepository.cloneFrom(
             remoteUri = sanitizedUri,
             workingDir = workspaceDir,
-            branch = branch,
+            branch = effectiveBranch,
             httpsToken = httpsToken
         ).getOrElse { error ->
             cleanupOnFailure(workspaceDir)
-            return Result.failure(mapCloneFailure(error, branch))
+            return Result.failure(mapCloneFailure(error, effectiveBranch))
         }
 
         return buildConfig(
             name,
             sanitizedUri,
             workspaceDir,
-            validateBranch = branch
+            validateBranch = effectiveBranch
         ).also { result ->
             if (result.isFailure) cleanupOnFailure(workspaceDir)
         }

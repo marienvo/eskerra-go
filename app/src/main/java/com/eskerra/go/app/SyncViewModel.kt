@@ -16,11 +16,12 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 class SyncViewModel(
-    private val config: WorkspaceConfig,
+    private var config: WorkspaceConfig,
     private val filesDir: File,
     private val loadSyncStatus: LoadSyncStatus,
     private val manualSyncNow: ManualSyncNow,
-    private val onSyncSuccess: () -> Unit = {}
+    private val onSyncSuccess: () -> Unit = {},
+    private val onConfigUpdated: (WorkspaceConfig) -> Unit = {}
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<SyncUiState>(SyncUiState.Loading)
@@ -68,6 +69,10 @@ class SyncViewModel(
                 )
             }.fold(
                 onSuccess = { result ->
+                    result.updatedConfig?.let { updated ->
+                        config = updated
+                        onConfigUpdated(updated)
+                    }
                     onSyncSuccess()
                     _uiState.value = SyncUiState.Success(
                         status = result.status,
@@ -101,7 +106,8 @@ class SyncViewModel(
             filesDir: File,
             loadSyncStatus: LoadSyncStatus,
             manualSyncNow: ManualSyncNow,
-            onSyncSuccess: () -> Unit = {}
+            onSyncSuccess: () -> Unit = {},
+            onConfigUpdated: (WorkspaceConfig) -> Unit = {}
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T = SyncViewModel(
@@ -109,7 +115,8 @@ class SyncViewModel(
                 filesDir,
                 loadSyncStatus,
                 manualSyncNow,
-                onSyncSuccess
+                onSyncSuccess,
+                onConfigUpdated
             ) as T
         }
     }

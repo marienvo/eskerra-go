@@ -82,7 +82,14 @@ class SyncSettingsViewModel(
         val ready = currentReady() ?: return
         viewModelScope.launch {
             _uiState.value = ready.copy(isTesting = true, statusMessage = null, errorMessage = null)
-            testRemoteConnection(config, filesDir).fold(
+            val token = ready.replacementToken.trim().ifBlank { null }
+            testRemoteConnection(
+                config = config,
+                filesDir = filesDir,
+                remoteUri = ready.editRemoteUri,
+                branch = ready.editBranch,
+                replacementToken = token
+            ).fold(
                 onSuccess = {
                     _uiState.value = ready.copy(
                         isTesting = false,

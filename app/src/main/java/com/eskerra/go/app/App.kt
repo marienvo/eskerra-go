@@ -176,7 +176,11 @@ fun App(
                         filesDir = filesDir,
                         loadSyncStatus = loadSyncStatus,
                         manualSyncNow = manualSyncNow,
-                        onSyncSuccess = markInboxNotesChanged
+                        onSyncSuccess = markInboxNotesChanged,
+                        onConfigUpdated = { updated ->
+                            currentConfig = updated
+                            onConfigUpdated(updated)
+                        }
                     )
                 )
                 val syncState by syncViewModel.uiState.collectAsState()

@@ -20,5 +20,11 @@ interface RemoteSyncSettingsRepository {
 
     suspend fun clearSettings(config: WorkspaceConfig, filesDir: File): Result<WorkspaceConfig>
 
-    suspend fun testConnection(config: WorkspaceConfig, filesDir: File): Result<Unit>
+    suspend fun testConnection(
+        config: WorkspaceConfig,
+        filesDir: File,
+        remoteUri: String? = null,
+        branch: String? = null,
+        replacementToken: String? = null
+    ): Result<Unit>
 }

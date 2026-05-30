@@ -20,17 +20,9 @@ internal object GitLocalBranchAlignment {
         branch: String,
         httpsToken: String?,
         fetchIfNeeded: Boolean = true
-    ): Result<Unit> = runCatching {
+    ): Result<String> = runCatching {
         Git.open(workingDir).use { git ->
             val repository = git.repository
-            val localRef = repository.exactRef("refs/heads/$branch")
-            if (localRef != null) {
-                if (repository.branch != branch) {
-                    git.checkout().setName(branch).call()
-                }
-                return@runCatching
-            }
-
             if (fetchIfNeeded) {
                 git.fetch()
                     .setRemote(ORIGIN_REMOTE)
@@ -38,17 +30,30 @@ internal object GitLocalBranchAlignment {
                     .call()
             }
 
-            val trackingRef = "refs/remotes/$ORIGIN_REMOTE/$branch"
+            val effectiveBranch = SyncBranchNames.reconcileLegacyDefault(branch) { name ->
+                repository.exactRef("refs/remotes/$ORIGIN_REMOTE/$name") != null
+            }
+
+            val localRef = repository.exactRef("refs/heads/$effectiveBranch")
+            if (localRef != null) {
+                if (repository.branch != effectiveBranch) {
+                    git.checkout().setName(effectiveBranch).call()
+                }
+                return@runCatching effectiveBranch
+            }
+
+            val trackingRef = "refs/remotes/$ORIGIN_REMOTE/$effectiveBranch"
             if (repository.exactRef(trackingRef) == null) {
-                error("remote branch not found: $branch")
+                error("remote branch not found: $effectiveBranch")
             }
 
             git.checkout()
                 .setCreateBranch(true)
-                .setName(branch)
-                .setStartPoint("$ORIGIN_REMOTE/$branch")
+                .setName(effectiveBranch)
+                .setStartPoint("$ORIGIN_REMOTE/$effectiveBranch")
                 .setUpstreamMode(CreateBranchCommand.SetupUpstreamMode.TRACK)
                 .call()
+            effectiveBranch
         }
     }
 

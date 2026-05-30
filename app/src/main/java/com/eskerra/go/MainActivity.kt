@@ -14,6 +14,7 @@ import com.eskerra.go.core.usecase.LoadNoteForReading
 import com.eskerra.go.core.usecase.LoadRemoteSyncSettings
 import com.eskerra.go.core.usecase.LoadSyncStatus
 import com.eskerra.go.core.usecase.ManualSyncNow
+import com.eskerra.go.core.usecase.ReconcileWorkspaceSyncBranch
 import com.eskerra.go.core.usecase.SaveNote
 import com.eskerra.go.core.usecase.SaveRemoteSyncSettings
 import com.eskerra.go.core.usecase.TestRemoteConnection
@@ -75,11 +76,17 @@ class MainActivity : ComponentActivity() {
 
         val remoteSyncRepository = JGitRemoteSyncRepository(gitRepository)
         val loadSyncStatus = LoadSyncStatus(remoteSyncRepository)
+        val reconcileWorkspaceSyncBranch = ReconcileWorkspaceSyncBranch(
+            workspaceStore = workspaceStore,
+            credentialStore = credentialStore,
+            remoteSyncRepository = remoteSyncRepository
+        )
         val manualSyncNow = ManualSyncNow(
             remoteSyncRepository = remoteSyncRepository,
             credentialStore = credentialStore,
             registryRepository = noteRegistryRepository,
-            loadSyncStatus = loadSyncStatus
+            loadSyncStatus = loadSyncStatus,
+            reconcileWorkspaceSyncBranch = reconcileWorkspaceSyncBranch
         )
 
         val remoteSyncSettingsRepository = DefaultRemoteSyncSettingsRepository(
@@ -110,7 +117,8 @@ class MainActivity : ComponentActivity() {
                 saveRemoteSyncSettings = saveRemoteSyncSettings,
                 updateSyncToken = updateSyncToken,
                 clearRemoteSyncSettings = clearRemoteSyncSettings,
-                testRemoteConnection = testRemoteConnection
+                testRemoteConnection = testRemoteConnection,
+                reconcileWorkspaceSyncBranch = reconcileWorkspaceSyncBranch
             )
         }
     }

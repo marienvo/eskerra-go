@@ -79,9 +79,20 @@ fun mapCloneFailure(error: Throwable, branch: String): WorkspaceSetupException {
             isAuthenticationError(text) -> WorkspaceSetupError.AuthenticationFailed
             isRemoteUnavailableError(text) -> WorkspaceSetupError.RemoteUnavailable
             isInvalidRepositoryError(text) -> WorkspaceSetupError.InvalidRepository
+            isRemoteBranchNotFoundError(text) -> WorkspaceSetupError.BranchNotFound(
+                branchNameFromRemoteError(text, branch)
+            )
             else -> WorkspaceSetupError.CloneFailed
         }
     )
+}
+
+internal fun isRemoteBranchNotFoundError(message: String): Boolean =
+    message.contains("remote branch not found", ignoreCase = true)
+
+internal fun branchNameFromRemoteError(message: String, fallback: String): String {
+    val suffix = message.substringAfterLast(':').trim()
+    return suffix.ifBlank { fallback }.ifBlank { "branch" }
 }
 
 internal fun isBranchRefError(message: String, branch: String): Boolean {
@@ -105,6 +116,12 @@ internal fun isBranchRefError(message: String, branch: String): Boolean {
 }
 
 internal fun isInvalidRepositoryError(message: String): Boolean {
+    if (message.contains("remote branch not found", ignoreCase = true)) return false
+    if (message.startsWith("file://", ignoreCase = true) &&
+        message.contains(": not found", ignoreCase = true)
+    ) {
+        return true
+    }
     if (message.contains("not a git repository", ignoreCase = true)) return true
     if (message.contains("No such file", ignoreCase = true)) return true
     if (message.contains("cannot access", ignoreCase = true)) return true

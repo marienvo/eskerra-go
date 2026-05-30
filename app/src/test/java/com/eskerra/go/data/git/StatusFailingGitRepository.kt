@@ -18,6 +18,12 @@ class StatusFailingGitRepository(
         httpsToken: String?
     ): Result<Unit> = delegate.cloneFrom(remoteUri, workingDir, branch, httpsToken)
 
+    override fun resolveCloneBranch(
+        remoteUri: String,
+        branch: String,
+        httpsToken: String?
+    ): Result<String> = delegate.resolveCloneBranch(remoteUri, branch, httpsToken)
+
     override fun status(workingDir: File): Result<GitWorkspaceStatus> =
         Result.failure(statusFailure)
 

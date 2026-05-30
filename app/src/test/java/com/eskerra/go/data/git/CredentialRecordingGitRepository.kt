@@ -42,6 +42,28 @@ class CredentialRecordingGitRepository(
         return delegate.cloneFrom(effectiveUri, workingDir, branch, httpsToken)
     }
 
+    override fun resolveCloneBranch(
+        remoteUri: String,
+        branch: String,
+        httpsToken: String?
+    ): Result<String> {
+        val trimmed = branch.trim()
+        if (httpsToken != null && simulatedLocalRemoteUri != null) {
+            return GitRemoteBranchProbe.resolveRemoteBranch(
+                simulatedLocalRemoteUri!!,
+                trimmed,
+                httpsToken = null
+            )
+        }
+        if (remoteUri.startsWith("file://", ignoreCase = true)) {
+            return GitRemoteBranchProbe.resolveRemoteBranch(remoteUri, trimmed, httpsToken = null)
+        }
+        if (httpsToken != null) {
+            return Result.success(trimmed)
+        }
+        return GitRemoteBranchProbe.resolveRemoteBranch(remoteUri, trimmed, httpsToken)
+    }
+
     override fun status(workingDir: File): Result<GitWorkspaceStatus> = delegate.status(workingDir)
 
     override fun writeFile(workingDir: File, relativePath: String, content: String): Result<Unit> =

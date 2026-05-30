@@ -83,6 +83,12 @@ class JGitWorkspaceRepository(
         clone.call().close()
     }
 
+    override fun resolveCloneBranch(
+        remoteUri: String,
+        branch: String,
+        httpsToken: String?
+    ): Result<String> = GitRemoteBranchProbe.resolveRemoteBranch(remoteUri, branch, httpsToken)
+
     override fun status(workingDir: File): Result<GitWorkspaceStatus> = runCatching {
         Git.open(workingDir).use { git ->
             val status = git.status().call()

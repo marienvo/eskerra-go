@@ -26,6 +26,7 @@ class ManualSyncNow(
     private val credentialStore: CredentialStore,
     private val registryRepository: NoteRegistryRepository,
     private val loadSyncStatus: LoadSyncStatus,
+    private val reconcileWorkspaceSyncBranch: ReconcileWorkspaceSyncBranch? = null,
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO
 ) {
 
@@ -34,7 +35,17 @@ class ManualSyncNow(
         filesDir: File,
         onProgress: (SyncProgressStep) -> Unit = {}
     ): Result<SyncResult> = withContext(dispatcher) {
-        sync(config, filesDir, onProgress)
+        val resolvedConfig = reconcileWorkspaceSyncBranch
+            ?.invoke(config, filesDir)
+            ?.getOrElse { return@withContext Result.failure(it) }
+            ?: config
+        sync(resolvedConfig, filesDir, onProgress).map { result ->
+            if (resolvedConfig != config) {
+                result.copy(updatedConfig = resolvedConfig)
+            } else {
+                result
+            }
+        }
     }
 
     private suspend fun sync(
@@ -85,7 +96,7 @@ class ManualSyncNow(
             return Result.failure(SyncException(SyncError.NonInboxLocalChanges))
         }
 
-        remoteSyncRepository
+        val effectiveBranch = remoteSyncRepository
             .ensureLocalBranch(workspaceDir, branch, httpsToken)
             .getOrElse { error ->
                 return Result.failure(SyncGitErrorMapper.mapFailure(error, branch))
@@ -113,12 +124,12 @@ class ManualSyncNow(
         }
 
         val comparison = remoteSyncRepository
-            .compareWithRemote(workspaceDir, branch)
+            .compareWithRemote(workspaceDir, effectiveBranch)
             .getOrElse { error ->
-                return Result.failure(SyncGitErrorMapper.mapFailure(error, branch))
+                return Result.failure(SyncGitErrorMapper.mapFailure(error, effectiveBranch))
             }
         if (comparison.remoteBranchMissing) {
-            return Result.failure(SyncException(SyncError.RemoteBranchNotFound(branch)))
+            return Result.failure(SyncException(SyncError.RemoteBranchNotFound(effectiveBranch)))
         }
 
         var pulled = false
@@ -131,26 +142,30 @@ class ManualSyncNow(
 
         if (comparison.localIsAncestorOfRemote && !comparison.isEqual) {
             onProgress(SyncProgressStep.IntegratingRemote)
-            remoteSyncRepository.fastForwardToRemote(workspaceDir, branch).getOrElse { error ->
-                return Result.failure(SyncGitErrorMapper.mapFailure(error, branch))
-            }
+            remoteSyncRepository
+                .fastForwardToRemote(workspaceDir, effectiveBranch)
+                .getOrElse { error ->
+                    return Result.failure(SyncGitErrorMapper.mapFailure(error, effectiveBranch))
+                }
             pulled = true
         }
 
         var pushed = false
-        val postIntegration = remoteSyncRepository.compareWithRemote(workspaceDir, branch)
+        val postIntegration = remoteSyncRepository.compareWithRemote(workspaceDir, effectiveBranch)
             .getOrElse { error ->
-                return Result.failure(SyncGitErrorMapper.mapFailure(error, branch))
+                return Result.failure(SyncGitErrorMapper.mapFailure(error, effectiveBranch))
             }
 
         if (postIntegration.remoteIsAncestorOfLocal && !postIntegration.isEqual) {
             onProgress(SyncProgressStep.PushingLocalCommits)
-            remoteSyncRepository.push(workspaceDir, branch, httpsToken).getOrElse { error ->
-                return Result.failure(SyncGitErrorMapper.mapFailure(error, branch))
-            }
+            remoteSyncRepository
+                .push(workspaceDir, effectiveBranch, httpsToken)
+                .getOrElse { error ->
+                    return Result.failure(SyncGitErrorMapper.mapFailure(error, effectiveBranch))
+                }
             pushed = true
             remoteSyncRepository.fetch(workspaceDir, httpsToken).getOrElse { error ->
-                return Result.failure(SyncGitErrorMapper.mapFailure(error, branch))
+                return Result.failure(SyncGitErrorMapper.mapFailure(error, effectiveBranch))
             }
         }
 

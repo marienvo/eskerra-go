@@ -350,6 +350,39 @@ class WorkspaceSetupRepositoryTest {
     }
 
     @Test
+    fun clone_masterBranch_resolvesToMainWhenRemoteHasOnlyMain() = runTest {
+        val filesDir = filesDir()
+        val bare = TestGitRepos.initBareRemote(File(temp.root, "main-only.git"))
+        val remoteUri = TestGitRepos.fileUri(bare)
+        val producer = temp.newFolder("producer")
+        org.eclipse.jgit.api.Git.init()
+            .setDirectory(producer)
+            .setInitialBranch("main")
+            .call()
+            .close()
+        gitRepository.writeFile(producer, "notes/seed.md", "# Seed\n").getOrThrow()
+        gitRepository.stageAll(producer).getOrThrow()
+        gitRepository.commit(producer, "Seed").getOrThrow()
+        org.eclipse.jgit.api.Git.open(producer).use { git ->
+            git.remoteAdd().setName("origin").setUri(org.eclipse.jgit.transport.URIish(remoteUri))
+                .call()
+            git.push().setRemote("origin").add("main").call()
+        }
+
+        val result = repository.completeSetup(
+            mode = WorkspaceSetupMode.Clone,
+            name = "Main Notes",
+            branch = "master",
+            remoteUri = remoteUri,
+            credential = null,
+            filesDir = filesDir
+        )
+
+        assertTrue(result.isSuccess)
+        assertEquals("main", result.getOrThrow().branch)
+    }
+
+    @Test
     fun clone_httpsPassesTokenThroughCredentialProviderNotUrl() = runTest {
         val filesDir = filesDir()
         val bare = TestGitRepos.initBareRemote(File(temp.root, "https-remote.git"))

@@ -25,7 +25,8 @@ interface RemoteSyncRepository {
      * Ensures [branch] exists locally and is checked out, fetching from `origin` when
      * a tracking branch must be created from [origin]/[branch].
      */
-    fun ensureLocalBranch(workingDir: File, branch: String, httpsToken: String?): Result<Unit>
+    /** Returns the branch that was checked out (may differ from [branch] after reconciliation). */
+    fun ensureLocalBranch(workingDir: File, branch: String, httpsToken: String?): Result<String>
 
     fun compareWithRemote(workingDir: File, branch: String): Result<RemoteBranchComparison>
 

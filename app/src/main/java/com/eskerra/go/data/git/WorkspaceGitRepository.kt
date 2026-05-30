@@ -43,6 +43,9 @@ interface WorkspaceGitRepository : WorkspaceGitStatusRepository {
         httpsToken: String? = null
     ): Result<Unit>
 
+    /** Resolves [branch] against the remote (including legacy `master` → `main`) before clone. */
+    fun resolveCloneBranch(remoteUri: String, branch: String, httpsToken: String?): Result<String>
+
     /** Read the working tree status of the repository at [workingDir]. */
     override fun status(workingDir: File): Result<GitWorkspaceStatus>
 

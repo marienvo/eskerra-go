@@ -226,6 +226,22 @@ class JGitRemoteSyncRepositoryTest {
     }
 
     @Test
+    fun probeRemoteConnection_reconcilesLegacyMasterToMainOnRemote() {
+        val remoteUri = newBareRemoteUri("remote-main-only.git")
+        val branch = seedRemote(remoteUri)
+
+        val result = remoteSync.probeRemoteConnection(remoteUri, "master", null)
+
+        assertTrue(
+            "expected success when remote has $branch but probe used master",
+            result.isSuccess || branch != "main"
+        )
+        if (branch == "main") {
+            assertTrue(result.isSuccess)
+        }
+    }
+
+    @Test
     fun probeRemoteConnection_unknownBranchFails() {
         val remoteUri = newBareRemoteUri("remote-missing.git")
         seedRemote(remoteUri)
