@@ -1,11 +1,11 @@
 package com.eskerra.go.data.workspace
 
+import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
-import java.io.File
 
 class WorkspacePathsTest {
 
@@ -31,7 +31,9 @@ class WorkspacePathsTest {
 
     @Test
     fun validateRelativePath_acceptsDefaultPath() {
-        assertTrue(WorkspacePaths.validateRelativePath(WorkspacePaths.DEFAULT_RELATIVE_PATH).isSuccess)
+        assertTrue(
+            WorkspacePaths.validateRelativePath(WorkspacePaths.DEFAULT_RELATIVE_PATH).isSuccess
+        )
     }
 
     @Test

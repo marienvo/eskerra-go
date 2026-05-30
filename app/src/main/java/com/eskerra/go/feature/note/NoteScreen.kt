@@ -29,22 +29,22 @@ fun NoteScreen(
     title: String,
     body: String,
     onWikiLinkClick: (target: String) -> Unit,
-    modifier: Modifier = Modifier,
+    modifier: Modifier = Modifier
 ) {
     Column(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(16.dp),
+            .padding(16.dp)
     ) {
         Text(
             text = title,
             style = MaterialTheme.typography.headlineMedium,
-            modifier = Modifier.padding(bottom = 12.dp),
+            modifier = Modifier.padding(bottom = 12.dp)
         )
         Text(
             text = buildNoteText(body, onWikiLinkClick),
-            style = MaterialTheme.typography.bodyLarge,
+            style = MaterialTheme.typography.bodyLarge
         )
     }
 }
@@ -57,7 +57,7 @@ private val WIKI_LINK_REGEX = Regex("""\[\[([^\]]+)]]""")
  */
 private fun buildNoteText(
     body: String,
-    onWikiLinkClick: (target: String) -> Unit,
+    onWikiLinkClick: (target: String) -> Unit
 ): AnnotatedString = buildAnnotatedString {
     var lastIndex = 0
     for (match in WIKI_LINK_REGEX.findAll(body)) {
@@ -65,16 +65,16 @@ private fun buildNoteText(
 
         val link = WikiLink(
             target = match.groupValues[1],
-            displayText = match.groupValues[1],
+            displayText = match.groupValues[1]
         )
         withLink(
             LinkAnnotation.Clickable(
                 tag = link.target,
                 styles = TextLinkStyles(
-                    style = SpanStyle(textDecoration = TextDecoration.Underline),
+                    style = SpanStyle(textDecoration = TextDecoration.Underline)
                 ),
-                linkInteractionListener = { onWikiLinkClick(link.target) },
-            ),
+                linkInteractionListener = { onWikiLinkClick(link.target) }
+            )
         ) {
             append(link.displayText)
         }

@@ -40,17 +40,17 @@ fun App() {
                 launchSingleTop = true
                 restoreState = true
             }
-        },
+        }
     ) { contentModifier ->
         NavHost(
             navController = navController,
             startDestination = AppRoute.INBOX,
-            modifier = contentModifier,
+            modifier = contentModifier
         ) {
             composable(AppRoute.INBOX) {
                 InboxScreen(
                     notes = FakeNotes.inboxSummaries(),
-                    onOpenNote = { id -> navController.navigate(AppRoute.note(id)) },
+                    onOpenNote = { id -> navController.navigate(AppRoute.note(id)) }
                 )
             }
 
@@ -63,7 +63,7 @@ fun App() {
                     onTitleChange = { title = it },
                     onBodyChange = { body = it },
                     // Intentionally not persisted in this UI-only step.
-                    onSave = { _, _ -> },
+                    onSave = { _, _ -> }
                 )
             }
 
@@ -76,22 +76,22 @@ fun App() {
                 DashboardScreen(
                     workspaceName = workspace.name,
                     noteCount = workspace.noteCount,
-                    gitStatus = FakeGitGateway.status,
+                    gitStatus = FakeGitGateway.status
                 )
             }
 
             composable(AppRoute.MENU) {
                 MenuScreen(
                     items = fakeMenuItems,
-                    onItemClick = { },
+                    onItemClick = { }
                 )
             }
 
             composable(
                 route = AppRoute.NOTE_PATTERN,
                 arguments = listOf(
-                    navArgument(AppRoute.NOTE_ARG) { type = NavType.StringType },
-                ),
+                    navArgument(AppRoute.NOTE_ARG) { type = NavType.StringType }
+                )
             ) { entry ->
                 val raw = entry.arguments?.getString(AppRoute.NOTE_ARG).orEmpty()
                 val note = FakeNotes.note(AppRoute.decodeNoteId(raw))
@@ -102,7 +102,7 @@ fun App() {
                         FakeNotes.resolveWikiLink(target)?.let { targetId ->
                             navController.navigate(AppRoute.note(targetId))
                         }
-                    },
+                    }
                 )
             }
         }
@@ -112,11 +112,11 @@ fun App() {
 private val fakePodcasts: List<PodcastItem> = listOf(
     PodcastItem(title = "Note-taking, deeply", author = "Eskerra FM"),
     PodcastItem(title = "Plain text forever", author = "Markdown Weekly"),
-    PodcastItem(title = "Compose in practice", author = "Android Cafe"),
+    PodcastItem(title = "Compose in practice", author = "Android Cafe")
 )
 
 private val fakeMenuItems: List<String> = listOf(
     "Settings",
     "Workspaces",
-    "About",
+    "About"
 )

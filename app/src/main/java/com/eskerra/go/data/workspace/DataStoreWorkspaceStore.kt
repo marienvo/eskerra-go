@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 private val Context.workspaceDataStore: DataStore<Preferences> by preferencesDataStore(
-    name = "workspace_config",
+    name = "workspace_config"
 )
 
 private object WorkspacePreferenceKeys {
@@ -24,9 +24,7 @@ private object WorkspacePreferenceKeys {
 }
 
 /** Preferences DataStore-backed [WorkspaceStore]. Non-secret metadata only. */
-class DataStoreWorkspaceStore(
-    private val dataStore: DataStore<Preferences>,
-) : WorkspaceStore {
+class DataStoreWorkspaceStore(private val dataStore: DataStore<Preferences>) : WorkspaceStore {
 
     constructor(context: Context) : this(context.applicationContext.workspaceDataStore)
 
@@ -37,7 +35,7 @@ class DataStoreWorkspaceStore(
             "workspace_relative_path",
             "workspace_remote_uri",
             "workspace_branch",
-            "workspace_setup_completed_at",
+            "workspace_setup_completed_at"
         )
     }
 
@@ -71,7 +69,7 @@ class DataStoreWorkspaceStore(
             relativePath = relativePath,
             remoteUri = remoteUriRaw.ifBlank { null },
             branch = branch,
-            setupCompletedAtEpochMs = setupCompletedAt,
+            setupCompletedAtEpochMs = setupCompletedAt
         )
     }
 }

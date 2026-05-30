@@ -17,21 +17,17 @@ import androidx.compose.ui.unit.dp
  * Stateless menu. Receives fake entries and reports taps through [onItemClick].
  */
 @Composable
-fun MenuScreen(
-    items: List<String>,
-    onItemClick: (String) -> Unit,
-    modifier: Modifier = Modifier,
-) {
+fun MenuScreen(items: List<String>, onItemClick: (String) -> Unit, modifier: Modifier = Modifier) {
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
-            .padding(16.dp),
+            .padding(16.dp)
     ) {
         item {
             Text(
                 text = "Menu",
                 style = MaterialTheme.typography.headlineMedium,
-                modifier = Modifier.padding(bottom = 12.dp),
+                modifier = Modifier.padding(bottom = 12.dp)
             )
         }
         items(items) { item ->
@@ -39,7 +35,7 @@ fun MenuScreen(
                 headlineContent = { Text(item) },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { onItemClick(item) },
+                    .clickable { onItemClick(item) }
             )
         }
     }

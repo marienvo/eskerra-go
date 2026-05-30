@@ -13,10 +13,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 /** Stable app-start gate state, independent of Compose recomposition. */
-class AppGateViewModel(
-    private val workspaceStore: WorkspaceStore,
-    private val filesDir: File,
-) : ViewModel() {
+class AppGateViewModel(private val workspaceStore: WorkspaceStore, private val filesDir: File) :
+    ViewModel() {
 
     private val _gateState = MutableStateFlow<AppGateState>(AppGateState.Loading)
     val gateState: StateFlow<AppGateState> = _gateState.asStateFlow()
@@ -38,14 +36,11 @@ class AppGateViewModel(
     }
 
     companion object {
-        fun factory(
-            workspaceStore: WorkspaceStore,
-            filesDir: File,
-        ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
-            @Suppress("UNCHECKED_CAST")
-            override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                return AppGateViewModel(workspaceStore, filesDir) as T
+        fun factory(workspaceStore: WorkspaceStore, filesDir: File): ViewModelProvider.Factory =
+            object : ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : ViewModel> create(modelClass: Class<T>): T =
+                    AppGateViewModel(workspaceStore, filesDir) as T
             }
-        }
     }
 }

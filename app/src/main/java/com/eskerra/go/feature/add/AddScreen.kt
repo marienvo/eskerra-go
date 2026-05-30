@@ -24,24 +24,24 @@ fun AddScreen(
     onTitleChange: (String) -> Unit,
     onBodyChange: (String) -> Unit,
     onSave: (title: String, body: String) -> Unit,
-    modifier: Modifier = Modifier,
+    modifier: Modifier = Modifier
 ) {
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(16.dp),
+            .padding(16.dp)
     ) {
         Text(
             text = "Add note",
             style = MaterialTheme.typography.headlineMedium,
-            modifier = Modifier.padding(bottom = 12.dp),
+            modifier = Modifier.padding(bottom = 12.dp)
         )
         OutlinedTextField(
             value = title,
             onValueChange = onTitleChange,
             label = { Text("Title") },
             singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth()
         )
         OutlinedTextField(
             value = body,
@@ -49,11 +49,11 @@ fun AddScreen(
             label = { Text("Body") },
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 12.dp),
+                .padding(top = 12.dp)
         )
         Button(
             onClick = { onSave(title, body) },
-            modifier = Modifier.padding(top = 16.dp),
+            modifier = Modifier.padding(top = 16.dp)
         ) {
             Text("Save (not persisted yet)")
         }

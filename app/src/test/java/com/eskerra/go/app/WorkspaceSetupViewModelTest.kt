@@ -1,6 +1,5 @@
 package com.eskerra.go.app
 
-import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -34,13 +33,15 @@ class WorkspaceSetupViewModelTest {
         val viewModel = WorkspaceSetupViewModel(
             setupCompletion = FailingWorkspaceSetupCompletion(),
             filesDir = filesDir,
-            recoveryMessage = null,
+            recoveryMessage = null
         )
         var successCalled = false
 
         viewModel.submit { successCalled = true }
 
         assertTrue(!successCalled)
-        assertTrue(viewModel.uiState.errorMessage?.startsWith("Could not save workspace settings") == true)
+        assertTrue(
+            viewModel.uiState.errorMessage?.startsWith("Could not save workspace settings") == true
+        )
     }
 }

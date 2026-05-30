@@ -33,22 +33,22 @@ fun WorkspaceSetupScreen(
     onCredentialChange: (String) -> Unit,
     onModeChange: (WorkspaceSetupMode) -> Unit,
     onSubmit: () -> Unit,
-    modifier: Modifier = Modifier,
+    modifier: Modifier = Modifier
 ) {
     Column(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(24.dp),
+            .padding(24.dp)
     ) {
         Text(
             text = "Set up workspace",
-            style = MaterialTheme.typography.headlineMedium,
+            style = MaterialTheme.typography.headlineMedium
         )
         Text(
             text = "Create your single notes workspace under app-private storage.",
             style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(top = 8.dp, bottom = 16.dp),
+            modifier = Modifier.padding(top = 8.dp, bottom = 16.dp)
         )
 
         state.recoveryMessage?.let { message ->
@@ -56,19 +56,19 @@ fun WorkspaceSetupScreen(
                 text = message,
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(bottom = 12.dp),
+                modifier = Modifier.padding(bottom = 12.dp)
             )
         }
 
         SetupModeOption(
             label = "Initialize new local workspace",
             selected = state.mode == WorkspaceSetupMode.InitializeLocal,
-            onSelect = { onModeChange(WorkspaceSetupMode.InitializeLocal) },
+            onSelect = { onModeChange(WorkspaceSetupMode.InitializeLocal) }
         )
         SetupModeOption(
             label = "Clone from file:// remote",
             selected = state.mode == WorkspaceSetupMode.Clone,
-            onSelect = { onModeChange(WorkspaceSetupMode.Clone) },
+            onSelect = { onModeChange(WorkspaceSetupMode.Clone) }
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -79,7 +79,7 @@ fun WorkspaceSetupScreen(
             label = { Text("Workspace name") },
             singleLine = true,
             enabled = !state.isSubmitting,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth()
         )
 
         Spacer(modifier = Modifier.height(12.dp))
@@ -91,7 +91,7 @@ fun WorkspaceSetupScreen(
                 label = { Text("Branch") },
                 singleLine = true,
                 enabled = !state.isSubmitting,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth()
             )
             Spacer(modifier = Modifier.height(12.dp))
             OutlinedTextField(
@@ -103,7 +103,7 @@ fun WorkspaceSetupScreen(
                 },
                 singleLine = true,
                 enabled = !state.isSubmitting,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth()
             )
             Spacer(modifier = Modifier.height(12.dp))
             OutlinedTextField(
@@ -115,7 +115,7 @@ fun WorkspaceSetupScreen(
                 },
                 singleLine = true,
                 enabled = !state.isSubmitting,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth()
             )
         }
 
@@ -124,7 +124,7 @@ fun WorkspaceSetupScreen(
                 text = message,
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(top = 12.dp),
+                modifier = Modifier.padding(top = 12.dp)
             )
         }
 
@@ -137,7 +137,7 @@ fun WorkspaceSetupScreen(
                 onClick = onSubmit,
                 enabled = state.name.isNotBlank() &&
                     (state.mode != WorkspaceSetupMode.Clone || state.branch.isNotBlank()),
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Text("Continue")
             }
@@ -146,22 +146,18 @@ fun WorkspaceSetupScreen(
 }
 
 @Composable
-private fun SetupModeOption(
-    label: String,
-    selected: Boolean,
-    onSelect: () -> Unit,
-) {
+private fun SetupModeOption(label: String, selected: Boolean, onSelect: () -> Unit) {
     androidx.compose.foundation.layout.Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp),
+            .padding(vertical = 4.dp)
     ) {
         RadioButton(selected = selected, onClick = onSelect)
         Text(
             text = label,
             style = MaterialTheme.typography.bodyLarge,
-            modifier = Modifier.padding(start = 8.dp),
+            modifier = Modifier.padding(start = 8.dp)
         )
     }
 }

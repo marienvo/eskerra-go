@@ -22,14 +22,14 @@ class MainActivity : ComponentActivity() {
         val setupCompletion = DefaultWorkspaceSetupCompletion(
             setupRepository = DefaultWorkspaceSetupRepository(JGitWorkspaceRepository()),
             workspaceStore = workspaceStore,
-            credentialStore = credentialStore,
+            credentialStore = credentialStore
         )
 
         setContent {
             AppRoot(
                 workspaceStore = workspaceStore,
                 setupCompletion = setupCompletion,
-                filesDir = filesDir,
+                filesDir = filesDir
             )
         }
     }

@@ -10,5 +10,5 @@ data class WorkspaceSetupUiState(
     val credential: String = "",
     val isSubmitting: Boolean = false,
     val errorMessage: String? = null,
-    val recoveryMessage: String? = null,
+    val recoveryMessage: String? = null
 )

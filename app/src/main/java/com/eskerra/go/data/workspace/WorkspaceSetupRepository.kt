@@ -13,30 +13,34 @@ interface WorkspaceSetupRepository {
         name: String,
         branch: String,
         remoteUri: String?,
-        filesDir: File,
+        filesDir: File
     ): Result<WorkspaceConfig>
 }
 
-class DefaultWorkspaceSetupRepository(
-    private val gitRepository: WorkspaceGitRepository,
-) : WorkspaceSetupRepository {
+class DefaultWorkspaceSetupRepository(private val gitRepository: WorkspaceGitRepository) :
+    WorkspaceSetupRepository {
 
     override suspend fun completeSetup(
         mode: WorkspaceSetupMode,
         name: String,
         branch: String,
         remoteUri: String?,
-        filesDir: File,
+        filesDir: File
     ): Result<WorkspaceConfig> = withContext(Dispatchers.IO) {
         val trimmedName = name.trim()
         val trimmedBranch = branch.trim()
         if (trimmedName.isBlank()) {
-            return@withContext Result.failure(WorkspaceSetupException(WorkspaceSetupError.BlankName))
+            return@withContext Result.failure(
+                WorkspaceSetupException(WorkspaceSetupError.BlankName)
+            )
         }
-        val workspaceDirResult = WorkspacePaths.resolve(filesDir, WorkspacePaths.DEFAULT_RELATIVE_PATH)
+        val workspaceDirResult = WorkspacePaths.resolve(
+            filesDir,
+            WorkspacePaths.DEFAULT_RELATIVE_PATH
+        )
         val workspaceDir = workspaceDirResult.getOrElse { error ->
             return@withContext Result.failure(
-                WorkspaceSetupException(WorkspaceSetupError.StorageFailed(error.message)),
+                WorkspaceSetupException(WorkspaceSetupError.StorageFailed(error.message))
             )
         }
 
@@ -44,7 +48,7 @@ class DefaultWorkspaceSetupRepository(
             WorkspaceSetupMode.Clone -> {
                 if (trimmedBranch.isBlank()) {
                     return@withContext Result.failure(
-                        WorkspaceSetupException(WorkspaceSetupError.BlankBranch),
+                        WorkspaceSetupException(WorkspaceSetupError.BlankBranch)
                     )
                 }
                 completeClone(trimmedName, trimmedBranch, remoteUri, workspaceDir)
@@ -57,18 +61,22 @@ class DefaultWorkspaceSetupRepository(
         name: String,
         branch: String,
         remoteUri: String?,
-        workspaceDir: File,
+        workspaceDir: File
     ): Result<WorkspaceConfig> {
         val uri = remoteUri?.trim().orEmpty()
         if (uri.isBlank()) {
             return Result.failure(WorkspaceSetupException(WorkspaceSetupError.BlankRemoteUri))
         }
         if (!isFileRemoteUri(uri)) {
-            return Result.failure(WorkspaceSetupException(WorkspaceSetupError.UnsupportedRemoteScheme))
+            return Result.failure(
+                WorkspaceSetupException(WorkspaceSetupError.UnsupportedRemoteScheme)
+            )
         }
 
         WorkspacePaths.ensureEmptyDirectory(workspaceDir).getOrElse { error ->
-            return Result.failure(WorkspaceSetupException(WorkspaceSetupError.StorageFailed(error.message)))
+            return Result.failure(
+                WorkspaceSetupException(WorkspaceSetupError.StorageFailed(error.message))
+            )
         }
 
         gitRepository.cloneFrom(uri, workspaceDir, branch).getOrElse { error ->
@@ -83,12 +91,16 @@ class DefaultWorkspaceSetupRepository(
 
     private fun completeInit(name: String, workspaceDir: File): Result<WorkspaceConfig> {
         WorkspacePaths.ensureEmptyDirectory(workspaceDir).getOrElse { error ->
-            return Result.failure(WorkspaceSetupException(WorkspaceSetupError.StorageFailed(error.message)))
+            return Result.failure(
+                WorkspaceSetupException(WorkspaceSetupError.StorageFailed(error.message))
+            )
         }
 
         gitRepository.initOrOpen(workspaceDir).getOrElse { error ->
             cleanupOnFailure(workspaceDir)
-            return Result.failure(WorkspaceSetupException(WorkspaceSetupError.InitFailed(error.message)))
+            return Result.failure(
+                WorkspaceSetupException(WorkspaceSetupError.InitFailed(error.message))
+            )
         }
 
         return buildConfig(name, remoteUri = null, workspaceDir, validateBranch = null)
@@ -98,14 +110,16 @@ class DefaultWorkspaceSetupRepository(
         name: String,
         remoteUri: String?,
         workspaceDir: File,
-        validateBranch: String?,
+        validateBranch: String?
     ): Result<WorkspaceConfig> {
         val status = gitRepository.status(workspaceDir).getOrElse { error ->
-            return Result.failure(WorkspaceSetupException(WorkspaceSetupError.StorageFailed(error.message)))
+            return Result.failure(
+                WorkspaceSetupException(WorkspaceSetupError.StorageFailed(error.message))
+            )
         }
         if (validateBranch != null && status.branch != validateBranch) {
             return Result.failure(
-                WorkspaceSetupException(WorkspaceSetupError.BranchNotFound(validateBranch)),
+                WorkspaceSetupException(WorkspaceSetupError.BranchNotFound(validateBranch))
             )
         }
         return Result.success(
@@ -114,8 +128,8 @@ class DefaultWorkspaceSetupRepository(
                 relativePath = WorkspacePaths.DEFAULT_RELATIVE_PATH,
                 remoteUri = remoteUri,
                 branch = status.branch,
-                setupCompletedAtEpochMs = System.currentTimeMillis(),
-            ),
+                setupCompletedAtEpochMs = System.currentTimeMillis()
+            )
         )
     }
 

@@ -8,6 +8,6 @@ import com.eskerra.go.core.model.Workspace
 object FakeWorkspace {
     val current: Workspace = Workspace(
         name = "My Notes",
-        noteCount = 3,
+        noteCount = 3
     )
 }

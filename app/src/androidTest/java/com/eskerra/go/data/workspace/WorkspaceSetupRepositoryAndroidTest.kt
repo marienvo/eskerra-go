@@ -3,9 +3,9 @@ package com.eskerra.go.data.workspace
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.eskerra.go.data.git.JGitWorkspaceRepository
-import org.eclipse.jgit.api.Git
 import java.io.File
 import kotlinx.coroutines.runBlocking
+import org.eclipse.jgit.api.Git
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -41,13 +41,15 @@ class WorkspaceSetupRepositoryAndroidTest {
             name = "Device Notes",
             branch = "",
             remoteUri = null,
-            filesDir = filesDir,
+            filesDir = filesDir
         )
 
         assertTrue(result.isSuccess)
         val config = result.getOrThrow()
         assertEquals("Device Notes", config.name)
-        assertTrue(WorkspacePaths.isValidGitWorkspace(File(filesDir, WorkspacePaths.DEFAULT_RELATIVE_PATH)))
+        assertTrue(
+            WorkspacePaths.isValidGitWorkspace(File(filesDir, WorkspacePaths.DEFAULT_RELATIVE_PATH))
+        )
     }
 
     @Test
@@ -71,7 +73,7 @@ class WorkspaceSetupRepositoryAndroidTest {
             name = "Cloned Device Notes",
             branch = "master",
             remoteUri = remoteUri,
-            filesDir = cloneTargetRoot,
+            filesDir = cloneTargetRoot
         )
 
         assertTrue(result.isSuccess)

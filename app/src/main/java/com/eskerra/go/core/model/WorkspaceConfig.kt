@@ -9,5 +9,5 @@ data class WorkspaceConfig(
     val relativePath: String,
     val remoteUri: String?,
     val branch: String,
-    val setupCompletedAtEpochMs: Long,
+    val setupCompletedAtEpochMs: Long
 )

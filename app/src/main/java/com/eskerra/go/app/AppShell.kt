@@ -38,7 +38,7 @@ import androidx.compose.ui.unit.dp
 fun AppShell(
     currentRoute: String?,
     onNavigate: (route: String) -> Unit,
-    content: @Composable (contentModifier: Modifier) -> Unit,
+    content: @Composable (contentModifier: Modifier) -> Unit
 ) {
     androidx.compose.foundation.layout.Box(modifier = Modifier.fillMaxSize()) {
         content(Modifier.padding(top = 80.dp, bottom = 104.dp))
@@ -47,7 +47,7 @@ fun AppShell(
             onClick = { onNavigate(AppRoute.DASHBOARD) },
             modifier = Modifier
                 .align(Alignment.TopStart)
-                .padding(16.dp),
+                .padding(16.dp)
         ) {
             Icon(Icons.Filled.Dashboard, contentDescription = "Dashboard")
         }
@@ -56,7 +56,7 @@ fun AppShell(
             onClick = { onNavigate(AppRoute.MENU) },
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .padding(16.dp),
+                .padding(16.dp)
         ) {
             Icon(Icons.Filled.Menu, contentDescription = "Menu")
         }
@@ -68,7 +68,7 @@ fun AppShell(
             onPodcasts = { onNavigate(AppRoute.PODCASTS) },
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(16.dp),
+                .padding(16.dp)
         )
     }
 }
@@ -79,28 +79,28 @@ private fun BottomTaskbar(
     onInbox: () -> Unit,
     onAdd: () -> Unit,
     onPodcasts: () -> Unit,
-    modifier: Modifier = Modifier,
+    modifier: Modifier = Modifier
 ) {
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(32.dp),
         tonalElevation = 3.dp,
-        shadowElevation = 6.dp,
+        shadowElevation = 6.dp
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(24.dp),
+            horizontalArrangement = Arrangement.spacedBy(24.dp)
         ) {
             TaskbarButton(
                 icon = Icons.Filled.Inbox,
                 contentDescription = "Inbox",
                 selected = currentRoute == AppRoute.INBOX,
-                onClick = onInbox,
+                onClick = onInbox
             )
             FloatingActionButton(
                 onClick = onAdd,
-                modifier = Modifier.size(64.dp),
+                modifier = Modifier.size(64.dp)
             ) {
                 Icon(Icons.Filled.Add, contentDescription = "Add")
             }
@@ -108,7 +108,7 @@ private fun BottomTaskbar(
                 icon = Icons.Filled.Podcasts,
                 contentDescription = "Podcasts",
                 selected = currentRoute == AppRoute.PODCASTS,
-                onClick = onPodcasts,
+                onClick = onPodcasts
             )
         }
     }
@@ -119,7 +119,7 @@ private fun TaskbarButton(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     contentDescription: String,
     selected: Boolean,
-    onClick: () -> Unit,
+    onClick: () -> Unit
 ) {
     val tint = if (selected) MaterialTheme.colorScheme.primary else LocalContentColor.current
     IconButton(onClick = onClick) {

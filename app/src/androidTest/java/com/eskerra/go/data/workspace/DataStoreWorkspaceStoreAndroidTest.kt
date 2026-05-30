@@ -25,7 +25,7 @@ class DataStoreWorkspaceStoreAndroidTest {
         relativePath = WorkspacePaths.DEFAULT_RELATIVE_PATH,
         remoteUri = "file:///data/local/tmp/example.git",
         branch = "main",
-        setupCompletedAtEpochMs = 1_700_000_000_000L,
+        setupCompletedAtEpochMs = 1_700_000_000_000L
     )
 
     @Before
@@ -58,7 +58,7 @@ class DataStoreWorkspaceStoreAndroidTest {
             forbidden.forEach { fragment ->
                 assertFalse(
                     "Preference key must not contain '$fragment': $key",
-                    key.contains(fragment, ignoreCase = true),
+                    key.contains(fragment, ignoreCase = true)
                 )
             }
         }

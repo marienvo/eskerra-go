@@ -17,7 +17,7 @@ import kotlinx.coroutines.launch
 class WorkspaceSetupViewModel(
     private val setupCompletion: WorkspaceSetupCompletion,
     private val filesDir: File,
-    recoveryMessage: String?,
+    recoveryMessage: String?
 ) : ViewModel() {
 
     var uiState by mutableStateOf(WorkspaceSetupUiState(recoveryMessage = recoveryMessage))
@@ -54,7 +54,7 @@ class WorkspaceSetupViewModel(
                 branch = if (uiState.mode == WorkspaceSetupMode.Clone) uiState.branch else "",
                 remoteUri = uiState.remoteUri.trim().ifBlank { null },
                 credential = uiState.credential.trim().ifBlank { null },
-                filesDir = filesDir,
+                filesDir = filesDir
             )
             result.fold(
                 onSuccess = { config ->
@@ -68,9 +68,9 @@ class WorkspaceSetupViewModel(
                     }
                     uiState = uiState.copy(
                         isSubmitting = false,
-                        errorMessage = message,
+                        errorMessage = message
                     )
-                },
+                }
             )
         }
     }
@@ -79,12 +79,11 @@ class WorkspaceSetupViewModel(
         fun factory(
             setupCompletion: WorkspaceSetupCompletion,
             filesDir: File,
-            recoveryMessage: String?,
+            recoveryMessage: String?
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
-            override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                return WorkspaceSetupViewModel(setupCompletion, filesDir, recoveryMessage) as T
-            }
+            override fun <T : ViewModel> create(modelClass: Class<T>): T =
+                WorkspaceSetupViewModel(setupCompletion, filesDir, recoveryMessage) as T
         }
     }
 }

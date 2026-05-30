@@ -2,6 +2,7 @@ package com.eskerra.go.data.git
 
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import java.io.File
 import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.transport.URIish
 import org.junit.After
@@ -10,7 +11,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import java.io.File
 
 /**
  * Proves the core spike cycle runs on a real Android runtime against app-private

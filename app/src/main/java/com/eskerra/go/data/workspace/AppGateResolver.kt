@@ -16,14 +16,14 @@ fun resolveAppGateState(config: WorkspaceConfig?, filesDir: File): AppGateState 
     if (pathResult.isFailure) {
         return AppGateState.NeedsSetup(
             recoveryMessage = pathResult.exceptionOrNull()?.message
-                ?: "Stored workspace path is invalid",
+                ?: "Stored workspace path is invalid"
         )
     }
 
     val workspaceDir = pathResult.getOrThrow()
     if (!WorkspacePaths.isValidGitWorkspace(workspaceDir)) {
         return AppGateState.NeedsSetup(
-            recoveryMessage = "Workspace repository is missing or invalid",
+            recoveryMessage = "Workspace repository is missing or invalid"
         )
     }
 

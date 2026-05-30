@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.ktlint)
 }
 
 android {
@@ -23,7 +24,7 @@ android {
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro",
+                "proguard-rules.pro"
             )
         }
     }
@@ -41,6 +42,13 @@ android {
         compose = true
     }
 
+    lint {
+        abortOnError = true
+        warningsAsErrors = false
+        htmlReport = true
+        xmlReport = true
+    }
+
     packaging {
         resources {
             // JGit bundles service descriptors and metadata that collide when merged.
@@ -50,6 +58,16 @@ android {
             excludes += "META-INF/jgit-*"
         }
     }
+}
+
+ktlint {
+    android.set(true)
+    additionalEditorconfig.set(
+        mapOf(
+            "ktlint_code_style" to "android_studio",
+            "ktlint_function_naming_ignore_when_annotated_with" to "Composable"
+        )
+    )
 }
 
 dependencies {

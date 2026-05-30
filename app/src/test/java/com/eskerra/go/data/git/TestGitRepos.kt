@@ -1,7 +1,7 @@
 package com.eskerra.go.data.git
 
-import org.eclipse.jgit.api.Git
 import java.io.File
+import org.eclipse.jgit.api.Git
 
 /**
  * Helpers for creating throwaway Git repositories for the spike tests.

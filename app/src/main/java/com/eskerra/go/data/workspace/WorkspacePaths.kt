@@ -18,7 +18,9 @@ object WorkspacePaths {
             return Result.failure(IllegalArgumentException("Workspace path must be relative"))
         }
         if (relativePath.split('/', '\\').any { it == ".." }) {
-            return Result.failure(IllegalArgumentException("Workspace path must not contain '..' segments"))
+            return Result.failure(
+                IllegalArgumentException("Workspace path must not contain '..' segments")
+            )
         }
         return Result.success(Unit)
     }
@@ -27,7 +29,9 @@ object WorkspacePaths {
         validateRelativePath(relativePath).getOrElse { return Result.failure(it) }
         val resolved = File(filesDir, relativePath).canonicalFile
         if (!isInsideFilesDir(filesDir, resolved)) {
-            return Result.failure(IllegalArgumentException("Workspace path escapes app-private storage"))
+            return Result.failure(
+                IllegalArgumentException("Workspace path escapes app-private storage")
+            )
         }
         return Result.success(resolved)
     }

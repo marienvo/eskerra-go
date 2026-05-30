@@ -15,7 +15,7 @@ class FakeWorkspaceStoreTest {
         relativePath = WorkspacePaths.DEFAULT_RELATIVE_PATH,
         remoteUri = null,
         branch = "main",
-        setupCompletedAtEpochMs = 1_700_000_000_000L,
+        setupCompletedAtEpochMs = 1_700_000_000_000L
     )
 
     @Test

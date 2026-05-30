@@ -14,44 +14,38 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 /** Display model for a fake podcast row. */
-data class PodcastItem(
-    val title: String,
-    val author: String,
-)
+data class PodcastItem(val title: String, val author: String)
 
 /**
  * Stateless podcast list. Receives items to show; there is no playback in this
  * step.
  */
 @Composable
-fun PodcastsScreen(
-    podcasts: List<PodcastItem>,
-    modifier: Modifier = Modifier,
-) {
+fun PodcastsScreen(podcasts: List<PodcastItem>, modifier: Modifier = Modifier) {
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
-            .padding(16.dp),
+            .padding(16.dp)
     ) {
         item {
             Text(
                 text = "Podcasts",
                 style = MaterialTheme.typography.headlineMedium,
-                modifier = Modifier.padding(bottom = 12.dp),
+                modifier = Modifier.padding(bottom = 12.dp)
             )
         }
         items(podcasts) { podcast ->
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 6.dp),
+                    .padding(vertical = 6.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(text = podcast.title, style = MaterialTheme.typography.titleMedium)
                     Text(
                         text = podcast.author,
                         style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(top = 4.dp),
+                        modifier = Modifier.padding(top = 4.dp)
                     )
                 }
             }

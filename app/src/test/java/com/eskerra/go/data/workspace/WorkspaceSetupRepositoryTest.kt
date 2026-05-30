@@ -2,6 +2,7 @@ package com.eskerra.go.data.workspace
 
 import com.eskerra.go.data.git.JGitWorkspaceRepository
 import com.eskerra.go.data.git.TestGitRepos
+import java.io.File
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -10,7 +11,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
-import java.io.File
 
 class WorkspaceSetupRepositoryTest {
 
@@ -31,7 +31,7 @@ class WorkspaceSetupRepositoryTest {
             name = "Local Notes",
             branch = "",
             remoteUri = null,
-            filesDir = filesDir,
+            filesDir = filesDir
         )
 
         assertTrue(result.isSuccess)
@@ -64,7 +64,7 @@ class WorkspaceSetupRepositoryTest {
             name = "Cloned Notes",
             branch = remoteBranch,
             remoteUri = remoteUri,
-            filesDir = filesDir,
+            filesDir = filesDir
         )
 
         assertTrue(result.isSuccess)
@@ -84,7 +84,7 @@ class WorkspaceSetupRepositoryTest {
             name = "Remote Notes",
             branch = "main",
             remoteUri = "https://example.com/repo.git",
-            filesDir = filesDir,
+            filesDir = filesDir
         )
 
         assertTrue(result.isFailure)
@@ -101,7 +101,7 @@ class WorkspaceSetupRepositoryTest {
             name = "Remote Notes",
             branch = "main",
             remoteUri = null,
-            filesDir = filesDir,
+            filesDir = filesDir
         )
 
         assertTrue(result.isFailure)
@@ -118,7 +118,7 @@ class WorkspaceSetupRepositoryTest {
             name = "Remote Notes",
             branch = "   ",
             remoteUri = "file:///tmp/example.git",
-            filesDir = filesDir,
+            filesDir = filesDir
         )
 
         assertTrue(result.isFailure)
@@ -135,7 +135,7 @@ class WorkspaceSetupRepositoryTest {
             name = "   ",
             branch = "",
             remoteUri = null,
-            filesDir = filesDir,
+            filesDir = filesDir
         )
 
         assertTrue(result.isFailure)
@@ -163,14 +163,14 @@ class WorkspaceSetupRepositoryTest {
             name = "Cloned Notes",
             branch = "missing-branch",
             remoteUri = remoteUri,
-            filesDir = filesDir,
+            filesDir = filesDir
         )
 
         assertTrue(result.isFailure)
         val error = result.exceptionOrNull() as WorkspaceSetupException
         assertTrue(
             "expected BranchNotFound but was ${error.error}",
-            error.error is WorkspaceSetupError.BranchNotFound,
+            error.error is WorkspaceSetupError.BranchNotFound
         )
         assertFalse(workspaceDir.exists())
     }
@@ -185,14 +185,14 @@ class WorkspaceSetupRepositoryTest {
             name = "Remote Notes",
             branch = "master",
             remoteUri = missingUri,
-            filesDir = filesDir,
+            filesDir = filesDir
         )
 
         assertTrue(result.isFailure)
         val error = result.exceptionOrNull() as WorkspaceSetupException
         assertTrue(
             "expected InvalidRepository but was ${error.error}",
-            error.error is WorkspaceSetupError.InvalidRepository,
+            error.error is WorkspaceSetupError.InvalidRepository
         )
     }
 }

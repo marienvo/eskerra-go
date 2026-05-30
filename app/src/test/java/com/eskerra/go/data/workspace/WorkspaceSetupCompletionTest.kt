@@ -1,9 +1,7 @@
 package com.eskerra.go.data.workspace
 
-import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.data.credentials.FakeCredentialStore
 import com.eskerra.go.data.git.JGitWorkspaceRepository
-import com.eskerra.go.data.git.TestGitRepos
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -12,7 +10,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
-import java.io.File
 
 class WorkspaceSetupCompletionTest {
 
@@ -24,11 +21,11 @@ class WorkspaceSetupCompletionTest {
 
     private fun completion(
         workspaceStore: WorkspaceStore = FakeWorkspaceStore(),
-        credentialStore: FakeCredentialStore = FakeCredentialStore(),
+        credentialStore: FakeCredentialStore = FakeCredentialStore()
     ) = DefaultWorkspaceSetupCompletion(
         setupRepository = setupRepository,
         workspaceStore = workspaceStore,
-        credentialStore = credentialStore,
+        credentialStore = credentialStore
     )
 
     @Test
@@ -43,7 +40,7 @@ class WorkspaceSetupCompletionTest {
             branch = "",
             remoteUri = null,
             credential = "secret-token",
-            filesDir = filesDir,
+            filesDir = filesDir
         )
 
         assertTrue(result.isSuccess)
@@ -65,7 +62,7 @@ class WorkspaceSetupCompletionTest {
             branch = "",
             remoteUri = null,
             credential = null,
-            filesDir = filesDir,
+            filesDir = filesDir
         )
 
         assertTrue(result.isFailure)
@@ -86,7 +83,7 @@ class WorkspaceSetupCompletionTest {
             branch = "",
             remoteUri = null,
             credential = "secret-token",
-            filesDir = filesDir,
+            filesDir = filesDir
         )
 
         assertTrue(result.isFailure)
@@ -108,14 +105,17 @@ class WorkspaceSetupCompletionTest {
             branch = "",
             remoteUri = null,
             credential = "pat-12345",
-            filesDir = filesDir,
+            filesDir = filesDir
         )
 
         val saved = workspaceStore.read()
         requireNotNull(saved)
-        assertFalse(DataStoreWorkspaceStore.NON_SECRET_PREFERENCE_KEY_NAMES.any { key ->
-            key.contains("token", ignoreCase = true) || key.contains("credential", ignoreCase = true)
-        })
+        assertFalse(
+            DataStoreWorkspaceStore.NON_SECRET_PREFERENCE_KEY_NAMES.any { key ->
+                key.contains("token", ignoreCase = true) ||
+                    key.contains("credential", ignoreCase = true)
+            }
+        )
         assertFalse(saved.remoteUri?.contains("pat-12345") == true)
     }
 }

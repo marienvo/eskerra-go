@@ -14,14 +14,14 @@ interface WorkspaceSetupCompletion {
         branch: String,
         remoteUri: String?,
         credential: String?,
-        filesDir: java.io.File,
+        filesDir: java.io.File
     ): Result<WorkspaceConfig>
 }
 
 class DefaultWorkspaceSetupCompletion(
     private val setupRepository: WorkspaceSetupRepository,
     private val workspaceStore: WorkspaceStore,
-    private val credentialStore: CredentialStore,
+    private val credentialStore: CredentialStore
 ) : WorkspaceSetupCompletion {
 
     override suspend fun completeAndPersist(
@@ -30,14 +30,14 @@ class DefaultWorkspaceSetupCompletion(
         branch: String,
         remoteUri: String?,
         credential: String?,
-        filesDir: java.io.File,
+        filesDir: java.io.File
     ): Result<WorkspaceConfig> {
         val config = setupRepository.completeSetup(
             mode = mode,
             name = name,
             branch = branch,
             remoteUri = remoteUri,
-            filesDir = filesDir,
+            filesDir = filesDir
         ).getOrElse { return Result.failure(it) }
 
         val trimmedCredential = credential?.trim().orEmpty()
@@ -46,8 +46,8 @@ class DefaultWorkspaceSetupCompletion(
             credentialStore.saveToken(config.relativePath, trimmedCredential).getOrElse { error ->
                 return Result.failure(
                     WorkspaceSetupException(
-                        WorkspaceSetupError.CredentialSaveFailed(error.message),
-                    ),
+                        WorkspaceSetupError.CredentialSaveFailed(error.message)
+                    )
                 )
             }
             credentialWasSaved = true
@@ -55,8 +55,8 @@ class DefaultWorkspaceSetupCompletion(
             credentialStore.clear(config.relativePath).getOrElse { error ->
                 return Result.failure(
                     WorkspaceSetupException(
-                        WorkspaceSetupError.CredentialSaveFailed(error.message),
-                    ),
+                        WorkspaceSetupError.CredentialSaveFailed(error.message)
+                    )
                 )
             }
         }
@@ -69,7 +69,7 @@ class DefaultWorkspaceSetupCompletion(
                 credentialStore.clear(config.relativePath)
             }
             Result.failure(
-                WorkspaceSetupException(WorkspaceSetupError.MetadataSaveFailed(error.message)),
+                WorkspaceSetupException(WorkspaceSetupError.MetadataSaveFailed(error.message))
             )
         }
     }

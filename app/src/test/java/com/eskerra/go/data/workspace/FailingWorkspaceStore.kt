@@ -9,9 +9,7 @@ class FailingWorkspaceStore : WorkspaceStore {
 
     override suspend fun read(): WorkspaceConfig? = readResult
 
-    override suspend fun save(config: WorkspaceConfig) {
-        throw saveFailure
-    }
+    override suspend fun save(config: WorkspaceConfig): Unit = throw saveFailure
 
     override suspend fun clear() {
         readResult = null

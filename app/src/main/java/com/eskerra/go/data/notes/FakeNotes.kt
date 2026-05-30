@@ -10,10 +10,7 @@ import com.eskerra.go.core.model.NoteSummary
 object FakeNotes {
 
     /** A fake note: a summary plus a markdown-ish body that may contain `[[wiki links]]`. */
-    data class FakeNote(
-        val summary: NoteSummary,
-        val body: String,
-    )
+    data class FakeNote(val summary: NoteSummary, val body: String)
 
     private val notes: List<FakeNote> = listOf(
         FakeNote(
@@ -21,7 +18,7 @@ object FakeNotes {
                 id = NoteId("note-welcome"),
                 title = "Welcome to Eskerra Go",
                 snippet = "A quick tour of the inbox-first workflow.",
-                isInbox = true,
+                isInbox = true
             ),
             body = """
                 # Welcome
@@ -30,14 +27,14 @@ object FakeNotes {
 
                 Try opening [[Reading List]] or [[Meeting Notes]] from here.
                 Tapping a wiki link should navigate to that note.
-            """.trimIndent(),
+            """.trimIndent()
         ),
         FakeNote(
             summary = NoteSummary(
                 id = NoteId("note-reading-list"),
                 title = "Reading List",
                 snippet = "Books and articles to get to eventually.",
-                isInbox = true,
+                isInbox = true
             ),
             body = """
                 # Reading List
@@ -46,14 +43,14 @@ object FakeNotes {
                 - Material 3 guidelines
 
                 Back to [[Welcome to Eskerra Go]] when you are done.
-            """.trimIndent(),
+            """.trimIndent()
         ),
         FakeNote(
             summary = NoteSummary(
                 id = NoteId("note-meeting"),
                 title = "Meeting Notes",
                 snippet = "Sync notes from the weekly planning call.",
-                isInbox = true,
+                isInbox = true
             ),
             body = """
                 # Meeting Notes
@@ -61,15 +58,13 @@ object FakeNotes {
                 Action items captured during planning.
 
                 Related: [[Reading List]].
-            """.trimIndent(),
-        ),
+            """.trimIndent()
+        )
     )
 
-    fun inboxSummaries(): List<NoteSummary> =
-        notes.map { it.summary }.filter { it.isInbox }
+    fun inboxSummaries(): List<NoteSummary> = notes.map { it.summary }.filter { it.isInbox }
 
-    fun note(id: NoteId): FakeNote? =
-        notes.firstOrNull { it.summary.id == id }
+    fun note(id: NoteId): FakeNote? = notes.firstOrNull { it.summary.id == id }
 
     /** Resolves a wiki link [target] (by title) to a note id, if one exists. */
     fun resolveWikiLink(target: String): NoteId? =

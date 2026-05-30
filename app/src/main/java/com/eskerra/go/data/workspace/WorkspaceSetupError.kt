@@ -26,9 +26,8 @@ sealed class WorkspaceSetupError {
     }
 
     data class InvalidRepository(val detail: String?) : WorkspaceSetupError() {
-        override fun message() =
-            detail?.let { "Repository not found or invalid: $it" }
-                ?: "Repository not found or invalid."
+        override fun message() = detail?.let { "Repository not found or invalid: $it" }
+            ?: "Repository not found or invalid."
     }
 
     data class AuthenticationFailed(val detail: String?) : WorkspaceSetupError() {
@@ -45,13 +44,13 @@ sealed class WorkspaceSetupError {
     }
 
     data class StorageFailed(val detail: String?) : WorkspaceSetupError() {
-        override fun message() = detail?.let { "Storage setup failed: $it" } ?: "Storage setup failed."
+        override fun message() =
+            detail?.let { "Storage setup failed: $it" } ?: "Storage setup failed."
     }
 
     data class MetadataSaveFailed(val detail: String?) : WorkspaceSetupError() {
-        override fun message() =
-            detail?.let { "Could not save workspace settings: $it" }
-                ?: "Could not save workspace settings."
+        override fun message() = detail?.let { "Could not save workspace settings: $it" }
+            ?: "Could not save workspace settings."
     }
 
     data class CredentialSaveFailed(val detail: String?) : WorkspaceSetupError() {
@@ -70,7 +69,7 @@ fun mapCloneFailure(error: Throwable, branch: String): WorkspaceSetupException {
             isAuthenticationError(text) -> WorkspaceSetupError.AuthenticationFailed(error.message)
             isInvalidRepositoryError(text) -> WorkspaceSetupError.InvalidRepository(error.message)
             else -> WorkspaceSetupError.CloneFailed(error.message)
-        },
+        }
     )
 }
 
@@ -118,10 +117,9 @@ internal fun isInvalidRepositoryError(message: String): Boolean {
     return false
 }
 
-internal fun isAuthenticationError(message: String): Boolean {
-    return message.contains("authentication", ignoreCase = true) ||
+internal fun isAuthenticationError(message: String): Boolean =
+    message.contains("authentication", ignoreCase = true) ||
         message.contains("not authorized", ignoreCase = true) ||
         message.contains("401", ignoreCase = false) ||
         message.contains("403", ignoreCase = false) ||
         message.contains("credentials", ignoreCase = true)
-}

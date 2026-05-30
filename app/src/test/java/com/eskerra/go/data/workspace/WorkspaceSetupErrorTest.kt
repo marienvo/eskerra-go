@@ -16,7 +16,7 @@ class WorkspaceSetupErrorTest {
     fun branchNotFound_includesBranchName() {
         assertTrue(
             WorkspaceSetupError.BranchNotFound("develop").message()
-                .contains("develop"),
+                .contains("develop")
         )
     }
 
@@ -24,7 +24,7 @@ class WorkspaceSetupErrorTest {
     fun mapCloneFailure_mapsRefErrorsToBranchNotFound() {
         val error = mapCloneFailure(
             RuntimeException("Ref develop cannot be resolved"),
-            branch = "develop",
+            branch = "develop"
         )
         assertTrue(error.error is WorkspaceSetupError.BranchNotFound)
     }
@@ -33,7 +33,7 @@ class WorkspaceSetupErrorTest {
     fun mapCloneFailure_doesNotMapGenericNotFoundToBranchNotFound() {
         val error = mapCloneFailure(
             RuntimeException("No such file or directory: /missing/remote.git"),
-            branch = "main",
+            branch = "main"
         )
         assertTrue(error.error is WorkspaceSetupError.InvalidRepository)
     }
@@ -42,7 +42,7 @@ class WorkspaceSetupErrorTest {
     fun mapCloneFailure_mapsAuthErrors() {
         val error = mapCloneFailure(
             RuntimeException("Authentication failed for remote"),
-            branch = "main",
+            branch = "main"
         )
         assertTrue(error.error is WorkspaceSetupError.AuthenticationFailed)
     }

@@ -26,14 +26,14 @@ import java.io.File
 fun AppRoot(
     workspaceStore: WorkspaceStore,
     setupCompletion: WorkspaceSetupCompletion,
-    filesDir: File,
+    filesDir: File
 ) {
     EskerraGoTheme {
         val gateViewModel: AppGateViewModel = viewModel(
             factory = AppGateViewModel.factory(
                 workspaceStore = workspaceStore,
-                filesDir = filesDir,
-            ),
+                filesDir = filesDir
+            )
         )
         val gateState by gateViewModel.gateState.collectAsState()
 
@@ -41,7 +41,7 @@ fun AppRoot(
             AppGateState.Loading -> {
                 Box(
                     modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center,
+                    contentAlignment = Alignment.Center
                 ) {
                     CircularProgressIndicator()
                 }
@@ -57,8 +57,8 @@ fun AppRoot(
                     factory = WorkspaceSetupViewModel.factory(
                         setupCompletion = setupCompletion,
                         filesDir = filesDir,
-                        recoveryMessage = gate.recoveryMessage,
-                    ),
+                        recoveryMessage = gate.recoveryMessage
+                    )
                 )
                 val uiState = setupViewModel.uiState
 
@@ -73,7 +73,7 @@ fun AppRoot(
                         setupViewModel.submit { config ->
                             gateViewModel.markReady(config)
                         }
-                    },
+                    }
                 )
             }
 

@@ -26,7 +26,7 @@ class AppGateViewModelTest {
         relativePath = WorkspacePaths.DEFAULT_RELATIVE_PATH,
         remoteUri = null,
         branch = "master",
-        setupCompletedAtEpochMs = 1_700_000_000_000L,
+        setupCompletedAtEpochMs = 1_700_000_000_000L
     )
 
     @Before

@@ -11,5 +11,5 @@ package com.eskerra.go.data.git
 data class GitWorkspaceStatus(
     val branch: String,
     val hasUncommittedChanges: Boolean,
-    val changedPaths: Set<String>,
+    val changedPaths: Set<String>
 )

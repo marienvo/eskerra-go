@@ -20,17 +20,17 @@ fun DashboardScreen(
     workspaceName: String,
     noteCount: Int,
     gitStatus: String,
-    modifier: Modifier = Modifier,
+    modifier: Modifier = Modifier
 ) {
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(16.dp),
+            .padding(16.dp)
     ) {
         Text(
             text = "Dashboard",
             style = MaterialTheme.typography.headlineMedium,
-            modifier = Modifier.padding(bottom = 12.dp),
+            modifier = Modifier.padding(bottom = 12.dp)
         )
         StatCard(label = "Workspace", value = workspaceName)
         StatCard(label = "Notes", value = noteCount.toString())
@@ -39,21 +39,18 @@ fun DashboardScreen(
 }
 
 @Composable
-private fun StatCard(
-    label: String,
-    value: String,
-) {
+private fun StatCard(label: String, value: String) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 6.dp),
+            .padding(vertical = 6.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(text = label, style = MaterialTheme.typography.labelMedium)
             Text(
                 text = value,
                 style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(top = 4.dp),
+                modifier = Modifier.padding(top = 4.dp)
             )
         }
     }

@@ -24,18 +24,18 @@ import com.eskerra.go.core.model.NoteSummary
 fun InboxScreen(
     notes: List<NoteSummary>,
     onOpenNote: (NoteId) -> Unit,
-    modifier: Modifier = Modifier,
+    modifier: Modifier = Modifier
 ) {
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
-            .padding(16.dp),
+            .padding(16.dp)
     ) {
         item {
             Text(
                 text = "Inbox",
                 style = MaterialTheme.typography.headlineMedium,
-                modifier = Modifier.padding(bottom = 12.dp),
+                modifier = Modifier.padding(bottom = 12.dp)
             )
         }
         items(notes) { note ->
@@ -45,22 +45,19 @@ fun InboxScreen(
 }
 
 @Composable
-private fun InboxRow(
-    note: NoteSummary,
-    onClick: () -> Unit,
-) {
+private fun InboxRow(note: NoteSummary, onClick: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 6.dp)
-            .clickable(onClick = onClick),
+            .clickable(onClick = onClick)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(text = note.title, style = MaterialTheme.typography.titleMedium)
             Text(
                 text = note.snippet,
                 style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(top = 4.dp),
+                modifier = Modifier.padding(top = 4.dp)
             )
         }
     }
