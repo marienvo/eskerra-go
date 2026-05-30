@@ -3,11 +3,12 @@ description: Core project conventions and PoC boundaries for Eskerra Go
 alwaysApply: true
 ---
 
-# Project Conventions
+# Project Conventions (eskerra-go only)
+
+US English and other cross-repo conventions come from synced `language.mdc` (see AGENTS.md).
 
 Rules:
 
-- Code and comments MUST be in US English
 - UI code must not read files directly.
 - UI code must not call Git directly.
 - Composables receive state and callbacks only.
@@ -20,10 +21,3 @@ Rules:
 - No multi-workspace support in the PoC.
 - Prefer small files. New files over 250 lines need justification.
 - Every feature slice must include at least one unit test for domain/data behavior.
-
-## Language
-
-The first rule applies to all identifiers (classes, functions, variables,
-packages), comments, commit messages, log strings, and documentation. Use US
-spelling: "color" not "colour", "behavior" not "behaviour", "synchronize" not
-"synchronise", "canceled" not "cancelled".

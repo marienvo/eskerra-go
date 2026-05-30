@@ -4,6 +4,8 @@ Inbox-first notes app for Android. Step 1 proved the Compose UI shape; Step 2
 added an isolated Git spike; Step 3 adds workspace setup with DataStore
 persistence and an app-start gate. Inbox and Note still use fake data until Step 4.
 
+Specs and PoC scope: [`specs/`](specs/). Agent instructions: [`AGENTS.md`](AGENTS.md).
+
 ## Module layout (single module, package boundaries)
 
 ```

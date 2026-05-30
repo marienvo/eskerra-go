@@ -1,0 +1,15 @@
+---
+description: Add meaningful tests and require passing test suites
+alwaysApply: true
+---
+
+<!-- AUTO-SYNCED from notebox — do not edit here. Canonical: notebox/.cursor/rules/shared/testing.mdc -->
+<!-- Re-run: notebox/scripts/sync-shared-conventions.sh -->
+
+
+# Testing Expectations
+
+- Add tests wherever they provide meaningful confidence for behavior, regressions, and edge cases.
+- Match testing tools to the implementation language (for example: JUnit for Kotlin, Jest/Vitest for TypeScript, pytest for Python, `go test` for Go).
+- Treat failing tests as blockers: all relevant tests must pass before a change is considered done.
+- When a bug is fixed, add or update a test that proves the fix.
