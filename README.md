@@ -17,10 +17,14 @@ This repository is an Android PoC, not a complete production app.
   navigation, and inbox note create/edit/save with Git dirty status.
 - **Step 8:** restart/offline reliability, clearer loading/empty/error states, and
   removal of fake production note paths.
+- **Step 9:** manual HTTPS remote sync (explicit user action only), Keystore-backed
+  token storage, inbox-only app commits, fast-forward integration, and safe typed
+  sync errors. Use a disposable private repo first; see manual verification below.
 
 The core golden path works: configure a workspace, browse inbox notes, read wiki
-links, create and edit inbox notes, see Git dirty status, and reopen offline
-after restart. Dashboard, Podcasts, and Menu remain placeholders.
+links, create and edit inbox notes, see Git dirty status, reopen offline after
+restart, and manually sync against a sanitized HTTPS remote when configured.
+Dashboard, Podcasts, and Menu remain placeholders.
 
 Specs and PoC scope live in [`specs/`](specs/). Agent and project rules live in
 [`AGENTS.md`](AGENTS.md).
@@ -32,7 +36,8 @@ Specs and PoC scope live in [`specs/`](specs/). Agent and project rules live in
 The PoC target is intentionally narrow:
 
 - Git-first setup for one workspace.
-- Clone, pull, read, write, commit, and push path.
+- Clone from `file://` or sanitized `https://` remotes; manual sync for HTTPS.
+- Read, write (inbox only), commit, fetch, fast-forward, and push path.
 - Inbox list from markdown files.
 - Add flow that creates an editable inbox note.
 - Markdown reader with clickable wiki links.
@@ -137,11 +142,22 @@ JAVA_HOME=/usr/lib/jvm/java-17-temurin-jdk ./gradlew :app:testDebugUnitTest
 Device/emulator instrumentation tests:
 
 ```bash
-./gradlew :app:connectedDebugAndroidTest
+JAVA_HOME=/usr/lib/jvm/java-17-temurin-jdk ./gradlew :app:connectedDebugAndroidTest
 ```
 
 The instrumentation tests cover Android runtime behavior such as app-private
-storage, DataStore, and the JGit repository cycle under `context.filesDir`.
+storage, DataStore, Keystore credential round-trip, and the JGit repository cycle
+under `context.filesDir`.
+
+### Step 9 manual verification (real HTTPS remote)
+
+Before pointing the app at a valuable notes repository, run the disposable-repo
+checklist on a device or emulator:
+
+[`docs/verification/step-09-disposable-repo-manual-test.md`](docs/verification/step-09-disposable-repo-manual-test.md)
+
+Use remote URLs like `https://github.com/<owner>/<repo>.git` only. Never embed a
+token in the URL (forms like `https://<token>@github.com/...` are rejected).
 
 ---
 
@@ -190,9 +206,12 @@ using pure Java JGit:
 - `pullFastForwardOnly` fails cleanly on divergent history; there is no merge or
   conflict-resolution flow.
 
-Remote push/pull has only been exercised against local `file://` bare
-repositories. HTTPS/SSH transport and real remote authentication flows are
-deferred; optional setup tokens are stored separately from workspace metadata.
+JVM unit tests exercise sync against local `file://` bare repositories. Real
+HTTPS remotes require on-device verification (see manual checklist above).
+
+HTTPS token auth uses an in-memory JGit credential provider. Tokens are stored
+in Keystore-backed encrypted app-private files, not in DataStore metadata or
+`.git/config`. SSH and background sync are out of scope.
 
 ---
 
@@ -256,7 +275,7 @@ This is a short summary, not legal advice. For exact terms, read
 - One workspace only.
 - No background sync, full-text search, conflict resolution, podcast playback,
   or dashboard content in the PoC.
-- Git remote behavior has only been proven against local `file://` bare
-  repositories.
-- Real remote authentication, HTTPS/SSH transport, and secure credential flows
-  are deferred.
+- Manual HTTPS sync is implemented but must be validated on a disposable
+  private repo before use on a valuable vault (see
+  [`docs/verification/step-09-disposable-repo-manual-test.md`](docs/verification/step-09-disposable-repo-manual-test.md)).
+- SSH, background sync, and automatic conflict resolution are not implemented.
