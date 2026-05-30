@@ -136,7 +136,10 @@ fun WorkspaceSetupScreen(
             Button(
                 onClick = onSubmit,
                 enabled = state.name.isNotBlank() &&
-                    (state.mode != WorkspaceSetupMode.Clone || state.branch.isNotBlank()),
+                    (
+                        state.mode != WorkspaceSetupMode.Clone ||
+                            (state.branch.isNotBlank() && state.remoteUri.isNotBlank())
+                        ),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("Continue")
