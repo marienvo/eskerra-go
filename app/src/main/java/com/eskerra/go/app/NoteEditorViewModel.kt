@@ -19,9 +19,11 @@ import com.eskerra.go.feature.editor.CreateInboxUiState
 import com.eskerra.go.feature.editor.NoteEditorUiState
 import java.io.File
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 
 class NoteEditorViewModel(
@@ -35,6 +37,9 @@ class NoteEditorViewModel(
 
     private val _uiState = MutableStateFlow<NoteEditorUiState>(NoteEditorUiState.Loading)
     val uiState: StateFlow<NoteEditorUiState> = _uiState.asStateFlow()
+
+    private val _noteSavedEvents = Channel<Unit>(Channel.BUFFERED)
+    val noteSavedEvents = _noteSavedEvents.receiveAsFlow()
 
     private var loadJob: Job? = null
 
@@ -78,6 +83,7 @@ class NoteEditorViewModel(
                         errorMessage = null,
                         gitStatus = result.gitStatus
                     )
+                    _noteSavedEvents.trySend(Unit)
                 },
                 onFailure = { error ->
                     val failed = _uiState.value as? NoteEditorUiState.Content ?: current

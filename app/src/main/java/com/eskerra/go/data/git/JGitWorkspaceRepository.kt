@@ -1,5 +1,7 @@
 package com.eskerra.go.data.git
 
+import com.eskerra.go.core.model.GitWorkspaceStatus
+import com.eskerra.go.core.repository.WorkspaceGitStatusRepository
 import java.io.File
 import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.api.MergeCommand
@@ -27,7 +29,8 @@ import org.eclipse.jgit.transport.RemoteRefUpdate
 class JGitWorkspaceRepository(
     private val identity: PersonIdent = PersonIdent("Eskerra Go Spike", "spike@eskerra.local"),
     private val transportConfigCallback: TransportConfigCallback? = null
-) : WorkspaceGitRepository {
+) : WorkspaceGitRepository,
+    WorkspaceGitStatusRepository {
 
     override fun initOrOpen(workingDir: File): Result<Unit> = runCatching {
         if (!workingDir.exists()) {

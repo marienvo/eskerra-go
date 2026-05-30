@@ -3,12 +3,12 @@ package com.eskerra.go.core.usecase
 import com.eskerra.go.core.model.NoteContentError
 import com.eskerra.go.core.model.NoteContentException
 import com.eskerra.go.core.model.NoteId
+import com.eskerra.go.core.model.NoteIndexError
 import com.eskerra.go.core.model.NoteReaderSegment
 import com.eskerra.go.core.model.NoteSummary
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.data.notes.FakeNoteContentRepository
 import com.eskerra.go.data.notes.FakeNoteRegistryRepository
-import com.eskerra.go.data.notes.NoteIndexError
 import com.eskerra.go.data.workspace.WorkspacePaths
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals

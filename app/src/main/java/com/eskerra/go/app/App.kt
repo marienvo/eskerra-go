@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -23,7 +24,6 @@ import com.eskerra.go.core.usecase.SaveNote
 import com.eskerra.go.feature.dashboard.DashboardScreen
 import com.eskerra.go.feature.editor.CreateInboxScreen
 import com.eskerra.go.feature.editor.NoteEditorScreen
-import com.eskerra.go.feature.editor.NoteEditorUiState
 import com.eskerra.go.feature.inbox.InboxScreen
 import com.eskerra.go.feature.menu.MenuScreen
 import com.eskerra.go.feature.note.NoteScreen
@@ -159,6 +159,12 @@ fun App(
                 )
                 val readerState by noteReaderViewModel.uiState.collectAsState()
 
+                LaunchedEffect(currentRoute) {
+                    if (consumeNoteReaderChanged(currentRoute, noteId, entry.savedStateHandle)) {
+                        noteReaderViewModel.retry()
+                    }
+                }
+
                 NoteScreen(
                     state = readerState,
                     onRetry = noteReaderViewModel::retry,
@@ -190,10 +196,10 @@ fun App(
                 )
                 val editorState by editorViewModel.uiState.collectAsState()
 
-                LaunchedEffect(editorState) {
-                    val content = editorState as? NoteEditorUiState.Content
-                    if (content?.saveMessage == NoteEditorViewModel.SAVED_MESSAGE) {
+                LaunchedEffect(editorViewModel) {
+                    editorViewModel.noteSavedEvents.collect {
                         markInboxNotesChanged()
+                        navController.markNoteReaderChanged(noteId)
                     }
                 }
 
@@ -210,10 +216,27 @@ fun App(
 }
 
 private const val NOTES_CHANGED_KEY = "notesChanged"
+internal const val NOTE_CONTENT_CHANGED_KEY = "noteContentChanged"
+
+internal fun consumeNoteReaderChanged(
+    currentRoute: String?,
+    noteId: NoteId,
+    savedStateHandle: SavedStateHandle
+): Boolean {
+    if (currentRoute != AppRoute.note(noteId)) return false
+    return savedStateHandle.remove<Boolean>(NOTE_CONTENT_CHANGED_KEY) == true
+}
 
 private fun NavHostController.markInboxNotesChanged() {
     runCatching {
         getBackStackEntry(AppRoute.INBOX).savedStateHandle[NOTES_CHANGED_KEY] = true
+    }
+}
+
+private fun NavHostController.markNoteReaderChanged(noteId: NoteId) {
+    runCatching {
+        getBackStackEntry(AppRoute.note(noteId))
+            .savedStateHandle[NOTE_CONTENT_CHANGED_KEY] = true
     }
 }
 

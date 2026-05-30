@@ -62,7 +62,7 @@ class CreateInboxNoteViewModelTest {
         val useCase = CreateInboxNote(
             writeRepository = FakeNoteWriteRepository(),
             registryRepository = registry,
-            loadGitStatusSummary = LoadGitStatusSummary(JGitWorkspaceRepository()),
+            loadGitStatusSummary = loadGitStatusSummary(),
             clock = fixedClock
         )
         val viewModel = CreateInboxNoteViewModel(
@@ -81,7 +81,7 @@ class CreateInboxNoteViewModelTest {
         val useCase = CreateInboxNote(
             writeRepository = FakeNoteWriteRepository(),
             registryRepository = registry,
-            loadGitStatusSummary = LoadGitStatusSummary(JGitWorkspaceRepository()),
+            loadGitStatusSummary = loadGitStatusSummary(),
             clock = fixedClock
         )
         val viewModel = CreateInboxNoteViewModel(
@@ -97,4 +97,7 @@ class CreateInboxNoteViewModelTest {
             (state as CreateInboxUiState.Error).message
         )
     }
+
+    private fun loadGitStatusSummary(): LoadGitStatusSummary =
+        LoadGitStatusSummary(JGitWorkspaceRepository(), Dispatchers.Main)
 }

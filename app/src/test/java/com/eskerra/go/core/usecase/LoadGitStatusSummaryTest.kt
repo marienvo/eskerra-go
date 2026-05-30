@@ -6,6 +6,7 @@ import com.eskerra.go.data.git.JGitWorkspaceRepository
 import com.eskerra.go.data.git.StatusFailingGitRepository
 import com.eskerra.go.data.workspace.WorkspacePaths
 import java.io.File
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -27,7 +28,7 @@ class LoadGitStatusSummaryTest {
     )
 
     @Test
-    fun cleanWorkspaceMapsToClean() {
+    fun cleanWorkspaceMapsToClean() = runTest {
         val filesDir = temp.newFolder("files")
         val workspaceDir = gitWorkspace(filesDir)
         val gitRepository = JGitWorkspaceRepository()
@@ -41,7 +42,7 @@ class LoadGitStatusSummaryTest {
     }
 
     @Test
-    fun dirtyWorkspaceMapsToDirtyWithChangedCount() {
+    fun dirtyWorkspaceMapsToDirtyWithChangedCount() = runTest {
         val filesDir = temp.newFolder("files")
         val workspaceDir = gitWorkspace(filesDir)
         val gitRepository = JGitWorkspaceRepository()
@@ -55,7 +56,7 @@ class LoadGitStatusSummaryTest {
     }
 
     @Test
-    fun missingWorkspaceMapsToUnavailable() {
+    fun missingWorkspaceMapsToUnavailable() = runTest {
         val filesDir = temp.newFolder("files")
         val useCase = LoadGitStatusSummary(JGitWorkspaceRepository())
 
@@ -65,7 +66,7 @@ class LoadGitStatusSummaryTest {
     }
 
     @Test
-    fun nonGitDirectoryMapsToUnavailable() {
+    fun nonGitDirectoryMapsToUnavailable() = runTest {
         val filesDir = temp.newFolder("files")
         File(filesDir, WorkspacePaths.DEFAULT_RELATIVE_PATH).mkdirs()
         val useCase = LoadGitStatusSummary(JGitWorkspaceRepository())
@@ -76,7 +77,7 @@ class LoadGitStatusSummaryTest {
     }
 
     @Test
-    fun statusFailureMapsToError() {
+    fun statusFailureMapsToError() = runTest {
         val filesDir = temp.newFolder("files")
         gitWorkspace(filesDir)
         val useCase = LoadGitStatusSummary(StatusFailingGitRepository())

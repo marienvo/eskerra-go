@@ -1,5 +1,6 @@
 package com.eskerra.go.app
 
+import androidx.lifecycle.SavedStateHandle
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.usecase.LoadEditableNote
@@ -20,6 +21,8 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -81,6 +84,36 @@ class AppNavigationHardeningTest {
         assertEquals(NoteEditorUiState.InvalidNoteId, viewModel.uiState.value)
     }
 
+    @Test
+    fun consumeNoteReaderChanged_retriesOnlyForCurrentReaderRoute() {
+        val noteId = NoteId("Inbox/First.md")
+        val savedStateHandle = SavedStateHandle(
+            mapOf(NOTE_CONTENT_CHANGED_KEY to true)
+        )
+
+        assertFalse(
+            consumeNoteReaderChanged(
+                currentRoute = AppRoute.INBOX,
+                noteId = noteId,
+                savedStateHandle = savedStateHandle
+            )
+        )
+        assertTrue(
+            consumeNoteReaderChanged(
+                currentRoute = AppRoute.note(noteId),
+                noteId = noteId,
+                savedStateHandle = savedStateHandle
+            )
+        )
+        assertFalse(
+            consumeNoteReaderChanged(
+                currentRoute = AppRoute.note(noteId),
+                noteId = noteId,
+                savedStateHandle = savedStateHandle
+            )
+        )
+    }
+
     private fun readerViewModel(noteId: NoteId): NoteReaderViewModel = NoteReaderViewModel(
         config = config,
         filesDir = temp.newFolder("files"),
@@ -102,8 +135,11 @@ class AppNavigationHardeningTest {
         saveNote = SaveNote(
             writeRepository = FakeNoteWriteRepository(),
             registryRepository = FakeNoteRegistryRepository(),
-            loadGitStatusSummary = LoadGitStatusSummary(JGitWorkspaceRepository())
+            loadGitStatusSummary = loadGitStatusSummary()
         ),
-        loadGitStatusSummary = LoadGitStatusSummary(JGitWorkspaceRepository())
+        loadGitStatusSummary = loadGitStatusSummary()
     )
+
+    private fun loadGitStatusSummary(): LoadGitStatusSummary =
+        LoadGitStatusSummary(JGitWorkspaceRepository(), Dispatchers.Main)
 }

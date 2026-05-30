@@ -1,6 +1,8 @@
 package com.eskerra.go.app
 
 import com.eskerra.go.core.model.NoteId
+import com.eskerra.go.core.model.NoteIndexError
+import com.eskerra.go.core.model.NoteIndexException
 import com.eskerra.go.core.model.NoteRegistry
 import com.eskerra.go.core.model.NoteSummary
 import com.eskerra.go.core.model.WorkspaceConfig
@@ -12,8 +14,6 @@ import com.eskerra.go.data.git.JGitWorkspaceRepository
 import com.eskerra.go.data.notes.FakeNoteContentRepository
 import com.eskerra.go.data.notes.FakeNoteRegistryRepository
 import com.eskerra.go.data.notes.FakeNoteWriteRepository
-import com.eskerra.go.data.notes.NoteIndexError
-import com.eskerra.go.data.notes.NoteIndexException
 import com.eskerra.go.data.workspace.WorkspacePaths
 import com.eskerra.go.feature.editor.NoteEditorUiState
 import java.io.File
@@ -71,9 +71,9 @@ class NoteEditorErrorMappingTest {
             saveNote = SaveNote(
                 writeRepository = FakeNoteWriteRepository(),
                 registryRepository = saveRegistry,
-                loadGitStatusSummary = LoadGitStatusSummary(JGitWorkspaceRepository())
+                loadGitStatusSummary = loadGitStatusSummary()
             ),
-            loadGitStatusSummary = LoadGitStatusSummary(JGitWorkspaceRepository())
+            loadGitStatusSummary = loadGitStatusSummary()
         )
 
         viewModel.updateDraft("# Editable\n\nChanged")
@@ -105,9 +105,9 @@ class NoteEditorErrorMappingTest {
             saveNote = SaveNote(
                 writeRepository = FakeNoteWriteRepository(),
                 registryRepository = saveRegistry,
-                loadGitStatusSummary = LoadGitStatusSummary(JGitWorkspaceRepository())
+                loadGitStatusSummary = loadGitStatusSummary()
             ),
-            loadGitStatusSummary = LoadGitStatusSummary(JGitWorkspaceRepository())
+            loadGitStatusSummary = loadGitStatusSummary()
         )
 
         viewModel.updateDraft("# First\n\nEdited")
@@ -132,4 +132,7 @@ class NoteEditorErrorMappingTest {
             return response
         }
     }
+
+    private fun loadGitStatusSummary(): LoadGitStatusSummary =
+        LoadGitStatusSummary(JGitWorkspaceRepository(), Dispatchers.Main)
 }

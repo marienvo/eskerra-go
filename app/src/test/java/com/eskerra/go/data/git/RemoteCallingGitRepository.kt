@@ -1,5 +1,6 @@
 package com.eskerra.go.data.git
 
+import com.eskerra.go.core.model.GitWorkspaceStatus
 import java.io.File
 
 /**

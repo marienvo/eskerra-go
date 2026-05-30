@@ -1,11 +1,11 @@
 package com.eskerra.go.app
 
 import com.eskerra.go.core.model.NoteId
+import com.eskerra.go.core.model.NoteIndexError
 import com.eskerra.go.core.model.NoteSummary
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.usecase.LoadInboxSummaries
 import com.eskerra.go.data.notes.FakeNoteRegistryRepository
-import com.eskerra.go.data.notes.NoteIndexError
 import com.eskerra.go.data.workspace.WorkspacePaths
 import com.eskerra.go.feature.inbox.InboxUiState
 import kotlinx.coroutines.Dispatchers

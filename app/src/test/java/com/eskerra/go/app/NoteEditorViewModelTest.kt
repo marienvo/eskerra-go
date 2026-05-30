@@ -3,6 +3,7 @@ package com.eskerra.go.app
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NoteSummary
 import com.eskerra.go.core.model.WorkspaceConfig
+import com.eskerra.go.core.repository.WorkspaceGitStatusRepository
 import com.eskerra.go.core.usecase.LoadEditableNote
 import com.eskerra.go.core.usecase.LoadGitStatusSummary
 import com.eskerra.go.core.usecase.SaveNote
@@ -14,6 +15,7 @@ import com.eskerra.go.data.workspace.WorkspacePaths
 import com.eskerra.go.feature.editor.NoteEditorUiState
 import java.io.File
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -112,6 +114,55 @@ class NoteEditorViewModelTest {
     }
 
     @Test
+    fun saveEmitsNoteSavedEventOnce() = runTest {
+        val noteId = NoteId("Inbox/First.md")
+        val registry = FakeNoteRegistryRepository.withInboxNotes(summary(noteId, "First"))
+        val content = FakeNoteContentRepository.withContent(noteId, "# First")
+        val viewModel = editorViewModel(noteId, registry, content)
+        val events = mutableListOf<Unit>()
+        val collectJob = launch { viewModel.noteSavedEvents.collect { events.add(Unit) } }
+
+        viewModel.updateDraft("# First\n\nSaved body")
+        viewModel.save()
+        advanceUntilIdle()
+
+        assertEquals(1, events.size)
+        collectJob.cancel()
+    }
+
+    @Test
+    fun failedSaveDoesNotEmitNoteSavedEvent() = runTest {
+        val noteId = NoteId("Inbox/First.md")
+        val registry = FakeNoteRegistryRepository.withInboxNotes(summary(noteId, "First"))
+        val content = FakeNoteContentRepository.withContent(noteId, "# First")
+        val writeRepository = FakeNoteWriteRepository.failing(
+            com.eskerra.go.core.model.NoteWriteError.WriteFailed("disk")
+        )
+        val saveNote = SaveNote(
+            writeRepository = writeRepository,
+            registryRepository = registry,
+            loadGitStatusSummary = loadGitStatusSummary()
+        )
+        val viewModel = NoteEditorViewModel(
+            config = config,
+            filesDir = temp.newFolder("files"),
+            noteId = noteId,
+            loadEditableNote = LoadEditableNote(registry, content),
+            saveNote = saveNote,
+            loadGitStatusSummary = loadGitStatusSummary()
+        )
+        val events = mutableListOf<Unit>()
+        val collectJob = launch { viewModel.noteSavedEvents.collect { events.add(Unit) } }
+
+        viewModel.updateDraft("# First\n\nDraft kept")
+        viewModel.save()
+        advanceUntilIdle()
+
+        assertTrue(events.isEmpty())
+        collectJob.cancel()
+    }
+
+    @Test
     fun failedSaveKeepsDraft() = runTest {
         val noteId = NoteId("Inbox/First.md")
         val registry = FakeNoteRegistryRepository.withInboxNotes(summary(noteId, "First"))
@@ -122,7 +173,7 @@ class NoteEditorViewModelTest {
         val saveNote = SaveNote(
             writeRepository = writeRepository,
             registryRepository = registry,
-            loadGitStatusSummary = LoadGitStatusSummary(JGitWorkspaceRepository())
+            loadGitStatusSummary = loadGitStatusSummary()
         )
         val viewModel = NoteEditorViewModel(
             config = config,
@@ -130,7 +181,7 @@ class NoteEditorViewModelTest {
             noteId = noteId,
             loadEditableNote = LoadEditableNote(registry, content),
             saveNote = saveNote,
-            loadGitStatusSummary = LoadGitStatusSummary(JGitWorkspaceRepository())
+            loadGitStatusSummary = loadGitStatusSummary()
         )
 
         viewModel.updateDraft("# First\n\nDraft kept")
@@ -175,9 +226,9 @@ class NoteEditorViewModelTest {
             saveNote = SaveNote(
                 writeRepository = FakeNoteWriteRepository(),
                 registryRepository = registry,
-                loadGitStatusSummary = LoadGitStatusSummary(gitRepository)
+                loadGitStatusSummary = loadGitStatusSummary(gitRepository)
             ),
-            loadGitStatusSummary = LoadGitStatusSummary(gitRepository)
+            loadGitStatusSummary = loadGitStatusSummary(gitRepository)
         )
 
         val state = viewModel.uiState.value as NoteEditorUiState.Content
@@ -214,10 +265,14 @@ class NoteEditorViewModelTest {
         saveNote = SaveNote(
             writeRepository = writeRepository,
             registryRepository = registry,
-            loadGitStatusSummary = LoadGitStatusSummary(JGitWorkspaceRepository())
+            loadGitStatusSummary = loadGitStatusSummary()
         ),
-        loadGitStatusSummary = LoadGitStatusSummary(JGitWorkspaceRepository())
+        loadGitStatusSummary = loadGitStatusSummary()
     )
+
+    private fun loadGitStatusSummary(
+        gitRepository: WorkspaceGitStatusRepository = JGitWorkspaceRepository()
+    ): LoadGitStatusSummary = LoadGitStatusSummary(gitRepository, Dispatchers.Main)
 
     private fun summary(id: NoteId, title: String): NoteSummary =
         NoteSummary(id = id, title = title, snippet = "", isInbox = true)

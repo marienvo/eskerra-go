@@ -2,14 +2,25 @@ package com.eskerra.go.core.usecase
 
 import com.eskerra.go.core.model.GitStatusSummary
 import com.eskerra.go.core.model.WorkspaceConfig
-import com.eskerra.go.data.git.WorkspaceGitRepository
+import com.eskerra.go.core.repository.WorkspaceGitStatusRepository
 import com.eskerra.go.data.workspace.WorkspacePaths
 import java.io.File
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
-/** Maps [WorkspaceGitRepository.status] to a UI-safe [GitStatusSummary]. */
-class LoadGitStatusSummary(private val gitRepository: WorkspaceGitRepository) {
+/** Maps [WorkspaceGitStatusRepository.status] to a UI-safe [GitStatusSummary]. */
+class LoadGitStatusSummary(
+    private val gitRepository: WorkspaceGitStatusRepository,
+    private val dispatcher: CoroutineDispatcher = Dispatchers.IO
+) {
 
-    operator fun invoke(config: WorkspaceConfig, filesDir: File): GitStatusSummary {
+    suspend operator fun invoke(config: WorkspaceConfig, filesDir: File): GitStatusSummary =
+        withContext(dispatcher) {
+            load(config, filesDir)
+        }
+
+    private fun load(config: WorkspaceConfig, filesDir: File): GitStatusSummary {
         val workspaceResult = WorkspacePaths.resolve(filesDir, config.relativePath)
         if (workspaceResult.isFailure) {
             return GitStatusSummary.unavailable

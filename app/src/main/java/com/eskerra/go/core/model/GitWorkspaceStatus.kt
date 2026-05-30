@@ -1,4 +1,4 @@
-package com.eskerra.go.data.git
+package com.eskerra.go.core.model
 
 /**
  * Minimal snapshot of a working tree's Git status for the Step 2 spike.

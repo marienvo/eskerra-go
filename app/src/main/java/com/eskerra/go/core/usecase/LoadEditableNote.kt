@@ -4,12 +4,12 @@ import com.eskerra.go.core.model.EditableNote
 import com.eskerra.go.core.model.NoteContentError
 import com.eskerra.go.core.model.NoteContentException
 import com.eskerra.go.core.model.NoteId
+import com.eskerra.go.core.model.NoteIndexError
+import com.eskerra.go.core.model.NoteIndexException
 import com.eskerra.go.core.model.NotePath
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.NoteContentRepository
 import com.eskerra.go.core.repository.NoteRegistryRepository
-import com.eskerra.go.data.notes.NoteIndexError
-import com.eskerra.go.data.notes.NoteIndexException
 import java.io.File
 
 /**

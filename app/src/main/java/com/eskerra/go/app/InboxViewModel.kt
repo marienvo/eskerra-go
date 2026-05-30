@@ -3,10 +3,10 @@ package com.eskerra.go.app
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.eskerra.go.core.model.NoteIndexError
+import com.eskerra.go.core.model.NoteIndexException
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.usecase.LoadInboxSummaries
-import com.eskerra.go.data.notes.NoteIndexError
-import com.eskerra.go.data.notes.NoteIndexException
 import com.eskerra.go.feature.inbox.InboxUiState
 import java.io.File
 import kotlinx.coroutines.Job

@@ -1,5 +1,7 @@
 package com.eskerra.go.data.notes
 
+import com.eskerra.go.core.model.NoteIndexError
+import com.eskerra.go.core.model.NoteIndexException
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.data.workspace.WorkspacePaths
 import java.io.File
@@ -80,6 +82,6 @@ class FileNoteRegistryRepositoryTest {
         assertTrue(result.isFailure)
         val error = (result.exceptionOrNull() as NoteIndexException).error
         assertTrue(error is NoteIndexError.ScanFailed)
-        assertEquals("boom", error.detail)
+        assertEquals("boom", (error as NoteIndexError.ScanFailed).detail)
     }
 }

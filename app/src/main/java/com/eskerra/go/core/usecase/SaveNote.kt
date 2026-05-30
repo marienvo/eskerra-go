@@ -26,7 +26,7 @@ class SaveNote(
         noteId: NoteId,
         markdown: String
     ): Result<SaveNoteResult> {
-        if (NotePath.fromRelativePath(noteId.value).isFailure) {
+        val notePath = NotePath.fromRelativePath(noteId.value).getOrElse {
             return Result.failure(SaveNoteException(SaveNoteError.InvalidNoteId))
         }
 
@@ -47,10 +47,6 @@ class SaveNote(
 
         if (!summary.isInbox) {
             return Result.failure(SaveNoteException(SaveNoteError.ReadOnlyNote))
-        }
-
-        val notePath = NotePath.fromRelativePath(noteId.value).getOrElse {
-            return Result.failure(SaveNoteException(SaveNoteError.InvalidNoteId))
         }
 
         writeRepository.write(config, filesDir, notePath, markdown).getOrElse { error ->
