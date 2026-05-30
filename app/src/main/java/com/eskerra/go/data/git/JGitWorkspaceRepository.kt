@@ -2,6 +2,7 @@ package com.eskerra.go.data.git
 
 import com.eskerra.go.core.model.GitWorkspaceStatus
 import com.eskerra.go.core.repository.WorkspaceGitStatusRepository
+import com.eskerra.go.data.workspace.RemoteUriSecurity
 import java.io.File
 import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.api.MergeCommand
@@ -60,27 +61,31 @@ class JGitWorkspaceRepository(
         workingDir: File,
         branch: String?,
         httpsToken: String?
-    ): Result<Unit> = runCatching {
-        if (workingDir.exists()) {
-            if (!workingDir.isDirectory) {
-                error("workingDir exists but is not a directory: $workingDir")
+    ): Result<Unit> {
+        RemoteUriSecurity.validateNoEmbeddedCredentials(remoteUri)
+            .onFailure { return Result.failure(it) }
+        return runCatching {
+            if (workingDir.exists()) {
+                if (!workingDir.isDirectory) {
+                    error("workingDir exists but is not a directory: $workingDir")
+                }
+                val entries = workingDir.listFiles()
+                if (entries != null && entries.isNotEmpty()) {
+                    error("clone target is not empty: $workingDir")
+                }
             }
-            val entries = workingDir.listFiles()
-            if (entries != null && entries.isNotEmpty()) {
-                error("clone target is not empty: $workingDir")
+            val clone = Git.cloneRepository()
+                .setURI(remoteUri)
+                .setDirectory(workingDir)
+            if (!branch.isNullOrBlank()) {
+                clone.setBranch(branch)
             }
+            val callback = httpsToken?.let {
+                HttpsTokenCredentialsProviderFactory.transportConfigCallback(it)
+            } ?: transportConfigCallback
+            callback?.let { clone.setTransportConfigCallback(it) }
+            clone.call().close()
         }
-        val clone = Git.cloneRepository()
-            .setURI(remoteUri)
-            .setDirectory(workingDir)
-        if (!branch.isNullOrBlank()) {
-            clone.setBranch(branch)
-        }
-        val callback = httpsToken?.let {
-            HttpsTokenCredentialsProviderFactory.transportConfigCallback(it)
-        } ?: transportConfigCallback
-        callback?.let { clone.setTransportConfigCallback(it) }
-        clone.call().close()
     }
 
     override fun resolveCloneBranch(
@@ -175,8 +180,10 @@ class JGitWorkspaceRepository(
         }
     }
 
-    override fun configureSanitizedOrigin(workingDir: File, remoteUri: String): Result<Unit> =
-        runCatching {
+    override fun configureSanitizedOrigin(workingDir: File, remoteUri: String): Result<Unit> {
+        RemoteUriSecurity.validateNoEmbeddedCredentials(remoteUri)
+            .onFailure { return Result.failure(it) }
+        return runCatching {
             Git.open(workingDir).use { git ->
                 val remotes = git.remoteList().call().map { it.name }
                 if (ORIGIN in remotes) {
@@ -192,6 +199,7 @@ class JGitWorkspaceRepository(
                 }
             }
         }
+    }
 
     override fun readOriginUrl(workingDir: File): Result<String?> = runCatching {
         Git.open(workingDir).use { git ->

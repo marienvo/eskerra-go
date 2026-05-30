@@ -1,8 +1,11 @@
 package com.eskerra.go.data.git
 
+import com.eskerra.go.data.workspace.WorkspaceSetupError
+import com.eskerra.go.data.workspace.WorkspaceSetupException
 import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -42,6 +45,35 @@ class JGitWorkspaceRemoteTest {
         val pulledFile = File(consumer, "notes/shared.md")
         assertTrue(pulledFile.isFile)
         assertEquals("# Shared\n", pulledFile.readText())
+    }
+
+    @Test
+    fun cloneFrom_rejectsCredentialBearingRemoteUri() {
+        val target = temp.newFolder("clone-target")
+        val credentialUri = "https://mysecrettoken@example.com/repo.git"
+
+        val result = repo.cloneFrom(credentialUri, target)
+
+        assertTrue(result.isFailure)
+        val error = result.exceptionOrNull() as WorkspaceSetupException
+        assertTrue(error.error is WorkspaceSetupError.CredentialBearingRemoteUri)
+        assertFalse(error.error.message().contains("mysecrettoken"))
+        assertFalse(File(target, ".git").exists())
+    }
+
+    @Test
+    fun configureSanitizedOrigin_rejectsCredentialBearingRemoteUri() {
+        val dir = temp.newFolder("workspace")
+        repo.initOrOpen(dir).getOrThrow()
+        val credentialUri = "https://mysecrettoken@example.com/repo.git"
+
+        val result = repo.configureSanitizedOrigin(dir, credentialUri)
+
+        assertTrue(result.isFailure)
+        val error = result.exceptionOrNull() as WorkspaceSetupException
+        assertTrue(error.error is WorkspaceSetupError.CredentialBearingRemoteUri)
+        assertFalse(error.error.message().contains("mysecrettoken"))
+        assertNull(repo.readOriginUrl(dir).getOrNull())
     }
 
     @Test
