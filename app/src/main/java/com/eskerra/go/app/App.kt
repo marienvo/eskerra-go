@@ -13,10 +13,11 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.usecase.LoadInboxSummaries
+import com.eskerra.go.core.usecase.LoadNoteForReading
 import com.eskerra.go.data.git.FakeGitGateway
-import com.eskerra.go.data.notes.FakeNotes
 import com.eskerra.go.data.workspace.FakeWorkspace
 import com.eskerra.go.feature.add.AddScreen
 import com.eskerra.go.feature.dashboard.DashboardScreen
@@ -28,12 +29,16 @@ import com.eskerra.go.feature.podcasts.PodcastsScreen
 import java.io.File
 
 /**
- * Root composable. Owns the navigation graph and is the only layer that reads
- * fake data. It reads from `data/` packages and passes plain state and callbacks into
- * the stateless feature screens, which never touch the data layer themselves.
+ * Root composable. Owns the navigation graph and wires ViewModels to stateless
+ * feature screens.
  */
 @Composable
-fun App(config: WorkspaceConfig, filesDir: File, loadInboxSummaries: LoadInboxSummaries) {
+fun App(
+    config: WorkspaceConfig,
+    filesDir: File,
+    loadInboxSummaries: LoadInboxSummaries,
+    loadNoteForReading: LoadNoteForReading
+) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
@@ -64,7 +69,10 @@ fun App(config: WorkspaceConfig, filesDir: File, loadInboxSummaries: LoadInboxSu
 
                 InboxScreen(
                     state = inboxState,
-                    onRetry = inboxViewModel::refresh
+                    onRetry = inboxViewModel::refresh,
+                    onNoteClick = { noteId ->
+                        navController.navigate(AppRoute.note(noteId))
+                    }
                 )
             }
 
@@ -108,14 +116,23 @@ fun App(config: WorkspaceConfig, filesDir: File, loadInboxSummaries: LoadInboxSu
                 )
             ) { entry ->
                 val raw = entry.arguments?.getString(AppRoute.NOTE_ARG).orEmpty()
-                val note = FakeNotes.note(AppRoute.decodeNoteId(raw))
+                val noteId = AppRoute.decodeNoteId(raw)
+                val noteReaderViewModel: NoteReaderViewModel = viewModel(
+                    factory = NoteReaderViewModel.factory(
+                        config = config,
+                        filesDir = filesDir,
+                        noteId = noteId,
+                        loadNoteForReading = loadNoteForReading
+                    )
+                )
+                val readerState by noteReaderViewModel.uiState.collectAsState()
+
                 NoteScreen(
-                    title = note?.summary?.title ?: "Note not found",
-                    body = note?.body ?: "This note does not exist in the fake data.",
-                    onWikiLinkClick = { target ->
-                        FakeNotes.resolveWikiLink(target)?.let { targetId ->
-                            navController.navigate(AppRoute.note(targetId))
-                        }
+                    state = readerState,
+                    onRetry = noteReaderViewModel::retry,
+                    onBack = { navController.popBackStack() },
+                    onResolvedWikiLinkClick = { targetId: NoteId ->
+                        navController.navigate(AppRoute.note(targetId))
                     }
                 )
             }

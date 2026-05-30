@@ -1,5 +1,6 @@
 package com.eskerra.go.feature.inbox
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NoteSummary
 
 /**
@@ -23,13 +25,19 @@ import com.eskerra.go.core.model.NoteSummary
  * about where the notes come from.
  */
 @Composable
-fun InboxScreen(state: InboxUiState, onRetry: () -> Unit, modifier: Modifier = Modifier) {
+fun InboxScreen(
+    state: InboxUiState,
+    onRetry: () -> Unit,
+    onNoteClick: (NoteId) -> Unit,
+    modifier: Modifier = Modifier
+) {
     when (state) {
         InboxUiState.Loading -> InboxLoading(modifier)
         InboxUiState.Empty -> InboxEmpty(modifier)
         is InboxUiState.Error -> InboxError(message = state.message, onRetry = onRetry, modifier)
         is InboxUiState.Content -> InboxContent(
             notes = state.notes,
+            onNoteClick = onNoteClick,
             modifier = modifier
         )
     }
@@ -98,7 +106,11 @@ private fun InboxError(message: String, onRetry: () -> Unit, modifier: Modifier 
 }
 
 @Composable
-private fun InboxContent(notes: List<NoteSummary>, modifier: Modifier = Modifier) {
+private fun InboxContent(
+    notes: List<NoteSummary>,
+    onNoteClick: (NoteId) -> Unit,
+    modifier: Modifier = Modifier
+) {
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
@@ -112,17 +124,18 @@ private fun InboxContent(notes: List<NoteSummary>, modifier: Modifier = Modifier
             )
         }
         items(notes) { note ->
-            InboxRow(note = note)
+            InboxRow(note = note, onClick = { onNoteClick(note.id) })
         }
     }
 }
 
 @Composable
-private fun InboxRow(note: NoteSummary) {
+private fun InboxRow(note: NoteSummary, onClick: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 6.dp)
+            .clickable(onClick = onClick)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(text = note.title, style = MaterialTheme.typography.titleMedium)

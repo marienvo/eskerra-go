@@ -6,8 +6,10 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import com.eskerra.go.app.AppRoot
 import com.eskerra.go.core.usecase.LoadInboxSummaries
+import com.eskerra.go.core.usecase.LoadNoteForReading
 import com.eskerra.go.data.credentials.AppPrivateCredentialStore
 import com.eskerra.go.data.git.JGitWorkspaceRepository
+import com.eskerra.go.data.notes.FileNoteContentRepository
 import com.eskerra.go.data.notes.FileNoteRegistryRepository
 import com.eskerra.go.data.workspace.DataStoreWorkspaceStore
 import com.eskerra.go.data.workspace.DefaultWorkspaceSetupCompletion
@@ -27,14 +29,20 @@ class MainActivity : ComponentActivity() {
             credentialStore = credentialStore
         )
 
-        val loadInboxSummaries = LoadInboxSummaries(FileNoteRegistryRepository())
+        val noteRegistryRepository = FileNoteRegistryRepository()
+        val loadInboxSummaries = LoadInboxSummaries(noteRegistryRepository)
+        val loadNoteForReading = LoadNoteForReading(
+            registryRepository = noteRegistryRepository,
+            contentRepository = FileNoteContentRepository()
+        )
 
         setContent {
             AppRoot(
                 workspaceStore = workspaceStore,
                 setupCompletion = setupCompletion,
                 filesDir = filesDir,
-                loadInboxSummaries = loadInboxSummaries
+                loadInboxSummaries = loadInboxSummaries,
+                loadNoteForReading = loadNoteForReading
             )
         }
     }
