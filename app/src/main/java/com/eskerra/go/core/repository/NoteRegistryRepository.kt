@@ -1,4 +1,4 @@
-package com.eskerra.go.data.notes
+package com.eskerra.go.core.repository
 
 import com.eskerra.go.core.model.NoteRegistry
 import com.eskerra.go.core.model.WorkspaceConfig

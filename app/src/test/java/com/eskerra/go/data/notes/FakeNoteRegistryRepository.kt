@@ -3,10 +3,13 @@ package com.eskerra.go.data.notes
 import com.eskerra.go.core.model.NoteRegistry
 import com.eskerra.go.core.model.NoteSummary
 import com.eskerra.go.core.model.WorkspaceConfig
+import com.eskerra.go.core.repository.NoteRegistryRepository
 import java.io.File
+import kotlinx.coroutines.delay
 
 class FakeNoteRegistryRepository(
-    private var result: Result<NoteRegistry> = Result.success(NoteRegistry.fromNotes(emptyList()))
+    private var result: Result<NoteRegistry> = Result.success(NoteRegistry.fromNotes(emptyList())),
+    private var refreshDelayMs: Long = 0L
 ) : NoteRegistryRepository {
 
     var lastConfig: WorkspaceConfig? = null
@@ -20,10 +23,17 @@ class FakeNoteRegistryRepository(
         this.result = result
     }
 
+    fun setRefreshDelayMs(delayMs: Long) {
+        refreshDelayMs = delayMs
+    }
+
     override suspend fun refresh(config: WorkspaceConfig, filesDir: File): Result<NoteRegistry> {
         refreshCount += 1
         lastConfig = config
         lastFilesDir = filesDir
+        if (refreshDelayMs > 0L) {
+            delay(refreshDelayMs)
+        }
         return result
     }
 

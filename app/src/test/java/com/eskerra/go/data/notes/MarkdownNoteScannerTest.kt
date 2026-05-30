@@ -200,6 +200,29 @@ class MarkdownNoteScannerTest {
         assertTrue(registry.notes.isEmpty())
     }
 
+    @Test
+    fun scan_doesNotFollowSymlinkFiles() {
+        val workspace = temp.newFolder("workspace")
+        val external = temp.newFolder("external")
+        write(external, "secret.md", "# Secret\n\nOutside workspace.")
+        File(workspace, "Inbox").mkdirs()
+
+        try {
+            Files.createSymbolicLink(
+                File(workspace, "Inbox/link.md").toPath(),
+                File(external, "secret.md").toPath()
+            )
+        } catch (_: UnsupportedOperationException) {
+            return
+        } catch (_: SecurityException) {
+            return
+        }
+
+        val registry = scanner.scan(workspace).getOrThrow()
+
+        assertTrue(registry.notes.isEmpty())
+    }
+
     private fun write(workspace: File, relativePath: String, content: String) {
         val file = File(workspace, relativePath)
         file.parentFile?.mkdirs()

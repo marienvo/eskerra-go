@@ -12,7 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.eskerra.go.data.notes.LoadInboxSummaries
+import com.eskerra.go.core.usecase.LoadInboxSummaries
 import com.eskerra.go.data.workspace.WorkspaceSetupCompletion
 import com.eskerra.go.data.workspace.WorkspaceStore
 import com.eskerra.go.feature.setup.WorkspaceSetupScreen

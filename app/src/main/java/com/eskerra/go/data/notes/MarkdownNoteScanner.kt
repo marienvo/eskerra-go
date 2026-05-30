@@ -5,7 +5,12 @@ import com.eskerra.go.core.model.NotePath
 import com.eskerra.go.core.model.NoteRegistry
 import com.eskerra.go.core.model.NoteSummary
 import java.io.File
+import java.nio.file.FileVisitResult
 import java.nio.file.Files
+import java.nio.file.LinkOption
+import java.nio.file.Path
+import java.nio.file.SimpleFileVisitor
+import java.nio.file.attribute.BasicFileAttributes
 
 /** Scans a workspace directory and returns indexed note summaries. */
 fun interface NoteWorkspaceScanner {
@@ -23,28 +28,50 @@ class MarkdownNoteScanner : NoteWorkspaceScanner {
         val summaries = mutableListOf<NoteSummary>()
 
         try {
-            Files.walk(root.toPath()).use { paths ->
-                paths.forEach { path ->
-                    val file = path.toFile()
-                    if (!file.isFile) return@forEach
-                    if (isUnderGitDirectory(root, file)) return@forEach
-                    if (!isMarkdownFile(file)) return@forEach
-
-                    val relativePath = root.toPath().relativize(path).toString().replace('\\', '/')
-                    val notePath = NotePath.fromRelativePath(relativePath).getOrElse { error ->
-                        throw NoteIndexException(NoteIndexError.ScanFailed(error.message))
+            Files.walkFileTree(
+                root.toPath(),
+                object : SimpleFileVisitor<Path>() {
+                    override fun preVisitDirectory(
+                        dir: Path,
+                        attrs: BasicFileAttributes
+                    ): FileVisitResult {
+                        if (dir.fileName.toString() == GIT_DIRECTORY) {
+                            return FileVisitResult.SKIP_SUBTREE
+                        }
+                        return FileVisitResult.CONTINUE
                     }
-                    val isInbox = isInboxNote(notePath.value)
-                    val (title, snippet) = extractTitleAndSnippet(file)
 
-                    summaries += NoteSummary(
-                        id = NoteId(notePath.value),
-                        title = title,
-                        snippet = snippet,
-                        isInbox = isInbox
-                    )
+                    override fun visitFile(
+                        path: Path,
+                        attrs: BasicFileAttributes
+                    ): FileVisitResult {
+                        if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) {
+                            return FileVisitResult.CONTINUE
+                        }
+
+                        val file = path.toFile()
+                        if (!isMarkdownFile(file)) return FileVisitResult.CONTINUE
+
+                        val relativePath = root.toPath()
+                            .relativize(path)
+                            .toString()
+                            .replace('\\', '/')
+                        val notePath = NotePath.fromRelativePath(relativePath).getOrElse { error ->
+                            throw NoteIndexException(NoteIndexError.ScanFailed(error.message))
+                        }
+                        val isInbox = isInboxNote(notePath.value)
+                        val (title, snippet) = extractTitleAndSnippet(file)
+
+                        summaries += NoteSummary(
+                            id = NoteId(notePath.value),
+                            title = title,
+                            snippet = snippet,
+                            isInbox = isInbox
+                        )
+                        return FileVisitResult.CONTINUE
+                    }
                 }
-            }
+            )
         } catch (error: NoteIndexException) {
             return Result.failure(error)
         } catch (error: Exception) {
@@ -54,12 +81,6 @@ class MarkdownNoteScanner : NoteWorkspaceScanner {
         }
 
         return Result.success(NoteRegistry.fromNotes(summaries))
-    }
-
-    private fun isUnderGitDirectory(root: File, file: File): Boolean {
-        val relative = root.toPath().relativize(file.toPath()).toString()
-        val segments = relative.split(File.separatorChar, '/')
-        return segments.any { it == GIT_DIRECTORY }
     }
 
     private fun isMarkdownFile(file: File): Boolean {

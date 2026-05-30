@@ -2,6 +2,7 @@ package com.eskerra.go.data.notes
 
 import com.eskerra.go.core.model.NoteRegistry
 import com.eskerra.go.core.model.WorkspaceConfig
+import com.eskerra.go.core.repository.NoteRegistryRepository
 import com.eskerra.go.data.workspace.WorkspacePaths
 import java.io.File
 import kotlinx.coroutines.Dispatchers
@@ -10,8 +11,6 @@ import kotlinx.coroutines.withContext
 class FileNoteRegistryRepository(
     private val scanner: NoteWorkspaceScanner = MarkdownNoteScanner()
 ) : NoteRegistryRepository {
-
-    private var lastRegistry: NoteRegistry? = null
 
     override suspend fun refresh(config: WorkspaceConfig, filesDir: File): Result<NoteRegistry> =
         withContext(Dispatchers.IO) {
@@ -35,7 +34,6 @@ class FileNoteRegistryRepository(
 
             scanner.scan(workspaceDir).fold(
                 onSuccess = { registry ->
-                    lastRegistry = registry
                     Result.success(registry)
                 },
                 onFailure = { error ->

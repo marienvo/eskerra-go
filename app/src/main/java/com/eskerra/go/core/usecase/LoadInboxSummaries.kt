@@ -1,7 +1,8 @@
-package com.eskerra.go.data.notes
+package com.eskerra.go.core.usecase
 
 import com.eskerra.go.core.model.NoteSummary
 import com.eskerra.go.core.model.WorkspaceConfig
+import com.eskerra.go.core.repository.NoteRegistryRepository
 import java.io.File
 
 /** Returns inbox note summaries from a refreshed workspace note registry. */

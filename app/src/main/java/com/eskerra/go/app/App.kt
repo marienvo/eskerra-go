@@ -14,9 +14,9 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.eskerra.go.core.model.WorkspaceConfig
+import com.eskerra.go.core.usecase.LoadInboxSummaries
 import com.eskerra.go.data.git.FakeGitGateway
 import com.eskerra.go.data.notes.FakeNotes
-import com.eskerra.go.data.notes.LoadInboxSummaries
 import com.eskerra.go.data.workspace.FakeWorkspace
 import com.eskerra.go.feature.add.AddScreen
 import com.eskerra.go.feature.dashboard.DashboardScreen

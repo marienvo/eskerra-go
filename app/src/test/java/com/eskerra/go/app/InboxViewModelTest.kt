@@ -3,12 +3,14 @@ package com.eskerra.go.app
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NoteSummary
 import com.eskerra.go.core.model.WorkspaceConfig
+import com.eskerra.go.core.usecase.LoadInboxSummaries
 import com.eskerra.go.data.notes.FakeNoteRegistryRepository
-import com.eskerra.go.data.notes.LoadInboxSummaries
 import com.eskerra.go.data.workspace.WorkspacePaths
 import com.eskerra.go.feature.inbox.InboxUiState
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -121,5 +123,53 @@ class InboxViewModelTest {
         val state = viewModel.uiState.value as InboxUiState.Content
         assertEquals(listOf(note), state.notes)
         assertEquals(2, repository.refreshCount)
+    }
+
+    @Test
+    fun refresh_cancelsInFlightLoad() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(dispatcher)
+
+        val filesDir = temp.newFolder("files")
+        val staleNote = NoteSummary(
+            id = NoteId("Inbox/stale.md"),
+            title = "Stale",
+            snippet = "",
+            isInbox = true
+        )
+        val freshNote = NoteSummary(
+            id = NoteId("Inbox/fresh.md"),
+            title = "Fresh",
+            snippet = "",
+            isInbox = true
+        )
+        val repository = FakeNoteRegistryRepository(
+            result = Result.success(
+                com.eskerra.go.core.model.NoteRegistry.fromNotes(listOf(staleNote))
+            ),
+            refreshDelayMs = 1_000L
+        )
+        val viewModel = InboxViewModel(
+            config = config,
+            filesDir = filesDir,
+            loadInboxSummaries = LoadInboxSummaries(repository)
+        )
+        dispatcher.scheduler.runCurrent()
+        assertEquals(1, repository.refreshCount)
+
+        repository.setResult(
+            Result.success(
+                com.eskerra.go.core.model.NoteRegistry.fromNotes(listOf(freshNote))
+            )
+        )
+        repository.setRefreshDelayMs(0L)
+        viewModel.refresh()
+        dispatcher.scheduler.runCurrent()
+        assertEquals(2, repository.refreshCount)
+
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value as InboxUiState.Content
+        assertEquals(listOf(freshNote), state.notes)
     }
 }
