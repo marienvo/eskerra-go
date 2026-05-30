@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.eskerra.go.app.WorkspaceSetupViewModelTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-05-30T10:50:08" hostname="fedora" time="0.027">
-  <properties/>
-  <testcase name="submit_metadataSaveFailure_showsErrorAndDoesNotCallSuccess" classname="com.eskerra.go.app.WorkspaceSetupViewModelTest" time="0.027"/>
-  <system-out><![CDATA[]]></system-out>
-  <system-err><![CDATA[]]></system-err>
-</testsuite>
