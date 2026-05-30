@@ -1,6 +1,7 @@
 package com.eskerra.go.app
 
 import com.eskerra.go.core.model.WorkspaceConfig
+import com.eskerra.go.data.git.JGitWorkspaceRepository
 import com.eskerra.go.data.workspace.FakeWorkspaceStore
 import com.eskerra.go.data.workspace.WorkspacePaths
 import java.io.File
@@ -52,7 +53,7 @@ class AppGateViewModelTest {
         val filesDir = temp.newFolder("files")
         val workspaceDir = File(filesDir, WorkspacePaths.DEFAULT_RELATIVE_PATH)
         workspaceDir.mkdirs()
-        File(workspaceDir, ".git").mkdir()
+        JGitWorkspaceRepository().initOrOpen(workspaceDir).getOrThrow()
 
         val store = FakeWorkspaceStore()
         store.save(config)
@@ -74,11 +75,25 @@ class AppGateViewModelTest {
     }
 
     @Test
+    fun init_withMissingWorkspace_showsRecoverableSetup() = runTest {
+        val filesDir = temp.newFolder("files")
+        val store = FakeWorkspaceStore()
+        store.save(config)
+        val viewModel = AppGateViewModel(store, filesDir)
+
+        val state = viewModel.gateState.value as AppGateState.NeedsSetup
+        assertEquals(
+            "Workspace files are missing. Set up again to recover.",
+            state.recoveryMessage
+        )
+    }
+
+    @Test
     fun init_afterPersistedConfig_skipsSetup() = runTest {
         val filesDir = temp.newFolder("files")
         val workspaceDir = File(filesDir, WorkspacePaths.DEFAULT_RELATIVE_PATH)
         workspaceDir.mkdirs()
-        File(workspaceDir, ".git").mkdir()
+        JGitWorkspaceRepository().initOrOpen(workspaceDir).getOrThrow()
 
         val store = FakeWorkspaceStore()
         store.save(config)

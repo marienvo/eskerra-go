@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -17,6 +18,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.eskerra.go.data.workspace.WorkspaceSetupMode
 
@@ -115,6 +118,8 @@ fun WorkspaceSetupScreen(
                 },
                 singleLine = true,
                 enabled = !state.isSubmitting,
+                visualTransformation = WorkspaceSetupInputOptions.credentialVisualTransformation,
+                keyboardOptions = WorkspaceSetupInputOptions.credentialKeyboardOptions,
                 modifier = Modifier.fillMaxWidth()
             )
         }
@@ -146,6 +151,15 @@ fun WorkspaceSetupScreen(
             }
         }
     }
+}
+
+/** Password-style input defaults for the optional access token field. */
+internal object WorkspaceSetupInputOptions {
+    val credentialVisualTransformation = PasswordVisualTransformation()
+    val credentialKeyboardOptions = KeyboardOptions(
+        autoCorrectEnabled = false,
+        keyboardType = KeyboardType.Password
+    )
 }
 
 @Composable

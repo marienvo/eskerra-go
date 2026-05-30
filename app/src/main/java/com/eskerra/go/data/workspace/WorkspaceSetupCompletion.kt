@@ -40,7 +40,11 @@ class DefaultWorkspaceSetupCompletion(
             filesDir = filesDir
         ).getOrElse { return Result.failure(it) }
 
-        val trimmedCredential = credential?.trim().orEmpty()
+        val trimmedCredential = if (mode == WorkspaceSetupMode.Clone) {
+            credential?.trim().orEmpty()
+        } else {
+            ""
+        }
         var credentialWasSaved = false
         if (trimmedCredential.isNotEmpty()) {
             credentialStore.saveToken(config.relativePath, trimmedCredential).getOrElse { error ->

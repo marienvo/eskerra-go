@@ -2,6 +2,7 @@ package com.eskerra.go.app
 
 import com.eskerra.go.core.model.NoteContentError
 import com.eskerra.go.core.model.NoteId
+import com.eskerra.go.core.model.NoteIndexError
 import com.eskerra.go.core.model.NoteReaderSegment
 import com.eskerra.go.core.model.NoteSummary
 import com.eskerra.go.core.model.WorkspaceConfig
@@ -124,6 +125,40 @@ class NoteReaderViewModelTest {
     }
 
     @Test
+    fun invalidNoteIdStateForBlankPath() = runTest {
+        val viewModel = NoteReaderViewModel(
+            config = config,
+            filesDir = temp.newFolder("files"),
+            noteId = NoteId(""),
+            loadNoteForReading = LoadNoteForReading(
+                FakeNoteRegistryRepository(),
+                FakeNoteContentRepository()
+            )
+        )
+
+        assertEquals(NoteReaderUiState.InvalidNoteId, viewModel.uiState.value)
+    }
+
+    @Test
+    fun workspaceMissingMapsToSafeMessage() = runTest {
+        val noteId = NoteId("Inbox/First.md")
+        val registry = FakeNoteRegistryRepository.failing(
+            NoteIndexError.WorkspaceMissing(null)
+        )
+        val viewModel = NoteReaderViewModel(
+            config = config,
+            filesDir = temp.newFolder("files"),
+            noteId = noteId,
+            loadNoteForReading = LoadNoteForReading(registry, FakeNoteContentRepository())
+        )
+
+        assertEquals(
+            NoteReaderUiState.Error(NoteReaderViewModel.WORKSPACE_MISSING_MESSAGE),
+            viewModel.uiState.value
+        )
+    }
+
+    @Test
     fun retryReloadsAfterFailure() = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
         Dispatchers.setMain(dispatcher)
@@ -156,6 +191,37 @@ class NoteReaderViewModelTest {
         advanceUntilIdle()
 
         assertTrue(viewModel.uiState.value is NoteReaderUiState.Content)
+    }
+
+    @Test
+    fun retryReloadsUpdatedNoteContent() = runTest {
+        val noteId = NoteId("Inbox/First.md")
+        val registry = FakeNoteRegistryRepository.withInboxNotes(summary(noteId, "First"))
+        val content = FakeNoteContentRepository.withContent(noteId, "# Original")
+        val viewModel = NoteReaderViewModel(
+            config = config,
+            filesDir = temp.newFolder("files"),
+            noteId = noteId,
+            loadNoteForReading = LoadNoteForReading(registry, content)
+        )
+
+        val original = viewModel.uiState.value as NoteReaderUiState.Content
+        assertEquals("# Original", original.document.content.markdown)
+
+        content.setResult(
+            Result.success(
+                com.eskerra.go.core.model.NoteContent(
+                    noteId,
+                    com.eskerra.go.core.model.NotePath.fromRelativePath(noteId.value).getOrThrow(),
+                    "# Updated after save"
+                )
+            )
+        )
+        viewModel.retry()
+        advanceUntilIdle()
+
+        val refreshed = viewModel.uiState.value as NoteReaderUiState.Content
+        assertEquals("# Updated after save", refreshed.document.content.markdown)
     }
 
     private fun summary(id: NoteId, title: String): NoteSummary =

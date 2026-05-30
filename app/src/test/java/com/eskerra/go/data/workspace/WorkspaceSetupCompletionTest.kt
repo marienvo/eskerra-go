@@ -4,6 +4,7 @@ import com.eskerra.go.data.credentials.CredentialStore
 import com.eskerra.go.data.credentials.FailingCredentialStore
 import com.eskerra.go.data.credentials.FakeCredentialStore
 import com.eskerra.go.data.git.JGitWorkspaceRepository
+import com.eskerra.go.data.git.TestGitRepos
 import java.io.File
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -21,6 +22,9 @@ class WorkspaceSetupCompletionTest {
 
     private val gitRepository = JGitWorkspaceRepository()
     private val setupRepository = DefaultWorkspaceSetupRepository(gitRepository)
+    private var remoteCounter = 0
+
+    private data class CloneRemote(val remoteUri: String, val branch: String)
 
     private fun completion(
         workspaceStore: WorkspaceStore = FakeWorkspaceStore(),
@@ -34,17 +38,34 @@ class WorkspaceSetupCompletionTest {
     private fun workspaceDir(filesDir: File): File =
         File(filesDir, WorkspacePaths.DEFAULT_RELATIVE_PATH)
 
+    private fun preparedRemote(): CloneRemote {
+        remoteCounter += 1
+        val bare = TestGitRepos.initBareRemote(File(temp.root, "remote-$remoteCounter.git"))
+        val remoteUri = TestGitRepos.fileUri(bare)
+        val producer = temp.newFolder("producer-$remoteCounter")
+        gitRepository.cloneFrom(remoteUri, producer).getOrThrow()
+        gitRepository.writeFile(producer, "notes/seed.md", "# Seed\n").getOrThrow()
+        gitRepository.stageAll(producer).getOrThrow()
+        gitRepository.commit(producer, "Seed").getOrThrow()
+        gitRepository.push(producer).getOrThrow()
+        return CloneRemote(
+            remoteUri = remoteUri,
+            branch = gitRepository.status(producer).getOrThrow().branch
+        )
+    }
+
     @Test
     fun completeAndPersist_savesMetadataAndCredentialSeparately() = runTest {
         val filesDir = temp.newFolder("files")
         val workspaceStore = FakeWorkspaceStore()
         val credentialStore = FakeCredentialStore()
+        val remote = preparedRemote()
 
         val result = completion(workspaceStore, credentialStore).completeAndPersist(
-            mode = WorkspaceSetupMode.InitializeLocal,
+            mode = WorkspaceSetupMode.Clone,
             name = "Notes",
-            branch = "",
-            remoteUri = null,
+            branch = remote.branch,
+            remoteUri = remote.remoteUri,
             credential = "secret-token",
             filesDir = filesDir
         )
@@ -54,6 +75,24 @@ class WorkspaceSetupCompletionTest {
         assertEquals("Notes", workspaceStore.read()?.name)
         assertEquals("secret-token", credentialStore.tokens[WorkspacePaths.DEFAULT_RELATIVE_PATH])
         assertFalse(config.toString().contains("secret-token"))
+    }
+
+    @Test
+    fun completeAndPersist_initializeLocalDoesNotSaveCredential() = runTest {
+        val filesDir = temp.newFolder("files")
+        val credentialStore = FakeCredentialStore()
+
+        val result = completion(credentialStore = credentialStore).completeAndPersist(
+            mode = WorkspaceSetupMode.InitializeLocal,
+            name = "Notes",
+            branch = "",
+            remoteUri = null,
+            credential = "secret-token",
+            filesDir = filesDir
+        )
+
+        assertTrue(result.isSuccess)
+        assertTrue(credentialStore.tokens.isEmpty())
     }
 
     @Test
@@ -83,12 +122,13 @@ class WorkspaceSetupCompletionTest {
         val filesDir = temp.newFolder("files")
         val workspaceStore = FailingWorkspaceStore()
         val credentialStore = FakeCredentialStore()
+        val remote = preparedRemote()
 
         val result = completion(workspaceStore, credentialStore).completeAndPersist(
-            mode = WorkspaceSetupMode.InitializeLocal,
+            mode = WorkspaceSetupMode.Clone,
             name = "Notes",
-            branch = "",
-            remoteUri = null,
+            branch = remote.branch,
+            remoteUri = remote.remoteUri,
             credential = "secret-token",
             filesDir = filesDir
         )
@@ -106,12 +146,13 @@ class WorkspaceSetupCompletionTest {
         val filesDir = temp.newFolder("files")
         val workspaceStore = FakeWorkspaceStore()
         val credentialStore = FailingCredentialStore()
+        val remote = preparedRemote()
 
         val result = completion(workspaceStore, credentialStore).completeAndPersist(
-            mode = WorkspaceSetupMode.InitializeLocal,
+            mode = WorkspaceSetupMode.Clone,
             name = "Notes",
-            branch = "",
-            remoteUri = null,
+            branch = remote.branch,
+            remoteUri = remote.remoteUri,
             credential = "secret-token",
             filesDir = filesDir
         )
@@ -158,12 +199,13 @@ class WorkspaceSetupCompletionTest {
         val filesDir = temp.newFolder("files")
         val workspaceStore = FakeWorkspaceStore()
         val credentialStore = FakeCredentialStore()
+        val remote = preparedRemote()
 
         completion(workspaceStore, credentialStore).completeAndPersist(
-            mode = WorkspaceSetupMode.InitializeLocal,
+            mode = WorkspaceSetupMode.Clone,
             name = "Notes",
-            branch = "",
-            remoteUri = null,
+            branch = remote.branch,
+            remoteUri = remote.remoteUri,
             credential = "pat-12345",
             filesDir = filesDir
         )
@@ -177,5 +219,52 @@ class WorkspaceSetupCompletionTest {
             }
         )
         assertFalse(saved.remoteUri?.contains("pat-12345") == true)
+    }
+
+    @Test
+    fun completeAndPersist_rejectsCredentialBearingRemoteBeforePersist() = runTest {
+        val filesDir = temp.newFolder("files")
+        val workspaceStore = FakeWorkspaceStore()
+        val credentialStore = FakeCredentialStore()
+        val workspaceDir = workspaceDir(filesDir)
+
+        val result = completion(workspaceStore, credentialStore).completeAndPersist(
+            mode = WorkspaceSetupMode.Clone,
+            name = "Notes",
+            branch = "main",
+            remoteUri = "https://mysecrettoken@example.com/repo.git",
+            credential = "pat-12345",
+            filesDir = filesDir
+        )
+
+        assertTrue(result.isFailure)
+        val error = result.exceptionOrNull() as WorkspaceSetupException
+        assertTrue(error.error is WorkspaceSetupError.CredentialBearingRemoteUri)
+        assertFalse(error.error.message().contains("mysecrettoken"))
+        assertFalse(error.error.message().contains("pat-12345"))
+        assertNull(workspaceStore.read())
+        assertTrue(credentialStore.tokens.isEmpty())
+        assertFalse(WorkspacePaths.isValidGitWorkspace(workspaceDir))
+    }
+
+    @Test
+    fun completeAndPersist_tokenNotWrittenToGitConfig() = runTest {
+        val filesDir = temp.newFolder("files")
+        val workspaceStore = FakeWorkspaceStore()
+        val credentialStore = FakeCredentialStore()
+        val remote = preparedRemote()
+
+        completion(workspaceStore, credentialStore).completeAndPersist(
+            mode = WorkspaceSetupMode.Clone,
+            name = "Notes",
+            branch = remote.branch,
+            remoteUri = remote.remoteUri,
+            credential = "pat-12345",
+            filesDir = filesDir
+        )
+
+        val gitConfig = File(workspaceDir(filesDir), ".git/config")
+        assertTrue(gitConfig.isFile)
+        assertFalse(gitConfig.readText().contains("pat-12345"))
     }
 }

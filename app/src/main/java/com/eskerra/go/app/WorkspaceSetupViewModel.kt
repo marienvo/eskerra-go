@@ -40,25 +40,34 @@ class WorkspaceSetupViewModel(
     }
 
     fun onModeChange(mode: WorkspaceSetupMode) {
-        uiState = uiState.copy(mode = mode, errorMessage = null)
+        uiState = uiState.copy(
+            mode = mode,
+            credential = if (mode == WorkspaceSetupMode.Clone) uiState.credential else "",
+            errorMessage = null
+        )
     }
 
     fun submit(onSuccess: (WorkspaceConfig) -> Unit) {
         if (uiState.isSubmitting) return
 
-        uiState = uiState.copy(isSubmitting = true, errorMessage = null)
+        val submission = uiState
+        uiState = submission.copy(isSubmitting = true, errorMessage = null)
         viewModelScope.launch {
             val result = setupCompletion.completeAndPersist(
-                mode = uiState.mode,
-                name = uiState.name,
-                branch = if (uiState.mode == WorkspaceSetupMode.Clone) uiState.branch else "",
-                remoteUri = uiState.remoteUri.trim().ifBlank { null },
-                credential = uiState.credential.trim().ifBlank { null },
+                mode = submission.mode,
+                name = submission.name,
+                branch = if (submission.mode == WorkspaceSetupMode.Clone) submission.branch else "",
+                remoteUri = submission.remoteUri.trim().ifBlank { null },
+                credential = if (submission.mode == WorkspaceSetupMode.Clone) {
+                    submission.credential.trim().ifBlank { null }
+                } else {
+                    null
+                },
                 filesDir = filesDir
             )
             result.fold(
                 onSuccess = { config ->
-                    uiState = uiState.copy(isSubmitting = false)
+                    uiState = uiState.copy(isSubmitting = false, credential = "")
                     onSuccess(config)
                 },
                 onFailure = { error ->

@@ -97,6 +97,63 @@ class WorkspaceSetupRepositoryTest {
     }
 
     @Test
+    fun clone_rejectsCredentialBearingHttpsUri() = runTest {
+        val filesDir = filesDir()
+        val workspaceDir = File(filesDir, WorkspacePaths.DEFAULT_RELATIVE_PATH)
+
+        val result = repository.completeSetup(
+            mode = WorkspaceSetupMode.Clone,
+            name = "Remote Notes",
+            branch = "main",
+            remoteUri = "https://mysecrettoken@example.com/repo.git",
+            filesDir = filesDir
+        )
+
+        assertTrue(result.isFailure)
+        val error = result.exceptionOrNull() as WorkspaceSetupException
+        assertTrue(error.error is WorkspaceSetupError.CredentialBearingRemoteUri)
+        assertFalse(error.error.message().contains("mysecrettoken"))
+        assertFalse(workspaceDir.exists())
+    }
+
+    @Test
+    fun clone_rejectsCredentialBearingSshUri() = runTest {
+        val filesDir = filesDir()
+
+        val result = repository.completeSetup(
+            mode = WorkspaceSetupMode.Clone,
+            name = "Remote Notes",
+            branch = "main",
+            remoteUri = "ssh://git@example.com/repo.git",
+            filesDir = filesDir
+        )
+
+        assertTrue(result.isFailure)
+        val error = result.exceptionOrNull() as WorkspaceSetupException
+        assertTrue(error.error is WorkspaceSetupError.CredentialBearingRemoteUri)
+    }
+
+    @Test
+    fun clone_rejectsCredentialBearingFileUri() = runTest {
+        val filesDir = filesDir()
+        val workspaceDir = File(filesDir, WorkspacePaths.DEFAULT_RELATIVE_PATH)
+
+        val result = repository.completeSetup(
+            mode = WorkspaceSetupMode.Clone,
+            name = "Remote Notes",
+            branch = "main",
+            remoteUri = "file://user:mysecrettoken@/tmp/repo.git",
+            filesDir = filesDir
+        )
+
+        assertTrue(result.isFailure)
+        val error = result.exceptionOrNull() as WorkspaceSetupException
+        assertTrue(error.error is WorkspaceSetupError.CredentialBearingRemoteUri)
+        assertFalse(error.error.message().contains("mysecrettoken"))
+        assertFalse(workspaceDir.exists())
+    }
+
+    @Test
     fun clone_rejectsNonFileUri() = runTest {
         val filesDir = filesDir()
 

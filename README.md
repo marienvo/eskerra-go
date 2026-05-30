@@ -13,15 +13,14 @@ repo; Android work belongs here.
 
 This repository is an Android PoC, not a complete production app.
 
-- **Step 1:** proved the Compose UI shape.
-- **Step 2:** added an isolated JGit spike behind `data/git`.
-- **Step 3:** added workspace setup with DataStore persistence and an
-  app-start gate.
-- **Step 4:** will replace the remaining fake Inbox and Note data paths with
-  real markdown-backed behavior.
+- **Steps 1–7:** Compose shell, JGit spike, workspace setup, real inbox/reader/wiki
+  navigation, and inbox note create/edit/save with Git dirty status.
+- **Step 8:** restart/offline reliability, clearer loading/empty/error states, and
+  removal of fake production note paths.
 
-The current UI can show the app shell, setup flow, Inbox, Note, Add, Podcasts,
-Dashboard, and Menu screens. Inbox and Note still use fake data until Step 4.
+The core golden path works: configure a workspace, browse inbox notes, read wiki
+links, create and edit inbox notes, see Git dirty status, and reopen offline
+after restart. Dashboard, Podcasts, and Menu remain placeholders.
 
 Specs and PoC scope live in [`specs/`](specs/). Agent and project rules live in
 [`AGENTS.md`](AGENTS.md).
@@ -88,7 +87,7 @@ sdk.dir=/home/you/Android/Sdk
 If your shell does not already point at JDK 17:
 
 ```bash
-export JAVA_HOME=/usr/lib/jvm/java-17-openjdk
+export JAVA_HOME=/usr/lib/jvm/java-17-temurin-jdk
 ```
 
 ---
@@ -101,8 +100,22 @@ Build the debug APK:
 ./gradlew :app:assembleDebug
 ```
 
-Install/run it from Android Studio, or install the generated debug APK with
-standard Android tooling.
+Build, install on a connected phone or emulator, and launch the app in one
+step:
+
+```bash
+./scripts/install-debug.sh
+```
+
+Or with Gradle only (installs but does not launch):
+
+```bash
+JAVA_HOME=/usr/lib/jvm/java-17-temurin-jdk ./gradlew :app:installDebug
+```
+
+Prerequisites for device install: USB debugging enabled on the phone (or an
+emulator running), `adb` on your PATH, and exactly one authorized device
+connected. You can also install/run from Android Studio.
 
 If the Gradle wrapper JAR is missing in a fresh local checkout, regenerate it
 once with Gradle 8.9+ running on JDK 17:
@@ -115,10 +128,10 @@ gradle wrapper --gradle-version 8.11.1
 
 ## Tests
 
-Fast JVM tests:
+Fast JVM tests (use JDK 17):
 
 ```bash
-./gradlew :app:testDebugUnitTest
+JAVA_HOME=/usr/lib/jvm/java-17-temurin-jdk ./gradlew :app:testDebugUnitTest
 ```
 
 Device/emulator instrumentation tests:
@@ -178,7 +191,8 @@ using pure Java JGit:
   conflict-resolution flow.
 
 Remote push/pull has only been exercised against local `file://` bare
-repositories. HTTPS/SSH transport and credential storage are deferred.
+repositories. HTTPS/SSH transport and real remote authentication flows are
+deferred; optional setup tokens are stored separately from workspace metadata.
 
 ---
 
@@ -237,7 +251,8 @@ This is a short summary, not legal advice. For exact terms, read
 ## Known limitations
 
 - Android only; iOS is not a target.
-- PoC status: Inbox and Note still use fake data until Step 4.
+- PoC status: core inbox/note/editor flow is local-first; Dashboard, Podcasts,
+  and Menu are placeholders.
 - One workspace only.
 - No background sync, full-text search, conflict resolution, podcast playback,
   or dashboard content in the PoC.

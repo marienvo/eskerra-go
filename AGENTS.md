@@ -59,7 +59,8 @@ Do not rely on CI to catch ktlint or Android lint violations.
 
 ```bash
 ./gradlew :app:assembleDebug
+./scripts/install-debug.sh   # build, install on device/emulator, and launch
 ./gradlew :app:connectedDebugAndroidTest
 ```
 
-Use `assembleDebug` only when building the APK is the goal. `connectedDebugAndroidTest` requires a device or emulator and is not part of the standard quality gate.
+Use `assembleDebug` only when building the APK is the goal. `installDebug` (or the script above) requires a connected device or emulator. `connectedDebugAndroidTest` requires a device or emulator and is not part of the standard quality gate.

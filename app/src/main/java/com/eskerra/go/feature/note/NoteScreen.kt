@@ -40,6 +40,7 @@ fun NoteScreen(
     state: NoteReaderUiState,
     onRetry: () -> Unit,
     onBack: () -> Unit,
+    onEdit: () -> Unit,
     onResolvedWikiLinkClick: (NoteId) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -60,7 +61,9 @@ fun NoteScreen(
             is NoteReaderUiState.Content -> NoteReaderContent(
                 title = state.title,
                 path = state.path,
+                canEdit = state.canEdit,
                 segments = state.document.segments,
+                onEdit = onEdit,
                 onResolvedWikiLinkClick = onResolvedWikiLinkClick
             )
             NoteReaderUiState.NotFound -> NoteReaderMessage(
@@ -96,7 +99,9 @@ private fun NoteReaderLoading() {
 private fun NoteReaderContent(
     title: String,
     path: String,
+    canEdit: Boolean,
     segments: List<NoteReaderSegment>,
+    onEdit: () -> Unit,
     onResolvedWikiLinkClick: (NoteId) -> Unit
 ) {
     Column(
@@ -115,6 +120,14 @@ private fun NoteReaderContent(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(bottom = 12.dp)
         )
+        if (canEdit) {
+            Button(
+                onClick = onEdit,
+                modifier = Modifier.padding(bottom = 12.dp)
+            ) {
+                Text("Edit")
+            }
+        }
         Text(
             text = buildReaderText(
                 segments = segments,

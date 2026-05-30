@@ -1,5 +1,6 @@
 package com.eskerra.go.data.workspace
 
+import com.eskerra.go.data.git.JGitWorkspaceRepository
 import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -61,6 +62,10 @@ class WorkspacePathsTest {
         assertTrue(!WorkspacePaths.isValidGitWorkspace(dir))
 
         File(dir, ".git").mkdir()
+        assertTrue(!WorkspacePaths.isValidGitWorkspace(dir))
+
+        File(dir, ".git").deleteRecursively()
+        JGitWorkspaceRepository().initOrOpen(dir).getOrThrow()
         assertTrue(WorkspacePaths.isValidGitWorkspace(dir))
     }
 }

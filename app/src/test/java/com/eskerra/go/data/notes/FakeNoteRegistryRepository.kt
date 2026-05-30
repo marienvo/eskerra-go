@@ -1,5 +1,7 @@
 package com.eskerra.go.data.notes
 
+import com.eskerra.go.core.model.NoteIndexError
+import com.eskerra.go.core.model.NoteIndexException
 import com.eskerra.go.core.model.NoteRegistry
 import com.eskerra.go.core.model.NoteSummary
 import com.eskerra.go.core.model.WorkspaceConfig

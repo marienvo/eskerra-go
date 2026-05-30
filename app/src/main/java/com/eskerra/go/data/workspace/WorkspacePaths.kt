@@ -42,7 +42,13 @@ object WorkspacePaths {
         return target == base || target.path.startsWith(base.path + File.separator)
     }
 
-    fun isValidGitWorkspace(dir: File): Boolean = File(dir, ".git").isDirectory
+    fun isValidGitWorkspace(dir: File): Boolean {
+        val gitDir = File(dir, ".git")
+        return gitDir.isDirectory &&
+            File(gitDir, "HEAD").isFile &&
+            File(gitDir, "objects").isDirectory &&
+            File(gitDir, "refs").isDirectory
+    }
 
     fun ensureEmptyDirectory(dir: File): Result<Unit> {
         if (dir.exists() && dir.listFiles()?.isNotEmpty() == true) {

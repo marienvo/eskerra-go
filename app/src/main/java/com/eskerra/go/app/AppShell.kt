@@ -64,7 +64,7 @@ fun AppShell(
         BottomTaskbar(
             currentRoute = currentRoute,
             onInbox = { onNavigate(AppRoute.INBOX) },
-            onAdd = { onNavigate(AppRoute.ADD) },
+            onAdd = { onNavigate(AppRoute.CREATE_INBOX) },
             onPodcasts = { onNavigate(AppRoute.PODCASTS) },
             modifier = Modifier
                 .align(Alignment.BottomCenter)

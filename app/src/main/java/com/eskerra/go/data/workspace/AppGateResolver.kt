@@ -15,15 +15,19 @@ fun resolveAppGateState(config: WorkspaceConfig?, filesDir: File): AppGateState 
     val pathResult = WorkspacePaths.resolve(filesDir, config.relativePath)
     if (pathResult.isFailure) {
         return AppGateState.NeedsSetup(
-            recoveryMessage = pathResult.exceptionOrNull()?.message
-                ?: "Stored workspace path is invalid"
+            recoveryMessage = "Stored workspace path is invalid. Set up again to recover."
         )
     }
 
     val workspaceDir = pathResult.getOrThrow()
+    if (!workspaceDir.isDirectory) {
+        return AppGateState.NeedsSetup(
+            recoveryMessage = "Workspace files are missing. Set up again to recover."
+        )
+    }
     if (!WorkspacePaths.isValidGitWorkspace(workspaceDir)) {
         return AppGateState.NeedsSetup(
-            recoveryMessage = "Workspace repository is missing or invalid"
+            recoveryMessage = "Workspace repository is missing or invalid. Set up again to recover."
         )
     }
 

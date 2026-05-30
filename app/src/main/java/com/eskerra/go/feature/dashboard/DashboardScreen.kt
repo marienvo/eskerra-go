@@ -12,8 +12,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 /**
- * Stateless dashboard. Receives the values to display, including a fake Git
- * status label. It performs no work itself.
+ * Placeholder dashboard. Values are static until dashboard work is in scope.
+ * It performs no work itself and does not reflect live note or Git state.
  */
 @Composable
 fun DashboardScreen(

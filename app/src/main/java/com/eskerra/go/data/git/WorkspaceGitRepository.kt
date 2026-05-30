@@ -1,5 +1,7 @@
 package com.eskerra.go.data.git
 
+import com.eskerra.go.core.model.GitWorkspaceStatus
+import com.eskerra.go.core.repository.WorkspaceGitStatusRepository
 import java.io.File
 
 /**
@@ -14,7 +16,7 @@ import java.io.File
  * The interface is intentionally narrow and free of any Android `Context` so it
  * stays unit-testable on the plain JVM.
  */
-interface WorkspaceGitRepository {
+interface WorkspaceGitRepository : WorkspaceGitStatusRepository {
 
     /**
      * Open an existing repository at [workingDir], or run `git init` when
@@ -35,7 +37,7 @@ interface WorkspaceGitRepository {
     fun cloneFrom(remoteUri: String, workingDir: File, branch: String? = null): Result<Unit>
 
     /** Read the working tree status of the repository at [workingDir]. */
-    fun status(workingDir: File): Result<GitWorkspaceStatus>
+    override fun status(workingDir: File): Result<GitWorkspaceStatus>
 
     /**
      * Create or overwrite a file at [relativePath] (relative to the repo root)

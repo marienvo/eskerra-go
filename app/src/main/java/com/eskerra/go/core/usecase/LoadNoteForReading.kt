@@ -5,6 +5,8 @@ import com.eskerra.go.core.model.MissingWikiLink
 import com.eskerra.go.core.model.NoteContentError
 import com.eskerra.go.core.model.NoteContentException
 import com.eskerra.go.core.model.NoteId
+import com.eskerra.go.core.model.NoteIndexError
+import com.eskerra.go.core.model.NoteIndexException
 import com.eskerra.go.core.model.NotePath
 import com.eskerra.go.core.model.NoteReaderDocument
 import com.eskerra.go.core.model.NoteReaderSegment
@@ -16,8 +18,6 @@ import com.eskerra.go.core.repository.NoteContentRepository
 import com.eskerra.go.core.repository.NoteRegistryRepository
 import com.eskerra.go.core.wikilink.WikiLinkParser
 import com.eskerra.go.core.wikilink.WikiLinkResolver
-import com.eskerra.go.data.notes.NoteIndexError
-import com.eskerra.go.data.notes.NoteIndexException
 import java.io.File
 
 /**
