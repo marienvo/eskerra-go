@@ -18,6 +18,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.eskerra.go.app.LocalShellChromeInsets
+import com.eskerra.go.app.shellScrollContentPadding
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NoteSummary
 
@@ -32,24 +34,66 @@ fun InboxScreen(
     onNoteClick: (NoteId) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(modifier = modifier.fillMaxSize()) {
-        when (state) {
-            InboxUiState.Loading -> InboxLoading(Modifier.weight(1f))
-            InboxUiState.Empty -> InboxEmpty(Modifier.weight(1f))
-            is InboxUiState.Error -> InboxError(
-                message = state.message,
-                onRetry = onRetry,
-                modifier = Modifier.weight(1f)
-            )
-            is InboxUiState.Content -> InboxContent(
-                notes = state.notes,
-                onNoteClick = onNoteClick,
-                modifier = Modifier.weight(1f)
+    when (state) {
+        InboxUiState.Loading -> InboxLoading(modifier)
+        is InboxUiState.Error -> InboxError(
+            message = state.message,
+            onRetry = onRetry,
+            modifier = modifier
+        )
+        InboxUiState.Empty,
+        is InboxUiState.Content -> InboxScrollBody(
+            state = state,
+            onNoteClick = onNoteClick,
+            modifier = modifier
+        )
+    }
+}
+
+@Composable
+private fun InboxScrollBody(
+    state: InboxUiState,
+    onNoteClick: (NoteId) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = shellScrollContentPadding()
+    ) {
+        item {
+            Text(
+                text = "Inbox",
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(bottom = 12.dp)
             )
         }
 
-        if (state is InboxUiState.Content || state is InboxUiState.Empty) {
-            TodayHubPlaceholder()
+        when (state) {
+            InboxUiState.Empty -> {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 32.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "No inbox notes yet. Tap Add to create one.",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+                item { TodayHubPlaceholder() }
+            }
+            is InboxUiState.Content -> {
+                items(state.notes) { note ->
+                    InboxRow(note = note, onClick = { onNoteClick(note.id) })
+                }
+                item { TodayHubPlaceholder() }
+            }
+            else -> Unit
         }
     }
 }
@@ -62,14 +106,17 @@ private fun TodayHubPlaceholder(modifier: Modifier = Modifier) {
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .padding(vertical = 12.dp)
     )
 }
 
 @Composable
 private fun InboxLoading(modifier: Modifier = Modifier) {
+    val chrome = LocalShellChromeInsets.current
     Box(
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier
+            .fillMaxSize()
+            .padding(chrome.asPaddingValues()),
         contentAlignment = Alignment.Center
     ) {
         CircularProgressIndicator()
@@ -77,27 +124,13 @@ private fun InboxLoading(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun InboxEmpty(modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = "No inbox notes yet. Tap Add to create one.",
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-    }
-}
-
-@Composable
 private fun InboxError(message: String, onRetry: () -> Unit, modifier: Modifier = Modifier) {
+    val chrome = LocalShellChromeInsets.current
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(16.dp),
+            .padding(chrome.asPaddingValues())
+            .padding(horizontal = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
@@ -126,31 +159,6 @@ private fun InboxError(message: String, onRetry: () -> Unit, modifier: Modifier 
                     Text("Retry")
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun InboxContent(
-    notes: List<NoteSummary>,
-    onNoteClick: (NoteId) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    LazyColumn(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp, vertical = 16.dp)
-    ) {
-        item {
-            Text(
-                text = "Inbox",
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(bottom = 12.dp)
-            )
-        }
-        items(notes) { note ->
-            InboxRow(note = note, onClick = { onNoteClick(note.id) })
         }
     }
 }

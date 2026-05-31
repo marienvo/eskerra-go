@@ -3,14 +3,10 @@ package com.eskerra.go.app
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -26,12 +22,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-
-private val TopChromeHeight = 56.dp
-private val BottomChromeHeight = 104.dp
 
 /**
  * Floating navigation shell. It overlays controls on top of the current screen:
@@ -39,8 +33,9 @@ private val BottomChromeHeight = 104.dp
  * - a top-right sync button (when remote is configured) and hamburger Menu button
  *
  * The shell owns no app state. It reports navigation intents through [onNavigate]
- * and renders the active screen via [content], passing a [Modifier] that insets
- * the content away from the floating controls.
+ * and renders the active screen edge-to-edge via [content]. Scrollable screens
+ * should apply [LocalShellChromeInsets] through [shellScrollContentPadding] so
+ * content can pass under the floating chrome while remaining reachable.
  */
 @Composable
 fun AppShell(
@@ -50,46 +45,42 @@ fun AppShell(
     onNavigate: (route: String) -> Unit,
     content: @Composable (contentModifier: Modifier) -> Unit
 ) {
-    val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val chromeInsets = rememberShellChromeInsets()
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        content(
-            Modifier.padding(
-                top = TopChromeHeight + statusBarTop,
-                bottom = BottomChromeHeight + navBarBottom
+    CompositionLocalProvider(LocalShellChromeInsets provides chromeInsets) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            content(Modifier.fillMaxSize())
+
+            Row(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .statusBarsPadding()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (syncIndicator != null) {
+                    ShellSyncButton(
+                        state = syncIndicator,
+                        onClick = onSyncClick
+                    )
+                }
+                SmallFloatingActionButton(onClick = { onNavigate(AppRoute.MENU) }) {
+                    Icon(Icons.Filled.Menu, contentDescription = "Menu")
+                }
+            }
+
+            BottomTaskbar(
+                currentRoute = currentRoute,
+                onInbox = { onNavigate(AppRoute.INBOX) },
+                onAdd = { onNavigate(AppRoute.CREATE_INBOX) },
+                onPodcasts = { onNavigate(AppRoute.PODCASTS) },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .padding(16.dp)
             )
-        )
-
-        Row(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .statusBarsPadding()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            if (syncIndicator != null) {
-                ShellSyncButton(
-                    state = syncIndicator,
-                    onClick = onSyncClick
-                )
-            }
-            SmallFloatingActionButton(onClick = { onNavigate(AppRoute.MENU) }) {
-                Icon(Icons.Filled.Menu, contentDescription = "Menu")
-            }
         }
-
-        BottomTaskbar(
-            currentRoute = currentRoute,
-            onInbox = { onNavigate(AppRoute.INBOX) },
-            onAdd = { onNavigate(AppRoute.CREATE_INBOX) },
-            onPodcasts = { onNavigate(AppRoute.PODCASTS) },
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .navigationBarsPadding()
-                .padding(16.dp)
-        )
     }
 }
 

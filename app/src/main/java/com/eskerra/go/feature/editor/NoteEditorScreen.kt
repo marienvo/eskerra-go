@@ -20,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.eskerra.go.app.LocalShellChromeInsets
 import com.eskerra.go.core.model.GitStatusSummary
 
 /**
@@ -35,12 +36,16 @@ fun NoteEditorScreen(
     onRetry: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(16.dp)
-    ) {
-        IconButton(onClick = onBack) {
+    val chrome = LocalShellChromeInsets.current
+    Column(modifier = modifier.fillMaxSize()) {
+        IconButton(
+            onClick = onBack,
+            modifier = Modifier.padding(
+                top = chrome.top,
+                start = 16.dp,
+                end = 16.dp
+            )
+        ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                 contentDescription = "Back",
@@ -82,12 +87,16 @@ fun CreateInboxScreen(
     onSave: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(16.dp)
-    ) {
-        IconButton(onClick = onBack) {
+    val chrome = LocalShellChromeInsets.current
+    Column(modifier = modifier.fillMaxSize()) {
+        IconButton(
+            onClick = onBack,
+            modifier = Modifier.padding(
+                top = chrome.top,
+                start = 16.dp,
+                end = 16.dp
+            )
+        ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                 contentDescription = "Back",
@@ -111,10 +120,12 @@ private fun CreateInboxContent(
     onDraftChange: (String) -> Unit,
     onSave: () -> Unit
 ) {
+    val chrome = LocalShellChromeInsets.current
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
+            .padding(bottom = chrome.bottom, start = 16.dp, end = 16.dp)
     ) {
         Text(
             text = "New inbox note",
@@ -155,8 +166,11 @@ private fun CreateInboxContent(
 
 @Composable
 private fun EditorLoading() {
+    val chrome = LocalShellChromeInsets.current
     Box(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(bottom = chrome.bottom, start = 16.dp, end = 16.dp),
         contentAlignment = Alignment.Center
     ) {
         CircularProgressIndicator()
@@ -169,10 +183,12 @@ private fun EditorContent(
     onDraftChange: (String) -> Unit,
     onSave: () -> Unit
 ) {
+    val chrome = LocalShellChromeInsets.current
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
+            .padding(bottom = chrome.bottom, start = 16.dp, end = 16.dp)
     ) {
         Text(
             text = state.note.title,
@@ -252,8 +268,11 @@ private fun gitStatusColor(status: GitStatusSummary) = when (status.state) {
 
 @Composable
 private fun EditorMessage(title: String, body: String, onRetry: (() -> Unit)?) {
+    val chrome = LocalShellChromeInsets.current
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = chrome.bottom, start = 16.dp, end = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(

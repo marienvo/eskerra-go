@@ -12,6 +12,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.eskerra.go.app.shellScrollContentPadding
 
 /** Display model for a fake podcast row. */
 data class PodcastItem(val title: String, val author: String)
@@ -23,9 +24,8 @@ data class PodcastItem(val title: String, val author: String)
 @Composable
 fun PodcastsScreen(podcasts: List<PodcastItem>, modifier: Modifier = Modifier) {
     LazyColumn(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(16.dp)
+        modifier = modifier.fillMaxSize(),
+        contentPadding = shellScrollContentPadding()
     ) {
         item {
             Text(

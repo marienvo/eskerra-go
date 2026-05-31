@@ -28,6 +28,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import com.eskerra.go.app.LocalShellChromeInsets
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NoteReaderSegment
 
@@ -44,12 +45,16 @@ fun NoteScreen(
     onResolvedWikiLinkClick: (NoteId) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(16.dp)
-    ) {
-        IconButton(onClick = onBack) {
+    val chrome = LocalShellChromeInsets.current
+    Column(modifier = modifier.fillMaxSize()) {
+        IconButton(
+            onClick = onBack,
+            modifier = Modifier.padding(
+                top = chrome.top,
+                start = 16.dp,
+                end = 16.dp
+            )
+        ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                 contentDescription = "Back",
@@ -88,8 +93,11 @@ fun NoteScreen(
 
 @Composable
 private fun NoteReaderLoading() {
+    val chrome = LocalShellChromeInsets.current
     Box(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(bottom = chrome.bottom, start = 16.dp, end = 16.dp),
         contentAlignment = Alignment.Center
     ) {
         CircularProgressIndicator()
@@ -105,10 +113,12 @@ private fun NoteReaderContent(
     onEdit: () -> Unit,
     onResolvedWikiLinkClick: (NoteId) -> Unit
 ) {
+    val chrome = LocalShellChromeInsets.current
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
+            .padding(bottom = chrome.bottom, start = 16.dp, end = 16.dp)
     ) {
         Text(
             text = title,
@@ -145,8 +155,11 @@ private fun NoteReaderContent(
 
 @Composable
 private fun NoteReaderMessage(title: String, body: String, onRetry: (() -> Unit)?) {
+    val chrome = LocalShellChromeInsets.current
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = chrome.bottom, start = 16.dp, end = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(

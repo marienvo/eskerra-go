@@ -12,6 +12,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.eskerra.go.app.shellScrollContentPadding
 
 /**
  * Stateless menu. Receives fake entries and reports taps through [onItemClick].
@@ -19,9 +20,8 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun MenuScreen(items: List<String>, onItemClick: (String) -> Unit, modifier: Modifier = Modifier) {
     LazyColumn(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(16.dp)
+        modifier = modifier.fillMaxSize(),
+        contentPadding = shellScrollContentPadding()
     ) {
         item {
             Text(
