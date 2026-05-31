@@ -25,6 +25,20 @@ Do not edit synced `.cursor/rules/{language,quality,specs,testing}.mdc`, `.curso
 - Module budgets enforce file size in CI. New `.kt` files may not exceed **400** lines without a baseline entry; files **≥800** lines may not grow without an intentional baseline bump. See [`specs/team-scalability/README.md`](specs/team-scalability/README.md) and [`scripts/module-budget-baseline.json`](scripts/module-budget-baseline.json).
 - Every feature slice must include at least one unit test for domain/data behavior.
 
+## Branding / launcher icons
+
+Launcher mipmaps and the Android 12+ system splash icon come from the sibling **notebox** desktop app (same Eskerra logo as Tauri). Canonical artwork: `notebox/assets/brand/eskerra-logo.png`.
+
+When the logo changes in notebox:
+
+```bash
+cd /path/to/notebox/apps/desktop
+npm run desktop:icons
+cp -r src-tauri/icons/android/* /path/to/eskerra-go/app/src/main/res/
+```
+
+Keep `app/src/main/res/values/ic_launcher_background.xml` at `#121212` (matches splash background) after copying. Regenerate only from notebox; do not edit mipmaps by hand in eskerra-go unless you are also updating the Tauri source icons.
+
 ## Specs
 
 Non-obvious decisions and PoC scope live under [`specs/`](specs/). See also [`.cursor/rules/project-conventions.mdc`](.cursor/rules/project-conventions.mdc).
