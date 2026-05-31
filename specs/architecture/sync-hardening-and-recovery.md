@@ -47,6 +47,12 @@ No sync history database.
 
 Each blocking `SyncError` maps to a short recovery hint via `SyncRecoveryGuidance`. Hints are non-technical and never suggest destructive Git commands.
 
+## Foreground sync-status refresh
+
+- On app start (after the workspace gate is `Ready`) and when the app returns to the foreground, the shell may run a **read-only** remote check: `fetch` to update remote-tracking refs, then local ahead/behind comparison.
+- This is user-visible foreground work only; it does not commit, pull, push, or schedule background sync.
+- Debounce rapid foreground refreshes (for example within 30 seconds) to avoid redundant network calls.
+
 ## Out of scope
 
 Background sync, sync-on-save, SSH, conflict resolution UI, auto merge/rebase/reset/stash, full sync history, note deletion/move/rename.

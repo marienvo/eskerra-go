@@ -12,8 +12,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 /**
- * Placeholder dashboard. Values are static until dashboard work is in scope.
- * It performs no work itself and does not reflect live note or Git state.
+ * Dashboard with live sync status from the app shell. Note count remains static
+ * until dashboard work is in scope.
  */
 @Composable
 fun DashboardScreen(

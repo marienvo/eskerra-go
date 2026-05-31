@@ -25,6 +25,7 @@ import com.eskerra.go.core.usecase.LoadSyncStatus
 import com.eskerra.go.core.usecase.ManualSyncNow
 import com.eskerra.go.core.usecase.ReconcileWorkspaceSyncBranch
 import com.eskerra.go.core.usecase.RecordLastSyncAttempt
+import com.eskerra.go.core.usecase.RefreshRemoteSyncStatus
 import com.eskerra.go.core.usecase.SaveNote
 import com.eskerra.go.core.usecase.SaveRemoteSyncSettings
 import com.eskerra.go.core.usecase.TestRemoteConnection
@@ -51,6 +52,7 @@ fun AppRoot(
     saveNote: SaveNote,
     loadGitStatusSummary: LoadGitStatusSummary,
     loadSyncStatus: LoadSyncStatus,
+    refreshRemoteSyncStatus: RefreshRemoteSyncStatus,
     buildSyncPreflight: BuildSyncPreflight,
     buildSafeSyncDiagnostic: BuildSafeSyncDiagnostic,
     manualSyncNow: ManualSyncNow,
@@ -62,7 +64,7 @@ fun AppRoot(
     testRemoteConnection: TestRemoteConnection,
     reconcileWorkspaceSyncBranch: ReconcileWorkspaceSyncBranch
 ) {
-    EskerraGoTheme {
+    EskerraGoTheme(darkTheme = true) {
         val gateViewModel: AppGateViewModel = viewModel(
             factory = AppGateViewModel.factory(
                 workspaceStore = workspaceStore,
@@ -122,6 +124,7 @@ fun AppRoot(
                 saveNote = saveNote,
                 loadGitStatusSummary = loadGitStatusSummary,
                 loadSyncStatus = loadSyncStatus,
+                refreshRemoteSyncStatus = refreshRemoteSyncStatus,
                 buildSyncPreflight = buildSyncPreflight,
                 buildSafeSyncDiagnostic = buildSafeSyncDiagnostic,
                 manualSyncNow = manualSyncNow,

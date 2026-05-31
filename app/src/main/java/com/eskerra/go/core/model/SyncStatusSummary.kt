@@ -29,3 +29,19 @@ data class SyncStatusSummary(
         )
     }
 }
+
+/** True when the workspace is out of sync and the shell should draw attention. */
+val SyncStatusSummary.needsAttention: Boolean
+    get() = state != SyncStatusState.Clean && state != SyncStatusState.Unavailable
+
+/** Short label for dashboard and shell diagnostics. */
+fun SyncStatusSummary.displayLabel(): String = when (state) {
+    SyncStatusState.Clean -> "Clean"
+    SyncStatusState.DirtyLocalChanges -> "Local changes"
+    SyncStatusState.Ahead -> "Ahead ($aheadCount)"
+    SyncStatusState.Behind -> "Behind ($behindCount)"
+    SyncStatusState.Diverged -> "Diverged"
+    SyncStatusState.ConflictRisk -> "Conflict risk"
+    SyncStatusState.Unavailable -> "Not configured"
+    SyncStatusState.Error -> "Error"
+}

@@ -18,6 +18,7 @@ import com.eskerra.go.core.usecase.LoadSyncStatus
 import com.eskerra.go.core.usecase.ManualSyncNow
 import com.eskerra.go.core.usecase.ReconcileWorkspaceSyncBranch
 import com.eskerra.go.core.usecase.RecordLastSyncAttempt
+import com.eskerra.go.core.usecase.RefreshRemoteSyncStatus
 import com.eskerra.go.core.usecase.SaveNote
 import com.eskerra.go.core.usecase.SaveRemoteSyncSettings
 import com.eskerra.go.core.usecase.TestRemoteConnection
@@ -79,6 +80,11 @@ class MainActivity : ComponentActivity() {
 
         val remoteSyncRepository = JGitRemoteSyncRepository(gitRepository)
         val loadSyncStatus = LoadSyncStatus(remoteSyncRepository)
+        val refreshRemoteSyncStatus = RefreshRemoteSyncStatus(
+            remoteSyncRepository = remoteSyncRepository,
+            credentialStore = credentialStore,
+            loadSyncStatus = loadSyncStatus
+        )
         val buildSyncPreflight = BuildSyncPreflight(
             remoteSyncRepository = remoteSyncRepository,
             credentialStore = credentialStore
@@ -124,6 +130,7 @@ class MainActivity : ComponentActivity() {
                 saveNote = saveNote,
                 loadGitStatusSummary = loadGitStatusSummary,
                 loadSyncStatus = loadSyncStatus,
+                refreshRemoteSyncStatus = refreshRemoteSyncStatus,
                 buildSyncPreflight = buildSyncPreflight,
                 buildSafeSyncDiagnostic = buildSafeSyncDiagnostic,
                 manualSyncNow = manualSyncNow,

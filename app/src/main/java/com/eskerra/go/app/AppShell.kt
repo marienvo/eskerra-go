@@ -1,6 +1,7 @@
 package com.eskerra.go.app
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -28,7 +29,7 @@ import androidx.compose.ui.unit.dp
  * Floating navigation shell. It overlays controls on top of the current screen:
  * - a bottom floating taskbar with Inbox, a large centered Add, and Podcasts
  * - a top-left Dashboard button
- * - a top-right hamburger Menu button
+ * - a top-right sync button (when remote is configured) and hamburger Menu button
  *
  * The shell owns no app state. It reports navigation intents through [onNavigate]
  * and renders the active screen via [content], passing a [Modifier] that insets
@@ -37,10 +38,12 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun AppShell(
     currentRoute: String?,
+    syncIndicator: ShellSyncIndicatorState?,
+    onSyncClick: () -> Unit,
     onNavigate: (route: String) -> Unit,
     content: @Composable (contentModifier: Modifier) -> Unit
 ) {
-    androidx.compose.foundation.layout.Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize()) {
         content(Modifier.padding(top = 80.dp, bottom = 104.dp))
 
         SmallFloatingActionButton(
@@ -52,13 +55,22 @@ fun AppShell(
             Icon(Icons.Filled.Dashboard, contentDescription = "Dashboard")
         }
 
-        SmallFloatingActionButton(
-            onClick = { onNavigate(AppRoute.MENU) },
+        Row(
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .padding(16.dp)
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(Icons.Filled.Menu, contentDescription = "Menu")
+            if (syncIndicator != null) {
+                ShellSyncButton(
+                    state = syncIndicator,
+                    onClick = onSyncClick
+                )
+            }
+            SmallFloatingActionButton(onClick = { onNavigate(AppRoute.MENU) }) {
+                Icon(Icons.Filled.Menu, contentDescription = "Menu")
+            }
         }
 
         BottomTaskbar(

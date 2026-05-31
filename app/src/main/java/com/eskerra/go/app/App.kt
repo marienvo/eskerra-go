@@ -1,12 +1,16 @@
 package com.eskerra.go.app
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
@@ -30,6 +34,7 @@ import com.eskerra.go.core.usecase.LoadRemoteSyncSettings
 import com.eskerra.go.core.usecase.LoadSyncStatus
 import com.eskerra.go.core.usecase.ManualSyncNow
 import com.eskerra.go.core.usecase.RecordLastSyncAttempt
+import com.eskerra.go.core.usecase.RefreshRemoteSyncStatus
 import com.eskerra.go.core.usecase.SaveNote
 import com.eskerra.go.core.usecase.SaveRemoteSyncSettings
 import com.eskerra.go.core.usecase.TestRemoteConnection
@@ -44,6 +49,7 @@ import com.eskerra.go.feature.podcasts.PodcastItem
 import com.eskerra.go.feature.podcasts.PodcastsScreen
 import com.eskerra.go.feature.sync.SyncScreen
 import com.eskerra.go.feature.sync.SyncSettingsScreen
+import com.eskerra.go.feature.sync.SyncUiState
 import java.io.File
 
 /**
@@ -61,6 +67,7 @@ fun App(
     saveNote: SaveNote,
     loadGitStatusSummary: LoadGitStatusSummary,
     loadSyncStatus: LoadSyncStatus,
+    refreshRemoteSyncStatus: RefreshRemoteSyncStatus,
     buildSyncPreflight: BuildSyncPreflight,
     buildSafeSyncDiagnostic: BuildSafeSyncDiagnostic,
     manualSyncNow: ManualSyncNow,
@@ -79,9 +86,65 @@ fun App(
     val markInboxNotesChanged = {
         navController.markInboxNotesChanged()
     }
+    val appSyncViewModel: AppSyncViewModel = viewModel(
+        key = currentConfig.syncViewModelKey(),
+        factory = AppSyncViewModel.factory(
+            config = currentConfig,
+            filesDir = filesDir,
+            loadSyncStatus = loadSyncStatus,
+            refreshRemoteSyncStatus = refreshRemoteSyncStatus,
+            buildSyncPreflight = buildSyncPreflight,
+            buildSafeSyncDiagnostic = buildSafeSyncDiagnostic,
+            manualSyncNow = manualSyncNow,
+            recordLastSyncAttempt = recordLastSyncAttempt,
+            onSyncSuccess = markInboxNotesChanged,
+            onConfigUpdated = { updated ->
+                currentConfig = updated
+                onConfigUpdated(updated)
+            }
+        )
+    )
+    val syncState by appSyncViewModel.uiState.collectAsState()
+    val remoteConfigured = !currentConfig.remoteUri.isNullOrBlank()
+
+    LaunchedEffect(currentConfig) {
+        appSyncViewModel.refreshRemoteStatus(force = true)
+    }
+
+    DisposableEffect(appSyncViewModel) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_START) {
+                appSyncViewModel.refreshRemoteStatus()
+            }
+        }
+        ProcessLifecycleOwner.get().lifecycle.addObserver(observer)
+        onDispose {
+            ProcessLifecycleOwner.get().lifecycle.removeObserver(observer)
+        }
+    }
+
+    val syncIndicator = shellSyncIndicatorState(syncState, remoteConfigured)
 
     AppShell(
         currentRoute = currentRoute,
+        syncIndicator = syncIndicator,
+        onSyncClick = {
+            when (val state = syncState) {
+                is SyncUiState.Ready -> if (state.preflight.canSync) {
+                    appSyncViewModel.syncNow()
+                } else {
+                    navController.navigate(AppRoute.SYNC) {
+                        launchSingleTop = true
+                    }
+                }
+                is SyncUiState.Success -> appSyncViewModel.syncNow()
+                SyncUiState.Loading,
+                is SyncUiState.Syncing -> Unit
+                is SyncUiState.Error -> navController.navigate(AppRoute.SYNC) {
+                    launchSingleTop = true
+                }
+            }
+        },
         onNavigate = { route ->
             navController.navigate(route) {
                 launchSingleTop = true
@@ -158,7 +221,7 @@ fun App(
                 DashboardScreen(
                     workspaceName = currentConfig.name,
                     noteCount = PLACEHOLDER_NOTE_COUNT,
-                    gitStatus = PLACEHOLDER_GIT_STATUS
+                    gitStatus = syncStatusLabel(syncState)
                 )
             }
 
@@ -175,29 +238,10 @@ fun App(
             }
 
             composable(AppRoute.SYNC) {
-                val syncViewModel: SyncViewModel = viewModel(
-                    key = currentConfig.syncViewModelKey(),
-                    factory = SyncViewModel.factory(
-                        config = currentConfig,
-                        filesDir = filesDir,
-                        loadSyncStatus = loadSyncStatus,
-                        buildSyncPreflight = buildSyncPreflight,
-                        buildSafeSyncDiagnostic = buildSafeSyncDiagnostic,
-                        manualSyncNow = manualSyncNow,
-                        recordLastSyncAttempt = recordLastSyncAttempt,
-                        onSyncSuccess = markInboxNotesChanged,
-                        onConfigUpdated = { updated ->
-                            currentConfig = updated
-                            onConfigUpdated(updated)
-                        }
-                    )
-                )
-                val syncState by syncViewModel.uiState.collectAsState()
-
                 SyncScreen(
                     state = syncState,
-                    onSyncNow = syncViewModel::syncNow,
-                    onRetry = syncViewModel::refreshStatus,
+                    onSyncNow = appSyncViewModel::syncNow,
+                    onRetry = appSyncViewModel::refreshLocalStatus,
                     onOpenSettings = { navController.navigate(AppRoute.SYNC_SETTINGS) }
                 )
             }
@@ -338,7 +382,6 @@ private fun NavHostController.markNoteReaderChanged(noteId: NoteId) {
 }
 
 private const val PLACEHOLDER_NOTE_COUNT = 0
-private const val PLACEHOLDER_GIT_STATUS = "Placeholder — not connected"
 
 private val fakePodcasts: List<PodcastItem> = listOf(
     PodcastItem(title = "Note-taking, deeply", author = "Eskerra FM"),
