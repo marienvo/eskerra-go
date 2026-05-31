@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import com.eskerra.go.app.shellScrollContentPadding
 
 @Composable
 fun SyncSettingsScreen(
@@ -36,7 +37,7 @@ fun SyncSettingsScreen(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(16.dp),
+            .padding(shellScrollContentPadding()),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text(

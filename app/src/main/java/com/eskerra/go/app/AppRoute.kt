@@ -11,7 +11,6 @@ object AppRoute {
     const val INBOX = "inbox"
     const val CREATE_INBOX = "create-inbox"
     const val PODCASTS = "podcasts"
-    const val DASHBOARD = "dashboard"
     const val MENU = "menu"
     const val SYNC = "sync"
     const val SYNC_SETTINGS = "sync-settings"

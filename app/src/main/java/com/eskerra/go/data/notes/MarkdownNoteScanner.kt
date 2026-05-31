@@ -68,7 +68,8 @@ class MarkdownNoteScanner : NoteWorkspaceScanner {
                             id = NoteId(notePath.value),
                             title = title,
                             snippet = snippet,
-                            isInbox = isInbox
+                            isInbox = isInbox,
+                            lastModifiedEpochMillis = attrs.lastModifiedTime().toMillis()
                         )
                         return FileVisitResult.CONTINUE
                     }

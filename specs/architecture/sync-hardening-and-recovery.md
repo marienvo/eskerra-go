@@ -14,6 +14,7 @@ Manual HTTPS sync works after Step 9 Slices 1–3. Slice 4 hardens behavior befo
 ## Reentrancy
 
 - **UI/ViewModel:** ignore duplicate `syncNow()` while `SyncUiState.Syncing`. Do not cancel and restart an in-flight sync on double-tap.
+- **UI/ViewModel:** `syncNow()` cancels any in-flight status `loadJob` before starting sync so a completing refresh cannot overwrite `SyncUiState.Syncing`.
 - **Use case:** `ManualSyncNow` holds a `Mutex`. A concurrent invoke returns `SyncError.SyncAlreadyRunning`.
 - **Editor/save:** local editing and saving remain allowed during sync (no global lock).
 
@@ -46,6 +47,14 @@ No sync history database.
 ## Recovery guidance
 
 Each blocking `SyncError` maps to a short recovery hint via `SyncRecoveryGuidance`. Hints are non-technical and never suggest destructive Git commands.
+
+## Foreground sync-status refresh
+
+- On app start (after the workspace gate is `Ready`) and when the app returns to the foreground, the shell may run a **read-only** remote check: `fetch` to update remote-tracking refs, then local ahead/behind comparison.
+- Start with a **local-only** status read for the shell indicator, then run the remote check without forcing `SyncUiState.Loading` so the sync button stays usable while the fetch completes. Use a single status `loadJob` so the local emit completes before the remote fetch starts (no cancel between the two steps).
+- This is user-visible foreground work only; it does not commit, pull, push, or schedule background sync. PoC “no background sync” means no automatic commit/push/pull — read-only `fetch` for the indicator is allowed.
+- Debounce rapid foreground refreshes (for example within 30 seconds) to avoid redundant network calls.
+- After inbox note create or save, the app may reload **local-only** Git sync status for the shell indicator. This is not background sync and does not fetch remote.
 
 ## Out of scope
 

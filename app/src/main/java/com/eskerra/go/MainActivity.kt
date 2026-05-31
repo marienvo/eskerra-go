@@ -1,7 +1,9 @@
 package com.eskerra.go
 
+import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import com.eskerra.go.app.AppRoot
@@ -18,6 +20,7 @@ import com.eskerra.go.core.usecase.LoadSyncStatus
 import com.eskerra.go.core.usecase.ManualSyncNow
 import com.eskerra.go.core.usecase.ReconcileWorkspaceSyncBranch
 import com.eskerra.go.core.usecase.RecordLastSyncAttempt
+import com.eskerra.go.core.usecase.RefreshRemoteSyncStatus
 import com.eskerra.go.core.usecase.SaveNote
 import com.eskerra.go.core.usecase.SaveRemoteSyncSettings
 import com.eskerra.go.core.usecase.TestRemoteConnection
@@ -38,7 +41,10 @@ import com.eskerra.go.data.workspace.DefaultWorkspaceSetupRepository
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT)
+        )
 
         val workspaceStore = DataStoreWorkspaceStore(applicationContext)
         val credentialStore = EncryptedCredentialStore(
@@ -79,6 +85,11 @@ class MainActivity : ComponentActivity() {
 
         val remoteSyncRepository = JGitRemoteSyncRepository(gitRepository)
         val loadSyncStatus = LoadSyncStatus(remoteSyncRepository)
+        val refreshRemoteSyncStatus = RefreshRemoteSyncStatus(
+            remoteSyncRepository = remoteSyncRepository,
+            credentialStore = credentialStore,
+            loadSyncStatus = loadSyncStatus
+        )
         val buildSyncPreflight = BuildSyncPreflight(
             remoteSyncRepository = remoteSyncRepository,
             credentialStore = credentialStore
@@ -124,6 +135,7 @@ class MainActivity : ComponentActivity() {
                 saveNote = saveNote,
                 loadGitStatusSummary = loadGitStatusSummary,
                 loadSyncStatus = loadSyncStatus,
+                refreshRemoteSyncStatus = refreshRemoteSyncStatus,
                 buildSyncPreflight = buildSyncPreflight,
                 buildSafeSyncDiagnostic = buildSafeSyncDiagnostic,
                 manualSyncNow = manualSyncNow,

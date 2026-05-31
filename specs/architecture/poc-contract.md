@@ -3,7 +3,8 @@ Eskerra Go PoC proves:
 - One workspace
 - Clone/pull/read/write/commit/push path
 - Inbox list from markdown files
-- Add creates editable inbox note
+- Add opens a compose form; Save creates an editable inbox note under `Inbox/` using line 1 as title, H1, and sanitized filename
+- Inbox list order: last modified descending
 - Markdown reader supports clickable wiki links
 - Wiki links resolve by note title or filename stem case-insensitively; path-like targets stay case-sensitive and normalize `.` path segments for registry lookup
 - Non-inbox notes are read-only
@@ -27,4 +28,3 @@ Explicitly out of scope:
 - Multi-workspace
 - Conflict resolution
 - Podcast playback
-- Dashboard content

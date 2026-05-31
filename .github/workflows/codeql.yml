@@ -1,0 +1,93 @@
+name: CodeQL
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  schedule:
+    - cron: "19 21 * * 1"
+  workflow_dispatch:
+
+permissions:
+  security-events: write
+  packages: read
+  actions: read
+  contents: write
+
+concurrency:
+  group: codeql-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyze (java-kotlin)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      # Advanced CodeQL cannot upload SARIF while default setup is enabled.
+      # https://docs.github.com/en/code-security/reference/code-scanning/sarif-files/troubleshoot-sarif-uploads/default-setup-enabled
+      - name: Disable CodeQL default setup for advanced upload
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          endpoint="https://api.github.com/repos/${GITHUB_REPOSITORY}/code-scanning/default-setup"
+          headers=(
+            -H "Authorization: Bearer ${GH_TOKEN}"
+            -H "Accept: application/vnd.github+json"
+            -H "X-GitHub-Api-Version: 2022-11-28"
+          )
+          before_code=$(curl -sS -o /tmp/default-setup-before.json -w "%{http_code}" "${headers[@]}" "${endpoint}")
+          echo "CodeQL default setup before PATCH: HTTP ${before_code}"
+          if [ "${before_code}" = "200" ]; then
+            jq '{state, languages, updated_at}' /tmp/default-setup-before.json
+          fi
+          patch_code=$(curl -sS -o /tmp/default-setup-patch.json -w "%{http_code}" \
+            -X PATCH "${headers[@]}" "${endpoint}" \
+            -d '{"state":"not-configured"}')
+          echo "PATCH default setup to not-configured: HTTP ${patch_code}"
+          if [ -s /tmp/default-setup-patch.json ]; then
+            cat /tmp/default-setup-patch.json
+          fi
+          after_code=$(curl -sS -o /tmp/default-setup-after.json -w "%{http_code}" "${headers[@]}" "${endpoint}")
+          if [ "${after_code}" = "200" ] && [ "$(jq -r '.state' /tmp/default-setup-after.json)" = "configured" ]; then
+            echo "::error::CodeQL default setup is still enabled. A repo admin must open Settings → Advanced Security → CodeQL analysis → Disable CodeQL (or Switch to advanced, then Disable CodeQL). If an organization security policy manages CodeQL, an org admin must allow advanced setup for this repository."
+            exit 1
+          fi
+          if [ "${patch_code}" -ge 400 ] 2>/dev/null; then
+            echo "::warning::Could not PATCH default setup (HTTP ${patch_code}). If SARIF upload fails, disable CodeQL default setup in repository settings."
+          fi
+
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up JDK
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: java-kotlin
+          build-mode: manual
+          config-file: ./.github/codeql/codeql-config.yml
+
+      - name: Build Android (CodeQL trace)
+        env:
+          GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m -Dfile.encoding=UTF-8
+        run: |
+          ./gradlew --no-daemon \
+            -Dorg.gradle.configuration-cache=false \
+            :app:assembleDebug
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: "/language:java-kotlin"

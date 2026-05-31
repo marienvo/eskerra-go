@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Base launcher theme. The real UI theme is applied in Compose (ui/theme). -->
-    <style name="Theme.EskerraGo" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.EskerraGo" parent="android:Theme.Material.NoActionBar" />
 </resources>

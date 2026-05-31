@@ -28,6 +28,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import com.eskerra.go.app.LocalShellChromeInsets
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NoteReaderSegment
 
@@ -44,15 +45,20 @@ fun NoteScreen(
     onResolvedWikiLinkClick: (NoteId) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(16.dp)
-    ) {
-        IconButton(onClick = onBack) {
+    val chrome = LocalShellChromeInsets.current
+    Column(modifier = modifier.fillMaxSize()) {
+        IconButton(
+            onClick = onBack,
+            modifier = Modifier.padding(
+                top = chrome.top,
+                start = 16.dp,
+                end = 16.dp
+            )
+        ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Back"
+                contentDescription = "Back",
+                tint = MaterialTheme.colorScheme.onSurface
             )
         }
 
@@ -87,8 +93,11 @@ fun NoteScreen(
 
 @Composable
 private fun NoteReaderLoading() {
+    val chrome = LocalShellChromeInsets.current
     Box(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(bottom = chrome.bottom, start = 16.dp, end = 16.dp),
         contentAlignment = Alignment.Center
     ) {
         CircularProgressIndicator()
@@ -104,14 +113,17 @@ private fun NoteReaderContent(
     onEdit: () -> Unit,
     onResolvedWikiLinkClick: (NoteId) -> Unit
 ) {
+    val chrome = LocalShellChromeInsets.current
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
+            .padding(bottom = chrome.bottom, start = 16.dp, end = 16.dp)
     ) {
         Text(
             text = title,
             style = MaterialTheme.typography.headlineMedium,
+            color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.padding(bottom = 4.dp)
         )
         Text(
@@ -132,27 +144,34 @@ private fun NoteReaderContent(
             text = buildReaderText(
                 segments = segments,
                 onResolvedWikiLinkClick = onResolvedWikiLinkClick,
+                bodyColor = MaterialTheme.colorScheme.onSurface,
                 mutedColor = MaterialTheme.colorScheme.onSurfaceVariant
             ),
-            style = MaterialTheme.typography.bodyLarge
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface
         )
     }
 }
 
 @Composable
 private fun NoteReaderMessage(title: String, body: String, onRetry: (() -> Unit)?) {
+    val chrome = LocalShellChromeInsets.current
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = chrome.bottom, start = 16.dp, end = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
             text = title,
             style = MaterialTheme.typography.headlineSmall,
+            color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.padding(bottom = 8.dp)
         )
         Text(
             text = body,
-            style = MaterialTheme.typography.bodyLarge
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface
         )
         if (onRetry != null) {
             Button(
@@ -168,14 +187,18 @@ private fun NoteReaderMessage(title: String, body: String, onRetry: (() -> Unit)
 private fun buildReaderText(
     segments: List<NoteReaderSegment>,
     onResolvedWikiLinkClick: (NoteId) -> Unit,
+    bodyColor: Color,
     mutedColor: Color
 ): AnnotatedString = buildAnnotatedString {
+    val bodyStyle = SpanStyle(color = bodyColor)
     val mutedStyle = SpanStyle(color = mutedColor)
-    val linkStyle = SpanStyle(textDecoration = TextDecoration.Underline)
+    val linkStyle = SpanStyle(color = bodyColor, textDecoration = TextDecoration.Underline)
 
     segments.forEach { segment ->
         when (segment) {
-            is NoteReaderSegment.Text -> append(segment.text)
+            is NoteReaderSegment.Text -> withStyle(bodyStyle) {
+                append(segment.text)
+            }
             is NoteReaderSegment.ResolvedLink -> {
                 withLink(
                     LinkAnnotation.Clickable(

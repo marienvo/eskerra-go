@@ -10,9 +10,6 @@ import com.eskerra.go.data.notes.FakeNoteRegistryRepository
 import com.eskerra.go.data.notes.FakeNoteWriteRepository
 import com.eskerra.go.data.workspace.WorkspacePaths
 import com.eskerra.go.feature.editor.CreateInboxUiState
-import java.time.Clock
-import java.time.Instant
-import java.time.ZoneOffset
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -21,7 +18,8 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -40,9 +38,6 @@ class CreateInboxNoteViewModelTest {
         setupCompletedAtEpochMs = 1_700_000_000_000L
     )
 
-    private val fixedInstant = Instant.parse("2026-05-30T16:42:00Z")
-    private val fixedClock = Clock.fixed(fixedInstant, ZoneOffset.UTC)
-
     @Before
     fun setUpMainDispatcher() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
@@ -54,47 +49,70 @@ class CreateInboxNoteViewModelTest {
     }
 
     @Test
-    fun createEmitsNoteIdForEditorNavigation() = runTest {
-        val noteId = NoteId("Inbox/2026-05-30-164200.md")
+    fun initDoesNotCreateNote() = runTest {
+        val viewModel = createViewModel()
+
+        assertNull(viewModel.savedNoteId.value)
+        val state = viewModel.uiState.value as CreateInboxUiState.Content
+        assertEquals("", state.draft)
+        assertFalse(state.canSave)
+    }
+
+    @Test
+    fun saveEmitsNoteIdForReaderNavigation() = runTest {
+        val noteId = NoteId("Inbox/Mijn idee.md")
         val registry = FakeNoteRegistryRepository.withInboxNotes(
-            NoteSummary(noteId, "Untitled inbox note", "", isInbox = true)
+            NoteSummary(noteId, "Mijn idee", "", isInbox = true, lastModifiedEpochMillis = 1L)
         )
         val useCase = CreateInboxNote(
             writeRepository = FakeNoteWriteRepository(),
             registryRepository = registry,
-            loadGitStatusSummary = loadGitStatusSummary(),
-            clock = fixedClock
+            loadGitStatusSummary = loadGitStatusSummary()
         )
         val viewModel = CreateInboxNoteViewModel(
             config = config,
             filesDir = temp.newFolder("files"),
             createInboxNote = useCase
         )
+        viewModel.updateDraft("Mijn idee\nBody")
+        viewModel.save()
         advanceUntilIdle()
 
-        assertEquals(noteId, viewModel.createdNoteId.value)
+        assertEquals(noteId, viewModel.savedNoteId.value)
     }
 
     @Test
-    fun createFailureShowsErrorState() = runTest {
+    fun saveFailureShowsErrorState() = runTest {
         val registry = FakeNoteRegistryRepository.failing()
         val useCase = CreateInboxNote(
             writeRepository = FakeNoteWriteRepository(),
             registryRepository = registry,
-            loadGitStatusSummary = loadGitStatusSummary(),
-            clock = fixedClock
+            loadGitStatusSummary = loadGitStatusSummary()
         )
         val viewModel = CreateInboxNoteViewModel(
             config = config,
             filesDir = temp.newFolder("files"),
             createInboxNote = useCase
         )
+        viewModel.updateDraft("My idea")
+        viewModel.save()
+        advanceUntilIdle()
 
-        val state = viewModel.uiState.value
-        assertTrue(state is CreateInboxUiState.Error)
-        assertEquals(
-            CreateInboxNoteViewModel.CREATE_ERROR_MESSAGE,
-            (state as CreateInboxUiState.Error).message
+        val state = viewModel.uiState.value as CreateInboxUiState.Content
+        assertEquals(CreateInboxNoteViewModel.CREATE_ERROR_MESSAGE, state.errorMessage)
+        assertFalse(state.isSaving)
+    }
+
+    private fun createViewModel(): CreateInboxNoteViewModel {
+        val useCase = CreateInboxNote(
+            writeRepository = FakeNoteWriteRepository(),
+            registryRepository = FakeNoteRegistryRepository.withInboxNotes(),
+            loadGitStatusSummary = loadGitStatusSummary()
+        )
+        return CreateInboxNoteViewModel(
+            config = config,
+            filesDir = temp.newFolder("files"),
+            createInboxNote = useCase
         )
     }
 

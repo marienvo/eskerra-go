@@ -19,10 +19,10 @@ Do not edit synced `.cursor/rules/{language,quality,specs,testing}.mdc`, `.curso
 - Git operations live only in `data/git`.
 - Markdown parsing and wiki-link resolution live outside UI.
 - Inbox editability is a domain rule: inbox notes editable, all other notes read-only.
-- No background sync in the PoC.
+- No background sync in the PoC (no automatic commit/push/pull; read-only remote `fetch` for the shell indicator is allowed — see [`specs/architecture/sync-hardening-and-recovery.md`](specs/architecture/sync-hardening-and-recovery.md)).
 - No full-text search in the PoC.
 - No multi-workspace support in the PoC.
-- Prefer small files. New files over 250 lines need justification.
+- Module budgets enforce file size in CI. New `.kt` files may not exceed **400** lines without a baseline entry; files **≥800** lines may not grow without an intentional baseline bump. See [`specs/team-scalability/README.md`](specs/team-scalability/README.md) and [`scripts/module-budget-baseline.json`](scripts/module-budget-baseline.json).
 - Every feature slice must include at least one unit test for domain/data behavior.
 
 ## Specs
@@ -46,12 +46,17 @@ Gradle requires **Java 17** (CI uses Temurin 17). If the default JDK is newer, s
 Run these in order; resolve all failures before finishing. Matches the CI verify job in `.github/workflows/android-ci.yml`.
 
 ```bash
+# Module size budgets (requires jq)
+./scripts/check-module-budgets.sh
+
 # Minimum gate for Kotlin/UI or Gradle script changes
 JAVA_HOME=/usr/lib/jvm/temurin-17-jdk ./gradlew :app:ktlintCheck :app:lintDebug
 
 # Full gate when domain, data, or logic changed
 JAVA_HOME=/usr/lib/jvm/temurin-17-jdk ./gradlew :app:ktlintCheck :app:lintDebug :app:testDebugUnitTest
 ```
+
+After a deliberate module split, refresh caps with `./scripts/update-module-budget-baseline.sh` and commit `scripts/module-budget-baseline.json`.
 
 Do not rely on CI to catch ktlint or Android lint violations.
 

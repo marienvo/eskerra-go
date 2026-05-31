@@ -5,6 +5,8 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -25,6 +27,7 @@ import com.eskerra.go.core.usecase.LoadSyncStatus
 import com.eskerra.go.core.usecase.ManualSyncNow
 import com.eskerra.go.core.usecase.ReconcileWorkspaceSyncBranch
 import com.eskerra.go.core.usecase.RecordLastSyncAttempt
+import com.eskerra.go.core.usecase.RefreshRemoteSyncStatus
 import com.eskerra.go.core.usecase.SaveNote
 import com.eskerra.go.core.usecase.SaveRemoteSyncSettings
 import com.eskerra.go.core.usecase.TestRemoteConnection
@@ -51,6 +54,7 @@ fun AppRoot(
     saveNote: SaveNote,
     loadGitStatusSummary: LoadGitStatusSummary,
     loadSyncStatus: LoadSyncStatus,
+    refreshRemoteSyncStatus: RefreshRemoteSyncStatus,
     buildSyncPreflight: BuildSyncPreflight,
     buildSafeSyncDiagnostic: BuildSafeSyncDiagnostic,
     manualSyncNow: ManualSyncNow,
@@ -62,77 +66,83 @@ fun AppRoot(
     testRemoteConnection: TestRemoteConnection,
     reconcileWorkspaceSyncBranch: ReconcileWorkspaceSyncBranch
 ) {
-    EskerraGoTheme {
-        val gateViewModel: AppGateViewModel = viewModel(
-            factory = AppGateViewModel.factory(
-                workspaceStore = workspaceStore,
-                filesDir = filesDir,
-                reconcileWorkspaceSyncBranch = reconcileWorkspaceSyncBranch
-            )
-        )
-        val gateState by gateViewModel.gateState.collectAsState()
-
-        when (val gate = gateState) {
-            AppGateState.Loading -> {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator()
-                }
-            }
-
-            is AppGateState.NeedsSetup -> {
-                val activity = LocalContext.current as? ComponentActivity
-                BackHandler {
-                    activity?.finish()
-                }
-
-                val setupViewModel: WorkspaceSetupViewModel = viewModel(
-                    factory = WorkspaceSetupViewModel.factory(
-                        setupCompletion = setupCompletion,
-                        filesDir = filesDir,
-                        recoveryMessage = gate.recoveryMessage
-                    )
+    EskerraGoTheme(darkTheme = true) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.background
+        ) {
+            val gateViewModel: AppGateViewModel = viewModel(
+                factory = AppGateViewModel.factory(
+                    workspaceStore = workspaceStore,
+                    filesDir = filesDir,
+                    reconcileWorkspaceSyncBranch = reconcileWorkspaceSyncBranch
                 )
-                val uiState = setupViewModel.uiState
+            )
+            val gateState by gateViewModel.gateState.collectAsState()
 
-                WorkspaceSetupScreen(
-                    state = uiState,
-                    onNameChange = setupViewModel::onNameChange,
-                    onBranchChange = setupViewModel::onBranchChange,
-                    onRemoteUriChange = setupViewModel::onRemoteUriChange,
-                    onCredentialChange = setupViewModel::onCredentialChange,
-                    onModeChange = setupViewModel::onModeChange,
-                    onSubmit = {
-                        setupViewModel.submit { config ->
-                            gateViewModel.markReady(config)
-                        }
+            when (val gate = gateState) {
+                AppGateState.Loading -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
                     }
+                }
+
+                is AppGateState.NeedsSetup -> {
+                    val activity = LocalContext.current as? ComponentActivity
+                    BackHandler {
+                        activity?.finish()
+                    }
+
+                    val setupViewModel: WorkspaceSetupViewModel = viewModel(
+                        factory = WorkspaceSetupViewModel.factory(
+                            setupCompletion = setupCompletion,
+                            filesDir = filesDir,
+                            recoveryMessage = gate.recoveryMessage
+                        )
+                    )
+                    val uiState = setupViewModel.uiState
+
+                    WorkspaceSetupScreen(
+                        state = uiState,
+                        onNameChange = setupViewModel::onNameChange,
+                        onBranchChange = setupViewModel::onBranchChange,
+                        onRemoteUriChange = setupViewModel::onRemoteUriChange,
+                        onCredentialChange = setupViewModel::onCredentialChange,
+                        onModeChange = setupViewModel::onModeChange,
+                        onSubmit = {
+                            setupViewModel.submit { config ->
+                                gateViewModel.markReady(config)
+                            }
+                        }
+                    )
+                }
+
+                is AppGateState.Ready -> App(
+                    config = gate.config,
+                    filesDir = filesDir,
+                    loadInboxSummaries = loadInboxSummaries,
+                    loadNoteForReading = loadNoteForReading,
+                    createInboxNote = createInboxNote,
+                    loadEditableNote = loadEditableNote,
+                    saveNote = saveNote,
+                    loadGitStatusSummary = loadGitStatusSummary,
+                    loadSyncStatus = loadSyncStatus,
+                    refreshRemoteSyncStatus = refreshRemoteSyncStatus,
+                    buildSyncPreflight = buildSyncPreflight,
+                    buildSafeSyncDiagnostic = buildSafeSyncDiagnostic,
+                    manualSyncNow = manualSyncNow,
+                    recordLastSyncAttempt = recordLastSyncAttempt,
+                    loadRemoteSyncSettings = loadRemoteSyncSettings,
+                    saveRemoteSyncSettings = saveRemoteSyncSettings,
+                    updateSyncToken = updateSyncToken,
+                    clearRemoteSyncSettings = clearRemoteSyncSettings,
+                    testRemoteConnection = testRemoteConnection,
+                    onConfigUpdated = gateViewModel::updateReadyConfig
                 )
             }
-
-            is AppGateState.Ready -> App(
-                config = gate.config,
-                filesDir = filesDir,
-                loadInboxSummaries = loadInboxSummaries,
-                loadNoteForReading = loadNoteForReading,
-                createInboxNote = createInboxNote,
-                loadEditableNote = loadEditableNote,
-                saveNote = saveNote,
-                loadGitStatusSummary = loadGitStatusSummary,
-                loadSyncStatus = loadSyncStatus,
-                buildSyncPreflight = buildSyncPreflight,
-                buildSafeSyncDiagnostic = buildSafeSyncDiagnostic,
-                manualSyncNow = manualSyncNow,
-                recordLastSyncAttempt = recordLastSyncAttempt,
-                loadRemoteSyncSettings = loadRemoteSyncSettings,
-                saveRemoteSyncSettings = saveRemoteSyncSettings,
-                updateSyncToken = updateSyncToken,
-                clearRemoteSyncSettings = clearRemoteSyncSettings,
-                testRemoteConnection = testRemoteConnection,
-                onConfigUpdated = gateViewModel::updateReadyConfig
-            )
         }
     }
 }
