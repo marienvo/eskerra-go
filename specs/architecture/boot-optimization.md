@@ -50,7 +50,7 @@ Inbox ordering after refresh remains last-modified descending per [poc-contract.
 
 ## Launch UX
 
-Cold start keeps the Android splash screen (launcher icon on `#121212`) until launch is **settled**, then dismisses in one step to shell + content.
+Cold start keeps the Android splash screen (launcher icon on `#281943`) until launch is **settled**, then dismisses in one step to shell + content.
 
 **Launch settled** means:
 

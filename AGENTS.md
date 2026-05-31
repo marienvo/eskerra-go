@@ -27,17 +27,14 @@ Do not edit synced `.cursor/rules/{language,quality,specs,testing}.mdc`, `.curso
 
 ## Branding / launcher icons
 
-Launcher mipmaps and the Android 12+ system splash use the sibling **notebox** pipeline (canonical raster: `notebox/assets/brand/eskerra-logo.png`; square master for generators: `eskerra-logo-app-icon.png`).
+Launcher mipmaps live under `app/src/main/res/mipmap-*` (adaptive foreground PNGs + `mipmap-anydpi-v26` XML). Play Store / web exports are in [`branding/`](branding/) when present.
 
-When the logo changes in notebox:
+When the logo changes, replace the mipmap trees and adaptive XML (Android Studio Image Asset or exported mipmaps), then keep these aligned:
 
-```bash
-cd /path/to/notebox
-./scripts/generate-brand-app-icons.sh
-cp -r apps/desktop/src-tauri/icons/android/* /path/to/eskerra-go/app/src/main/res/
-```
+- `values/ic_launcher_background.xml` — `#281943`
+- `values/colors.xml` (`splash_background`) — `#281943` (system splash + post-splash window background)
 
-After copying, keep `values/ic_launcher_background.xml` and `values/colors.xml` (`splash_background`) at `#031226` (desktop chrome backdrop). Do not edit generated mipmaps by hand in eskerra-go.
+Do not reintroduce a `_android/` staging folder; commit assets directly under `app/src/main/res/`.
 
 ## Specs
 
