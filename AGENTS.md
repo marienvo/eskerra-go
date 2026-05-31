@@ -33,6 +33,7 @@ When the logo changes, replace the mipmap trees and adaptive XML (Android Studio
 
 - `values/ic_launcher_background.xml` — `#281943`
 - `values/colors.xml` (`splash_background`) — `#281943` (system splash + post-splash window background)
+- `drawable/ic_splash_logo.xml` — splash-only logo (35% inset on foreground); launcher mipmaps stay full size
 
 Do not reintroduce a `_android/` staging folder; commit assets directly under `app/src/main/res/`.
 
