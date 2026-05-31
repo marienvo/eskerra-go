@@ -1,8 +1,10 @@
 package com.eskerra.go.app
 
+import com.eskerra.go.core.model.LastSyncStatus
 import com.eskerra.go.core.model.SyncStatusState
 import com.eskerra.go.core.model.SyncStatusSummary
 import com.eskerra.go.core.model.WorkspaceConfig
+import com.eskerra.go.core.repository.LastSyncStatusStore
 import com.eskerra.go.core.usecase.BuildSafeSyncDiagnostic
 import com.eskerra.go.core.usecase.BuildSyncPreflight
 import com.eskerra.go.core.usecase.FailingNoteRegistryRepository
@@ -21,6 +23,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -160,6 +163,32 @@ class AppSyncViewModelTest {
     }
 
     @Test
+    fun syncNow_cancelsInFlightLoadJob_doesNotOverwriteSyncing() = runTest {
+        val ioDispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            val slowRegistry = FakeNoteRegistryRepository()
+            slowRegistry.setRefreshDelayMs(1_000)
+            val viewModel = createViewModel(
+                ioDispatcher = ioDispatcher,
+                registry = slowRegistry,
+                lastSyncStore = SlowLastSyncStatusStore(delayMs = 1_000)
+            )
+
+            viewModel.refreshRemoteStatus(force = true)
+            testScheduler.runCurrent()
+            viewModel.syncNow()
+            testScheduler.runCurrent()
+            assertTrue(viewModel.uiState.value is SyncUiState.Syncing)
+            advanceUntilIdle()
+
+            assertTrue(viewModel.uiState.value is SyncUiState.Success)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
     fun refreshLocalStatusQuietly_keepsReadyState() = runTest {
         val ioDispatcher = StandardTestDispatcher(testScheduler)
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
@@ -179,11 +208,32 @@ class AppSyncViewModelTest {
         }
     }
 
+    @Test
+    fun refreshRemoteStatusQuietly_doesNotSetLoading() = runTest {
+        val ioDispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            val viewModel = createViewModel(ioDispatcher)
+            viewModel.refreshRemoteStatus(force = true)
+            advanceUntilIdle()
+            assertTrue(viewModel.uiState.value is SyncUiState.Ready)
+
+            viewModel.refreshRemoteStatusQuietly(force = true)
+            assertTrue(viewModel.uiState.value is SyncUiState.Ready)
+            advanceUntilIdle()
+            assertTrue(viewModel.uiState.value is SyncUiState.Ready)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
     private fun createViewModel(
         ioDispatcher: CoroutineDispatcher,
         registry: com.eskerra.go.core.repository.NoteRegistryRepository = FakeRegistryRepository(),
         onSyncSuccess: () -> Unit = {},
-        clock: () -> Long = { 0L }
+        clock: () -> Long = { 0L },
+        remoteSyncRepository: com.eskerra.go.core.repository.RemoteSyncRepository? = null,
+        lastSyncStore: LastSyncStatusStore = FakeWorkspaceStore()
     ): AppSyncViewModel {
         val status = SyncStatusSummary(
             state = SyncStatusState.Clean,
@@ -193,12 +243,11 @@ class AppSyncViewModelTest {
             behindCount = 0,
             message = "Up to date."
         )
-        val fakeRemote = FetchTrackingFakeRemoteSyncRepository(
+        val fakeRemote = remoteSyncRepository ?: FetchTrackingFakeRemoteSyncRepository(
             inner = FakeRemoteSyncRepository(status),
             fetchCount = fetchCount
         )
         val credentials = FakeCredentialStore()
-        val lastSyncStore = FakeWorkspaceStore()
         val loadSyncStatus = LoadSyncStatus(fakeRemote, ioDispatcher)
         val refreshRemoteSyncStatus = RefreshRemoteSyncStatus(
             remoteSyncRepository = fakeRemote,
@@ -250,6 +299,17 @@ class AppSyncViewModelTest {
         override fun fetch(workingDir: File, httpsToken: String?): Result<Unit> {
             fetchCount.incrementAndGet()
             return inner.fetch(workingDir, httpsToken)
+        }
+    }
+
+    private class SlowLastSyncStatusStore(
+        private val delegate: FakeWorkspaceStore = FakeWorkspaceStore(),
+        private val delayMs: Long
+    ) : LastSyncStatusStore by delegate {
+
+        override suspend fun readLastSyncStatus(): LastSyncStatus? {
+            delay(delayMs)
+            return delegate.readLastSyncStatus()
         }
     }
 }

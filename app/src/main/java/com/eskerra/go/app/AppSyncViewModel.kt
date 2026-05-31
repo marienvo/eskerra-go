@@ -88,11 +88,32 @@ class AppSyncViewModel(
         }
     }
 
+    fun refreshRemoteStatusQuietly(force: Boolean = false) {
+        if (_uiState.value is SyncUiState.Syncing) {
+            return
+        }
+
+        val now = clock()
+        if (!force &&
+            lastRemoteRefreshAtMs >= 0L &&
+            now - lastRemoteRefreshAtMs < refreshDebounceMs
+        ) {
+            return
+        }
+
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
+            emitReadyState(refreshRemoteSyncStatus(config, filesDir))
+            lastRemoteRefreshAtMs = clock()
+        }
+    }
+
     fun syncNow() {
         if (_uiState.value is SyncUiState.Syncing) {
             return
         }
 
+        loadJob?.cancel()
         syncJob = viewModelScope.launch {
             val currentStatus = when (val state = _uiState.value) {
                 is SyncUiState.Ready -> state.status
@@ -157,6 +178,9 @@ class AppSyncViewModel(
     }
 
     private suspend fun emitReadyState(status: com.eskerra.go.core.model.SyncStatusSummary) {
+        if (_uiState.value is SyncUiState.Syncing) {
+            return
+        }
         val preflight = buildSyncPreflight(config, filesDir)
         val diagnostic = buildSafeSyncDiagnostic(config, filesDir)
         _uiState.value = SyncUiState.Ready(

@@ -135,23 +135,28 @@ class DefaultRemoteSyncSettingsRepository(
             return@withContext Result.failure(it)
         }
         val cleared = config.copy(remoteUri = null)
-        try {
-            workspaceStore.save(cleared)
-        } catch (_: Exception) {
-            return@withContext Result.failure(
-                RemoteSyncSettingsException(RemoteSyncSettingsError.MetadataSaveFailed)
-            )
-        }
-        credentialStore.clear(config.relativePath).getOrElse {
-            return@withContext Result.failure(
-                RemoteSyncSettingsException(RemoteSyncSettingsError.CredentialSaveFailed)
-            )
-        }
-        remoteSyncRepository.clearSanitizedOrigin(workspaceDir).getOrElse { error ->
+        val previousOriginUrl = remoteSyncRepository.readOriginUrl(workspaceDir).getOrNull()
+        val previousToken = credentialStore.readToken(config.relativePath).getOrNull()
+
+        remoteSyncRepository.clearSanitizedOrigin(workspaceDir).getOrElse {
             return@withContext Result.failure(
                 RemoteSyncSettingsException(
                     RemoteSyncSettingsError.GitFailed("Could not clear remote sync settings.")
                 )
+            )
+        }
+        credentialStore.clear(config.relativePath).getOrElse {
+            rollbackSavedSettings(config, workspaceDir, previousOriginUrl, previousToken)
+            return@withContext Result.failure(
+                RemoteSyncSettingsException(RemoteSyncSettingsError.CredentialSaveFailed)
+            )
+        }
+        try {
+            workspaceStore.save(cleared)
+        } catch (_: Exception) {
+            rollbackSavedSettings(config, workspaceDir, previousOriginUrl, previousToken)
+            return@withContext Result.failure(
+                RemoteSyncSettingsException(RemoteSyncSettingsError.MetadataSaveFailed)
             )
         }
         Result.success(cleared)

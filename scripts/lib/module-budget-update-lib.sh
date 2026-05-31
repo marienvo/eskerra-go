@@ -2,7 +2,9 @@
 # Pure update logic for module-budget-baseline.json (testable without git).
 set -euo pipefail
 
-NEW_FILE_MAX_LINES=400
+_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/module-budget-common.sh
+source "${_LIB_DIR}/module-budget-common.sh"
 
 # build_updated_max_lines_by_path baseline_tsv path_exists_fn count_lines_fn auto_additions_tsv
 # Emits sorted JSON object: {"maxLinesByPath": {...}}
