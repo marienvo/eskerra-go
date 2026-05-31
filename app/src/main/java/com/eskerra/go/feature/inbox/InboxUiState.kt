@@ -6,7 +6,8 @@ import com.eskerra.go.core.model.NoteSummary
 sealed interface InboxUiState {
     data object Loading : InboxUiState
 
-    data class Content(val notes: List<NoteSummary>) : InboxUiState
+    data class Content(val notes: List<NoteSummary>, val isRefreshing: Boolean = false) :
+        InboxUiState
 
     data object Empty : InboxUiState
 

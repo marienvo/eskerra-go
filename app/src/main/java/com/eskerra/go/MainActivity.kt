@@ -15,6 +15,7 @@ import com.eskerra.go.core.usecase.CreateInboxNote
 import com.eskerra.go.core.usecase.LoadEditableNote
 import com.eskerra.go.core.usecase.LoadGitStatusSummary
 import com.eskerra.go.core.usecase.LoadInboxSummaries
+import com.eskerra.go.core.usecase.LoadInboxSummariesCached
 import com.eskerra.go.core.usecase.LoadNoteForReading
 import com.eskerra.go.core.usecase.LoadRemoteSyncSettings
 import com.eskerra.go.core.usecase.LoadSyncStatus
@@ -30,6 +31,7 @@ import com.eskerra.go.data.credentials.AndroidKeystoreTokenCipher
 import com.eskerra.go.data.credentials.EncryptedCredentialStore
 import com.eskerra.go.data.git.JGitRemoteSyncRepository
 import com.eskerra.go.data.git.JGitWorkspaceRepository
+import com.eskerra.go.data.notes.FileInboxSnapshotStore
 import com.eskerra.go.data.notes.FileNoteContentRepository
 import com.eskerra.go.data.notes.FileNoteRegistryRepository
 import com.eskerra.go.data.notes.FileNoteWriteRepository
@@ -49,6 +51,7 @@ class MainActivity : ComponentActivity() {
         )
 
         val workspaceStore = DataStoreWorkspaceStore(applicationContext)
+        val bootCacheStore = workspaceStore
         val credentialStore = EncryptedCredentialStore(
             filesDir = filesDir,
             tokenCipher = AndroidKeystoreTokenCipher()
@@ -65,7 +68,10 @@ class MainActivity : ComponentActivity() {
         val noteWriteRepository = FileNoteWriteRepository(gitRepository)
         val loadGitStatusSummary = LoadGitStatusSummary(gitRepository)
 
-        val loadInboxSummaries = LoadInboxSummaries(noteRegistryRepository)
+        val loadInboxSummaries = LoadInboxSummariesCached(
+            delegate = LoadInboxSummaries(noteRegistryRepository),
+            snapshotStore = FileInboxSnapshotStore()
+        )
         val loadNoteForReading = LoadNoteForReading(
             registryRepository = noteRegistryRepository,
             contentRepository = noteContentRepository
@@ -128,6 +134,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             AppRoot(
                 workspaceStore = workspaceStore,
+                bootCacheStore = bootCacheStore,
                 setupCompletion = setupCompletion,
                 filesDir = filesDir,
                 loadInboxSummaries = loadInboxSummaries,

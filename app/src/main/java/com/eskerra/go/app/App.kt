@@ -29,11 +29,12 @@ import com.eskerra.go.core.usecase.ClearRemoteSyncSettings
 import com.eskerra.go.core.usecase.CreateInboxNote
 import com.eskerra.go.core.usecase.LoadEditableNote
 import com.eskerra.go.core.usecase.LoadGitStatusSummary
-import com.eskerra.go.core.usecase.LoadInboxSummaries
+import com.eskerra.go.core.usecase.LoadInboxSummariesCached
 import com.eskerra.go.core.usecase.LoadNoteForReading
 import com.eskerra.go.core.usecase.LoadRemoteSyncSettings
 import com.eskerra.go.core.usecase.LoadSyncStatus
 import com.eskerra.go.core.usecase.ManualSyncNow
+import com.eskerra.go.core.usecase.ReconcileWorkspaceSyncBranch
 import com.eskerra.go.core.usecase.RecordLastSyncAttempt
 import com.eskerra.go.core.usecase.RefreshRemoteSyncStatus
 import com.eskerra.go.core.usecase.SaveNote
@@ -60,7 +61,7 @@ import java.io.File
 fun App(
     config: WorkspaceConfig,
     filesDir: File,
-    loadInboxSummaries: LoadInboxSummaries,
+    loadInboxSummaries: LoadInboxSummariesCached,
     loadNoteForReading: LoadNoteForReading,
     createInboxNote: CreateInboxNote,
     loadEditableNote: LoadEditableNote,
@@ -77,6 +78,7 @@ fun App(
     updateSyncToken: UpdateSyncToken,
     clearRemoteSyncSettings: ClearRemoteSyncSettings,
     testRemoteConnection: TestRemoteConnection,
+    reconcileWorkspaceSyncBranch: ReconcileWorkspaceSyncBranch,
     onConfigUpdated: (WorkspaceConfig) -> Unit
 ) {
     var currentConfig by remember(config) { mutableStateOf(config) }
@@ -107,9 +109,14 @@ fun App(
     val syncState by appSyncViewModel.uiState.collectAsState()
     val remoteConfigured = !currentConfig.remoteUri.isNullOrBlank()
 
-    LaunchedEffect(currentConfig) {
-        appSyncViewModel.refreshShellStatusQuietly(forceRemote = true)
-    }
+    AppBootEffects(
+        config = currentConfig,
+        filesDir = filesDir,
+        reconcileWorkspaceSyncBranch = reconcileWorkspaceSyncBranch,
+        appSyncViewModel = appSyncViewModel,
+        onConfigUpdated = onConfigUpdated,
+        onConfigChanged = { updated -> currentConfig = updated }
+    )
 
     DisposableEffect(appSyncViewModel) {
         val observer = LifecycleEventObserver { _, event ->

@@ -14,13 +14,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.eskerra.go.core.repository.BootCacheStore
 import com.eskerra.go.core.usecase.BuildSafeSyncDiagnostic
 import com.eskerra.go.core.usecase.BuildSyncPreflight
 import com.eskerra.go.core.usecase.ClearRemoteSyncSettings
 import com.eskerra.go.core.usecase.CreateInboxNote
 import com.eskerra.go.core.usecase.LoadEditableNote
 import com.eskerra.go.core.usecase.LoadGitStatusSummary
-import com.eskerra.go.core.usecase.LoadInboxSummaries
+import com.eskerra.go.core.usecase.LoadInboxSummariesCached
 import com.eskerra.go.core.usecase.LoadNoteForReading
 import com.eskerra.go.core.usecase.LoadRemoteSyncSettings
 import com.eskerra.go.core.usecase.LoadSyncStatus
@@ -45,9 +46,10 @@ import java.io.File
 @Composable
 fun AppRoot(
     workspaceStore: WorkspaceStore,
+    bootCacheStore: BootCacheStore,
     setupCompletion: WorkspaceSetupCompletion,
     filesDir: File,
-    loadInboxSummaries: LoadInboxSummaries,
+    loadInboxSummaries: LoadInboxSummariesCached,
     loadNoteForReading: LoadNoteForReading,
     createInboxNote: CreateInboxNote,
     loadEditableNote: LoadEditableNote,
@@ -74,8 +76,8 @@ fun AppRoot(
             val gateViewModel: AppGateViewModel = viewModel(
                 factory = AppGateViewModel.factory(
                     workspaceStore = workspaceStore,
-                    filesDir = filesDir,
-                    reconcileWorkspaceSyncBranch = reconcileWorkspaceSyncBranch
+                    bootCacheStore = bootCacheStore,
+                    filesDir = filesDir
                 )
             )
             val gateState by gateViewModel.gateState.collectAsState()
@@ -140,6 +142,7 @@ fun AppRoot(
                     updateSyncToken = updateSyncToken,
                     clearRemoteSyncSettings = clearRemoteSyncSettings,
                     testRemoteConnection = testRemoteConnection,
+                    reconcileWorkspaceSyncBranch = reconcileWorkspaceSyncBranch,
                     onConfigUpdated = gateViewModel::updateReadyConfig
                 )
             }

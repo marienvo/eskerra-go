@@ -2,6 +2,7 @@ package com.eskerra.go.app
 
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.data.git.JGitWorkspaceRepository
+import com.eskerra.go.data.workspace.FakeBootCacheStore
 import com.eskerra.go.data.workspace.FakeWorkspaceStore
 import com.eskerra.go.data.workspace.WorkspacePaths
 import com.eskerra.go.data.workspace.resolveAppGateState
@@ -25,6 +26,8 @@ class AppRestartFlowTest {
     @get:Rule
     val temp = TemporaryFolder()
 
+    private val testDispatcher = UnconfinedTestDispatcher()
+
     private val config = WorkspaceConfig(
         name = "My Notes",
         relativePath = WorkspacePaths.DEFAULT_RELATIVE_PATH,
@@ -35,7 +38,7 @@ class AppRestartFlowTest {
 
     @Before
     fun setUpMainDispatcher() {
-        Dispatchers.setMain(UnconfinedTestDispatcher())
+        Dispatchers.setMain(testDispatcher)
     }
 
     @After
@@ -51,10 +54,10 @@ class AppRestartFlowTest {
         val store = FakeWorkspaceStore()
         store.save(config)
 
-        val firstLaunch = AppGateViewModel(store, filesDir)
+        val firstLaunch = appGateViewModel(store, filesDir)
         assertEquals(AppGateState.Ready(config), firstLaunch.gateState.value)
 
-        val secondLaunch = AppGateViewModel(store, filesDir)
+        val secondLaunch = appGateViewModel(store, filesDir)
         assertEquals(AppGateState.Ready(config), secondLaunch.gateState.value)
     }
 
@@ -64,7 +67,7 @@ class AppRestartFlowTest {
         prepareValidWorkspace(filesDir)
 
         val store = FakeWorkspaceStore()
-        val viewModel = AppGateViewModel(store, filesDir)
+        val viewModel = appGateViewModel(store, filesDir)
 
         assertEquals(AppGateState.NeedsSetup(), viewModel.gateState.value)
     }
@@ -123,4 +126,12 @@ class AppRestartFlowTest {
         workspaceDir.mkdirs()
         JGitWorkspaceRepository().initOrOpen(workspaceDir).getOrThrow()
     }
+
+    private fun appGateViewModel(store: FakeWorkspaceStore, filesDir: File): AppGateViewModel =
+        AppGateViewModel(
+            workspaceStore = store,
+            bootCacheStore = FakeBootCacheStore(),
+            filesDir = filesDir,
+            ioDispatcher = testDispatcher
+        )
 }

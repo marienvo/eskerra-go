@@ -5,9 +5,12 @@ import com.eskerra.go.core.model.NoteIndexError
 import com.eskerra.go.core.model.NoteSummary
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.usecase.LoadInboxSummaries
+import com.eskerra.go.core.usecase.LoadInboxSummariesCached
+import com.eskerra.go.data.notes.FakeInboxSnapshotStore
 import com.eskerra.go.data.notes.FakeNoteRegistryRepository
 import com.eskerra.go.data.workspace.WorkspacePaths
 import com.eskerra.go.feature.inbox.InboxUiState
+import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -17,6 +20,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -57,26 +61,59 @@ class InboxViewModelTest {
             isInbox = true
         )
         val repository = FakeNoteRegistryRepository.withInboxNotes(note)
-        val viewModel = InboxViewModel(
-            config = config,
+        val viewModel = inboxViewModel(
             filesDir = filesDir,
-            loadInboxSummaries = LoadInboxSummaries(repository)
+            repository = repository
         )
 
         val state = viewModel.uiState.value as InboxUiState.Content
         assertEquals(listOf(note), state.notes)
+        assertFalse(state.isRefreshing)
         assertSame(config, repository.lastConfig)
         assertSame(filesDir, repository.lastFilesDir)
+    }
+
+    @Test
+    fun init_withCachedNotes_skipsInitialLoading() = runTest {
+        val filesDir = temp.newFolder("files")
+        val cachedNote = NoteSummary(
+            id = NoteId("Inbox/cached.md"),
+            title = "Cached",
+            snippet = "",
+            isInbox = true
+        )
+        val repository = FakeNoteRegistryRepository(
+            result = Result.success(
+                com.eskerra.go.core.model.NoteRegistry.fromNotes(listOf(cachedNote))
+            ),
+            refreshDelayMs = 1_000L
+        )
+        val snapshotStore = FakeInboxSnapshotStore()
+        snapshotStore.save(config, filesDir, listOf(cachedNote))
+
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(dispatcher)
+
+        val viewModel = inboxViewModel(
+            filesDir = filesDir,
+            repository = repository,
+            snapshotStore = snapshotStore
+        )
+        dispatcher.scheduler.runCurrent()
+
+        val state = viewModel.uiState.value as InboxUiState.Content
+        assertEquals(listOf(cachedNote), state.notes)
+        assertTrue(state.isRefreshing)
+        assertTrue(viewModel.uiState.value !is InboxUiState.Loading)
     }
 
     @Test
     fun init_withNoInboxNotes_movesToEmpty() = runTest {
         val filesDir = temp.newFolder("files")
         val repository = FakeNoteRegistryRepository()
-        val viewModel = InboxViewModel(
-            config = config,
+        val viewModel = inboxViewModel(
             filesDir = filesDir,
-            loadInboxSummaries = LoadInboxSummaries(repository)
+            repository = repository
         )
 
         assertEquals(InboxUiState.Empty, viewModel.uiState.value)
@@ -86,10 +123,9 @@ class InboxViewModelTest {
     fun init_whenLoadFails_movesToError() = runTest {
         val filesDir = temp.newFolder("files")
         val repository = FakeNoteRegistryRepository.failing()
-        val viewModel = InboxViewModel(
-            config = config,
+        val viewModel = inboxViewModel(
             filesDir = filesDir,
-            loadInboxSummaries = LoadInboxSummaries(repository)
+            repository = repository
         )
 
         assertEquals(
@@ -102,10 +138,9 @@ class InboxViewModelTest {
     fun init_whenWorkspaceMissing_mapsToMissingMessage() = runTest {
         val filesDir = temp.newFolder("files")
         val repository = FakeNoteRegistryRepository.failing(NoteIndexError.WorkspaceMissing(null))
-        val viewModel = InboxViewModel(
-            config = config,
+        val viewModel = inboxViewModel(
             filesDir = filesDir,
-            loadInboxSummaries = LoadInboxSummaries(repository)
+            repository = repository
         )
 
         assertEquals(
@@ -120,10 +155,9 @@ class InboxViewModelTest {
         val repository = FakeNoteRegistryRepository.failing(
             NoteIndexError.InvalidWorkspacePath(null)
         )
-        val viewModel = InboxViewModel(
-            config = config,
+        val viewModel = inboxViewModel(
             filesDir = filesDir,
-            loadInboxSummaries = LoadInboxSummaries(repository)
+            repository = repository
         )
 
         assertEquals(
@@ -135,15 +169,13 @@ class InboxViewModelTest {
     @Test
     fun emptyStateIsDistinctFromScanFailure() = runTest {
         val filesDir = temp.newFolder("files")
-        val emptyViewModel = InboxViewModel(
-            config = config,
+        val emptyViewModel = inboxViewModel(
             filesDir = filesDir,
-            loadInboxSummaries = LoadInboxSummaries(FakeNoteRegistryRepository())
+            repository = FakeNoteRegistryRepository()
         )
-        val failingViewModel = InboxViewModel(
-            config = config,
+        val failingViewModel = inboxViewModel(
             filesDir = filesDir,
-            loadInboxSummaries = LoadInboxSummaries(FakeNoteRegistryRepository.failing())
+            repository = FakeNoteRegistryRepository.failing()
         )
 
         assertEquals(InboxUiState.Empty, emptyViewModel.uiState.value)
@@ -154,10 +186,9 @@ class InboxViewModelTest {
     fun refresh_retriesLoad() = runTest {
         val filesDir = temp.newFolder("files")
         val repository = FakeNoteRegistryRepository.failing()
-        val viewModel = InboxViewModel(
-            config = config,
+        val viewModel = inboxViewModel(
             filesDir = filesDir,
-            loadInboxSummaries = LoadInboxSummaries(repository)
+            repository = repository
         )
         assertEquals(1, repository.refreshCount)
 
@@ -203,10 +234,9 @@ class InboxViewModelTest {
             ),
             refreshDelayMs = 1_000L
         )
-        val viewModel = InboxViewModel(
-            config = config,
+        val viewModel = inboxViewModel(
             filesDir = filesDir,
-            loadInboxSummaries = LoadInboxSummaries(repository)
+            repository = repository
         )
         dispatcher.scheduler.runCurrent()
         assertEquals(1, repository.refreshCount)
@@ -226,4 +256,17 @@ class InboxViewModelTest {
         val state = viewModel.uiState.value as InboxUiState.Content
         assertEquals(listOf(freshNote), state.notes)
     }
+
+    private fun inboxViewModel(
+        filesDir: File,
+        repository: FakeNoteRegistryRepository,
+        snapshotStore: FakeInboxSnapshotStore = FakeInboxSnapshotStore()
+    ): InboxViewModel = InboxViewModel(
+        config = config,
+        filesDir = filesDir,
+        loadInboxSummaries = LoadInboxSummariesCached(
+            delegate = LoadInboxSummaries(repository),
+            snapshotStore = snapshotStore
+        )
+    )
 }

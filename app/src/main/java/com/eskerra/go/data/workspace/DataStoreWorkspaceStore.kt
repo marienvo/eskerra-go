@@ -7,8 +7,10 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.eskerra.go.core.model.GateFingerprint
 import com.eskerra.go.core.model.LastSyncStatus
 import com.eskerra.go.core.model.WorkspaceConfig
+import com.eskerra.go.core.repository.BootCacheStore
 import com.eskerra.go.core.repository.LastSyncStatusStore
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -26,12 +28,14 @@ private object WorkspacePreferenceKeys {
     val lastSyncAttemptAt = longPreferencesKey("last_sync_attempt_at")
     val lastSyncOutcome = stringPreferencesKey("last_sync_outcome")
     val lastSyncErrorCategory = stringPreferencesKey("last_sync_error_category")
+    val gateFingerprint = stringPreferencesKey("gate_fingerprint")
 }
 
-/** Preferences DataStore-backed [WorkspaceStore] and [LastSyncStatusStore]. Non-secret metadata only. */
+/** Preferences DataStore-backed workspace, sync, and boot cache persistence. Non-secret only. */
 class DataStoreWorkspaceStore(private val dataStore: DataStore<Preferences>) :
     WorkspaceStore,
-    LastSyncStatusStore {
+    LastSyncStatusStore,
+    BootCacheStore {
 
     constructor(context: Context) : this(context.applicationContext.workspaceDataStore)
 
@@ -45,8 +49,28 @@ class DataStoreWorkspaceStore(private val dataStore: DataStore<Preferences>) :
             "workspace_setup_completed_at",
             "last_sync_attempt_at",
             "last_sync_outcome",
-            "last_sync_error_category"
+            "last_sync_error_category",
+            "gate_fingerprint"
         )
+    }
+
+    override suspend fun readFingerprint(): GateFingerprint? {
+        val raw = dataStore.data.map { prefs ->
+            prefs[WorkspacePreferenceKeys.gateFingerprint]
+        }.first()
+        return raw?.let(::GateFingerprint)
+    }
+
+    override suspend fun saveFingerprint(fingerprint: GateFingerprint) {
+        dataStore.edit { prefs ->
+            prefs[WorkspacePreferenceKeys.gateFingerprint] = fingerprint.value
+        }
+    }
+
+    override suspend fun clearFingerprint() {
+        dataStore.edit { prefs ->
+            prefs.remove(WorkspacePreferenceKeys.gateFingerprint)
+        }
     }
 
     override suspend fun read(): WorkspaceConfig? {

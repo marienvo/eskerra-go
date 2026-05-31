@@ -61,12 +61,21 @@ private fun InboxScrollBody(
         contentPadding = shellScrollContentPadding()
     ) {
         item {
-            Text(
-                text = "Inbox",
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(bottom = 12.dp)
-            )
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = "Inbox",
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
+                if (state is InboxUiState.Content && state.isRefreshing) {
+                    CircularProgressIndicator(
+                        modifier = Modifier
+                            .align(Alignment.CenterHorizontally)
+                            .padding(bottom = 8.dp)
+                    )
+                }
+            }
         }
 
         when (state) {

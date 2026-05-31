@@ -6,7 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.eskerra.go.core.model.NoteIndexError
 import com.eskerra.go.core.model.NoteIndexException
 import com.eskerra.go.core.model.WorkspaceConfig
-import com.eskerra.go.core.usecase.LoadInboxSummaries
+import com.eskerra.go.core.usecase.LoadInboxSummariesCached
 import com.eskerra.go.feature.inbox.InboxUiState
 import java.io.File
 import kotlinx.coroutines.Job
@@ -18,7 +18,7 @@ import kotlinx.coroutines.launch
 class InboxViewModel(
     private val config: WorkspaceConfig,
     private val filesDir: File,
-    private val loadInboxSummaries: LoadInboxSummaries
+    private val loadInboxSummaries: LoadInboxSummariesCached
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<InboxUiState>(InboxUiState.Loading)
@@ -27,25 +27,59 @@ class InboxViewModel(
     private var refreshJob: Job? = null
 
     init {
-        refresh()
+        viewModelScope.launch {
+            val cached = loadInboxSummaries.readCached(config, filesDir)
+            if (cached != null) {
+                _uiState.value = cached.toInboxUiState(isRefreshing = true)
+            }
+            refresh(showFullScreenLoading = cached == null)
+        }
     }
 
     fun refresh() {
+        refresh(showFullScreenLoading = _uiState.value !is InboxUiState.Content)
+    }
+
+    private fun refresh(showFullScreenLoading: Boolean) {
         refreshJob?.cancel()
         refreshJob = viewModelScope.launch {
-            _uiState.value = InboxUiState.Loading
+            if (showFullScreenLoading) {
+                _uiState.value = InboxUiState.Loading
+            } else {
+                markRefreshing()
+            }
+
             loadInboxSummaries(config, filesDir).fold(
                 onSuccess = { notes ->
-                    _uiState.value = when {
-                        notes.isEmpty() -> InboxUiState.Empty
-                        else -> InboxUiState.Content(notes)
-                    }
+                    _uiState.value = notes.toInboxUiState(isRefreshing = false)
                 },
                 onFailure = { error ->
-                    _uiState.value = InboxUiState.Error(mapScanFailure(error))
+                    if (_uiState.value is InboxUiState.Content) {
+                        markRefreshing(false)
+                    } else {
+                        _uiState.value = InboxUiState.Error(mapScanFailure(error))
+                    }
                 }
             )
         }
+    }
+
+    private fun markRefreshing(isRefreshing: Boolean = true) {
+        when (val state = _uiState.value) {
+            is InboxUiState.Content -> _uiState.value = state.copy(isRefreshing = isRefreshing)
+            InboxUiState.Empty -> if (isRefreshing) {
+                _uiState.value = InboxUiState.Content(emptyList(), isRefreshing = true)
+            }
+            else -> Unit
+        }
+    }
+
+    private fun List<com.eskerra.go.core.model.NoteSummary>.toInboxUiState(
+        isRefreshing: Boolean
+    ): InboxUiState = when {
+        isEmpty() && !isRefreshing -> InboxUiState.Empty
+        isEmpty() -> InboxUiState.Content(emptyList(), isRefreshing = true)
+        else -> InboxUiState.Content(this, isRefreshing = isRefreshing)
     }
 
     private fun mapScanFailure(error: Throwable): String {
@@ -65,7 +99,7 @@ class InboxViewModel(
         fun factory(
             config: WorkspaceConfig,
             filesDir: File,
-            loadInboxSummaries: LoadInboxSummaries
+            loadInboxSummaries: LoadInboxSummariesCached
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T =
