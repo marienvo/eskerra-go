@@ -23,6 +23,14 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Check module budgets
+        run: ./scripts/check-module-budgets.sh
+
+      - name: Test module budget scripts
+        run: ./scripts/check-module-budget-baseline.test.sh
 
       - name: Set up JDK
         uses: actions/setup-java@v5
