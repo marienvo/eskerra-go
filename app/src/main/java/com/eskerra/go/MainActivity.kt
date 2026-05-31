@@ -160,7 +160,11 @@ class MainActivity : ComponentActivity() {
                 clearRemoteSyncSettings = clearRemoteSyncSettings,
                 testRemoteConnection = testRemoteConnection,
                 reconcileWorkspaceSyncBranch = reconcileWorkspaceSyncBranch,
-                onLaunchSettled = { keepSplashOnScreen = false }
+                onLaunchSettled = {
+                    if (keepSplashOnScreen) {
+                        keepSplashOnScreen = false
+                    }
+                }
             )
         }
     }

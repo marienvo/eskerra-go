@@ -16,6 +16,11 @@ internal fun isLaunchSettled(gateState: AppGateState, inboxUiState: InboxUiState
         is AppGateState.Ready -> inboxUiState != null && inboxUiState !is InboxUiState.Loading
     }
 
+/**
+ * Dismisses the splash once [isLaunchSettled] becomes true.
+ * Keys on the derived settled flag, not [InboxUiState], so [InboxUiState.Content.isRefreshing]
+ * toggles do not restart the effect.
+ */
 @Composable
 internal fun AppLaunchSettledEffect(
     gateState: AppGateState,
@@ -23,8 +28,9 @@ internal fun AppLaunchSettledEffect(
     onLaunchSettled: () -> Unit,
     minSplashHoldMs: Long = MIN_SPLASH_HOLD_MS
 ) {
-    LaunchedEffect(gateState, inboxUiState) {
-        if (!isLaunchSettled(gateState, inboxUiState)) {
+    val launchSettled = isLaunchSettled(gateState, inboxUiState)
+    LaunchedEffect(gateState, launchSettled) {
+        if (!launchSettled) {
             return@LaunchedEffect
         }
         withFrameNanos { }
