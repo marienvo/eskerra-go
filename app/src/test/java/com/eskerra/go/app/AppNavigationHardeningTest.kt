@@ -100,11 +100,27 @@ class AppNavigationHardeningTest {
         )
         assertTrue(
             consumeNoteReaderChanged(
-                currentRoute = AppRoute.note(noteId),
+                currentRoute = AppRoute.NOTE_PATTERN,
                 noteId = noteId,
                 savedStateHandle = savedStateHandle
             )
         )
+        assertFalse(
+            consumeNoteReaderChanged(
+                currentRoute = AppRoute.NOTE_PATTERN,
+                noteId = noteId,
+                savedStateHandle = savedStateHandle
+            )
+        )
+    }
+
+    @Test
+    fun consumeNoteReaderChanged_doesNotMatchConcreteNoteRoute() {
+        val noteId = NoteId("Inbox/First.md")
+        val savedStateHandle = SavedStateHandle(
+            mapOf(NOTE_CONTENT_CHANGED_KEY to true)
+        )
+
         assertFalse(
             consumeNoteReaderChanged(
                 currentRoute = AppRoute.note(noteId),
@@ -112,6 +128,7 @@ class AppNavigationHardeningTest {
                 savedStateHandle = savedStateHandle
             )
         )
+        assertTrue(savedStateHandle.get<Boolean>(NOTE_CONTENT_CHANGED_KEY) == true)
     }
 
     private fun readerViewModel(noteId: NoteId): NoteReaderViewModel = NoteReaderViewModel(

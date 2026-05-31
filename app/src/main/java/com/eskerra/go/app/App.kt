@@ -290,6 +290,10 @@ fun App(
                     editorViewModel.noteSavedEvents.collect {
                         markInboxNotesChanged()
                         navController.markNoteReaderChanged(noteId)
+                        navController.navigate(AppRoute.note(noteId)) {
+                            popUpTo(AppRoute.editor(noteId)) { inclusive = true }
+                            launchSingleTop = true
+                        }
                     }
                 }
 
@@ -316,7 +320,7 @@ internal fun consumeNoteReaderChanged(
     noteId: NoteId,
     savedStateHandle: SavedStateHandle
 ): Boolean {
-    if (currentRoute != AppRoute.note(noteId)) return false
+    if (currentRoute != AppRoute.NOTE_PATTERN) return false
     return savedStateHandle.remove<Boolean>(NOTE_CONTENT_CHANGED_KEY) == true
 }
 
