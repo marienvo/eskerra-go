@@ -27,17 +27,17 @@ Do not edit synced `.cursor/rules/{language,quality,specs,testing}.mdc`, `.curso
 
 ## Branding / launcher icons
 
-Launcher mipmaps and the Android 12+ system splash icon come from the sibling **notebox** desktop app (same Eskerra logo as Tauri). Canonical artwork: `notebox/assets/brand/eskerra-logo.png`.
+Launcher mipmaps and the Android 12+ system splash use the sibling **notebox** pipeline (canonical raster: `notebox/assets/brand/eskerra-logo.png`; square master for generators: `eskerra-logo-app-icon.png`).
 
 When the logo changes in notebox:
 
 ```bash
-cd /path/to/notebox/apps/desktop
-npm run desktop:icons
-cp -r src-tauri/icons/android/* /path/to/eskerra-go/app/src/main/res/
+cd /path/to/notebox
+./scripts/generate-brand-app-icons.sh
+cp -r apps/desktop/src-tauri/icons/android/* /path/to/eskerra-go/app/src/main/res/
 ```
 
-Keep `app/src/main/res/values/ic_launcher_background.xml` at `#121212` (matches splash background) after copying. Regenerate only from notebox; do not edit mipmaps by hand in eskerra-go unless you are also updating the Tauri source icons.
+After copying, keep `values/ic_launcher_background.xml` and `values/colors.xml` (`splash_background`) at `#031226` (desktop chrome backdrop). Do not edit generated mipmaps by hand in eskerra-go.
 
 ## Specs
 
