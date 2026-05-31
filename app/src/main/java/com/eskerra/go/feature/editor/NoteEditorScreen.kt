@@ -43,7 +43,8 @@ fun NoteEditorScreen(
         IconButton(onClick = onBack) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Back"
+                contentDescription = "Back",
+                tint = MaterialTheme.colorScheme.onSurface
             )
         }
 
@@ -118,6 +119,7 @@ private fun EditorContent(
         Text(
             text = state.note.title,
             style = MaterialTheme.typography.headlineMedium,
+            color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.padding(bottom = 4.dp)
         )
         Text(
@@ -199,11 +201,13 @@ private fun EditorMessage(title: String, body: String, onRetry: (() -> Unit)?) {
         Text(
             text = title,
             style = MaterialTheme.typography.headlineSmall,
+            color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.padding(bottom = 8.dp)
         )
         Text(
             text = body,
-            style = MaterialTheme.typography.bodyLarge
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface
         )
         if (onRetry != null) {
             Button(

@@ -52,6 +52,7 @@ Each blocking `SyncError` maps to a short recovery hint via `SyncRecoveryGuidanc
 - On app start (after the workspace gate is `Ready`) and when the app returns to the foreground, the shell may run a **read-only** remote check: `fetch` to update remote-tracking refs, then local ahead/behind comparison.
 - This is user-visible foreground work only; it does not commit, pull, push, or schedule background sync.
 - Debounce rapid foreground refreshes (for example within 30 seconds) to avoid redundant network calls.
+- After inbox note create or save, the app may reload **local-only** Git sync status for the shell indicator. This is not background sync and does not fetch remote.
 
 ## Out of scope
 

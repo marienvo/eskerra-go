@@ -14,6 +14,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -22,38 +23,40 @@ fun ShellSyncButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val containerColor = if (state.needsAttention) {
-        MaterialTheme.colorScheme.errorContainer
-    } else {
-        MaterialTheme.colorScheme.primaryContainer
+    val busy = state.isChecking || state.isSyncing
+    val containerColor = when {
+        busy -> MaterialTheme.colorScheme.surfaceContainerHigh
+        state.needsAttention -> MaterialTheme.colorScheme.errorContainer
+        else -> MaterialTheme.colorScheme.surfaceContainerHigh
     }
-    val contentColor = if (state.needsAttention) {
-        MaterialTheme.colorScheme.onErrorContainer
-    } else {
-        MaterialTheme.colorScheme.onPrimaryContainer
+    val contentColor = when {
+        busy -> MaterialTheme.colorScheme.onSurfaceVariant
+        state.needsAttention -> MaterialTheme.colorScheme.onErrorContainer
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
 
     BadgedBox(
-        modifier = modifier,
+        modifier = modifier.alpha(if (state.isEnabled && !busy) 1f else 0.38f),
         badge = {
-            if (state.badgeText != null && !state.isChecking && !state.isSyncing) {
+            if (state.badgeText != null && !busy) {
                 Badge { Text(state.badgeText) }
             }
         }
     ) {
         SmallFloatingActionButton(
-            onClick = onClick,
+            onClick = { if (state.isEnabled && !busy) onClick() },
             containerColor = containerColor,
             contentColor = contentColor
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Icon(Icons.Filled.Sync, contentDescription = "Sync")
-                if (state.isChecking || state.isSyncing) {
+                if (busy) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(20.dp),
                         strokeWidth = 2.dp,
                         color = contentColor
                     )
+                } else {
+                    Icon(Icons.Filled.Sync, contentDescription = "Sync")
                 }
             }
         }

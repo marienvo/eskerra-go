@@ -22,6 +22,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.WorkspaceConfig
+import com.eskerra.go.core.model.hasSyncWork
 import com.eskerra.go.core.usecase.BuildSafeSyncDiagnostic
 import com.eskerra.go.core.usecase.BuildSyncPreflight
 import com.eskerra.go.core.usecase.ClearRemoteSyncSettings
@@ -130,16 +131,16 @@ fun App(
         syncIndicator = syncIndicator,
         onSyncClick = {
             when (val state = syncState) {
-                is SyncUiState.Ready -> if (state.preflight.canSync) {
-                    appSyncViewModel.syncNow()
-                } else {
-                    navController.navigate(AppRoute.SYNC) {
+                is SyncUiState.Ready -> when {
+                    !state.status.hasSyncWork -> Unit
+                    state.preflight.canSync -> appSyncViewModel.syncNow()
+                    else -> navController.navigate(AppRoute.SYNC) {
                         launchSingleTop = true
                     }
                 }
-                is SyncUiState.Success -> appSyncViewModel.syncNow()
                 SyncUiState.Loading,
-                is SyncUiState.Syncing -> Unit
+                is SyncUiState.Syncing,
+                is SyncUiState.Success -> Unit
                 is SyncUiState.Error -> navController.navigate(AppRoute.SYNC) {
                     launchSingleTop = true
                 }
@@ -174,6 +175,7 @@ fun App(
                     ) == true
                     if (currentRoute == AppRoute.INBOX && notesChanged) {
                         inboxViewModel.refresh()
+                        appSyncViewModel.refreshLocalStatusQuietly()
                     }
                 }
 
@@ -200,6 +202,7 @@ fun App(
                     createViewModel.createdNoteId.collect { noteId ->
                         if (noteId != null) {
                             markInboxNotesChanged()
+                            appSyncViewModel.refreshLocalStatusQuietly()
                             navController.navigate(AppRoute.editor(noteId)) {
                                 popUpTo(AppRoute.CREATE_INBOX) { inclusive = true }
                             }
@@ -333,6 +336,7 @@ fun App(
                 LaunchedEffect(editorViewModel) {
                     editorViewModel.noteSavedEvents.collect {
                         markInboxNotesChanged()
+                        appSyncViewModel.refreshLocalStatusQuietly()
                         navController.markNoteReaderChanged(noteId)
                         navController.navigate(AppRoute.note(noteId)) {
                             popUpTo(AppRoute.editor(noteId)) { inclusive = true }

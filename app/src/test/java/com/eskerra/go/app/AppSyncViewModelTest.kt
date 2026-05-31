@@ -159,6 +159,26 @@ class AppSyncViewModelTest {
         }
     }
 
+    @Test
+    fun refreshLocalStatusQuietly_keepsReadyState() = runTest {
+        val ioDispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            val viewModel = createViewModel(ioDispatcher)
+
+            viewModel.refreshRemoteStatus(force = true)
+            advanceUntilIdle()
+            assertTrue(viewModel.uiState.value is SyncUiState.Ready)
+
+            viewModel.refreshLocalStatusQuietly()
+            advanceUntilIdle()
+
+            assertTrue(viewModel.uiState.value is SyncUiState.Ready)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
     private fun createViewModel(
         ioDispatcher: CoroutineDispatcher,
         registry: com.eskerra.go.core.repository.NoteRegistryRepository = FakeRegistryRepository(),

@@ -34,6 +34,10 @@ data class SyncStatusSummary(
 val SyncStatusSummary.needsAttention: Boolean
     get() = state != SyncStatusState.Clean && state != SyncStatusState.Unavailable
 
+/** True when manual sync would change local or remote Git state. */
+val SyncStatusSummary.hasSyncWork: Boolean
+    get() = needsAttention
+
 /** Short label for dashboard and shell diagnostics. */
 fun SyncStatusSummary.displayLabel(): String = when (state) {
     SyncStatusState.Clean -> "Clean"

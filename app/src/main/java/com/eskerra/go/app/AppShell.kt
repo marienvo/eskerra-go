@@ -3,9 +3,15 @@ package com.eskerra.go.app
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -25,6 +31,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
+private val TopChromeHeight = 80.dp
+private val BottomChromeHeight = 104.dp
+
 /**
  * Floating navigation shell. It overlays controls on top of the current screen:
  * - a bottom floating taskbar with Inbox, a large centered Add, and Podcasts
@@ -43,13 +52,22 @@ fun AppShell(
     onNavigate: (route: String) -> Unit,
     content: @Composable (contentModifier: Modifier) -> Unit
 ) {
+    val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+
     Box(modifier = Modifier.fillMaxSize()) {
-        content(Modifier.padding(top = 80.dp, bottom = 104.dp))
+        content(
+            Modifier.padding(
+                top = TopChromeHeight + statusBarTop,
+                bottom = BottomChromeHeight + navBarBottom
+            )
+        )
 
         SmallFloatingActionButton(
             onClick = { onNavigate(AppRoute.DASHBOARD) },
             modifier = Modifier
                 .align(Alignment.TopStart)
+                .statusBarsPadding()
                 .padding(16.dp)
         ) {
             Icon(Icons.Filled.Dashboard, contentDescription = "Dashboard")
@@ -58,6 +76,7 @@ fun AppShell(
         Row(
             modifier = Modifier
                 .align(Alignment.TopEnd)
+                .statusBarsPadding()
                 .padding(16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -80,6 +99,7 @@ fun AppShell(
             onPodcasts = { onNavigate(AppRoute.PODCASTS) },
             modifier = Modifier
                 .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
                 .padding(16.dp)
         )
     }

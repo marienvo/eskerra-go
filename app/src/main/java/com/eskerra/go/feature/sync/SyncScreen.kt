@@ -21,6 +21,7 @@ import com.eskerra.go.core.model.SyncProgressStep
 import com.eskerra.go.core.model.SyncRecoveryAction
 import com.eskerra.go.core.model.SyncStatusState
 import com.eskerra.go.core.model.SyncStatusSummary
+import com.eskerra.go.core.model.hasSyncWork
 
 /**
  * Minimal manual sync screen. Receives state and callbacks only; it does not
@@ -78,7 +79,9 @@ fun SyncScreen(
                 Button(
                     onClick = onSyncNow,
                     modifier = Modifier.fillMaxWidth(),
-                    enabled = state.remoteUri != null && state.preflight.canSync
+                    enabled = state.remoteUri != null &&
+                        state.preflight.canSync &&
+                        state.status.hasSyncWork
                 ) {
                     Text("Sync now")
                 }

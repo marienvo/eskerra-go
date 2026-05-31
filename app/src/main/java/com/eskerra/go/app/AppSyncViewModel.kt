@@ -77,6 +77,17 @@ class AppSyncViewModel(
         }
     }
 
+    fun refreshLocalStatusQuietly() {
+        if (_uiState.value is SyncUiState.Syncing) {
+            return
+        }
+
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
+            emitReadyState(loadSyncStatus(config, filesDir))
+        }
+    }
+
     fun syncNow() {
         if (_uiState.value is SyncUiState.Syncing) {
             return

@@ -52,7 +52,8 @@ fun NoteScreen(
         IconButton(onClick = onBack) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Back"
+                contentDescription = "Back",
+                tint = MaterialTheme.colorScheme.onSurface
             )
         }
 
@@ -112,6 +113,7 @@ private fun NoteReaderContent(
         Text(
             text = title,
             style = MaterialTheme.typography.headlineMedium,
+            color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.padding(bottom = 4.dp)
         )
         Text(
@@ -132,9 +134,11 @@ private fun NoteReaderContent(
             text = buildReaderText(
                 segments = segments,
                 onResolvedWikiLinkClick = onResolvedWikiLinkClick,
+                bodyColor = MaterialTheme.colorScheme.onSurface,
                 mutedColor = MaterialTheme.colorScheme.onSurfaceVariant
             ),
-            style = MaterialTheme.typography.bodyLarge
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface
         )
     }
 }
@@ -148,11 +152,13 @@ private fun NoteReaderMessage(title: String, body: String, onRetry: (() -> Unit)
         Text(
             text = title,
             style = MaterialTheme.typography.headlineSmall,
+            color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.padding(bottom = 8.dp)
         )
         Text(
             text = body,
-            style = MaterialTheme.typography.bodyLarge
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface
         )
         if (onRetry != null) {
             Button(
@@ -168,14 +174,18 @@ private fun NoteReaderMessage(title: String, body: String, onRetry: (() -> Unit)
 private fun buildReaderText(
     segments: List<NoteReaderSegment>,
     onResolvedWikiLinkClick: (NoteId) -> Unit,
+    bodyColor: Color,
     mutedColor: Color
 ): AnnotatedString = buildAnnotatedString {
+    val bodyStyle = SpanStyle(color = bodyColor)
     val mutedStyle = SpanStyle(color = mutedColor)
-    val linkStyle = SpanStyle(textDecoration = TextDecoration.Underline)
+    val linkStyle = SpanStyle(color = bodyColor, textDecoration = TextDecoration.Underline)
 
     segments.forEach { segment ->
         when (segment) {
-            is NoteReaderSegment.Text -> append(segment.text)
+            is NoteReaderSegment.Text -> withStyle(bodyStyle) {
+                append(segment.text)
+            }
             is NoteReaderSegment.ResolvedLink -> {
                 withLink(
                     LinkAnnotation.Clickable(

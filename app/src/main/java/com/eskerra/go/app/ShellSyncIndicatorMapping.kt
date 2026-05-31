@@ -3,6 +3,7 @@ package com.eskerra.go.app
 import com.eskerra.go.core.model.SyncStatusState
 import com.eskerra.go.core.model.SyncStatusSummary
 import com.eskerra.go.core.model.displayLabel
+import com.eskerra.go.core.model.hasSyncWork
 import com.eskerra.go.core.model.needsAttention
 import com.eskerra.go.feature.sync.SyncUiState
 
@@ -17,6 +18,7 @@ internal fun shellSyncIndicatorState(
     return when (syncState) {
         SyncUiState.Loading -> ShellSyncIndicatorState(
             needsAttention = false,
+            isEnabled = false,
             isChecking = true,
             isSyncing = false,
             badgeText = null
@@ -44,6 +46,7 @@ internal fun shellSyncIndicatorState(
             indicatorFromStatus(it, isChecking = false, isSyncing = false)
         } ?: ShellSyncIndicatorState(
             needsAttention = true,
+            isEnabled = true,
             isChecking = false,
             isSyncing = false,
             badgeText = "!"
@@ -55,12 +58,16 @@ private fun indicatorFromStatus(
     status: SyncStatusSummary,
     isChecking: Boolean,
     isSyncing: Boolean
-): ShellSyncIndicatorState = ShellSyncIndicatorState(
-    needsAttention = status.needsAttention,
-    isChecking = isChecking,
-    isSyncing = isSyncing,
-    badgeText = badgeTextFor(status)
-)
+): ShellSyncIndicatorState {
+    val busy = isChecking || isSyncing
+    return ShellSyncIndicatorState(
+        needsAttention = status.needsAttention,
+        isEnabled = status.hasSyncWork && !busy,
+        isChecking = isChecking,
+        isSyncing = isSyncing,
+        badgeText = badgeTextFor(status)
+    )
+}
 
 private fun badgeTextFor(status: SyncStatusSummary): String? = when (status.state) {
     SyncStatusState.Behind -> status.behindCount.takeIf { it > 0 }?.toString()
