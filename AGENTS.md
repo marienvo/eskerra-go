@@ -25,6 +25,18 @@ Do not edit synced `.cursor/rules/{language,quality,specs,testing}.mdc`, `.curso
 - Module budgets enforce file size in CI. New `.kt` files may not exceed **400** lines without a baseline entry; files **≥800** lines may not grow without an intentional baseline bump. See [`specs/team-scalability/README.md`](specs/team-scalability/README.md) and [`scripts/module-budget-baseline.json`](scripts/module-budget-baseline.json).
 - Every feature slice must include at least one unit test for domain/data behavior.
 
+## Branding / launcher icons
+
+Launcher mipmaps live under `app/src/main/res/mipmap-*` (adaptive foreground PNGs + `mipmap-anydpi-v26` XML). Play Store / web exports are in [`branding/`](branding/) when present.
+
+When the logo changes, replace the mipmap trees and adaptive XML (Android Studio Image Asset or exported mipmaps), then keep these aligned:
+
+- `values/ic_launcher_background.xml` — `#281943`
+- `values/colors.xml` (`splash_background`) — `#281943` (system splash + post-splash window background)
+- `drawable/ic_splash_logo.xml` — splash-only logo (35% inset on foreground); launcher mipmaps stay full size
+
+Do not reintroduce a `_android/` staging folder; commit assets directly under `app/src/main/res/`.
+
 ## Specs
 
 Non-obvious decisions and PoC scope live under [`specs/`](specs/). See also [`.cursor/rules/project-conventions.mdc`](.cursor/rules/project-conventions.mdc).

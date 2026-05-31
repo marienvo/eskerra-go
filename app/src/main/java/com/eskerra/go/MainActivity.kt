@@ -6,6 +6,10 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.eskerra.go.app.AppRoot
 import com.eskerra.go.core.usecase.BuildSafeSyncDiagnostic
 import com.eskerra.go.core.usecase.BuildSyncPreflight
@@ -14,6 +18,7 @@ import com.eskerra.go.core.usecase.CreateInboxNote
 import com.eskerra.go.core.usecase.LoadEditableNote
 import com.eskerra.go.core.usecase.LoadGitStatusSummary
 import com.eskerra.go.core.usecase.LoadInboxSummaries
+import com.eskerra.go.core.usecase.LoadInboxSummariesCached
 import com.eskerra.go.core.usecase.LoadNoteForReading
 import com.eskerra.go.core.usecase.LoadRemoteSyncSettings
 import com.eskerra.go.core.usecase.LoadSyncStatus
@@ -29,6 +34,7 @@ import com.eskerra.go.data.credentials.AndroidKeystoreTokenCipher
 import com.eskerra.go.data.credentials.EncryptedCredentialStore
 import com.eskerra.go.data.git.JGitRemoteSyncRepository
 import com.eskerra.go.data.git.JGitWorkspaceRepository
+import com.eskerra.go.data.notes.FileInboxSnapshotStore
 import com.eskerra.go.data.notes.FileNoteContentRepository
 import com.eskerra.go.data.notes.FileNoteRegistryRepository
 import com.eskerra.go.data.notes.FileNoteWriteRepository
@@ -40,13 +46,17 @@ import com.eskerra.go.data.workspace.DefaultWorkspaceSetupRepository
 /** Single entry point. Hosts the Compose UI and nothing else. */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
+        var keepSplashOnScreen by mutableStateOf(true)
+        splashScreen.setKeepOnScreenCondition { keepSplashOnScreen }
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT)
         )
 
         val workspaceStore = DataStoreWorkspaceStore(applicationContext)
+        val bootCacheStore = workspaceStore
         val credentialStore = EncryptedCredentialStore(
             filesDir = filesDir,
             tokenCipher = AndroidKeystoreTokenCipher()
@@ -63,7 +73,10 @@ class MainActivity : ComponentActivity() {
         val noteWriteRepository = FileNoteWriteRepository(gitRepository)
         val loadGitStatusSummary = LoadGitStatusSummary(gitRepository)
 
-        val loadInboxSummaries = LoadInboxSummaries(noteRegistryRepository)
+        val loadInboxSummaries = LoadInboxSummariesCached(
+            delegate = LoadInboxSummaries(noteRegistryRepository),
+            snapshotStore = FileInboxSnapshotStore()
+        )
         val loadNoteForReading = LoadNoteForReading(
             registryRepository = noteRegistryRepository,
             contentRepository = noteContentRepository
@@ -126,6 +139,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             AppRoot(
                 workspaceStore = workspaceStore,
+                bootCacheStore = bootCacheStore,
                 setupCompletion = setupCompletion,
                 filesDir = filesDir,
                 loadInboxSummaries = loadInboxSummaries,
@@ -145,7 +159,12 @@ class MainActivity : ComponentActivity() {
                 updateSyncToken = updateSyncToken,
                 clearRemoteSyncSettings = clearRemoteSyncSettings,
                 testRemoteConnection = testRemoteConnection,
-                reconcileWorkspaceSyncBranch = reconcileWorkspaceSyncBranch
+                reconcileWorkspaceSyncBranch = reconcileWorkspaceSyncBranch,
+                onLaunchSettled = {
+                    if (keepSplashOnScreen) {
+                        keepSplashOnScreen = false
+                    }
+                }
             )
         }
     }

@@ -4,23 +4,26 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.eskerra.go.core.repository.BootCacheStore
 import com.eskerra.go.core.usecase.BuildSafeSyncDiagnostic
 import com.eskerra.go.core.usecase.BuildSyncPreflight
 import com.eskerra.go.core.usecase.ClearRemoteSyncSettings
 import com.eskerra.go.core.usecase.CreateInboxNote
 import com.eskerra.go.core.usecase.LoadEditableNote
 import com.eskerra.go.core.usecase.LoadGitStatusSummary
-import com.eskerra.go.core.usecase.LoadInboxSummaries
+import com.eskerra.go.core.usecase.LoadInboxSummariesCached
 import com.eskerra.go.core.usecase.LoadNoteForReading
 import com.eskerra.go.core.usecase.LoadRemoteSyncSettings
 import com.eskerra.go.core.usecase.LoadSyncStatus
@@ -34,6 +37,7 @@ import com.eskerra.go.core.usecase.TestRemoteConnection
 import com.eskerra.go.core.usecase.UpdateSyncToken
 import com.eskerra.go.data.workspace.WorkspaceSetupCompletion
 import com.eskerra.go.data.workspace.WorkspaceStore
+import com.eskerra.go.feature.inbox.InboxUiState
 import com.eskerra.go.feature.setup.WorkspaceSetupScreen
 import com.eskerra.go.ui.theme.EskerraGoTheme
 import java.io.File
@@ -45,9 +49,10 @@ import java.io.File
 @Composable
 fun AppRoot(
     workspaceStore: WorkspaceStore,
+    bootCacheStore: BootCacheStore,
     setupCompletion: WorkspaceSetupCompletion,
     filesDir: File,
-    loadInboxSummaries: LoadInboxSummaries,
+    loadInboxSummaries: LoadInboxSummariesCached,
     loadNoteForReading: LoadNoteForReading,
     createInboxNote: CreateInboxNote,
     loadEditableNote: LoadEditableNote,
@@ -64,7 +69,8 @@ fun AppRoot(
     updateSyncToken: UpdateSyncToken,
     clearRemoteSyncSettings: ClearRemoteSyncSettings,
     testRemoteConnection: TestRemoteConnection,
-    reconcileWorkspaceSyncBranch: ReconcileWorkspaceSyncBranch
+    reconcileWorkspaceSyncBranch: ReconcileWorkspaceSyncBranch,
+    onLaunchSettled: () -> Unit = {}
 ) {
     EskerraGoTheme(darkTheme = true) {
         Surface(
@@ -74,23 +80,26 @@ fun AppRoot(
             val gateViewModel: AppGateViewModel = viewModel(
                 factory = AppGateViewModel.factory(
                     workspaceStore = workspaceStore,
-                    filesDir = filesDir,
-                    reconcileWorkspaceSyncBranch = reconcileWorkspaceSyncBranch
+                    bootCacheStore = bootCacheStore,
+                    filesDir = filesDir
                 )
             )
             val gateState by gateViewModel.gateState.collectAsState()
+            var inboxUiState by remember { mutableStateOf<InboxUiState?>(null) }
+
+            AppLaunchSettledEffect(
+                gateState = gateState,
+                inboxUiState = inboxUiState,
+                onLaunchSettled = onLaunchSettled
+            )
 
             when (val gate = gateState) {
                 AppGateState.Loading -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator()
-                    }
+                    Box(modifier = Modifier.fillMaxSize())
                 }
 
                 is AppGateState.NeedsSetup -> {
+                    SideEffect { inboxUiState = null }
                     val activity = LocalContext.current as? ComponentActivity
                     BackHandler {
                         activity?.finish()
@@ -140,7 +149,9 @@ fun AppRoot(
                     updateSyncToken = updateSyncToken,
                     clearRemoteSyncSettings = clearRemoteSyncSettings,
                     testRemoteConnection = testRemoteConnection,
-                    onConfigUpdated = gateViewModel::updateReadyConfig
+                    reconcileWorkspaceSyncBranch = reconcileWorkspaceSyncBranch,
+                    onConfigUpdated = gateViewModel::updateReadyConfig,
+                    onInboxUiStateChanged = { inboxUiState = it }
                 )
             }
         }

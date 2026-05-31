@@ -16,13 +16,7 @@ internal fun shellSyncIndicatorState(
     }
 
     return when (syncState) {
-        SyncUiState.Loading -> ShellSyncIndicatorState(
-            needsAttention = false,
-            isEnabled = false,
-            isChecking = true,
-            isSyncing = false,
-            badgeText = null
-        )
+        SyncUiState.Loading -> null
 
         is SyncUiState.Ready -> indicatorFromStatus(
             syncState.status,

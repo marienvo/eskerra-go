@@ -19,6 +19,11 @@ class ShellSyncIndicatorMappingTest {
     }
 
     @Test
+    fun returnsNull_whenLoadingAndRemoteConfigured() {
+        assertNull(shellSyncIndicatorState(SyncUiState.Loading, remoteConfigured = true))
+    }
+
+    @Test
     fun cleanReadyState_isDisabledWithoutAttention() {
         val state = readyStatus(SyncStatusState.Clean)
 

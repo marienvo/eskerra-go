@@ -1,5 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Base launcher theme. The real UI theme is applied in Compose (ui/theme). -->
-    <style name="Theme.EskerraGo" parent="android:Theme.Material.NoActionBar" />
+    <!-- Post-splash UI theme. Compose applies the real theme in ui/theme. -->
+    <style name="Theme.EskerraGo" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/splash_background</item>
+    </style>
+
+    <style name="Theme.EskerraGo.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/splash_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_logo</item>
+        <item name="postSplashScreenTheme">@style/Theme.EskerraGo</item>
+    </style>
 </resources>
