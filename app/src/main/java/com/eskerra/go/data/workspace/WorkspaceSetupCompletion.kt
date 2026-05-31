@@ -37,6 +37,7 @@ class DefaultWorkspaceSetupCompletion(
             name = name,
             branch = branch,
             remoteUri = remoteUri,
+            credential = credential,
             filesDir = filesDir
         ).getOrElse { return Result.failure(it) }
 
@@ -47,22 +48,18 @@ class DefaultWorkspaceSetupCompletion(
         }
         var credentialWasSaved = false
         if (trimmedCredential.isNotEmpty()) {
-            credentialStore.saveToken(config.relativePath, trimmedCredential).getOrElse { error ->
+            credentialStore.saveToken(config.relativePath, trimmedCredential).getOrElse { _ ->
                 rollbackWorkspace(filesDir, config)
                 return Result.failure(
-                    WorkspaceSetupException(
-                        WorkspaceSetupError.CredentialSaveFailed(error.message)
-                    )
+                    WorkspaceSetupException(WorkspaceSetupError.CredentialSaveFailed)
                 )
             }
             credentialWasSaved = true
         } else {
-            credentialStore.clear(config.relativePath).getOrElse { error ->
+            credentialStore.clear(config.relativePath).getOrElse { _ ->
                 rollbackWorkspace(filesDir, config)
                 return Result.failure(
-                    WorkspaceSetupException(
-                        WorkspaceSetupError.CredentialSaveFailed(error.message)
-                    )
+                    WorkspaceSetupException(WorkspaceSetupError.CredentialSaveFailed)
                 )
             }
         }
@@ -73,7 +70,7 @@ class DefaultWorkspaceSetupCompletion(
         } catch (error: Exception) {
             rollbackAfterMetadataSaveFailure(filesDir, config, credentialWasSaved)
             Result.failure(
-                WorkspaceSetupException(WorkspaceSetupError.MetadataSaveFailed(error.message))
+                WorkspaceSetupException(WorkspaceSetupError.MetadataSaveFailed)
             )
         }
     }

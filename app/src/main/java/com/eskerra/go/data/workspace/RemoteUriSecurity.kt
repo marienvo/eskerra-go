@@ -17,6 +17,12 @@ object RemoteUriSecurity {
         return Result.success(Unit)
     }
 
+    /** Returns true for `file://` and `https://` remotes supported in Step 9. */
+    fun isSupportedRemoteScheme(uri: String): Boolean {
+        val trimmed = uri.trim()
+        return isHttpsRemoteUri(trimmed) || isFileRemoteUri(trimmed)
+    }
+
     fun containsEmbeddedCredentials(uri: String): Boolean {
         val trimmed = uri.trim()
         if (trimmed.isEmpty()) return false
@@ -29,4 +35,10 @@ object RemoteUriSecurity {
             AUTHORITY_WITH_USERINFO.containsMatchIn(trimmed)
         }
     }
+
+    private fun isHttpsRemoteUri(uri: String): Boolean =
+        uri.startsWith("https://", ignoreCase = true)
+
+    private fun isFileRemoteUri(uri: String): Boolean =
+        uri.startsWith("file://") || uri.startsWith("file:/")
 }

@@ -2,6 +2,7 @@ package com.eskerra.go.data.git
 
 import com.eskerra.go.core.model.GitWorkspaceStatus
 import com.eskerra.go.core.repository.WorkspaceGitStatusRepository
+import com.eskerra.go.data.workspace.RemoteUriSecurity
 import java.io.File
 import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.api.MergeCommand
@@ -9,6 +10,7 @@ import org.eclipse.jgit.api.TransportCommand
 import org.eclipse.jgit.api.TransportConfigCallback
 import org.eclipse.jgit.lib.PersonIdent
 import org.eclipse.jgit.transport.RemoteRefUpdate
+import org.eclipse.jgit.transport.URIish
 
 /**
  * JGit-backed [WorkspaceGitRepository] for the Step 2 spike.
@@ -47,11 +49,22 @@ class JGitWorkspaceRepository(
         if (entries != null && entries.isNotEmpty()) {
             error("workingDir is not empty and not a Git repository: $workingDir")
         }
-        Git.init().setDirectory(workingDir).call().close()
+        Git.init()
+            .setDirectory(workingDir)
+            .setInitialBranch("main")
+            .call()
+            .close()
     }
 
-    override fun cloneFrom(remoteUri: String, workingDir: File, branch: String?): Result<Unit> =
-        runCatching {
+    override fun cloneFrom(
+        remoteUri: String,
+        workingDir: File,
+        branch: String?,
+        httpsToken: String?
+    ): Result<Unit> {
+        RemoteUriSecurity.validateNoEmbeddedCredentials(remoteUri)
+            .onFailure { return Result.failure(it) }
+        return runCatching {
             if (workingDir.exists()) {
                 if (!workingDir.isDirectory) {
                     error("workingDir exists but is not a directory: $workingDir")
@@ -67,10 +80,19 @@ class JGitWorkspaceRepository(
             if (!branch.isNullOrBlank()) {
                 clone.setBranch(branch)
             }
-            clone.withTransportConfig()
-                .call()
-                .close()
+            val callback = httpsToken?.let {
+                HttpsTokenCredentialsProviderFactory.transportConfigCallback(it)
+            } ?: transportConfigCallback
+            callback?.let { clone.setTransportConfigCallback(it) }
+            clone.call().close()
         }
+    }
+
+    override fun resolveCloneBranch(
+        remoteUri: String,
+        branch: String,
+        httpsToken: String?
+    ): Result<String> = GitRemoteBranchProbe.resolveRemoteBranch(remoteUri, branch, httpsToken)
 
     override fun status(workingDir: File): Result<GitWorkspaceStatus> = runCatching {
         Git.open(workingDir).use { git ->
@@ -154,6 +176,42 @@ class JGitWorkspaceRepository(
                 .call()
             if (!result.isSuccessful) {
                 error("pull was not a fast-forward: ${result.mergeResult?.mergeStatus}")
+            }
+        }
+    }
+
+    override fun configureSanitizedOrigin(workingDir: File, remoteUri: String): Result<Unit> {
+        RemoteUriSecurity.validateNoEmbeddedCredentials(remoteUri)
+            .onFailure { return Result.failure(it) }
+        return runCatching {
+            Git.open(workingDir).use { git ->
+                val remotes = git.remoteList().call().map { it.name }
+                if (ORIGIN in remotes) {
+                    git.remoteSetUrl()
+                        .setRemoteName(ORIGIN)
+                        .setRemoteUri(URIish(remoteUri))
+                        .call()
+                } else {
+                    git.remoteAdd()
+                        .setName(ORIGIN)
+                        .setUri(URIish(remoteUri))
+                        .call()
+                }
+            }
+        }
+    }
+
+    override fun readOriginUrl(workingDir: File): Result<String?> = runCatching {
+        Git.open(workingDir).use { git ->
+            git.repository.config.getString("remote", ORIGIN, "url")
+        }
+    }
+
+    override fun clearSanitizedOrigin(workingDir: File): Result<Unit> = runCatching {
+        Git.open(workingDir).use { git ->
+            val hasOrigin = git.remoteList().call().any { it.name == ORIGIN }
+            if (hasOrigin) {
+                git.remoteRemove().setRemoteName(ORIGIN).call()
             }
         }
     }

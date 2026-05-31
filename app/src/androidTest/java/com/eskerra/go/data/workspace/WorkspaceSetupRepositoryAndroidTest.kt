@@ -41,6 +41,7 @@ class WorkspaceSetupRepositoryAndroidTest {
             name = "Device Notes",
             branch = "",
             remoteUri = null,
+            credential = null,
             filesDir = filesDir
         )
 
@@ -73,6 +74,7 @@ class WorkspaceSetupRepositoryAndroidTest {
             name = "Cloned Device Notes",
             branch = "master",
             remoteUri = remoteUri,
+            credential = null,
             filesDir = cloneTargetRoot
         )
 

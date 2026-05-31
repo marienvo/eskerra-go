@@ -17,8 +17,19 @@ sealed class WorkspaceSetupError {
     }
 
     data object UnsupportedRemoteScheme : WorkspaceSetupError() {
-        override fun message() =
-            "Only file:// remotes are supported in this step. HTTPS auth is not wired yet."
+        override fun message() = "Only file:// and https:// remotes are supported in this step."
+    }
+
+    data object MissingCredential : WorkspaceSetupError() {
+        override fun message() = "Enter an access token for HTTPS remotes."
+    }
+
+    data object InvalidBranch : WorkspaceSetupError() {
+        override fun message() = "Enter a valid branch name."
+    }
+
+    data object RemoteUnavailable : WorkspaceSetupError() {
+        override fun message() = "Remote is unavailable. Check the URL and try again."
     }
 
     data object CredentialBearingRemoteUri : WorkspaceSetupError() {
@@ -29,31 +40,31 @@ sealed class WorkspaceSetupError {
         override fun message() = "Branch \"$branch\" was not found on the remote."
     }
 
-    data class InvalidRepository(val detail: String?) : WorkspaceSetupError() {
+    data object InvalidRepository : WorkspaceSetupError() {
         override fun message() = "Repository not found or invalid."
     }
 
-    data class AuthenticationFailed(val detail: String?) : WorkspaceSetupError() {
+    data object AuthenticationFailed : WorkspaceSetupError() {
         override fun message() = "Authentication failed."
     }
 
-    data class CloneFailed(val detail: String?) : WorkspaceSetupError() {
+    data object CloneFailed : WorkspaceSetupError() {
         override fun message() = "Clone failed."
     }
 
-    data class InitFailed(val detail: String?) : WorkspaceSetupError() {
+    data object InitFailed : WorkspaceSetupError() {
         override fun message() = "Initialize failed."
     }
 
-    data class StorageFailed(val detail: String?) : WorkspaceSetupError() {
+    data object StorageFailed : WorkspaceSetupError() {
         override fun message() = "Storage setup failed."
     }
 
-    data class MetadataSaveFailed(val detail: String?) : WorkspaceSetupError() {
+    data object MetadataSaveFailed : WorkspaceSetupError() {
         override fun message() = "Could not save workspace settings."
     }
 
-    data class CredentialSaveFailed(val detail: String?) : WorkspaceSetupError() {
+    data object CredentialSaveFailed : WorkspaceSetupError() {
         override fun message() = "Could not save credentials."
     }
 }
@@ -65,11 +76,23 @@ fun mapCloneFailure(error: Throwable, branch: String): WorkspaceSetupException {
     return WorkspaceSetupException(
         when {
             isBranchRefError(text, branch) -> WorkspaceSetupError.BranchNotFound(branch)
-            isAuthenticationError(text) -> WorkspaceSetupError.AuthenticationFailed(error.message)
-            isInvalidRepositoryError(text) -> WorkspaceSetupError.InvalidRepository(error.message)
-            else -> WorkspaceSetupError.CloneFailed(error.message)
+            isAuthenticationError(text) -> WorkspaceSetupError.AuthenticationFailed
+            isRemoteUnavailableError(text) -> WorkspaceSetupError.RemoteUnavailable
+            isInvalidRepositoryError(text) -> WorkspaceSetupError.InvalidRepository
+            isRemoteBranchNotFoundError(text) -> WorkspaceSetupError.BranchNotFound(
+                branchNameFromRemoteError(text, branch)
+            )
+            else -> WorkspaceSetupError.CloneFailed
         }
     )
+}
+
+internal fun isRemoteBranchNotFoundError(message: String): Boolean =
+    message.contains("remote branch not found", ignoreCase = true)
+
+internal fun branchNameFromRemoteError(message: String, fallback: String): String {
+    val suffix = message.substringAfterLast(':').trim()
+    return suffix.ifBlank { fallback }.ifBlank { "branch" }
 }
 
 internal fun isBranchRefError(message: String, branch: String): Boolean {
@@ -93,6 +116,12 @@ internal fun isBranchRefError(message: String, branch: String): Boolean {
 }
 
 internal fun isInvalidRepositoryError(message: String): Boolean {
+    if (message.contains("remote branch not found", ignoreCase = true)) return false
+    if (message.startsWith("file://", ignoreCase = true) &&
+        message.contains(": not found", ignoreCase = true)
+    ) {
+        return true
+    }
     if (message.contains("not a git repository", ignoreCase = true)) return true
     if (message.contains("No such file", ignoreCase = true)) return true
     if (message.contains("cannot access", ignoreCase = true)) return true
@@ -122,3 +151,11 @@ internal fun isAuthenticationError(message: String): Boolean =
         message.contains("401", ignoreCase = false) ||
         message.contains("403", ignoreCase = false) ||
         message.contains("credentials", ignoreCase = true)
+
+internal fun isRemoteUnavailableError(message: String): Boolean =
+    message.contains("Connection refused", ignoreCase = true) ||
+        message.contains("Connection timed out", ignoreCase = true) ||
+        message.contains("UnknownHost", ignoreCase = true) ||
+        message.contains("Network is unreachable", ignoreCase = true) ||
+        message.contains("unable to access", ignoreCase = true) ||
+        message.contains("Could not resolve host", ignoreCase = true)

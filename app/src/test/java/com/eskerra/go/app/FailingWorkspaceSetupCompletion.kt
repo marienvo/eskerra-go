@@ -17,6 +17,6 @@ class FailingWorkspaceSetupCompletion : WorkspaceSetupCompletion {
         credential: String?,
         filesDir: File
     ): Result<WorkspaceConfig> = Result.failure(
-        WorkspaceSetupException(WorkspaceSetupError.MetadataSaveFailed("disk full"))
+        WorkspaceSetupException(WorkspaceSetupError.MetadataSaveFailed)
     )
 }

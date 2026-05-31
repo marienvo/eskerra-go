@@ -17,6 +17,10 @@ When indexing markdown files for the Inbox list:
 - Symlinked markdown files and symlinked directories are not followed or indexed.
 - Rationale: a cloned workspace must not read app-private files outside the workspace via symlinks (for example credentials stored under the same app-private `filesDir`).
 
+## Sync branch alignment
+
+Configured sync branch, local checkout, and `origin/<branch>` must stay aligned for manual sync. See [sync-branch-alignment.md](sync-branch-alignment.md).
+
 Explicitly out of scope:
 - Full-text search
 - Background sync

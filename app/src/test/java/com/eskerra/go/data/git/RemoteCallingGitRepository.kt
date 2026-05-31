@@ -22,10 +22,21 @@ class RemoteCallingGitRepository(
 
     override fun initOrOpen(workingDir: File): Result<Unit> = delegate.initOrOpen(workingDir)
 
-    override fun cloneFrom(remoteUri: String, workingDir: File, branch: String?): Result<Unit> {
+    override fun cloneFrom(
+        remoteUri: String,
+        workingDir: File,
+        branch: String?,
+        httpsToken: String?
+    ): Result<Unit> {
         cloneCallCount += 1
         return Result.failure(IllegalStateException("clone should not run offline"))
     }
+
+    override fun resolveCloneBranch(
+        remoteUri: String,
+        branch: String,
+        httpsToken: String?
+    ): Result<String> = delegate.resolveCloneBranch(remoteUri, branch, httpsToken)
 
     override fun status(workingDir: File): Result<GitWorkspaceStatus> = delegate.status(workingDir)
 
@@ -51,4 +62,13 @@ class RemoteCallingGitRepository(
         pushCallCount += 1
         return Result.failure(IllegalStateException("push should not run offline"))
     }
+
+    override fun configureSanitizedOrigin(workingDir: File, remoteUri: String): Result<Unit> =
+        delegate.configureSanitizedOrigin(workingDir, remoteUri)
+
+    override fun clearSanitizedOrigin(workingDir: File): Result<Unit> =
+        delegate.clearSanitizedOrigin(workingDir)
+
+    override fun readOriginUrl(workingDir: File): Result<String?> =
+        delegate.readOriginUrl(workingDir)
 }

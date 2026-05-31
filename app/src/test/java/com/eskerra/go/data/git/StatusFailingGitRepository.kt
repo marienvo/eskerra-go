@@ -11,8 +11,18 @@ class StatusFailingGitRepository(
 
     override fun initOrOpen(workingDir: File): Result<Unit> = delegate.initOrOpen(workingDir)
 
-    override fun cloneFrom(remoteUri: String, workingDir: File, branch: String?): Result<Unit> =
-        delegate.cloneFrom(remoteUri, workingDir, branch)
+    override fun cloneFrom(
+        remoteUri: String,
+        workingDir: File,
+        branch: String?,
+        httpsToken: String?
+    ): Result<Unit> = delegate.cloneFrom(remoteUri, workingDir, branch, httpsToken)
+
+    override fun resolveCloneBranch(
+        remoteUri: String,
+        branch: String,
+        httpsToken: String?
+    ): Result<String> = delegate.resolveCloneBranch(remoteUri, branch, httpsToken)
 
     override fun status(workingDir: File): Result<GitWorkspaceStatus> =
         Result.failure(statusFailure)
@@ -31,4 +41,13 @@ class StatusFailingGitRepository(
         delegate.pullFastForwardOnly(workingDir)
 
     override fun push(workingDir: File): Result<Unit> = delegate.push(workingDir)
+
+    override fun configureSanitizedOrigin(workingDir: File, remoteUri: String): Result<Unit> =
+        delegate.configureSanitizedOrigin(workingDir, remoteUri)
+
+    override fun clearSanitizedOrigin(workingDir: File): Result<Unit> =
+        delegate.clearSanitizedOrigin(workingDir)
+
+    override fun readOriginUrl(workingDir: File): Result<String?> =
+        delegate.readOriginUrl(workingDir)
 }

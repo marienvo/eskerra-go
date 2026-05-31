@@ -7,7 +7,9 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.eskerra.go.core.model.LastSyncStatus
 import com.eskerra.go.core.model.WorkspaceConfig
+import com.eskerra.go.core.repository.LastSyncStatusStore
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
@@ -21,10 +23,15 @@ private object WorkspacePreferenceKeys {
     val remoteUri = stringPreferencesKey("workspace_remote_uri")
     val branch = stringPreferencesKey("workspace_branch")
     val setupCompletedAt = longPreferencesKey("workspace_setup_completed_at")
+    val lastSyncAttemptAt = longPreferencesKey("last_sync_attempt_at")
+    val lastSyncOutcome = stringPreferencesKey("last_sync_outcome")
+    val lastSyncErrorCategory = stringPreferencesKey("last_sync_error_category")
 }
 
-/** Preferences DataStore-backed [WorkspaceStore]. Non-secret metadata only. */
-class DataStoreWorkspaceStore(private val dataStore: DataStore<Preferences>) : WorkspaceStore {
+/** Preferences DataStore-backed [WorkspaceStore] and [LastSyncStatusStore]. Non-secret metadata only. */
+class DataStoreWorkspaceStore(private val dataStore: DataStore<Preferences>) :
+    WorkspaceStore,
+    LastSyncStatusStore {
 
     constructor(context: Context) : this(context.applicationContext.workspaceDataStore)
 
@@ -35,7 +42,10 @@ class DataStoreWorkspaceStore(private val dataStore: DataStore<Preferences>) : W
             "workspace_relative_path",
             "workspace_remote_uri",
             "workspace_branch",
-            "workspace_setup_completed_at"
+            "workspace_setup_completed_at",
+            "last_sync_attempt_at",
+            "last_sync_outcome",
+            "last_sync_error_category"
         )
     }
 
@@ -56,6 +66,33 @@ class DataStoreWorkspaceStore(private val dataStore: DataStore<Preferences>) : W
 
     override suspend fun clear() {
         dataStore.edit { it.clear() }
+    }
+
+    override suspend fun readLastSyncStatus(): LastSyncStatus? {
+        val prefs = dataStore.data.first()
+        val attemptedAt = prefs[WorkspacePreferenceKeys.lastSyncAttemptAt] ?: return null
+        val outcomeRaw = prefs[WorkspacePreferenceKeys.lastSyncOutcome] ?: return null
+        val outcome = runCatching {
+            com.eskerra.go.core.model.SyncAttemptOutcome.valueOf(outcomeRaw)
+        }.getOrNull() ?: return null
+        val errorCategory = prefs[WorkspacePreferenceKeys.lastSyncErrorCategory]
+        return LastSyncStatus(
+            attemptedAtEpochMs = attemptedAt,
+            outcome = outcome,
+            errorCategory = errorCategory
+        )
+    }
+
+    override suspend fun saveLastSyncStatus(status: LastSyncStatus) {
+        dataStore.edit { prefs ->
+            prefs[WorkspacePreferenceKeys.lastSyncAttemptAt] = status.attemptedAtEpochMs
+            prefs[WorkspacePreferenceKeys.lastSyncOutcome] = status.outcome.name
+            if (status.errorCategory.isNullOrBlank()) {
+                prefs.remove(WorkspacePreferenceKeys.lastSyncErrorCategory)
+            } else {
+                prefs[WorkspacePreferenceKeys.lastSyncErrorCategory] = status.errorCategory
+            }
+        }
     }
 
     private fun Preferences.toWorkspaceConfig(): WorkspaceConfig? {

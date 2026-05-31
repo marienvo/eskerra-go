@@ -3,6 +3,7 @@ package com.eskerra.go.data.workspace
 import com.eskerra.go.data.credentials.CredentialStore
 import com.eskerra.go.data.credentials.FailingCredentialStore
 import com.eskerra.go.data.credentials.FakeCredentialStore
+import com.eskerra.go.data.git.CredentialRecordingGitRepository
 import com.eskerra.go.data.git.JGitWorkspaceRepository
 import com.eskerra.go.data.git.TestGitRepos
 import java.io.File
@@ -266,5 +267,107 @@ class WorkspaceSetupCompletionTest {
         val gitConfig = File(workspaceDir(filesDir), ".git/config")
         assertTrue(gitConfig.isFile)
         assertFalse(gitConfig.readText().contains("pat-12345"))
+    }
+
+    @Test
+    fun completeAndPersist_httpsCloneRequiresToken() = runTest {
+        val filesDir = temp.newFolder("files")
+        val workspaceStore = FakeWorkspaceStore()
+        val credentialStore = FakeCredentialStore()
+
+        val result = completion(workspaceStore, credentialStore).completeAndPersist(
+            mode = WorkspaceSetupMode.Clone,
+            name = "Notes",
+            branch = "main",
+            remoteUri = "https://example.com/repo.git",
+            credential = null,
+            filesDir = filesDir
+        )
+
+        assertTrue(result.isFailure)
+        val error = result.exceptionOrNull() as WorkspaceSetupException
+        assertTrue(error.error is WorkspaceSetupError.MissingCredential)
+        assertNull(workspaceStore.read())
+        assertTrue(credentialStore.tokens.isEmpty())
+    }
+
+    @Test
+    fun completeAndPersist_httpsCloneStoresSanitizedRemoteAndTokenSeparately() = runTest {
+        val filesDir = temp.newFolder("files")
+        val workspaceStore = FakeWorkspaceStore()
+        val credentialStore = FakeCredentialStore()
+        val bare = TestGitRepos.initBareRemote(File(temp.root, "https-remote.git"))
+        val localRemoteUri = TestGitRepos.fileUri(bare)
+        val producer = temp.newFolder("producer-https")
+        gitRepository.cloneFrom(localRemoteUri, producer).getOrThrow()
+        gitRepository.writeFile(producer, "notes/seed.md", "# Seed\n").getOrThrow()
+        gitRepository.stageAll(producer).getOrThrow()
+        gitRepository.commit(producer, "Seed").getOrThrow()
+        gitRepository.push(producer).getOrThrow()
+        val remoteBranch = gitRepository.status(producer).getOrThrow().branch
+
+        val recordingGit = CredentialRecordingGitRepository()
+        recordingGit.simulatedLocalRemoteUri = localRemoteUri
+        val httpsCompletion = DefaultWorkspaceSetupCompletion(
+            setupRepository = DefaultWorkspaceSetupRepository(recordingGit),
+            workspaceStore = workspaceStore,
+            credentialStore = credentialStore
+        )
+        val httpsUri = "https://example.com/org/repo.git"
+        val token = "secret-https-token"
+
+        val result = httpsCompletion.completeAndPersist(
+            mode = WorkspaceSetupMode.Clone,
+            name = "Notes",
+            branch = remoteBranch,
+            remoteUri = httpsUri,
+            credential = token,
+            filesDir = filesDir
+        )
+
+        assertTrue(result.isSuccess)
+        val saved = workspaceStore.read()
+        requireNotNull(saved)
+        assertEquals(httpsUri, saved.remoteUri)
+        assertFalse(saved.remoteUri!!.contains(token))
+        assertEquals(
+            token,
+            credentialStore.readToken(WorkspacePaths.DEFAULT_RELATIVE_PATH).getOrThrow()
+        )
+        assertFalse(
+            DataStoreWorkspaceStore.NON_SECRET_PREFERENCE_KEY_NAMES.any { key ->
+                key.contains("token", ignoreCase = true)
+            }
+        )
+        val gitConfig = File(workspaceDir(filesDir), ".git/config")
+        assertTrue(gitConfig.isFile)
+        assertFalse(gitConfig.readText().contains(token))
+    }
+
+    @Test
+    fun completeAndPersist_httpsAuthFailureDoesNotExposeToken() = runTest {
+        val filesDir = temp.newFolder("files")
+        val recordingGit = CredentialRecordingGitRepository()
+        recordingGit.cloneFailure = RuntimeException("Authentication failed for remote")
+        val httpsCompletion = DefaultWorkspaceSetupCompletion(
+            setupRepository = DefaultWorkspaceSetupRepository(recordingGit),
+            workspaceStore = FakeWorkspaceStore(),
+            credentialStore = FakeCredentialStore()
+        )
+        val token = "secret-auth-token"
+
+        val result = httpsCompletion.completeAndPersist(
+            mode = WorkspaceSetupMode.Clone,
+            name = "Notes",
+            branch = "main",
+            remoteUri = "https://example.com/repo.git",
+            credential = token,
+            filesDir = filesDir
+        )
+
+        assertTrue(result.isFailure)
+        val error = result.exceptionOrNull() as WorkspaceSetupException
+        assertTrue(error.error is WorkspaceSetupError.AuthenticationFailed)
+        assertFalse(error.error.message().contains(token))
     }
 }

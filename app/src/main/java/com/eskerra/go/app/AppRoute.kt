@@ -13,6 +13,8 @@ object AppRoute {
     const val PODCASTS = "podcasts"
     const val DASHBOARD = "dashboard"
     const val MENU = "menu"
+    const val SYNC = "sync"
+    const val SYNC_SETTINGS = "sync-settings"
 
     const val NOTE_ARG = "noteId"
     const val NOTE_PATTERN = "note/{$NOTE_ARG}"

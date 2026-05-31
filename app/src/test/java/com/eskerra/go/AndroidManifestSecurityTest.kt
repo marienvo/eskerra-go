@@ -8,6 +8,17 @@ import org.junit.Test
 class AndroidManifestSecurityTest {
 
     @Test
+    fun internetPermission_isDeclared() {
+        val manifest = File("src/main/AndroidManifest.xml")
+        assertTrue("Expected manifest at ${manifest.absolutePath}", manifest.isFile)
+        val text = manifest.readText()
+        assertTrue(
+            "HTTPS clone requires INTERNET permission",
+            text.contains("android.permission.INTERNET")
+        )
+    }
+
+    @Test
     fun allowBackup_isDisabled() {
         val manifest = File("src/main/AndroidManifest.xml")
         assertTrue("Expected manifest at ${manifest.absolutePath}", manifest.isFile)

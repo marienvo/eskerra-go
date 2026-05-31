@@ -9,6 +9,7 @@ class WorkspaceSetupErrorTest {
     @Test
     fun unsupportedRemoteScheme_hasExplicitMessage() {
         val message = WorkspaceSetupError.UnsupportedRemoteScheme.message()
+        assertTrue(message.contains("https://"))
         assertTrue(message.contains("file://"))
     }
 
@@ -39,12 +40,15 @@ class WorkspaceSetupErrorTest {
     }
 
     @Test
-    fun mapCloneFailure_mapsAuthErrors() {
+    fun mapCloneFailure_mapsAuthErrorsWithoutRetainingRawDetail() {
+        val rawDetail = "Authentication failed for secret-token@example.com"
         val error = mapCloneFailure(
-            RuntimeException("Authentication failed for remote"),
+            RuntimeException(rawDetail),
             branch = "main"
         )
         assertTrue(error.error is WorkspaceSetupError.AuthenticationFailed)
+        assertFalse(error.toString().contains("secret-token"))
+        assertFalse(error.error.message().contains("secret-token"))
     }
 
     @Test
@@ -55,16 +59,16 @@ class WorkspaceSetupErrorTest {
     }
 
     @Test
-    fun userFacingMessagesDoNotIncludeRawDetails() {
+    fun securitySensitiveErrorsDoNotRetainRawDetailFields() {
         val rawDetail = "/tmp/private/token-secret.git"
         val errors = listOf(
-            WorkspaceSetupError.InvalidRepository(rawDetail),
-            WorkspaceSetupError.AuthenticationFailed(rawDetail),
-            WorkspaceSetupError.CloneFailed(rawDetail),
-            WorkspaceSetupError.InitFailed(rawDetail),
-            WorkspaceSetupError.StorageFailed(rawDetail),
-            WorkspaceSetupError.MetadataSaveFailed(rawDetail),
-            WorkspaceSetupError.CredentialSaveFailed(rawDetail)
+            WorkspaceSetupError.InvalidRepository,
+            WorkspaceSetupError.AuthenticationFailed,
+            WorkspaceSetupError.CloneFailed,
+            WorkspaceSetupError.InitFailed,
+            WorkspaceSetupError.StorageFailed,
+            WorkspaceSetupError.MetadataSaveFailed,
+            WorkspaceSetupError.CredentialSaveFailed
         )
 
         errors.forEach { error ->
@@ -77,6 +81,32 @@ class WorkspaceSetupErrorTest {
     @Test
     fun isBranchRefError_rejectsGenericPathNotFound() {
         assertFalse(isBranchRefError("No such file or directory", branch = "main"))
+    }
+
+    @Test
+    fun mapCloneFailure_mapsRemoteBranchNotFoundToBranchNotFound() {
+        val error = mapCloneFailure(
+            RuntimeException("remote branch not found: main"),
+            branch = "master"
+        )
+        assertTrue(error.error is WorkspaceSetupError.BranchNotFound)
+        assertTrue(error.error.message().contains("main"))
+    }
+
+    @Test
+    fun mapCloneFailure_mapsRemoteUnavailableErrors() {
+        val error = mapCloneFailure(
+            RuntimeException("Connection timed out: connect"),
+            branch = "main"
+        )
+        assertTrue(error.error is WorkspaceSetupError.RemoteUnavailable)
+    }
+
+    @Test
+    fun authenticationFailed_hasStableMessage() {
+        val message = WorkspaceSetupError.AuthenticationFailed.message()
+        assertTrue(message == "Authentication failed.")
+        assertFalse(message.contains("@"))
     }
 
     @Test

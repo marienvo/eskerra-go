@@ -29,12 +29,22 @@ interface WorkspaceGitRepository : WorkspaceGitStatusRepository {
     fun initOrOpen(workingDir: File): Result<Unit>
 
     /**
-     * Clone [remoteUri] (a local `file://` bare repo in the spike) into
-     * [workingDir], optionally checking out [branch].
+     * Clone [remoteUri] into [workingDir], optionally checking out [branch].
+     *
+     * For HTTPS remotes, pass [httpsToken] so auth uses an in-memory credential
+     * provider instead of embedding credentials in the URL.
      *
      * Fails (writing nothing) when [workingDir] already exists and is not empty.
      */
-    fun cloneFrom(remoteUri: String, workingDir: File, branch: String? = null): Result<Unit>
+    fun cloneFrom(
+        remoteUri: String,
+        workingDir: File,
+        branch: String? = null,
+        httpsToken: String? = null
+    ): Result<Unit>
+
+    /** Resolves [branch] against the remote (including legacy `master` → `main`) before clone. */
+    fun resolveCloneBranch(remoteUri: String, branch: String, httpsToken: String?): Result<String>
 
     /** Read the working tree status of the repository at [workingDir]. */
     override fun status(workingDir: File): Result<GitWorkspaceStatus>
@@ -66,4 +76,16 @@ interface WorkspaceGitRepository : WorkspaceGitStatusRepository {
 
     /** Push the current branch to the configured `origin` remote. */
     fun push(workingDir: File): Result<Unit>
+
+    /**
+     * Configure or update `origin` with a sanitized [remoteUri] only. Credentials
+     * must be supplied separately through transport callbacks, never in the URL.
+     */
+    fun configureSanitizedOrigin(workingDir: File, remoteUri: String): Result<Unit>
+
+    /** Removes the `origin` remote without deleting the repository or working tree. */
+    fun clearSanitizedOrigin(workingDir: File): Result<Unit>
+
+    /** Returns the sanitized `origin` URL from `.git/config`, or null when unset. */
+    fun readOriginUrl(workingDir: File): Result<String?>
 }

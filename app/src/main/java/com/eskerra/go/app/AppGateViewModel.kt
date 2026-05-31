@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.eskerra.go.core.model.WorkspaceConfig
+import com.eskerra.go.core.usecase.ReconcileWorkspaceSyncBranch
 import com.eskerra.go.data.workspace.WorkspaceStore
 import com.eskerra.go.data.workspace.resolveAppGateState
 import java.io.File
@@ -13,8 +14,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 /** Stable app-start gate state, independent of Compose recomposition. */
-class AppGateViewModel(private val workspaceStore: WorkspaceStore, private val filesDir: File) :
-    ViewModel() {
+class AppGateViewModel(
+    private val workspaceStore: WorkspaceStore,
+    private val filesDir: File,
+    private val reconcileWorkspaceSyncBranch: ReconcileWorkspaceSyncBranch? = null
+) : ViewModel() {
 
     private val _gateState = MutableStateFlow<AppGateState>(AppGateState.Loading)
     val gateState: StateFlow<AppGateState> = _gateState.asStateFlow()
@@ -26,7 +30,14 @@ class AppGateViewModel(private val workspaceStore: WorkspaceStore, private val f
     }
 
     private suspend fun refreshGate() {
-        val config = workspaceStore.read()
+        val stored = workspaceStore.read() ?: run {
+            _gateState.value = resolveAppGateState(null, filesDir)
+            return
+        }
+        val config = reconcileWorkspaceSyncBranch
+            ?.invoke(stored, filesDir)
+            ?.getOrNull()
+            ?: stored
         _gateState.value = resolveAppGateState(config, filesDir)
     }
 
@@ -35,12 +46,25 @@ class AppGateViewModel(private val workspaceStore: WorkspaceStore, private val f
         _gateState.value = AppGateState.Ready(config)
     }
 
+    /** Updates in-memory config after remote sync settings change. */
+    fun updateReadyConfig(config: WorkspaceConfig) {
+        if (_gateState.value is AppGateState.Ready) {
+            _gateState.value = AppGateState.Ready(config)
+        }
+    }
+
     companion object {
-        fun factory(workspaceStore: WorkspaceStore, filesDir: File): ViewModelProvider.Factory =
-            object : ViewModelProvider.Factory {
-                @Suppress("UNCHECKED_CAST")
-                override fun <T : ViewModel> create(modelClass: Class<T>): T =
-                    AppGateViewModel(workspaceStore, filesDir) as T
-            }
+        fun factory(
+            workspaceStore: WorkspaceStore,
+            filesDir: File,
+            reconcileWorkspaceSyncBranch: ReconcileWorkspaceSyncBranch? = null
+        ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T = AppGateViewModel(
+                workspaceStore = workspaceStore,
+                filesDir = filesDir,
+                reconcileWorkspaceSyncBranch = reconcileWorkspaceSyncBranch
+            ) as T
+        }
     }
 }
