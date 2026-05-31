@@ -8,7 +8,9 @@ import com.eskerra.go.data.workspace.GateFingerprintComputer
 import com.eskerra.go.data.workspace.WorkspacePaths
 import java.io.File
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -76,6 +78,37 @@ class AppGateViewModelTest {
 
         assertEquals(null, store.read())
         assertEquals(AppGateState.Ready(config), viewModel.gateState.value)
+    }
+
+    @Test
+    fun markReady_updatesStateBeforeFingerprintIo() = runTest {
+        val ioDispatcher = StandardTestDispatcher(testScheduler)
+        val filesDir = temp.newFolder("files")
+        val workspaceDir = File(filesDir, WorkspacePaths.DEFAULT_RELATIVE_PATH)
+        workspaceDir.mkdirs()
+        JGitWorkspaceRepository().initOrOpen(workspaceDir).getOrThrow()
+
+        val bootCache = FakeBootCacheStore()
+        val viewModel = AppGateViewModel(
+            workspaceStore = FakeWorkspaceStore(),
+            bootCacheStore = bootCache,
+            filesDir = filesDir,
+            ioDispatcher = ioDispatcher
+        )
+        advanceUntilIdle()
+
+        viewModel.markReady(config)
+
+        assertEquals(AppGateState.Ready(config), viewModel.gateState.value)
+        assertEquals(null, bootCache.readFingerprint())
+
+        advanceUntilIdle()
+
+        assertEquals(AppGateState.Ready(config), viewModel.gateState.value)
+        assertEquals(
+            GateFingerprintComputer.compute(config, filesDir),
+            bootCache.readFingerprint()
+        )
     }
 
     @Test

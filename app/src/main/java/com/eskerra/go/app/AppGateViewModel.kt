@@ -99,12 +99,12 @@ class AppGateViewModel(
 
     /** Called only after workspace metadata has already been persisted. */
     fun markReady(config: WorkspaceConfig) {
+        _gateState.value = AppGateState.Ready(config)
         viewModelScope.launch {
             val fingerprint = withContext(ioDispatcher) {
                 GateFingerprintComputer.compute(config, filesDir)
             }
             bootCacheStore.saveFingerprint(fingerprint)
-            _gateState.value = AppGateState.Ready(config)
         }
     }
 
