@@ -108,14 +108,13 @@ fun App(
     val remoteConfigured = !currentConfig.remoteUri.isNullOrBlank()
 
     LaunchedEffect(currentConfig) {
-        appSyncViewModel.refreshLocalStatusQuietly()
-        appSyncViewModel.refreshRemoteStatusQuietly(force = true)
+        appSyncViewModel.refreshShellStatusQuietly(forceRemote = true)
     }
 
     DisposableEffect(appSyncViewModel) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_START) {
-                appSyncViewModel.refreshRemoteStatusQuietly()
+                appSyncViewModel.refreshShellStatusQuietly(forceRemote = false)
             }
         }
         ProcessLifecycleOwner.get().lifecycle.addObserver(observer)

@@ -108,6 +108,32 @@ class AppSyncViewModel(
         }
     }
 
+    /** Local status first, then optional debounced remote check in one load job. */
+    fun refreshShellStatusQuietly(forceRemote: Boolean = false) {
+        if (_uiState.value is SyncUiState.Syncing) {
+            return
+        }
+
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
+            emitReadyState(loadSyncStatus(config, filesDir))
+            if (_uiState.value is SyncUiState.Syncing) {
+                return@launch
+            }
+
+            val now = clock()
+            if (!forceRemote &&
+                lastRemoteRefreshAtMs >= 0L &&
+                now - lastRemoteRefreshAtMs < refreshDebounceMs
+            ) {
+                return@launch
+            }
+
+            emitReadyState(refreshRemoteSyncStatus(config, filesDir))
+            lastRemoteRefreshAtMs = clock()
+        }
+    }
+
     fun syncNow() {
         if (_uiState.value is SyncUiState.Syncing) {
             return

@@ -209,6 +209,46 @@ class AppSyncViewModelTest {
     }
 
     @Test
+    fun refreshShellStatusQuietly_runsLocalThenRemoteInSingleJob() = runTest {
+        val ioDispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val localStatus = SyncStatusSummary(
+            state = SyncStatusState.DirtyLocalChanges,
+            branch = "main",
+            changedCount = 2,
+            aheadCount = 0,
+            behindCount = 0,
+            message = "Local changes pending."
+        )
+        val remoteStatus = SyncStatusSummary(
+            state = SyncStatusState.Clean,
+            branch = "main",
+            changedCount = 0,
+            aheadCount = 0,
+            behindCount = 0,
+            message = "Up to date."
+        )
+        try {
+            val viewModel = createViewModel(
+                ioDispatcher = ioDispatcher,
+                remoteSyncRepository = PhasedStatusRemoteSyncRepository(
+                    localStatus = localStatus,
+                    remoteStatus = remoteStatus
+                )
+            )
+
+            viewModel.refreshShellStatusQuietly(forceRemote = true)
+            advanceUntilIdle()
+
+            val ready = viewModel.uiState.value as SyncUiState.Ready
+            assertEquals(0, ready.status.changedCount)
+            assertEquals(SyncStatusState.Clean, ready.status.state)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
     fun refreshRemoteStatusQuietly_doesNotSetLoading() = runTest {
         val ioDispatcher = StandardTestDispatcher(testScheduler)
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
@@ -310,6 +350,30 @@ class AppSyncViewModelTest {
         override suspend fun readLastSyncStatus(): LastSyncStatus? {
             delay(delayMs)
             return delegate.readLastSyncStatus()
+        }
+    }
+
+    private class PhasedStatusRemoteSyncRepository(
+        private val localStatus: SyncStatusSummary,
+        private val remoteStatus: SyncStatusSummary
+    ) : com.eskerra.go.core.repository.RemoteSyncRepository by FakeRemoteSyncRepository(
+        localStatus
+    ) {
+
+        private val phase = AtomicInteger(0)
+
+        override fun fetch(workingDir: File, httpsToken: String?): Result<Unit> {
+            phase.set(2)
+            return Result.success(Unit)
+        }
+
+        override fun buildStatusSummary(
+            workspaceStatus: com.eskerra.go.core.model.GitWorkspaceStatus,
+            comparison: com.eskerra.go.core.model.RemoteBranchComparison?
+        ): SyncStatusSummary = if (phase.get() >= 2) {
+            remoteStatus
+        } else {
+            localStatus
         }
     }
 }

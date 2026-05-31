@@ -51,7 +51,7 @@ Each blocking `SyncError` maps to a short recovery hint via `SyncRecoveryGuidanc
 ## Foreground sync-status refresh
 
 - On app start (after the workspace gate is `Ready`) and when the app returns to the foreground, the shell may run a **read-only** remote check: `fetch` to update remote-tracking refs, then local ahead/behind comparison.
-- Start with a **local-only** status read for the shell indicator, then run the remote check without forcing `SyncUiState.Loading` so the sync button stays usable while the fetch completes.
+- Start with a **local-only** status read for the shell indicator, then run the remote check without forcing `SyncUiState.Loading` so the sync button stays usable while the fetch completes. Use a single status `loadJob` so the local emit completes before the remote fetch starts (no cancel between the two steps).
 - This is user-visible foreground work only; it does not commit, pull, push, or schedule background sync. PoC “no background sync” means no automatic commit/push/pull — read-only `fetch` for the indicator is allowed.
 - Debounce rapid foreground refreshes (for example within 30 seconds) to avoid redundant network calls.
 - After inbox note create or save, the app may reload **local-only** Git sync status for the shell indicator. This is not background sync and does not fetch remote.
