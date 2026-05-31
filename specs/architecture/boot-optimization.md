@@ -48,6 +48,23 @@ Clear fingerprint when:
 
 Inbox ordering after refresh remains last-modified descending per [poc-contract.md](poc-contract.md).
 
+## Launch UX
+
+Cold start keeps the Android splash screen (launcher icon on `#121212`) until launch is **settled**, then dismisses in one step to shell + content.
+
+**Launch settled** means:
+
+1. App gate is not `Loading` (`NeedsSetup` or `Ready`).
+2. When `Ready`, inbox UI is `Content`, `Empty`, or `Error` — not full-screen `Loading`.
+3. At least one layout frame has passed (`awaitFrame()`), plus a minimum hold of ~150ms to avoid subliminal flicker on fast devices.
+
+Implementation:
+
+- [MainActivity.kt](app/src/main/java/com/eskerra/go/MainActivity.kt) — `setKeepOnScreenCondition` until [AppLaunchSettled.kt](app/src/main/java/com/eskerra/go/app/AppLaunchSettled.kt) fires.
+- Gate `Loading` renders an empty surface (no spinner); splash covers it.
+- Shell sync FAB maps `SyncUiState.Loading` to no indicator (quiet shell refresh per [sync-hardening-and-recovery.md](sync-hardening-and-recovery.md)).
+- Inbox background rescan uses debounced `showRefreshIndicator` (~300ms) so fast cache-hit refreshes stay silent.
+
 ## Out of scope
 
 - Background sync

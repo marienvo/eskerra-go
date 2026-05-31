@@ -32,6 +32,7 @@ fun InboxScreen(
     state: InboxUiState,
     onRetry: () -> Unit,
     onNoteClick: (NoteId) -> Unit,
+    showRefreshIndicator: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     when (state) {
@@ -44,6 +45,7 @@ fun InboxScreen(
         InboxUiState.Empty,
         is InboxUiState.Content -> InboxScrollBody(
             state = state,
+            showRefreshIndicator = showRefreshIndicator,
             onNoteClick = onNoteClick,
             modifier = modifier
         )
@@ -53,6 +55,7 @@ fun InboxScreen(
 @Composable
 private fun InboxScrollBody(
     state: InboxUiState,
+    showRefreshIndicator: Boolean,
     onNoteClick: (NoteId) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -68,7 +71,7 @@ private fun InboxScrollBody(
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.padding(bottom = 12.dp)
                 )
-                if (state is InboxUiState.Content && state.isRefreshing) {
+                if (showRefreshIndicator) {
                     CircularProgressIndicator(
                         modifier = Modifier
                             .align(Alignment.CenterHorizontally)

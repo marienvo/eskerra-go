@@ -6,6 +6,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.eskerra.go.app.AppRoot
 import com.eskerra.go.core.usecase.BuildSafeSyncDiagnostic
@@ -43,8 +46,10 @@ import com.eskerra.go.data.workspace.DefaultWorkspaceSetupRepository
 /** Single entry point. Hosts the Compose UI and nothing else. */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
-        installSplashScreen()
+        val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
+        var keepSplashOnScreen by mutableStateOf(true)
+        splashScreen.setKeepOnScreenCondition { keepSplashOnScreen }
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT)
@@ -154,7 +159,8 @@ class MainActivity : ComponentActivity() {
                 updateSyncToken = updateSyncToken,
                 clearRemoteSyncSettings = clearRemoteSyncSettings,
                 testRemoteConnection = testRemoteConnection,
-                reconcileWorkspaceSyncBranch = reconcileWorkspaceSyncBranch
+                reconcileWorkspaceSyncBranch = reconcileWorkspaceSyncBranch,
+                onLaunchSettled = { keepSplashOnScreen = false }
             )
         }
     }

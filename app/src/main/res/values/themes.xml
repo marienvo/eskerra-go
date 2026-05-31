@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Post-splash UI theme. Compose applies the real theme in ui/theme. -->
-    <style name="Theme.EskerraGo" parent="android:Theme.Material.NoActionBar" />
+    <style name="Theme.EskerraGo" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/splash_background</item>
+    </style>
 
     <style name="Theme.EskerraGo.Splash" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">@color/splash_background</item>

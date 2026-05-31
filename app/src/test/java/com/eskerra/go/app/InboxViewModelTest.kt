@@ -105,6 +105,46 @@ class InboxViewModelTest {
         assertEquals(listOf(cachedNote), state.notes)
         assertTrue(state.isRefreshing)
         assertTrue(viewModel.uiState.value !is InboxUiState.Loading)
+        assertFalse(viewModel.showRefreshIndicator.value)
+    }
+
+    @Test
+    fun backgroundRefresh_showsIndicatorOnlyAfterDebounce() = runTest {
+        val filesDir = temp.newFolder("files")
+        val cachedNote = NoteSummary(
+            id = NoteId("Inbox/cached.md"),
+            title = "Cached",
+            snippet = "",
+            isInbox = true
+        )
+        val repository = FakeNoteRegistryRepository(
+            result = Result.success(
+                com.eskerra.go.core.model.NoteRegistry.fromNotes(listOf(cachedNote))
+            ),
+            refreshDelayMs = 1_000L
+        )
+        val snapshotStore = FakeInboxSnapshotStore()
+        snapshotStore.save(config, filesDir, listOf(cachedNote))
+
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(dispatcher)
+
+        val viewModel = inboxViewModel(
+            filesDir = filesDir,
+            repository = repository,
+            snapshotStore = snapshotStore
+        )
+        dispatcher.scheduler.runCurrent()
+
+        assertFalse(viewModel.showRefreshIndicator.value)
+
+        dispatcher.scheduler.advanceTimeBy(InboxViewModel.REFRESH_INDICATOR_DELAY_MS - 1)
+        dispatcher.scheduler.runCurrent()
+        assertFalse(viewModel.showRefreshIndicator.value)
+
+        dispatcher.scheduler.advanceTimeBy(1)
+        dispatcher.scheduler.runCurrent()
+        assertTrue(viewModel.showRefreshIndicator.value)
     }
 
     @Test

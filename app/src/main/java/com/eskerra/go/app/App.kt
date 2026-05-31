@@ -43,7 +43,7 @@ import com.eskerra.go.core.usecase.TestRemoteConnection
 import com.eskerra.go.core.usecase.UpdateSyncToken
 import com.eskerra.go.feature.editor.CreateInboxScreen
 import com.eskerra.go.feature.editor.NoteEditorScreen
-import com.eskerra.go.feature.inbox.InboxScreen
+import com.eskerra.go.feature.inbox.InboxUiState
 import com.eskerra.go.feature.menu.MenuScreen
 import com.eskerra.go.feature.note.NoteScreen
 import com.eskerra.go.feature.podcasts.PodcastItem
@@ -79,7 +79,8 @@ fun App(
     clearRemoteSyncSettings: ClearRemoteSyncSettings,
     testRemoteConnection: TestRemoteConnection,
     reconcileWorkspaceSyncBranch: ReconcileWorkspaceSyncBranch,
-    onConfigUpdated: (WorkspaceConfig) -> Unit
+    onConfigUpdated: (WorkspaceConfig) -> Unit,
+    onInboxUiStateChanged: (InboxUiState) -> Unit = {}
 ) {
     var currentConfig by remember(config) { mutableStateOf(config) }
     val navController = rememberNavController()
@@ -165,32 +166,15 @@ fun App(
             modifier = contentModifier
         ) {
             composable(AppRoute.INBOX) { entry ->
-                val inboxViewModel: InboxViewModel = viewModel(
-                    key = currentConfig.remoteUri,
-                    factory = InboxViewModel.factory(
-                        config = currentConfig,
-                        filesDir = filesDir,
-                        loadInboxSummaries = loadInboxSummaries
-                    )
-                )
-                val inboxState by inboxViewModel.uiState.collectAsState()
-
-                LaunchedEffect(currentRoute) {
-                    val notesChanged = entry.savedStateHandle.remove<Boolean>(
-                        NOTES_CHANGED_KEY
-                    ) == true
-                    if (currentRoute == AppRoute.INBOX && notesChanged) {
-                        inboxViewModel.refresh()
-                        appSyncViewModel.refreshLocalStatusQuietly()
-                    }
-                }
-
-                InboxScreen(
-                    state = inboxState,
-                    onRetry = inboxViewModel::refresh,
-                    onNoteClick = { noteId ->
-                        navController.navigate(AppRoute.note(noteId))
-                    }
+                AppInboxRoute(
+                    currentConfig = currentConfig,
+                    filesDir = filesDir,
+                    loadInboxSummaries = loadInboxSummaries,
+                    currentRoute = currentRoute,
+                    entry = entry,
+                    navController = navController,
+                    appSyncViewModel = appSyncViewModel,
+                    onInboxUiStateChanged = onInboxUiStateChanged
                 )
             }
 
@@ -360,7 +344,7 @@ fun App(
 /** ViewModel key for sync screens; includes branch so branch-only updates recreate VMs. */
 private fun WorkspaceConfig.syncViewModelKey(): String = "${remoteUri.orEmpty()}:$branch"
 
-private const val NOTES_CHANGED_KEY = "notesChanged"
+internal const val NOTES_CHANGED_KEY = "notesChanged"
 internal const val NOTE_CONTENT_CHANGED_KEY = "noteContentChanged"
 
 internal fun consumeNoteReaderChanged(

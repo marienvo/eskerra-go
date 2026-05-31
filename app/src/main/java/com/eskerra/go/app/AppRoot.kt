@@ -4,13 +4,15 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -35,6 +37,7 @@ import com.eskerra.go.core.usecase.TestRemoteConnection
 import com.eskerra.go.core.usecase.UpdateSyncToken
 import com.eskerra.go.data.workspace.WorkspaceSetupCompletion
 import com.eskerra.go.data.workspace.WorkspaceStore
+import com.eskerra.go.feature.inbox.InboxUiState
 import com.eskerra.go.feature.setup.WorkspaceSetupScreen
 import com.eskerra.go.ui.theme.EskerraGoTheme
 import java.io.File
@@ -66,7 +69,8 @@ fun AppRoot(
     updateSyncToken: UpdateSyncToken,
     clearRemoteSyncSettings: ClearRemoteSyncSettings,
     testRemoteConnection: TestRemoteConnection,
-    reconcileWorkspaceSyncBranch: ReconcileWorkspaceSyncBranch
+    reconcileWorkspaceSyncBranch: ReconcileWorkspaceSyncBranch,
+    onLaunchSettled: () -> Unit = {}
 ) {
     EskerraGoTheme(darkTheme = true) {
         Surface(
@@ -81,18 +85,21 @@ fun AppRoot(
                 )
             )
             val gateState by gateViewModel.gateState.collectAsState()
+            var inboxUiState by remember { mutableStateOf<InboxUiState?>(null) }
+
+            AppLaunchSettledEffect(
+                gateState = gateState,
+                inboxUiState = inboxUiState,
+                onLaunchSettled = onLaunchSettled
+            )
 
             when (val gate = gateState) {
                 AppGateState.Loading -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator()
-                    }
+                    Box(modifier = Modifier.fillMaxSize())
                 }
 
                 is AppGateState.NeedsSetup -> {
+                    SideEffect { inboxUiState = null }
                     val activity = LocalContext.current as? ComponentActivity
                     BackHandler {
                         activity?.finish()
@@ -143,7 +150,8 @@ fun AppRoot(
                     clearRemoteSyncSettings = clearRemoteSyncSettings,
                     testRemoteConnection = testRemoteConnection,
                     reconcileWorkspaceSyncBranch = reconcileWorkspaceSyncBranch,
-                    onConfigUpdated = gateViewModel::updateReadyConfig
+                    onConfigUpdated = gateViewModel::updateReadyConfig,
+                    onInboxUiStateChanged = { inboxUiState = it }
                 )
             }
         }
