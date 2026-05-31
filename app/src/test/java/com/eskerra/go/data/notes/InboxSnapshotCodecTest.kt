@@ -51,4 +51,36 @@ class InboxSnapshotCodecTest {
 
         assertEquals("missing workspaceFingerprint", result?.message)
     }
+
+    @Test
+    fun decode_roundTripsWhenSnippetContainsObjectDelimiter() {
+        val fingerprint = GateFingerprint("abc123")
+        val noteWithDelimiter = note.copy(snippet = "prefix},{suffix")
+        val raw = InboxSnapshotCodec.encode(
+            fingerprint = fingerprint,
+            savedAtEpochMs = 99L,
+            summaries = listOf(noteWithDelimiter)
+        )
+
+        assertEquals(listOf(noteWithDelimiter), InboxSnapshotCodec.decode(raw, fingerprint))
+    }
+
+    @Test
+    fun decode_roundTripsMultipleSummaries() {
+        val fingerprint = GateFingerprint("abc123")
+        val second = NoteSummary(
+            id = NoteId("Inbox/second.md"),
+            title = "Second",
+            snippet = "},{not-a-split",
+            isInbox = true,
+            lastModifiedEpochMillis = 43L
+        )
+        val raw = InboxSnapshotCodec.encode(
+            fingerprint = fingerprint,
+            savedAtEpochMs = 99L,
+            summaries = listOf(note, second)
+        )
+
+        assertEquals(listOf(note, second), InboxSnapshotCodec.decode(raw, fingerprint))
+    }
 }

@@ -116,18 +116,42 @@ internal object InboxSnapshotCodec {
         val contentEnd = raw.lastIndexOf(']')
         require(contentEnd > contentStart) { "invalid summaries array" }
         val body = raw.substring(contentStart, contentEnd).trim()
+        return splitTopLevelObjects(body).map(::parseSummary)
+    }
+
+    /** Splits a JSON array body into top-level `{...}` objects, respecting quoted strings. */
+    private fun splitTopLevelObjects(body: String): List<String> {
         if (body.isEmpty()) {
             return emptyList()
         }
-        return body.split("},{").map { chunk ->
-            val normalized = when {
-                chunk.startsWith('{') && chunk.endsWith('}') -> chunk
-                chunk.startsWith('{') -> "$chunk}"
-                chunk.endsWith('}') -> "{$chunk"
-                else -> "{$chunk}"
+        val objects = mutableListOf<String>()
+        var depth = 0
+        var inString = false
+        var escaped = false
+        var start = -1
+        body.forEachIndexed { index, char ->
+            when {
+                escaped -> escaped = false
+                inString && char == '\\' -> escaped = true
+                char == '"' -> inString = !inString
+                inString -> Unit
+                char == '{' -> {
+                    if (depth == 0) {
+                        start = index
+                    }
+                    depth += 1
+                }
+                char == '}' -> {
+                    depth -= 1
+                    if (depth == 0 && start >= 0) {
+                        objects.add(body.substring(start, index + 1))
+                        start = -1
+                    }
+                }
             }
-            parseSummary(normalized)
         }
+        require(depth == 0 && objects.isNotEmpty()) { "invalid summaries array" }
+        return objects
     }
 
     private fun parseSummary(raw: String): NoteSummary = NoteSummary(
