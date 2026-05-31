@@ -17,6 +17,18 @@ class InboxSnapshotCodecTest {
     )
 
     @Test
+    fun encodeAndDecode_roundTripsEmptySummaries() {
+        val fingerprint = GateFingerprint("abc123")
+        val raw = InboxSnapshotCodec.encode(
+            fingerprint = fingerprint,
+            savedAtEpochMs = 99L,
+            summaries = emptyList<NoteSummary>()
+        )
+
+        assertEquals(emptyList<NoteSummary>(), InboxSnapshotCodec.decode(raw, fingerprint))
+    }
+
+    @Test
     fun encodeAndDecode_roundTripsSummaries() {
         val fingerprint = GateFingerprint("abc123")
         val raw = InboxSnapshotCodec.encode(

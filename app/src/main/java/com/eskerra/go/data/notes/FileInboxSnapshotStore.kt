@@ -114,8 +114,11 @@ internal object InboxSnapshotCodec {
         require(arrayStart >= 0) { "missing summaries" }
         val contentStart = arrayStart + "\"summaries\":[".length
         val contentEnd = raw.lastIndexOf(']')
-        require(contentEnd > contentStart) { "invalid summaries array" }
+        require(contentEnd >= contentStart) { "invalid summaries array" }
         val body = raw.substring(contentStart, contentEnd).trim()
+        if (body.isEmpty()) {
+            return emptyList()
+        }
         return splitTopLevelObjects(body).map(::parseSummary)
     }
 

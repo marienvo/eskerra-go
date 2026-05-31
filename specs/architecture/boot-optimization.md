@@ -45,6 +45,7 @@ Clear fingerprint when:
 - **No cache:** keep existing full-screen inbox loading behavior.
 - **Scan failure with cache:** keep cached list visible; do not replace with error.
 - **Invalidation:** fingerprint mismatch ignores stale file; successful scan overwrites snapshot.
+- **Empty inbox:** a valid snapshot uses `"summaries":[]` and round-trips to an empty list (cache hit on next cold start).
 
 Inbox ordering after refresh remains last-modified descending per [poc-contract.md](poc-contract.md).
 

@@ -46,6 +46,17 @@ class FileInboxSnapshotStoreTest {
     }
 
     @Test
+    fun saveAndRead_roundTripsEmptySummaries() = runTest {
+        val filesDir = temp.newFolder("files")
+        prepareWorkspace(filesDir)
+        val store = FileInboxSnapshotStore()
+
+        store.save(config, filesDir, emptyList<NoteSummary>())
+
+        assertEquals(emptyList<NoteSummary>(), store.read(config, filesDir))
+    }
+
+    @Test
     fun read_returnsNullForCorruptSnapshot() = runTest {
         val filesDir = temp.newFolder("files")
         prepareWorkspace(filesDir)
