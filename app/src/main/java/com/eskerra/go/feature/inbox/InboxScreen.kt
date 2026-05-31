@@ -32,16 +32,38 @@ fun InboxScreen(
     onNoteClick: (NoteId) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    when (state) {
-        InboxUiState.Loading -> InboxLoading(modifier)
-        InboxUiState.Empty -> InboxEmpty(modifier)
-        is InboxUiState.Error -> InboxError(message = state.message, onRetry = onRetry, modifier)
-        is InboxUiState.Content -> InboxContent(
-            notes = state.notes,
-            onNoteClick = onNoteClick,
-            modifier = modifier
-        )
+    Column(modifier = modifier.fillMaxSize()) {
+        when (state) {
+            InboxUiState.Loading -> InboxLoading(Modifier.weight(1f))
+            InboxUiState.Empty -> InboxEmpty(Modifier.weight(1f))
+            is InboxUiState.Error -> InboxError(
+                message = state.message,
+                onRetry = onRetry,
+                modifier = Modifier.weight(1f)
+            )
+            is InboxUiState.Content -> InboxContent(
+                notes = state.notes,
+                onNoteClick = onNoteClick,
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        if (state is InboxUiState.Content || state is InboxUiState.Empty) {
+            TodayHubPlaceholder()
+        }
     }
+}
+
+@Composable
+private fun TodayHubPlaceholder(modifier: Modifier = Modifier) {
+    Text(
+        text = "placeholder todayhub",
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+    )
 }
 
 @Composable
@@ -117,7 +139,7 @@ private fun InboxContent(
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
-            .padding(16.dp)
+            .padding(horizontal = 16.dp, vertical = 16.dp)
     ) {
         item {
             Text(

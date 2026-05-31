@@ -4,6 +4,7 @@ import com.eskerra.go.core.model.CreateInboxNoteResult
 import com.eskerra.go.core.model.CreateNoteError
 import com.eskerra.go.core.model.CreateNoteException
 import com.eskerra.go.core.model.EditableNote
+import com.eskerra.go.core.model.InboxNoteDraft
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NotePath
 import com.eskerra.go.core.model.NoteWriteError
@@ -13,33 +14,29 @@ import com.eskerra.go.core.repository.NoteRegistryRepository
 import com.eskerra.go.core.repository.NoteWriteRepository
 import com.eskerra.go.data.notes.MarkdownNoteScanner
 import java.io.File
-import java.time.Clock
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 
-/** Creates a new inbox markdown note, refreshes the registry, and returns Git status. */
+/** Creates a new inbox markdown note from compose draft text, refreshes registry, returns Git status. */
 class CreateInboxNote(
     private val writeRepository: NoteWriteRepository,
     private val registryRepository: NoteRegistryRepository,
     private val loadGitStatusSummary: LoadGitStatusSummary,
-    private val clock: Clock = Clock.systemDefaultZone(),
     private val maxCollisionAttempts: Int = 100
 ) {
 
     suspend operator fun invoke(
         config: WorkspaceConfig,
         filesDir: File,
-        title: String? = null,
-        initialMarkdown: String? = null
+        draft: String
     ): Result<CreateInboxNoteResult> {
-        val instant = clock.instant()
-        val resolvedTitle = title?.trim()?.takeIf { it.isNotEmpty() }
-            ?: defaultTitle(instant, clock.zone)
-        val markdown = initialMarkdown?.takeIf { it.isNotBlank() }
-            ?: defaultMarkdown(resolvedTitle)
+        if (!InboxNoteDraft.hasNonBlankTitle(draft)) {
+            return Result.failure(
+                CreateNoteException(CreateNoteError.WriteFailed("Title must not be blank"))
+            )
+        }
 
-        val notePath = allocateInboxPath(config, filesDir, instant)
+        val markdown = InboxNoteDraft.toMarkdown(draft)
+        val stem = InboxNoteDraft.toFilenameStem(InboxNoteDraft.extractTitleLine(draft))
+        val notePath = allocateInboxPathFromStem(config, filesDir, stem)
             .getOrElse { return Result.failure(it) }
 
         writeRepository.write(config, filesDir, notePath, markdown).getOrElse { error ->
@@ -80,19 +77,18 @@ class CreateInboxNote(
         )
     }
 
-    private suspend fun allocateInboxPath(
+    private suspend fun allocateInboxPathFromStem(
         config: WorkspaceConfig,
         filesDir: File,
-        instant: Instant
+        stem: String
     ): Result<NotePath> {
-        val baseName = FILENAME_FORMATTER.format(instant.atZone(clock.zone))
-        val basePath = "$INBOX_PREFIX$baseName$MARKDOWN_SUFFIX"
+        val basePath = "$INBOX_PREFIX$stem$MARKDOWN_SUFFIX"
 
         for (attempt in 1..maxCollisionAttempts) {
             val candidatePath = if (attempt == 1) {
                 basePath
             } else {
-                "$INBOX_PREFIX$baseName-$attempt$MARKDOWN_SUFFIX"
+                "$INBOX_PREFIX$stem-$attempt$MARKDOWN_SUFFIX"
             }
 
             val notePath = NotePath.fromRelativePath(candidatePath).getOrElse {
@@ -126,18 +122,6 @@ class CreateInboxNote(
     internal companion object {
         const val INBOX_PREFIX = "${MarkdownNoteScanner.INBOX_DIRECTORY}/"
         const val MARKDOWN_SUFFIX = ".md"
-        const val DEFAULT_TITLE = "Untitled inbox note"
-
-        private val FILENAME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd-HHmmss")
-
-        fun defaultTitle(instant: Instant, zoneId: ZoneId = ZoneId.systemDefault()): String {
-            val formatted = DISPLAY_TITLE_FORMATTER.format(instant.atZone(zoneId))
-            return "Inbox note $formatted"
-        }
-
-        fun defaultMarkdown(title: String): String = "# $title\n\n"
-
-        private val DISPLAY_TITLE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
 
         private fun mapWriteFailure(error: Throwable): CreateNoteException {
             if (error is NoteWriteException) {

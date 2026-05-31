@@ -223,6 +223,35 @@ class MarkdownNoteScannerTest {
         assertTrue(registry.notes.isEmpty())
     }
 
+    @Test
+    fun scan_inboxSummariesSortByLastModifiedDescending() {
+        val workspace = temp.newFolder("workspace")
+        write(workspace, "Inbox/older.md", "# Older")
+        write(workspace, "Inbox/newer.md", "# Newer")
+        write(workspace, "Inbox/middle.md", "# Middle")
+        File(workspace, "Inbox/older.md").setLastModified(1_000L)
+        File(workspace, "Inbox/middle.md").setLastModified(2_000L)
+        File(workspace, "Inbox/newer.md").setLastModified(3_000L)
+
+        val inboxIds = scanner.scan(workspace).getOrThrow().inboxSummaries.map { it.id.value }
+
+        assertEquals(
+            listOf("Inbox/newer.md", "Inbox/middle.md", "Inbox/older.md"),
+            inboxIds
+        )
+    }
+
+    @Test
+    fun scan_capturesLastModifiedEpochMillis() {
+        val workspace = temp.newFolder("workspace")
+        write(workspace, "Inbox/timestamped.md", "# Timestamped")
+        File(workspace, "Inbox/timestamped.md").setLastModified(4_200L)
+
+        val note = scanner.scan(workspace).getOrThrow().notes.single()
+
+        assertEquals(4_200L, note.lastModifiedEpochMillis)
+    }
+
     private fun write(workspace: File, relativePath: String, content: String) {
         val file = File(workspace, relativePath)
         file.parentFile?.mkdirs()

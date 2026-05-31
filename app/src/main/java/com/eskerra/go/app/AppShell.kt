@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Inbox
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Podcasts
@@ -31,13 +30,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
-private val TopChromeHeight = 80.dp
+private val TopChromeHeight = 56.dp
 private val BottomChromeHeight = 104.dp
 
 /**
  * Floating navigation shell. It overlays controls on top of the current screen:
  * - a bottom floating taskbar with Inbox, a large centered Add, and Podcasts
- * - a top-left Dashboard button
  * - a top-right sync button (when remote is configured) and hamburger Menu button
  *
  * The shell owns no app state. It reports navigation intents through [onNavigate]
@@ -62,16 +60,6 @@ fun AppShell(
                 bottom = BottomChromeHeight + navBarBottom
             )
         )
-
-        SmallFloatingActionButton(
-            onClick = { onNavigate(AppRoute.DASHBOARD) },
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .statusBarsPadding()
-                .padding(16.dp)
-        ) {
-            Icon(Icons.Filled.Dashboard, contentDescription = "Dashboard")
-        }
 
         Row(
             modifier = Modifier

@@ -77,19 +77,77 @@ fun NoteEditorScreen(
 @Composable
 fun CreateInboxScreen(
     state: CreateInboxUiState,
-    onRetry: () -> Unit,
+    onBack: () -> Unit,
+    onDraftChange: (String) -> Unit,
+    onSave: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Box(
-        modifier = modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(16.dp)
     ) {
+        IconButton(onClick = onBack) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Back",
+                tint = MaterialTheme.colorScheme.onSurface
+            )
+        }
+
         when (state) {
-            CreateInboxUiState.Creating -> CircularProgressIndicator()
-            is CreateInboxUiState.Error -> EditorMessage(
-                title = "Could not create note",
-                body = state.message,
-                onRetry = onRetry
+            is CreateInboxUiState.Content -> CreateInboxContent(
+                state = state,
+                onDraftChange = onDraftChange,
+                onSave = onSave
+            )
+        }
+    }
+}
+
+@Composable
+private fun CreateInboxContent(
+    state: CreateInboxUiState.Content,
+    onDraftChange: (String) -> Unit,
+    onSave: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+    ) {
+        Text(
+            text = "New inbox note",
+            style = MaterialTheme.typography.headlineMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(bottom = 12.dp)
+        )
+
+        OutlinedTextField(
+            value = state.draft,
+            onValueChange = onDraftChange,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp),
+            readOnly = state.isSaving,
+            minLines = 12,
+            label = { Text("Note") },
+            placeholder = { Text("Title on the first line") }
+        )
+
+        Button(
+            onClick = onSave,
+            enabled = state.canSave && !state.isSaving,
+            modifier = Modifier.padding(bottom = 8.dp)
+        ) {
+            Text(if (state.isSaving) "Saving…" else "Save")
+        }
+
+        state.errorMessage?.let { message ->
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error
             )
         }
     }

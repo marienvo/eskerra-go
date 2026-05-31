@@ -6,7 +6,12 @@ package com.eskerra.go.core.model
  */
 data class NoteRegistry(val notes: List<NoteSummary>) {
 
-    val inboxSummaries: List<NoteSummary> get() = notes.filter { it.isInbox }
+    val inboxSummaries: List<NoteSummary> get() =
+        notes.filter { it.isInbox }
+            .sortedWith(
+                compareByDescending<NoteSummary> { it.lastModifiedEpochMillis }
+                    .thenBy { it.id.value }
+            )
 
     companion object {
         fun fromNotes(unsorted: List<NoteSummary>): NoteRegistry =

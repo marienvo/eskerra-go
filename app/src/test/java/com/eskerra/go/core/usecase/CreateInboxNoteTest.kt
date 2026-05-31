@@ -13,9 +13,6 @@ import com.eskerra.go.data.notes.FileNoteRegistryRepository
 import com.eskerra.go.data.notes.FileNoteWriteRepository
 import com.eskerra.go.data.workspace.WorkspacePaths
 import java.io.File
-import java.time.Clock
-import java.time.Instant
-import java.time.ZoneOffset
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -36,9 +33,6 @@ class CreateInboxNoteTest {
         setupCompletedAtEpochMs = 1_700_000_000_000L
     )
 
-    private val fixedInstant = Instant.parse("2026-05-30T16:42:00Z")
-    private val fixedClock = Clock.fixed(fixedInstant, ZoneOffset.UTC)
-
     @Test
     fun createsNewInboxNoteUnderInboxDirectory() = runTest {
         val filesDir = temp.newFolder("files")
@@ -49,11 +43,10 @@ class CreateInboxNoteTest {
         val useCase = CreateInboxNote(
             writeRepository = writeRepository,
             registryRepository = registryRepository,
-            loadGitStatusSummary = LoadGitStatusSummary(gitRepository),
-            clock = fixedClock
+            loadGitStatusSummary = LoadGitStatusSummary(gitRepository)
         )
 
-        val result = useCase(config, filesDir)
+        val result = useCase(config, filesDir, "My idea\nBody text")
 
         assertTrue(result.isSuccess)
         val note = result.getOrThrow().note
@@ -64,7 +57,7 @@ class CreateInboxNoteTest {
     }
 
     @Test
-    fun writesDefaultUtf8Markdown() = runTest {
+    fun writesMarkdownWithH1FromFirstLine() = runTest {
         val filesDir = temp.newFolder("files")
         gitWorkspace(filesDir)
         val gitRepository = JGitWorkspaceRepository()
@@ -73,17 +66,16 @@ class CreateInboxNoteTest {
         val useCase = CreateInboxNote(
             writeRepository = writeRepository,
             registryRepository = registryRepository,
-            loadGitStatusSummary = LoadGitStatusSummary(gitRepository),
-            clock = fixedClock
+            loadGitStatusSummary = LoadGitStatusSummary(gitRepository)
         )
 
-        val result = useCase(config, filesDir).getOrThrow()
-        val expectedTitle = CreateInboxNote.defaultTitle(fixedInstant, ZoneOffset.UTC)
-        assertEquals("# $expectedTitle\n\n", result.note.markdown)
+        val result = useCase(config, filesDir, "Mijn idee\n\nDetails").getOrThrow()
+
+        assertEquals("# Mijn idee\n\nDetails", result.note.markdown)
     }
 
     @Test
-    fun generatedFilenameUsesInjectedClock() = runTest {
+    fun filenameUsesSanitizedTitleFromFirstLine() = runTest {
         val filesDir = temp.newFolder("files")
         gitWorkspace(filesDir)
         val gitRepository = JGitWorkspaceRepository()
@@ -92,13 +84,12 @@ class CreateInboxNoteTest {
         val useCase = CreateInboxNote(
             writeRepository = writeRepository,
             registryRepository = registryRepository,
-            loadGitStatusSummary = LoadGitStatusSummary(gitRepository),
-            clock = fixedClock
+            loadGitStatusSummary = LoadGitStatusSummary(gitRepository)
         )
 
-        val result = useCase(config, filesDir).getOrThrow()
+        val result = useCase(config, filesDir, "Mijn idee").getOrThrow()
 
-        assertEquals("Inbox/2026-05-30-164200.md", result.note.path.value)
+        assertEquals("Inbox/Mijn idee.md", result.note.path.value)
     }
 
     @Test
@@ -106,7 +97,7 @@ class CreateInboxNoteTest {
         val filesDir = temp.newFolder("files")
         val workspaceDir = gitWorkspace(filesDir)
         File(workspaceDir, "Inbox").mkdirs()
-        File(workspaceDir, "Inbox/2026-05-30-164200.md").writeText("# Existing")
+        File(workspaceDir, "Inbox/Mijn idee.md").writeText("# Existing")
 
         val gitRepository = JGitWorkspaceRepository()
         val writeRepository = FileNoteWriteRepository(gitRepository)
@@ -114,13 +105,12 @@ class CreateInboxNoteTest {
         val useCase = CreateInboxNote(
             writeRepository = writeRepository,
             registryRepository = registryRepository,
-            loadGitStatusSummary = LoadGitStatusSummary(gitRepository),
-            clock = fixedClock
+            loadGitStatusSummary = LoadGitStatusSummary(gitRepository)
         )
 
-        val result = useCase(config, filesDir).getOrThrow()
+        val result = useCase(config, filesDir, "Mijn idee").getOrThrow()
 
-        assertEquals("Inbox/2026-05-30-164200-2.md", result.note.path.value)
+        assertEquals("Inbox/Mijn idee-2.md", result.note.path.value)
     }
 
     @Test
@@ -132,8 +122,7 @@ class CreateInboxNoteTest {
         val useCase = CreateInboxNote(
             writeRepository = writeRepository,
             registryRepository = registry,
-            loadGitStatusSummary = LoadGitStatusSummary(JGitWorkspaceRepository()),
-            clock = fixedClock
+            loadGitStatusSummary = LoadGitStatusSummary(JGitWorkspaceRepository())
         )
 
         registry.setResult(
@@ -141,17 +130,18 @@ class CreateInboxNoteTest {
                 com.eskerra.go.core.model.NoteRegistry.fromNotes(
                     listOf(
                         NoteSummary(
-                            id = NoteId("Inbox/2026-05-30-164200.md"),
-                            title = "Untitled inbox note",
+                            id = NoteId("Inbox/Mijn idee.md"),
+                            title = "Mijn idee",
                             snippet = "",
-                            isInbox = true
+                            isInbox = true,
+                            lastModifiedEpochMillis = 1L
                         )
                     )
                 )
             )
         )
 
-        useCase(config, filesDir)
+        useCase(config, filesDir, "Mijn idee")
 
         assertEquals(1, registry.refreshCount)
     }
@@ -166,11 +156,10 @@ class CreateInboxNoteTest {
         val useCase = CreateInboxNote(
             writeRepository = writeRepository,
             registryRepository = registryRepository,
-            loadGitStatusSummary = LoadGitStatusSummary(gitRepository),
-            clock = fixedClock
+            loadGitStatusSummary = LoadGitStatusSummary(gitRepository)
         )
 
-        val result = useCase(config, filesDir).getOrThrow()
+        val result = useCase(config, filesDir, "My idea").getOrThrow()
 
         assertEquals(GitStatusSummary.State.Dirty, result.gitStatus.state)
         assertTrue(result.gitStatus.changedCount >= 1)
@@ -184,11 +173,10 @@ class CreateInboxNoteTest {
         val useCase = CreateInboxNote(
             writeRepository = FakeNoteWriteRepository(),
             registryRepository = registry,
-            loadGitStatusSummary = LoadGitStatusSummary(JGitWorkspaceRepository()),
-            clock = fixedClock
+            loadGitStatusSummary = LoadGitStatusSummary(JGitWorkspaceRepository())
         )
 
-        val result = useCase(config, filesDir)
+        val result = useCase(config, filesDir, "My idea")
 
         assertTrue(result.isFailure)
         val error = (result.exceptionOrNull() as CreateNoteException).error

@@ -40,7 +40,6 @@ import com.eskerra.go.core.usecase.SaveNote
 import com.eskerra.go.core.usecase.SaveRemoteSyncSettings
 import com.eskerra.go.core.usecase.TestRemoteConnection
 import com.eskerra.go.core.usecase.UpdateSyncToken
-import com.eskerra.go.feature.dashboard.DashboardScreen
 import com.eskerra.go.feature.editor.CreateInboxScreen
 import com.eskerra.go.feature.editor.NoteEditorScreen
 import com.eskerra.go.feature.inbox.InboxScreen
@@ -199,11 +198,11 @@ fun App(
                 val createState by createViewModel.uiState.collectAsState()
 
                 LaunchedEffect(createViewModel) {
-                    createViewModel.createdNoteId.collect { noteId ->
+                    createViewModel.savedNoteId.collect { noteId ->
                         if (noteId != null) {
                             markInboxNotesChanged()
                             appSyncViewModel.refreshLocalStatusQuietly()
-                            navController.navigate(AppRoute.editor(noteId)) {
+                            navController.navigate(AppRoute.note(noteId)) {
                                 popUpTo(AppRoute.CREATE_INBOX) { inclusive = true }
                             }
                         }
@@ -212,20 +211,14 @@ fun App(
 
                 CreateInboxScreen(
                     state = createState,
-                    onRetry = createViewModel::retry
+                    onBack = { navController.popBackStack() },
+                    onDraftChange = createViewModel::updateDraft,
+                    onSave = createViewModel::save
                 )
             }
 
             composable(AppRoute.PODCASTS) {
                 PodcastsScreen(podcasts = fakePodcasts)
-            }
-
-            composable(AppRoute.DASHBOARD) {
-                DashboardScreen(
-                    workspaceName = currentConfig.name,
-                    noteCount = PLACEHOLDER_NOTE_COUNT,
-                    gitStatus = syncStatusLabel(syncState)
-                )
             }
 
             composable(AppRoute.MENU) {
@@ -384,8 +377,6 @@ private fun NavHostController.markNoteReaderChanged(noteId: NoteId) {
             .savedStateHandle[NOTE_CONTENT_CHANGED_KEY] = true
     }
 }
-
-private const val PLACEHOLDER_NOTE_COUNT = 0
 
 private val fakePodcasts: List<PodcastItem> = listOf(
     PodcastItem(title = "Note-taking, deeply", author = "Eskerra FM"),

@@ -24,7 +24,10 @@ sealed interface NoteEditorUiState {
 }
 
 sealed interface CreateInboxUiState {
-    data object Creating : CreateInboxUiState
-
-    data class Error(val message: String) : CreateInboxUiState
+    data class Content(
+        val draft: String,
+        val isSaving: Boolean,
+        val canSave: Boolean,
+        val errorMessage: String?
+    ) : CreateInboxUiState
 }

@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.eskerra.go.core.model.CreateNoteError
 import com.eskerra.go.core.model.CreateNoteException
+import com.eskerra.go.core.model.InboxNoteDraft
 import com.eskerra.go.core.model.NoteContentError
 import com.eskerra.go.core.model.NoteContentException
 import com.eskerra.go.core.model.NoteId
@@ -182,32 +183,52 @@ class CreateInboxNoteViewModel(
     private val createInboxNote: CreateInboxNote
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow<CreateInboxUiState>(CreateInboxUiState.Creating)
+    private val _uiState = MutableStateFlow<CreateInboxUiState>(
+        CreateInboxUiState.Content(
+            draft = "",
+            isSaving = false,
+            canSave = false,
+            errorMessage = null
+        )
+    )
     val uiState: StateFlow<CreateInboxUiState> = _uiState.asStateFlow()
 
-    private val _createdNoteId = MutableStateFlow<NoteId?>(null)
-    val createdNoteId: StateFlow<NoteId?> = _createdNoteId.asStateFlow()
+    private val _savedNoteId = MutableStateFlow<NoteId?>(null)
+    val savedNoteId: StateFlow<NoteId?> = _savedNoteId.asStateFlow()
 
-    private var createJob: Job? = null
+    private var saveJob: Job? = null
 
-    init {
-        create()
+    fun updateDraft(draft: String) {
+        val current = _uiState.value
+        if (current !is CreateInboxUiState.Content || current.isSaving) {
+            return
+        }
+        _uiState.value = current.copy(
+            draft = draft,
+            canSave = InboxNoteDraft.hasNonBlankTitle(draft),
+            errorMessage = null
+        )
     }
 
-    fun retry() {
-        create()
-    }
+    fun save() {
+        val current = _uiState.value
+        if (current !is CreateInboxUiState.Content || !current.canSave || current.isSaving) {
+            return
+        }
 
-    private fun create() {
-        createJob?.cancel()
-        createJob = viewModelScope.launch {
-            _uiState.value = CreateInboxUiState.Creating
-            createInboxNote(config, filesDir).fold(
+        saveJob?.cancel()
+        saveJob = viewModelScope.launch {
+            _uiState.value = current.copy(isSaving = true, errorMessage = null)
+            createInboxNote(config, filesDir, current.draft).fold(
                 onSuccess = { result ->
-                    _createdNoteId.value = result.note.id
+                    _savedNoteId.value = result.note.id
                 },
                 onFailure = { error ->
-                    _uiState.value = CreateInboxUiState.Error(mapCreateFailure(error))
+                    val failed = _uiState.value as? CreateInboxUiState.Content ?: current
+                    _uiState.value = failed.copy(
+                        isSaving = false,
+                        errorMessage = mapCreateFailure(error)
+                    )
                 }
             )
         }
