@@ -53,7 +53,7 @@ git config core.hooksPath scripts/githooks
 
 ## Commands
 
-Gradle requires **Java 17** (CI uses Temurin 17). If the default JDK is newer, set `JAVA_HOME` first — for example `JAVA_HOME=/usr/lib/jvm/temurin-17-jdk`.
+Gradle requires **Java 17** (CI uses Temurin 17). Use `./scripts/gradle.sh` for local and agent runs — it picks JDK 17 automatically when `JAVA_HOME` is unset. Plain `./gradlew` is fine when JDK 17 is already your default (as in CI).
 
 ### Quality gate (before marking work complete)
 
@@ -64,10 +64,10 @@ Run these in order; resolve all failures before finishing. Matches the CI verify
 ./scripts/check-module-budgets.sh
 
 # Minimum gate for Kotlin/UI or Gradle script changes
-JAVA_HOME=/usr/lib/jvm/temurin-17-jdk ./gradlew :app:ktlintCheck :app:lintDebug
+./scripts/gradle.sh :app:ktlintCheck :app:lintDebug
 
 # Full gate when domain, data, or logic changed
-JAVA_HOME=/usr/lib/jvm/temurin-17-jdk ./gradlew :app:ktlintCheck :app:lintDebug :app:testDebugUnitTest
+./scripts/gradle.sh :app:ktlintCheck :app:lintDebug :app:testDebugUnitTest
 ```
 
 After a deliberate module split, refresh caps with `./scripts/update-module-budget-baseline.sh` and commit `scripts/module-budget-baseline.json`.
@@ -77,9 +77,9 @@ Do not rely on CI to catch ktlint or Android lint violations.
 ### Other commands
 
 ```bash
-./gradlew :app:assembleDebug
+./scripts/gradle.sh :app:assembleDebug
 ./scripts/install-debug.sh   # build, install on device/emulator, and launch
-./gradlew :app:connectedDebugAndroidTest
+./scripts/gradle.sh :app:connectedDebugAndroidTest
 ```
 
 Use `assembleDebug` only when building the APK is the goal. `installDebug` (or the script above) requires a connected device or emulator. `connectedDebugAndroidTest` requires a device or emulator and is not part of the standard quality gate.
