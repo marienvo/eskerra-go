@@ -1,6 +1,6 @@
 package com.eskerra.go.data.r2
 
-import com.eskerra.go.core.model.PlaylistEntry
+import com.eskerra.go.core.model.R2ConditionalResult
 import com.eskerra.go.core.model.R2Config
 import com.eskerra.go.core.playlist.normalizePlaylistEntryForSync
 import java.time.Instant
@@ -10,18 +10,6 @@ import okhttp3.OkHttpClient
 
 private const val INVALID_STRUCTURE = "R2 playlist.json has an invalid structure."
 private const val INVALID_JSON = "R2 playlist.json is not valid JSON."
-
-/** Result of a conditional (ETag) GET against the R2 `playlist.json`. */
-sealed interface R2ConditionalResult {
-    /** Server returned 304 — the cached etag is still current. */
-    data object NotModified : R2ConditionalResult
-
-    /** No object (404) or an empty body. */
-    data object Missing : R2ConditionalResult
-
-    /** A newer object, with its current [etag] (may be `null` if absent). */
-    data class Updated(val entry: PlaylistEntry, val etag: String?) : R2ConditionalResult
-}
 
 /**
  * Conditional GET for the R2 `playlist.json`, mirroring

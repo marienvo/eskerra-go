@@ -1,5 +1,6 @@
 package com.eskerra.go.data.r2
 
+import com.eskerra.go.core.model.R2ConditionalResult
 import com.eskerra.go.core.model.R2Config
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
