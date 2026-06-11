@@ -12,6 +12,8 @@ Do not edit synced `.cursor/rules/{language,quality,specs,testing}.mdc`, `.curso
 
 ## Project-specific rules
 
+Architecture style (hybrid layering + feature slices) and placement rules for new code: [`specs/adr/001-hybrid-layering-and-feature-slices.md`](specs/adr/001-hybrid-layering-and-feature-slices.md).
+
 - UI code must not read files directly.
 - UI code must not call Git directly.
 - Composables receive state and callbacks only.
