@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ktlint)
 }
 
@@ -56,6 +57,8 @@ android {
             excludes += "META-INF/INDEX.LIST"
             excludes += "META-INF/*.txt"
             excludes += "META-INF/jgit-*"
+            excludes += "META-INF/NOTICE"
+            excludes += "META-INF/LICENSE"
         }
     }
 }
@@ -87,11 +90,14 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.kotlinx.serialization.json)
 
     implementation(libs.jgit)
+    implementation(libs.okhttp)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.okhttp.mockwebserver)
 
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.runner)
