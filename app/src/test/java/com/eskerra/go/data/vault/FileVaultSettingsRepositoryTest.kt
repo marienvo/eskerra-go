@@ -3,6 +3,7 @@ package com.eskerra.go.data.vault
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
+import com.eskerra.go.core.model.EskerraLocalSettings
 import com.eskerra.go.core.model.EskerraSettings
 import com.eskerra.go.core.model.R2Config
 import com.eskerra.go.core.vault.EskerraSettingsCodec
@@ -27,16 +28,20 @@ class FileVaultSettingsRepositoryTest {
 
     private val testDispatcher = StandardTestDispatcher()
     private val testScope = TestScope(testDispatcher)
+    private var dataStoreCount = 0
 
     private fun buildDataStore(): DataStore<Preferences> {
-        val file = tmp.newFile("prefs.preferences_pb")
+        val file = tmp.newFile("prefs-${dataStoreCount++}.preferences_pb")
         return PreferenceDataStoreFactory.create(
             scope = testScope.backgroundScope,
             produceFile = { file }
         )
     }
 
-    private fun repo() = FileVaultSettingsRepository(buildDataStore())
+    private fun localStore() = DataStoreLocalSettingsStore(buildDataStore())
+
+    private fun repo(local: DataStoreLocalSettingsStore = localStore()) =
+        FileVaultSettingsRepository(buildDataStore(), local)
 
     private fun workspaceRoot() = tmp.newFolder("workspace")
 
@@ -140,6 +145,39 @@ class FileVaultSettingsRepositoryTest {
         r.saveShared(root, original).getOrThrow()
         val loaded = r.loadShared(root).getOrThrow()
         assertEquals(original.r2, loaded.r2)
+    }
+
+    // ── migration: legacy shared displayName → local ─────────────────────────
+
+    @Test
+    fun `load migrates legacy shared displayName to local when local empty`() = testScope.runTest {
+        val root = workspaceRoot()
+        val dir = eskerraDir(root)
+        File(dir, VaultLayout.SHARED_SETTINGS_FILE)
+            .writeText("""{"displayName": "Alice", "r2": null}""")
+        val local = localStore()
+
+        repo(local).loadShared(root).getOrThrow()
+
+        assertEquals("Alice", local.load().displayName)
+        val rewritten = File(dir, VaultLayout.SHARED_SETTINGS_FILE).readText()
+        assertFalse(rewritten.contains("displayName"))
+    }
+
+    @Test
+    fun `load does not overwrite a non-empty local displayName`() = testScope.runTest {
+        val root = workspaceRoot()
+        val dir = eskerraDir(root)
+        File(dir, VaultLayout.SHARED_SETTINGS_FILE)
+            .writeText("""{"displayName": "Alice", "r2": null}""")
+        val local = localStore()
+        local.save(EskerraLocalSettings(displayName = "Bob"))
+
+        repo(local).loadShared(root).getOrThrow()
+
+        assertEquals("Bob", local.load().displayName)
+        val rewritten = File(dir, VaultLayout.SHARED_SETTINGS_FILE).readText()
+        assertFalse(rewritten.contains("displayName"))
     }
 
     private fun r2() = R2Config(

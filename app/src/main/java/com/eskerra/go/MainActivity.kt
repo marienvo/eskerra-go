@@ -132,8 +132,11 @@ class MainActivity : ComponentActivity() {
             reconcileWorkspaceSyncBranch = reconcileWorkspaceSyncBranch
         )
 
-        val vaultSettingsRepository = FileVaultSettingsRepository(applicationContext)
         val localSettingsStore = DataStoreLocalSettingsStore(applicationContext)
+        val vaultSettingsRepository = FileVaultSettingsRepository(
+            applicationContext,
+            localSettingsStore
+        )
         val loadVaultSettings = LoadVaultSettings(vaultSettingsRepository)
         val saveVaultSettings = SaveVaultSettings(vaultSettingsRepository)
         val loadLocalSettings = LoadLocalSettings(localSettingsStore)

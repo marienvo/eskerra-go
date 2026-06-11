@@ -9,6 +9,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.eskerra.go.core.model.EskerraSettings
 import com.eskerra.go.core.model.VaultSettingsError
 import com.eskerra.go.core.model.VaultSettingsException
+import com.eskerra.go.core.repository.LocalSettingsStore
 import com.eskerra.go.core.repository.VaultSettingsRepository
 import com.eskerra.go.core.vault.EskerraSettingsCodec
 import com.eskerra.go.core.vault.R2Settings
@@ -16,6 +17,9 @@ import com.eskerra.go.core.vault.VaultLayout
 import java.io.File
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
 
 private val Context.vaultSharedDataStore: DataStore<Preferences> by preferencesDataStore(
     name = "vault_shared_settings"
@@ -23,17 +27,31 @@ private val Context.vaultSharedDataStore: DataStore<Preferences> by preferencesD
 
 private val SHARED_JSON_KEY = stringPreferencesKey("shared_settings_json")
 
+private const val LEGACY_DISPLAY_NAME_KEY = "displayName"
+
 /**
  * Implements §1.2 source-of-truth resolution:
  * - Read shared: workspace file if it exists → else DataStore.
  * - Write shared: create/update the file if R2 is configured or file already exists
  *   (the sub-decision to create the file on first R2 save) → else DataStore.
- * - Migrations: .notebox → .eskerra rename; legacy settings.json → settings-shared.json.
+ * - Migrations: .notebox → .eskerra rename; legacy settings.json → settings-shared.json;
+ *   legacy shared `displayName` → local settings (when local is empty), then stripped
+ *   from the shared file (spec "migrateLegacySharedDisplayNameIfNeeded").
  */
-class FileVaultSettingsRepository(private val dataStore: DataStore<Preferences>) :
-    VaultSettingsRepository {
+class FileVaultSettingsRepository(
+    private val dataStore: DataStore<Preferences>,
+    private val localSettingsStore: LocalSettingsStore
+) : VaultSettingsRepository {
 
-    constructor(context: Context) : this(context.applicationContext.vaultSharedDataStore)
+    constructor(context: Context) : this(
+        context.applicationContext.vaultSharedDataStore,
+        DataStoreLocalSettingsStore(context)
+    )
+
+    constructor(context: Context, localSettingsStore: LocalSettingsStore) : this(
+        context.applicationContext.vaultSharedDataStore,
+        localSettingsStore
+    )
 
     override suspend fun loadShared(workspaceRoot: File): Result<EskerraSettings> {
         migrateNoteboxIfNeeded(workspaceRoot)
@@ -43,7 +61,7 @@ class FileVaultSettingsRepository(private val dataStore: DataStore<Preferences>)
         val legacyFile = File(eskerraDir, VaultLayout.LEGACY_SETTINGS_FILE)
 
         return when {
-            sharedFile.isFile -> parseFile(sharedFile)
+            sharedFile.isFile -> readSharedFile(sharedFile)
             legacyFile.isFile -> migrateLegacySettings(legacyFile, sharedFile)
             else -> loadFromDataStore()
         }
@@ -63,21 +81,64 @@ class FileVaultSettingsRepository(private val dataStore: DataStore<Preferences>)
         }
     }
 
-    private fun parseFile(file: File): Result<EskerraSettings> {
-        val raw = runCatching { file.readText() }.getOrElse {
+    private suspend fun readSharedFile(sharedFile: File): Result<EskerraSettings> {
+        val raw = runCatching { sharedFile.readText() }.getOrElse {
             return Result.failure(
-                VaultSettingsException(VaultSettingsError.IoError("Failed to read ${file.name}."))
+                VaultSettingsException(
+                    VaultSettingsError.IoError("Failed to read ${sharedFile.name}.")
+                )
             )
         }
-        return EskerraSettingsCodec.parse(raw)
+        val settings = EskerraSettingsCodec.parse(raw).getOrElse { return Result.failure(it) }
+        migrateLegacyDisplayName(raw, settings, sharedFile)
+        return Result.success(settings)
     }
 
-    private fun migrateLegacySettings(legacyFile: File, sharedFile: File): Result<EskerraSettings> {
-        val result = parseFile(legacyFile)
-        val settings = result.getOrElse { return result }
-        val serialized = EskerraSettingsCodec.serialize(settings)
-        runCatching { sharedFile.writeText(serialized) }
+    private suspend fun migrateLegacySettings(
+        legacyFile: File,
+        sharedFile: File
+    ): Result<EskerraSettings> {
+        val raw = runCatching { legacyFile.readText() }.getOrElse {
+            return Result.failure(
+                VaultSettingsException(
+                    VaultSettingsError.IoError("Failed to read ${legacyFile.name}.")
+                )
+            )
+        }
+        val settings = EskerraSettingsCodec.parse(raw).getOrElse { return Result.failure(it) }
+        runCatching {
+            sharedFile.parentFile?.mkdirs()
+            sharedFile.writeText(EskerraSettingsCodec.serialize(settings))
+        }
+        migrateLegacyDisplayName(raw, settings, sharedFile)
         return Result.success(settings)
+    }
+
+    /**
+     * Spec `migrateLegacySharedDisplayNameIfNeeded`: if the raw shared JSON still carries a
+     * legacy `displayName`, copy it to local settings when the local name is empty, then
+     * rewrite the shared file without the key. [settings] is already parsed without the key
+     * (the codec ignores it), so re-serializing strips it from disk.
+     */
+    private suspend fun migrateLegacyDisplayName(
+        raw: String,
+        settings: EskerraSettings,
+        sharedFile: File
+    ) {
+        val obj = runCatching { Json.parseToJsonElement(raw).jsonObject }.getOrNull() ?: return
+        if (!obj.containsKey(LEGACY_DISPLAY_NAME_KEY)) return
+
+        val legacyName = (obj[LEGACY_DISPLAY_NAME_KEY] as? JsonPrimitive)
+            ?.takeIf { it.isString }
+            ?.content
+        if (!legacyName.isNullOrEmpty()) {
+            val local = localSettingsStore.load()
+            if (local.displayName.isEmpty()) {
+                localSettingsStore.save(local.copy(displayName = legacyName))
+            }
+        }
+
+        runCatching { sharedFile.writeText(EskerraSettingsCodec.serialize(settings)) }
     }
 
     private suspend fun loadFromDataStore(): Result<EskerraSettings> {
