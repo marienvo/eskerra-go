@@ -11,11 +11,8 @@ import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.long
 
 /**
- * Pure playlist parse/serialize, mirroring the relevant parts of
- * `packages/eskerra-core/src/playlist.ts`. The conflict-resolution merge
- * functions (`pickNewerPlaylistEntry`, `isRemotePlaylistNewerThanKnown`,
- * `buildPlaylistEntryForWrite`, `isPlaylistR2PollEchoFromOwnDevice`) land here
- * in Phase 6; this file currently carries the codec the R2 client needs.
+ * Pure playlist parse/serialize/merge, mirroring
+ * `packages/eskerra-core/src/playlist.ts`.
  */
 @OptIn(ExperimentalSerializationApi::class)
 private val prettyJson = Json {
@@ -38,14 +35,21 @@ fun normalizePlaylistEntryForSync(element: JsonElement?): PlaylistEntry? {
     val positionMs = obj.finiteOrNull("positionMs") ?: return null
     val durationMs = obj.durationOrInvalid("durationMs") ?: return null
 
+    // Optional/legacy fields: absent → default; present but wrong type → reject
+    val updatedAt = if ("updatedAt" !in obj) 0L else obj.finiteOrNull("updatedAt") ?: return null
+    val playbackOwnerId =
+        if ("playbackOwnerId" !in obj) "" else obj.stringOrNull("playbackOwnerId") ?: return null
+    val controlRevision =
+        if ("controlRevision" !in obj) 0L else obj.finiteOrNull("controlRevision") ?: return null
+
     return PlaylistEntry(
         episodeId = episodeId,
         mp3Url = mp3Url,
         positionMs = positionMs,
         durationMs = durationMs.value,
-        updatedAt = obj.finiteOrNull("updatedAt") ?: 0L,
-        playbackOwnerId = obj.stringOrNull("playbackOwnerId") ?: "",
-        controlRevision = obj.finiteOrNull("controlRevision") ?: 0L
+        updatedAt = updatedAt,
+        playbackOwnerId = playbackOwnerId,
+        controlRevision = controlRevision
     )
 }
 
@@ -87,3 +91,59 @@ private fun JsonObject.durationOrInvalid(key: String): DurationValue? {
     val finite = finiteOrNull(key) ?: return null
     return DurationValue(finite)
 }
+
+/**
+ * Prefer the entry with the greater `controlRevision`; if equal, prefer greater `updatedAt`;
+ * on full tie, prefer [second] (e.g. remote).
+ */
+fun pickNewerPlaylistEntry(first: PlaylistEntry?, second: PlaylistEntry?): PlaylistEntry? {
+    if (first == null) return second
+    if (second == null) return first
+    if (first.controlRevision != second.controlRevision) {
+        return if (first.controlRevision > second.controlRevision) first else second
+    }
+    if (first.updatedAt > second.updatedAt) return first
+    if (second.updatedAt > first.updatedAt) return second
+    return second
+}
+
+/** True when the remote entry was last written by this device (ETag echo guard). */
+fun isPlaylistR2PollEchoFromOwnDevice(entry: PlaylistEntry, deviceInstanceId: String): Boolean {
+    val ours = deviceInstanceId.trim()
+    val owner = entry.playbackOwnerId.trim()
+    return ours.isNotEmpty() && owner.isNotEmpty() && owner == ours
+}
+
+/** True when [remote] is strictly newer than what this device last merged. */
+fun isRemotePlaylistNewerThanKnown(
+    remote: PlaylistEntry,
+    knownUpdatedAtMs: Long,
+    knownControlRevision: Long
+): Boolean {
+    if (remote.controlRevision > knownControlRevision) return true
+    if (remote.controlRevision < knownControlRevision) return false
+    return remote.updatedAt > knownUpdatedAtMs
+}
+
+/**
+ * Merges [base] with optional patch fields and stamps a control write:
+ * bumps `controlRevision`, sets `playbackOwnerId`, advances `updatedAt` to at
+ * least [nowMs].
+ */
+fun buildPlaylistEntryForWrite(
+    base: PlaylistEntry,
+    deviceInstanceId: String,
+    nowMs: Long,
+    positionMs: Long = base.positionMs,
+    episodeId: String = base.episodeId,
+    mp3Url: String = base.mp3Url,
+    durationMs: Long? = base.durationMs
+): PlaylistEntry = base.copy(
+    episodeId = episodeId,
+    mp3Url = mp3Url,
+    positionMs = positionMs,
+    durationMs = durationMs,
+    playbackOwnerId = deviceInstanceId,
+    controlRevision = base.controlRevision + 1,
+    updatedAt = maxOf(nowMs, base.updatedAt)
+)
