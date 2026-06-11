@@ -24,8 +24,9 @@ import kotlinx.coroutines.launch
  *   never fires on first-boot missing.
  * - `setIntervalMs` reschedules the timer without an extra immediate tick.
  *
- * @param scope Parent scope; the poller creates a child [SupervisorJob] so [dispose] cleanly
- *   stops all work without cancelling the parent.
+ * @param scope Provides the [CoroutineDispatcher] for all poller coroutines. The poller owns a
+ *   **standalone** [SupervisorJob] (not a child of [scope]'s job), so [dispose] is the
+ *   sole stop mechanism; callers must call it when the host is destroyed.
  */
 class PlaylistEtagPoller(
     initialIntervalMs: Long,
@@ -35,7 +36,7 @@ class PlaylistEtagPoller(
     private val onRemotePlaylistCleared: (() -> Unit)? = null,
     private val onTransientError: ((Throwable) -> Unit)? = null
 ) {
-    private val pollerJob = SupervisorJob(scope.coroutineContext[Job])
+    private val pollerJob = SupervisorJob()
     private val pollerScope = CoroutineScope(scope.coroutineContext + pollerJob)
 
     private var etag: String? = null
