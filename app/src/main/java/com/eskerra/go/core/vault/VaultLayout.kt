@@ -2,6 +2,9 @@ package com.eskerra.go.core.vault
 
 /** Path constants mirroring `packages/eskerra-core/src/vaultLayout.ts`. */
 object VaultLayout {
+    const val ASSETS_DIRECTORY_NAME = "Assets"
+    const val ATTACHMENTS_DIRECTORY_NAME = "Attachments"
+
     const val ESKERRA_DIR = ".eskerra"
     const val NOTEBOX_DIR = ".notebox"
     const val SHARED_SETTINGS_FILE = "settings-shared.json"

@@ -13,20 +13,17 @@ import com.eskerra.go.core.model.NoteRegistry
 import com.mikepenz.markdown.compose.Markdown
 import com.mikepenz.markdown.m3.markdownColor
 import com.mikepenz.markdown.m3.markdownTypography
+import java.io.File
 import java.time.LocalDateTime
 
 /**
- * Shared read-only vault markdown renderer (spec §8): YAML frontmatter strip, wiki→synthetic-link
+ * Shared read-only vault markdown renderer (spec §8, §13): YAML frontmatter strip, wiki→synthetic-link
  * preprocessing, standard markdown via the library, custom callout cards, per-tone link colours,
- * tap routing, and reminder pills.
- */
-/**
- * Shared read-only vault markdown renderer (spec §8): YAML frontmatter strip, wiki→synthetic-link
- * preprocessing, standard markdown via the library, custom callout cards, per-tone link colours,
- * tap routing, and reminder pills.
+ * vault image loading, tap routing, and reminder pills.
  *
- * @param sourceNoteId vault-relative path of the open note; enables relative `.md` link resolution
- *   (spec §9.3). Pass `null` when the source context is unknown (links will show as muted).
+ * @param workspaceRoot vault working-tree root on disk; required for local attachment `file://` loads.
+ * @param sourceNoteId vault-relative path of the open note; enables relative link/image resolution
+ *   (spec §9.3, §13). Pass `null` when the source context is unknown (links show as muted).
  * @param onNoteNotFound called when a tapped link cannot be resolved; message reflects [indexStatus]
  *   ("Note not found", "Still indexing vault", "Vault index unavailable").
  */
@@ -39,6 +36,7 @@ fun VaultMarkdownView(
     onOpenExternalUrl: (String) -> Unit,
     onAmbiguousWikiLink: (List<NoteId>, String) -> Unit,
     modifier: Modifier = Modifier,
+    workspaceRoot: File? = null,
     sourceNoteId: NoteId? = null,
     onNoteNotFound: (String) -> Unit = {}
 ) {
@@ -74,6 +72,7 @@ fun VaultMarkdownView(
         onLinkTap,
         sourceNoteId
     )
+    val components = vaultMarkdownComponents(workspaceRoot, sourceNoteId)
 
     Column(modifier) {
         segments.forEach { segment ->
@@ -83,13 +82,16 @@ fun VaultMarkdownView(
                     colors = colors,
                     typography = typography,
                     annotator = annotator,
+                    components = components,
                     modifier = Modifier.fillMaxWidth()
                 )
 
                 is CalloutBlocks.Segment.Callout -> CalloutCard(
                     callout = segment,
                     colors = colors,
-                    typography = typography
+                    typography = typography,
+                    workspaceRoot = workspaceRoot,
+                    sourceNoteId = sourceNoteId
                 )
             }
         }

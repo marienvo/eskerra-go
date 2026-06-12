@@ -24,6 +24,7 @@ import com.eskerra.go.core.markdown.VaultReadonlyLink
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NoteRegistry
 import com.eskerra.go.ui.markdown.VaultMarkdownView
+import java.io.File
 
 /**
  * Stateless read-only note reader. Renders precomputed [NoteReaderUiState] through the shared §8
@@ -39,6 +40,7 @@ fun NoteScreen(
     onOpenExternalUrl: (String) -> Unit,
     onAmbiguousWikiLink: (List<NoteId>, String) -> Unit,
     onNoteNotFound: (String) -> Unit = {},
+    workspaceRoot: File? = null,
     modifier: Modifier = Modifier
 ) {
     val chrome = LocalShellChromeInsets.current
@@ -71,7 +73,8 @@ fun NoteScreen(
                 onOpenInternalNote = onOpenInternalNote,
                 onOpenExternalUrl = onOpenExternalUrl,
                 onAmbiguousWikiLink = onAmbiguousWikiLink,
-                onNoteNotFound = onNoteNotFound
+                onNoteNotFound = onNoteNotFound,
+                workspaceRoot = workspaceRoot
             )
             NoteReaderUiState.NotFound -> NoteReaderMessage(
                 title = "Note not found",
@@ -117,7 +120,8 @@ private fun NoteReaderContent(
     onOpenInternalNote: (NoteId) -> Unit,
     onOpenExternalUrl: (String) -> Unit,
     onAmbiguousWikiLink: (List<NoteId>, String) -> Unit,
-    onNoteNotFound: (String) -> Unit
+    onNoteNotFound: (String) -> Unit,
+    workspaceRoot: File?
 ) {
     val chrome = LocalShellChromeInsets.current
     Column(
@@ -153,6 +157,7 @@ private fun NoteReaderContent(
             onOpenInternalNote = onOpenInternalNote,
             onOpenExternalUrl = onOpenExternalUrl,
             onAmbiguousWikiLink = onAmbiguousWikiLink,
+            workspaceRoot = workspaceRoot,
             sourceNoteId = sourceNoteId,
             onNoteNotFound = onNoteNotFound,
             modifier = Modifier.fillMaxWidth()

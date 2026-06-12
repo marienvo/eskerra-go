@@ -13,9 +13,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.eskerra.go.core.markdown.CalloutBlocks
+import com.eskerra.go.core.model.NoteId
 import com.mikepenz.markdown.compose.Markdown
 import com.mikepenz.markdown.model.MarkdownColors
 import com.mikepenz.markdown.model.MarkdownTypography
+import java.io.File
 
 /**
  * Renders a single Obsidian callout block (spec §8) as a tinted card with an accent title and the
@@ -26,7 +28,9 @@ fun CalloutCard(
     callout: CalloutBlocks.Segment.Callout,
     colors: MarkdownColors,
     typography: MarkdownTypography,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    workspaceRoot: File? = null,
+    sourceNoteId: NoteId? = null
 ) {
     val accent = VaultMarkdownTokens.calloutAccent(callout.resolved.color)
     Box(
@@ -49,6 +53,7 @@ fun CalloutCard(
                     content = callout.body,
                     colors = colors,
                     typography = typography,
+                    components = vaultMarkdownComponents(workspaceRoot, sourceNoteId),
                     modifier = Modifier.fillMaxWidth()
                 )
             }

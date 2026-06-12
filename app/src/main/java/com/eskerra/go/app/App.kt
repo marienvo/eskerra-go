@@ -46,6 +46,7 @@ import com.eskerra.go.core.usecase.SaveRemoteSyncSettings
 import com.eskerra.go.core.usecase.SaveVaultSettings
 import com.eskerra.go.core.usecase.TestRemoteConnection
 import com.eskerra.go.core.usecase.UpdateSyncToken
+import com.eskerra.go.data.workspace.WorkspacePaths
 import com.eskerra.go.feature.editor.CreateInboxScreen
 import com.eskerra.go.feature.editor.NoteEditorScreen
 import com.eskerra.go.feature.inbox.InboxUiState
@@ -97,6 +98,9 @@ fun App(
     onInboxUiStateChanged: (InboxUiState) -> Unit = {}
 ) {
     var currentConfig by remember(config) { mutableStateOf(config) }
+    val workspaceRoot = remember(currentConfig, filesDir) {
+        WorkspacePaths.resolve(filesDir, currentConfig.relativePath).getOrNull()
+    }
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
@@ -346,7 +350,8 @@ fun App(
                     },
                     onNoteNotFound = { message: String ->
                         showNoteNotFoundToast(noteReaderContext, message)
-                    }
+                    },
+                    workspaceRoot = workspaceRoot
                 )
 
                 val registry = (readerState as? NoteReaderUiState.Content)?.document?.registry
