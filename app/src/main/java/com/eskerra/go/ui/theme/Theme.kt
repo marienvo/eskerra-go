@@ -22,6 +22,7 @@ private val LightColorScheme = lightColorScheme(
     tertiary = Pink40
 )
 
+/** Dark-mode-only theme. Chrome/header/modal tokens live in [EskerraChromeTokens] (spec §10). */
 @Composable
 fun EskerraGoTheme(darkTheme: Boolean = true, content: @Composable () -> Unit) {
     val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme

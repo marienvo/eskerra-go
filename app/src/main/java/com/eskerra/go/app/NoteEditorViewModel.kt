@@ -52,14 +52,15 @@ class NoteEditorViewModel(
         load()
     }
 
-    fun updateDraft(markdown: String) {
+    fun updateDraft(draft: String) {
         val current = _uiState.value
         if (current !is NoteEditorUiState.Content || !current.note.canEdit || current.isSaving) {
             return
         }
         _uiState.value = current.copy(
-            draftMarkdown = markdown,
-            isDirty = markdown != current.note.markdown,
+            draftMarkdown = draft,
+            isDirty = draftMarkdownToPersisted(draft, current.note.isInbox) !=
+                current.note.markdown,
             saveMessage = null,
             errorMessage = null
         )
@@ -73,11 +74,15 @@ class NoteEditorViewModel(
 
         viewModelScope.launch {
             _uiState.value = current.copy(isSaving = true, errorMessage = null, saveMessage = null)
-            saveNote(config, filesDir, noteId, current.draftMarkdown).fold(
+            val markdown = draftMarkdownToPersisted(current.draftMarkdown, current.note.isInbox)
+            saveNote(config, filesDir, noteId, markdown).fold(
                 onSuccess = { result ->
                     _uiState.value = NoteEditorUiState.Content(
                         note = result.note,
-                        draftMarkdown = result.note.markdown,
+                        draftMarkdown = persistedMarkdownToDraft(
+                            result.note.markdown,
+                            result.note.isInbox
+                        ),
                         isDirty = false,
                         isSaving = false,
                         saveMessage = SAVED_MESSAGE,
@@ -106,7 +111,7 @@ class NoteEditorViewModel(
                     val gitStatus = loadGitStatusSummary(config, filesDir)
                     _uiState.value = NoteEditorUiState.Content(
                         note = note,
-                        draftMarkdown = note.markdown,
+                        draftMarkdown = persistedMarkdownToDraft(note.markdown, note.isInbox),
                         isDirty = false,
                         isSaving = false,
                         saveMessage = null,
@@ -147,6 +152,12 @@ class NoteEditorViewModel(
             is SaveNoteError.WriteFailed, null -> SAVE_ERROR_MESSAGE
         }
     }
+
+    private fun persistedMarkdownToDraft(markdown: String, isInbox: Boolean): String =
+        if (isInbox) InboxNoteDraft.fromMarkdownToComposeInput(markdown) else markdown
+
+    private fun draftMarkdownToPersisted(draft: String, isInbox: Boolean): String =
+        if (isInbox) InboxNoteDraft.toMarkdown(draft) else draft
 
     companion object {
         const val LOAD_ERROR_MESSAGE = "Could not open this note."

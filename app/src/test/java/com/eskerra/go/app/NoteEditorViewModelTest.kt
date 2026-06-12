@@ -76,7 +76,7 @@ class NoteEditorViewModelTest {
         val viewModel = editorViewModel(noteId, registry, content)
 
         val state = viewModel.uiState.value as NoteEditorUiState.Content
-        assertEquals("# First\n\nBody", state.draftMarkdown)
+        assertEquals("First\n\nBody", state.draftMarkdown)
         assertFalse(state.isDirty)
         assertTrue(state.note.canEdit)
     }
@@ -88,10 +88,10 @@ class NoteEditorViewModelTest {
         val content = FakeNoteContentRepository.withContent(noteId, "# First")
         val viewModel = editorViewModel(noteId, registry, content)
 
-        viewModel.updateDraft("# First\n\nEdited")
+        viewModel.updateDraft("First\n\nEdited")
 
         val state = viewModel.uiState.value as NoteEditorUiState.Content
-        assertEquals("# First\n\nEdited", state.draftMarkdown)
+        assertEquals("First\n\nEdited", state.draftMarkdown)
         assertTrue(state.isDirty)
     }
 
@@ -103,7 +103,7 @@ class NoteEditorViewModelTest {
         val writeRepository = FakeNoteWriteRepository()
         val viewModel = editorViewModel(noteId, registry, content, writeRepository)
 
-        viewModel.updateDraft("# First\n\nSaved body")
+        viewModel.updateDraft("First\n\nSaved body")
         viewModel.save()
         advanceUntilIdle()
 
@@ -122,7 +122,7 @@ class NoteEditorViewModelTest {
         val events = mutableListOf<Unit>()
         val collectJob = launch { viewModel.noteSavedEvents.collect { events.add(Unit) } }
 
-        viewModel.updateDraft("# First\n\nSaved body")
+        viewModel.updateDraft("First\n\nSaved body")
         viewModel.save()
         advanceUntilIdle()
 
@@ -154,7 +154,7 @@ class NoteEditorViewModelTest {
         val events = mutableListOf<Unit>()
         val collectJob = launch { viewModel.noteSavedEvents.collect { events.add(Unit) } }
 
-        viewModel.updateDraft("# First\n\nDraft kept")
+        viewModel.updateDraft("First\n\nDraft kept")
         viewModel.save()
         advanceUntilIdle()
 
@@ -184,12 +184,12 @@ class NoteEditorViewModelTest {
             loadGitStatusSummary = loadGitStatusSummary()
         )
 
-        viewModel.updateDraft("# First\n\nDraft kept")
+        viewModel.updateDraft("First\n\nDraft kept")
         viewModel.save()
         advanceUntilIdle()
 
         val state = viewModel.uiState.value as NoteEditorUiState.Content
-        assertEquals("# First\n\nDraft kept", state.draftMarkdown)
+        assertEquals("First\n\nDraft kept", state.draftMarkdown)
         assertTrue(state.isDirty)
         assertEquals(NoteEditorViewModel.SAVE_ERROR_MESSAGE, state.errorMessage)
     }
@@ -232,7 +232,7 @@ class NoteEditorViewModelTest {
         )
 
         val state = viewModel.uiState.value as NoteEditorUiState.Content
-        assertEquals("# First", state.draftMarkdown)
+        assertEquals("First", state.draftMarkdown)
         assertEquals(
             com.eskerra.go.core.model.GitStatusSummary.State.Error,
             state.gitStatus.state

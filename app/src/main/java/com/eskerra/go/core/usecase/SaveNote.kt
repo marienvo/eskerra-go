@@ -95,6 +95,8 @@ class SaveNote(
                         SaveNoteError.InvalidNoteId
                     is NoteWriteError.WriteFailed ->
                         SaveNoteError.WriteFailed(error.error.detail)
+                    is NoteWriteError.DeleteFailed ->
+                        SaveNoteError.WriteFailed(error.error.detail)
                 }
                 return SaveNoteException(mapped)
             }

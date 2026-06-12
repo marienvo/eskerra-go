@@ -14,11 +14,10 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Inbox
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Podcasts
+import androidx.compose.material.icons.filled.Today
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -26,6 +25,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.eskerra.go.ui.theme.EskerraChromeTokens
 
 /**
  * Floating navigation shell. It overlays controls on top of the current screen:
@@ -73,6 +73,7 @@ fun AppShell(
             BottomTaskbar(
                 currentRoute = currentRoute,
                 onInbox = { onNavigate(AppRoute.INBOX) },
+                onToday = { onNavigate(AppRoute.TODAY_HUB) },
                 onAdd = { onNavigate(AppRoute.CREATE_INBOX) },
                 onPodcasts = { onNavigate(AppRoute.PODCASTS) },
                 modifier = Modifier
@@ -88,6 +89,7 @@ fun AppShell(
 private fun BottomTaskbar(
     currentRoute: String?,
     onInbox: () -> Unit,
+    onToday: () -> Unit,
     onAdd: () -> Unit,
     onPodcasts: () -> Unit,
     modifier: Modifier = Modifier
@@ -108,6 +110,12 @@ private fun BottomTaskbar(
                 contentDescription = "Inbox",
                 selected = currentRoute == AppRoute.INBOX,
                 onClick = onInbox
+            )
+            TaskbarButton(
+                icon = Icons.Filled.Today,
+                contentDescription = "Today",
+                selected = currentRoute == AppRoute.TODAY_HUB,
+                onClick = onToday
             )
             FloatingActionButton(
                 onClick = onAdd,
@@ -132,7 +140,11 @@ private fun TaskbarButton(
     selected: Boolean,
     onClick: () -> Unit
 ) {
-    val tint = if (selected) MaterialTheme.colorScheme.primary else LocalContentColor.current
+    val tint = if (selected) {
+        EskerraChromeTokens.HeaderText
+    } else {
+        EskerraChromeTokens.HeaderInactive
+    }
     IconButton(onClick = onClick) {
         Icon(icon, contentDescription = contentDescription, tint = tint)
     }

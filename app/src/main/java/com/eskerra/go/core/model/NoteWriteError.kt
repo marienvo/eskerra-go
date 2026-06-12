@@ -9,6 +9,8 @@ sealed interface NoteWriteError {
     data object InvalidNotePath : NoteWriteError
 
     data class WriteFailed(val detail: String?) : NoteWriteError
+
+    data class DeleteFailed(val detail: String?) : NoteWriteError
 }
 
 class NoteWriteException(val error: NoteWriteError) : Exception(error.toString())

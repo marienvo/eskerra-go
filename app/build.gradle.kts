@@ -95,6 +95,16 @@ dependencies {
     implementation(libs.jgit)
     implementation(libs.okhttp)
 
+    // Compose markdown renderer (Phase 3+)
+    implementation(libs.markdown.renderer.core)
+    implementation(libs.markdown.renderer.m3)
+
+    // Image loading for vault attachments (Phase 5+)
+    implementation(libs.coil.compose)
+
+    // Date/time for relative labels, reminder-pill tone, Today Hub week math (Phase 2+)
+    implementation(libs.kotlinx.datetime)
+
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.okhttp.mockwebserver)

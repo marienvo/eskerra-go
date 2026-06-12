@@ -7,13 +7,13 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ProcessLifecycleOwner
-import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -23,10 +23,12 @@ import androidx.navigation.navArgument
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.model.hasSyncWork
+import com.eskerra.go.core.repository.ActiveTodayHubStore
 import com.eskerra.go.core.usecase.BuildSafeSyncDiagnostic
 import com.eskerra.go.core.usecase.BuildSyncPreflight
 import com.eskerra.go.core.usecase.ClearRemoteSyncSettings
 import com.eskerra.go.core.usecase.CreateInboxNote
+import com.eskerra.go.core.usecase.DeleteInboxNotes
 import com.eskerra.go.core.usecase.EnsureDeviceInstanceId
 import com.eskerra.go.core.usecase.LoadEditableNote
 import com.eskerra.go.core.usecase.LoadGitStatusSummary
@@ -35,7 +37,10 @@ import com.eskerra.go.core.usecase.LoadLocalSettings
 import com.eskerra.go.core.usecase.LoadNoteForReading
 import com.eskerra.go.core.usecase.LoadRemoteSyncSettings
 import com.eskerra.go.core.usecase.LoadSyncStatus
+import com.eskerra.go.core.usecase.LoadTodayHub
+import com.eskerra.go.core.usecase.LoadTodayHubRow
 import com.eskerra.go.core.usecase.LoadVaultSettings
+import com.eskerra.go.core.usecase.MaintainVaultSearchIndex
 import com.eskerra.go.core.usecase.ManualSyncNow
 import com.eskerra.go.core.usecase.ReconcileWorkspaceSyncBranch
 import com.eskerra.go.core.usecase.RecordLastSyncAttempt
@@ -44,19 +49,23 @@ import com.eskerra.go.core.usecase.SaveLocalSettings
 import com.eskerra.go.core.usecase.SaveNote
 import com.eskerra.go.core.usecase.SaveRemoteSyncSettings
 import com.eskerra.go.core.usecase.SaveVaultSettings
+import com.eskerra.go.core.usecase.SearchVault
 import com.eskerra.go.core.usecase.TestRemoteConnection
+import com.eskerra.go.core.usecase.TouchVaultSearchPaths
 import com.eskerra.go.core.usecase.UpdateSyncToken
+import com.eskerra.go.data.workspace.WorkspacePaths
 import com.eskerra.go.feature.editor.CreateInboxScreen
 import com.eskerra.go.feature.editor.NoteEditorScreen
 import com.eskerra.go.feature.inbox.InboxUiState
 import com.eskerra.go.feature.menu.MenuScreen
+import com.eskerra.go.feature.note.NoteReaderUiState
 import com.eskerra.go.feature.note.NoteScreen
-import com.eskerra.go.feature.podcasts.PodcastItem
 import com.eskerra.go.feature.podcasts.PodcastsScreen
 import com.eskerra.go.feature.settings.VaultSettingsScreen
 import com.eskerra.go.feature.sync.SyncScreen
 import com.eskerra.go.feature.sync.SyncSettingsScreen
 import com.eskerra.go.feature.sync.SyncUiState
+import com.eskerra.go.ui.markdown.AmbiguousWikiLinkSheet
 import java.io.File
 
 /**
@@ -70,9 +79,13 @@ fun App(
     loadInboxSummaries: LoadInboxSummariesCached,
     loadNoteForReading: LoadNoteForReading,
     createInboxNote: CreateInboxNote,
+    deleteInboxNotes: DeleteInboxNotes,
     loadEditableNote: LoadEditableNote,
     saveNote: SaveNote,
     loadGitStatusSummary: LoadGitStatusSummary,
+    loadTodayHub: LoadTodayHub,
+    loadTodayHubRow: LoadTodayHubRow,
+    activeTodayHubStore: ActiveTodayHubStore,
     loadSyncStatus: LoadSyncStatus,
     refreshRemoteSyncStatus: RefreshRemoteSyncStatus,
     buildSyncPreflight: BuildSyncPreflight,
@@ -90,11 +103,18 @@ fun App(
     loadLocalSettings: LoadLocalSettings,
     saveLocalSettings: SaveLocalSettings,
     ensureDeviceInstanceId: EnsureDeviceInstanceId,
+    searchVault: SearchVault,
+    maintainVaultSearchIndex: MaintainVaultSearchIndex,
+    touchVaultSearchPaths: TouchVaultSearchPaths,
     onConfigUpdated: (WorkspaceConfig) -> Unit,
     onInboxUiStateChanged: (InboxUiState) -> Unit = {}
 ) {
     var currentConfig by remember(config) { mutableStateOf(config) }
+    val workspaceRoot = remember(currentConfig, filesDir) {
+        WorkspacePaths.resolve(filesDir, currentConfig.relativePath).getOrNull()
+    }
     val navController = rememberNavController()
+    val scope = rememberCoroutineScope()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     val markInboxNotesChanged = {
@@ -128,6 +148,11 @@ fun App(
         appSyncViewModel = appSyncViewModel,
         onConfigUpdated = onConfigUpdated,
         onConfigChanged = { updated -> currentConfig = updated }
+    )
+    AppSearchIndexEffects(
+        config = currentConfig,
+        filesDir = filesDir,
+        maintainVaultSearchIndex = maintainVaultSearchIndex
     )
 
     DisposableEffect(appSyncViewModel) {
@@ -181,10 +206,12 @@ fun App(
                     currentConfig = currentConfig,
                     filesDir = filesDir,
                     loadInboxSummaries = loadInboxSummaries,
+                    deleteInboxNotes = deleteInboxNotes,
                     currentRoute = currentRoute,
                     entry = entry,
                     navController = navController,
                     appSyncViewModel = appSyncViewModel,
+                    touchVaultSearchPaths = touchVaultSearchPaths,
                     onInboxUiStateChanged = onInboxUiStateChanged
                 )
             }
@@ -204,6 +231,12 @@ fun App(
                         if (noteId != null) {
                             markInboxNotesChanged()
                             appSyncViewModel.refreshLocalStatusQuietly()
+                            scope.touchVaultSearchPathsAsync(
+                                touchVaultSearchPaths,
+                                currentConfig,
+                                filesDir,
+                                listOf(noteId.value)
+                            )
                             navController.navigate(AppRoute.note(noteId)) {
                                 popUpTo(AppRoute.CREATE_INBOX) { inclusive = true }
                             }
@@ -219,6 +252,28 @@ fun App(
                 )
             }
 
+            composable(AppRoute.SEARCH) {
+                AppSearchRoute(
+                    currentConfig = currentConfig,
+                    filesDir = filesDir,
+                    searchVault = searchVault,
+                    maintainVaultSearchIndex = maintainVaultSearchIndex,
+                    navController = navController
+                )
+            }
+
+            composable(AppRoute.TODAY_HUB) {
+                AppTodayHubRoute(
+                    currentConfig = currentConfig,
+                    filesDir = filesDir,
+                    loadTodayHub = loadTodayHub,
+                    loadTodayHubRow = loadTodayHubRow,
+                    activeTodayHubStore = activeTodayHubStore,
+                    workspaceRoot = workspaceRoot,
+                    navController = navController
+                )
+            }
+
             composable(AppRoute.PODCASTS) {
                 PodcastsScreen(podcasts = fakePodcasts)
             }
@@ -228,6 +283,7 @@ fun App(
                     items = menuItems,
                     onItemClick = { item ->
                         when (item) {
+                            MENU_SEARCH -> navController.navigate(AppRoute.SEARCH)
                             MENU_SYNC -> navController.navigate(AppRoute.SYNC)
                             MENU_SETTINGS -> navController.navigate(AppRoute.SETTINGS)
                         }
@@ -323,15 +379,41 @@ fun App(
                     }
                 }
 
+                val noteReaderContext = LocalContext.current
+                var ambiguousCandidates by remember { mutableStateOf<List<NoteId>?>(null) }
+
                 NoteScreen(
                     state = readerState,
                     onRetry = noteReaderViewModel::retry,
                     onBack = { navController.popBackStack() },
                     onEdit = { navController.navigate(AppRoute.editor(noteId)) },
-                    onResolvedWikiLinkClick = { targetId: NoteId ->
+                    onOpenInternalNote = { targetId: NoteId ->
                         navController.navigate(AppRoute.note(targetId))
-                    }
+                    },
+                    onOpenExternalUrl = { url: String ->
+                        openExternalUrl(noteReaderContext, url)
+                    },
+                    onAmbiguousWikiLink = { candidates: List<NoteId>, _: String ->
+                        ambiguousCandidates = candidates
+                    },
+                    onNoteNotFound = { message: String ->
+                        showNoteNotFoundToast(noteReaderContext, message)
+                    },
+                    workspaceRoot = workspaceRoot
                 )
+
+                val registry = (readerState as? NoteReaderUiState.Content)?.document?.registry
+                if (ambiguousCandidates != null && registry != null) {
+                    AmbiguousWikiLinkSheet(
+                        candidates = ambiguousCandidates!!,
+                        registry = registry,
+                        onPickNote = { picked ->
+                            ambiguousCandidates = null
+                            navController.navigate(AppRoute.note(picked))
+                        },
+                        onDismiss = { ambiguousCandidates = null }
+                    )
+                }
             }
 
             composable(
@@ -358,6 +440,12 @@ fun App(
                     editorViewModel.noteSavedEvents.collect {
                         markInboxNotesChanged()
                         appSyncViewModel.refreshLocalStatusQuietly()
+                        scope.touchVaultSearchPathsAsync(
+                            touchVaultSearchPaths,
+                            currentConfig,
+                            filesDir,
+                            listOf(noteId.value)
+                        )
                         navController.markNoteReaderChanged(noteId)
                         navController.navigate(AppRoute.note(noteId)) {
                             popUpTo(AppRoute.editor(noteId)) { inclusive = true }
@@ -380,46 +468,3 @@ fun App(
 
 /** ViewModel key for sync screens; includes branch so branch-only updates recreate VMs. */
 private fun WorkspaceConfig.syncViewModelKey(): String = "${remoteUri.orEmpty()}:$branch"
-
-internal const val NOTES_CHANGED_KEY = "notesChanged"
-internal const val NOTE_CONTENT_CHANGED_KEY = "noteContentChanged"
-
-internal fun consumeNoteReaderChanged(
-    currentRoute: String?,
-    noteId: NoteId,
-    savedStateHandle: SavedStateHandle
-): Boolean {
-    if (currentRoute != AppRoute.NOTE_PATTERN) return false
-    return savedStateHandle.remove<Boolean>(NOTE_CONTENT_CHANGED_KEY) == true
-}
-
-private fun NavHostController.markInboxNotesChanged() {
-    runCatching {
-        getBackStackEntry(AppRoute.INBOX).savedStateHandle[NOTES_CHANGED_KEY] = true
-    }
-}
-
-private fun NavHostController.markNoteReaderChanged(noteId: NoteId) {
-    runCatching {
-        getBackStackEntry(AppRoute.note(noteId))
-            .savedStateHandle[NOTE_CONTENT_CHANGED_KEY] = true
-    }
-}
-
-private val fakePodcasts: List<PodcastItem> = listOf(
-    PodcastItem(title = "Note-taking, deeply", author = "Eskerra FM"),
-    PodcastItem(title = "Plain text forever", author = "Markdown Weekly"),
-    PodcastItem(title = "Compose in practice", author = "Android Cafe")
-)
-
-private const val MENU_SYNC = "Sync"
-private const val MENU_SETTINGS = "Settings"
-private const val MENU_WORKSPACES = "Workspaces"
-private const val MENU_ABOUT = "About"
-
-private val menuItems: List<String> = listOf(
-    MENU_SYNC,
-    MENU_SETTINGS,
-    MENU_WORKSPACES,
-    MENU_ABOUT
-)

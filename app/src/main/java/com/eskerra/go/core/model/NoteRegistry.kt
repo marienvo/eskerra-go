@@ -10,7 +10,7 @@ data class NoteRegistry(val notes: List<NoteSummary>) {
         notes.filter { it.isInbox }
             .sortedWith(
                 compareByDescending<NoteSummary> { it.lastModifiedEpochMillis }
-                    .thenBy { it.id.value }
+                    .thenBy(String.CASE_INSENSITIVE_ORDER) { it.fileName }
             )
 
     companion object {

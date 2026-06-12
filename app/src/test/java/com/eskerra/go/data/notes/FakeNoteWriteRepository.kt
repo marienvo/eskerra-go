@@ -15,10 +15,14 @@ class FakeNoteWriteRepository(
 ) : NoteWriteRepository {
 
     val writtenPaths = mutableListOf<Pair<NotePath, String>>()
+    val deletedPaths = mutableListOf<NotePath>()
     var writeCount: Int = 0
         private set
     var existsCount: Int = 0
         private set
+    var deleteCount: Int = 0
+        private set
+    private var deleteResult: Result<Unit> = Result.success(Unit)
     var lastConfig: WorkspaceConfig? = null
         private set
     var lastFilesDir: File? = null
@@ -34,6 +38,10 @@ class FakeNoteWriteRepository(
 
     fun setWriteDelayMs(delayMs: Long) {
         writeDelayMs = delayMs
+    }
+
+    fun setDeleteResult(result: Result<Unit>) {
+        deleteResult = result
     }
 
     override suspend fun write(
@@ -61,6 +69,18 @@ class FakeNoteWriteRepository(
         lastConfig = config
         lastFilesDir = filesDir
         return existsResult
+    }
+
+    override suspend fun delete(
+        config: WorkspaceConfig,
+        filesDir: File,
+        notePath: NotePath
+    ): Result<Unit> {
+        deleteCount += 1
+        lastConfig = config
+        lastFilesDir = filesDir
+        deletedPaths += notePath
+        return deleteResult
     }
 
     companion object {

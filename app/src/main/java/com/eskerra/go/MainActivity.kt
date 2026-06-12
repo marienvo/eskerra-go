@@ -15,6 +15,7 @@ import com.eskerra.go.core.usecase.BuildSafeSyncDiagnostic
 import com.eskerra.go.core.usecase.BuildSyncPreflight
 import com.eskerra.go.core.usecase.ClearRemoteSyncSettings
 import com.eskerra.go.core.usecase.CreateInboxNote
+import com.eskerra.go.core.usecase.DeleteInboxNotes
 import com.eskerra.go.core.usecase.EnsureDeviceInstanceId
 import com.eskerra.go.core.usecase.LoadEditableNote
 import com.eskerra.go.core.usecase.LoadGitStatusSummary
@@ -24,7 +25,10 @@ import com.eskerra.go.core.usecase.LoadLocalSettings
 import com.eskerra.go.core.usecase.LoadNoteForReading
 import com.eskerra.go.core.usecase.LoadRemoteSyncSettings
 import com.eskerra.go.core.usecase.LoadSyncStatus
+import com.eskerra.go.core.usecase.LoadTodayHub
+import com.eskerra.go.core.usecase.LoadTodayHubRow
 import com.eskerra.go.core.usecase.LoadVaultSettings
+import com.eskerra.go.core.usecase.MaintainVaultSearchIndex
 import com.eskerra.go.core.usecase.ManualSyncNow
 import com.eskerra.go.core.usecase.ReconcileWorkspaceSyncBranch
 import com.eskerra.go.core.usecase.RecordLastSyncAttempt
@@ -33,7 +37,9 @@ import com.eskerra.go.core.usecase.SaveLocalSettings
 import com.eskerra.go.core.usecase.SaveNote
 import com.eskerra.go.core.usecase.SaveRemoteSyncSettings
 import com.eskerra.go.core.usecase.SaveVaultSettings
+import com.eskerra.go.core.usecase.SearchVault
 import com.eskerra.go.core.usecase.TestRemoteConnection
+import com.eskerra.go.core.usecase.TouchVaultSearchPaths
 import com.eskerra.go.core.usecase.UpdateSyncToken
 import com.eskerra.go.data.credentials.AndroidKeystoreTokenCipher
 import com.eskerra.go.data.credentials.EncryptedCredentialStore
@@ -43,6 +49,8 @@ import com.eskerra.go.data.notes.FileInboxSnapshotStore
 import com.eskerra.go.data.notes.FileNoteContentRepository
 import com.eskerra.go.data.notes.FileNoteRegistryRepository
 import com.eskerra.go.data.notes.FileNoteWriteRepository
+import com.eskerra.go.data.search.SqliteVaultSearchRepository
+import com.eskerra.go.data.todayhub.DataStoreActiveTodayHubStore
 import com.eskerra.go.data.vault.DataStoreLocalSettingsStore
 import com.eskerra.go.data.vault.FileVaultSettingsRepository
 import com.eskerra.go.data.workspace.DataStoreWorkspaceStore
@@ -93,6 +101,11 @@ class MainActivity : ComponentActivity() {
             registryRepository = noteRegistryRepository,
             loadGitStatusSummary = loadGitStatusSummary
         )
+        val deleteInboxNotes = DeleteInboxNotes(
+            writeRepository = noteWriteRepository,
+            registryRepository = noteRegistryRepository,
+            loadGitStatusSummary = loadGitStatusSummary
+        )
         val loadEditableNote = LoadEditableNote(
             registryRepository = noteRegistryRepository,
             contentRepository = noteContentRepository
@@ -102,6 +115,13 @@ class MainActivity : ComponentActivity() {
             registryRepository = noteRegistryRepository,
             loadGitStatusSummary = loadGitStatusSummary
         )
+
+        val loadTodayHub = LoadTodayHub(
+            registryRepository = noteRegistryRepository,
+            contentRepository = noteContentRepository
+        )
+        val loadTodayHubRow = LoadTodayHubRow(contentRepository = noteContentRepository)
+        val activeTodayHubStore = DataStoreActiveTodayHubStore(applicationContext)
 
         val remoteSyncRepository = JGitRemoteSyncRepository(gitRepository)
         val loadSyncStatus = LoadSyncStatus(remoteSyncRepository)
@@ -154,6 +174,11 @@ class MainActivity : ComponentActivity() {
         val clearRemoteSyncSettings = ClearRemoteSyncSettings(remoteSyncSettingsRepository)
         val testRemoteConnection = TestRemoteConnection(remoteSyncSettingsRepository)
 
+        val vaultSearchRepository = SqliteVaultSearchRepository(applicationContext)
+        val searchVault = SearchVault(vaultSearchRepository)
+        val maintainVaultSearchIndex = MaintainVaultSearchIndex(vaultSearchRepository)
+        val touchVaultSearchPaths = TouchVaultSearchPaths(vaultSearchRepository)
+
         setContent {
             AppRoot(
                 workspaceStore = workspaceStore,
@@ -163,9 +188,13 @@ class MainActivity : ComponentActivity() {
                 loadInboxSummaries = loadInboxSummaries,
                 loadNoteForReading = loadNoteForReading,
                 createInboxNote = createInboxNote,
+                deleteInboxNotes = deleteInboxNotes,
                 loadEditableNote = loadEditableNote,
                 saveNote = saveNote,
                 loadGitStatusSummary = loadGitStatusSummary,
+                loadTodayHub = loadTodayHub,
+                loadTodayHubRow = loadTodayHubRow,
+                activeTodayHubStore = activeTodayHubStore,
                 loadSyncStatus = loadSyncStatus,
                 refreshRemoteSyncStatus = refreshRemoteSyncStatus,
                 buildSyncPreflight = buildSyncPreflight,
@@ -183,6 +212,9 @@ class MainActivity : ComponentActivity() {
                 loadLocalSettings = loadLocalSettings,
                 saveLocalSettings = saveLocalSettings,
                 ensureDeviceInstanceId = ensureDeviceInstanceId,
+                searchVault = searchVault,
+                maintainVaultSearchIndex = maintainVaultSearchIndex,
+                touchVaultSearchPaths = touchVaultSearchPaths,
                 onLaunchSettled = {
                     if (keepSplashOnScreen) {
                         keepSplashOnScreen = false

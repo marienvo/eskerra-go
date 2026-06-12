@@ -59,6 +59,9 @@ interface WorkspaceGitRepository : WorkspaceGitStatusRepository {
      */
     fun writeFile(workingDir: File, relativePath: String, content: String): Result<Unit>
 
+    /** Deletes a file at [relativePath] when it exists inside [workingDir]. */
+    fun deleteFile(workingDir: File, relativePath: String): Result<Unit>
+
     /** Stage all changes (additions, modifications, and deletions). */
     fun stageAll(workingDir: File): Result<Unit>
 

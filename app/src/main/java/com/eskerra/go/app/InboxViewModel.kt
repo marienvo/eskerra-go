@@ -3,9 +3,13 @@ package com.eskerra.go.app
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.eskerra.go.core.model.DeleteInboxNoteError
+import com.eskerra.go.core.model.DeleteInboxNoteException
+import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NoteIndexError
 import com.eskerra.go.core.model.NoteIndexException
 import com.eskerra.go.core.model.WorkspaceConfig
+import com.eskerra.go.core.usecase.DeleteInboxNotes
 import com.eskerra.go.core.usecase.LoadInboxSummariesCached
 import com.eskerra.go.feature.inbox.InboxUiState
 import java.io.File
@@ -19,7 +23,9 @@ import kotlinx.coroutines.launch
 class InboxViewModel(
     private val config: WorkspaceConfig,
     private val filesDir: File,
-    private val loadInboxSummaries: LoadInboxSummariesCached
+    private val loadInboxSummaries: LoadInboxSummariesCached,
+    private val deleteInboxNotes: DeleteInboxNotes,
+    private val onInboxMutated: (List<String>) -> Unit = {}
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<InboxUiState>(InboxUiState.Loading)
@@ -28,7 +34,17 @@ class InboxViewModel(
     private val _showRefreshIndicator = MutableStateFlow(false)
     val showRefreshIndicator: StateFlow<Boolean> = _showRefreshIndicator.asStateFlow()
 
+    private val _selectedNoteIds = MutableStateFlow<Set<NoteId>>(emptySet())
+    val selectedNoteIds: StateFlow<Set<NoteId>> = _selectedNoteIds.asStateFlow()
+
+    private val _isDeleting = MutableStateFlow(false)
+    val isDeleting: StateFlow<Boolean> = _isDeleting.asStateFlow()
+
+    private val _deleteError = MutableStateFlow<String?>(null)
+    val deleteError: StateFlow<String?> = _deleteError.asStateFlow()
+
     private var refreshJob: Job? = null
+    private var deleteJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -42,6 +58,49 @@ class InboxViewModel(
 
     fun refresh() {
         refresh(showFullScreenLoading = _uiState.value !is InboxUiState.Content)
+    }
+
+    fun toggleSelection(noteId: NoteId) {
+        if (_isDeleting.value) return
+        _deleteError.value = null
+        _selectedNoteIds.value = _selectedNoteIds.value.toMutableSet().apply {
+            if (contains(noteId)) remove(noteId) else add(noteId)
+        }
+    }
+
+    fun clearSelection() {
+        _deleteError.value = null
+        _selectedNoteIds.value = emptySet()
+    }
+
+    fun deleteSelected() {
+        if (_isDeleting.value) return
+        val selected = _selectedNoteIds.value
+        if (selected.isEmpty()) return
+
+        val availableNotes = (_uiState.value as? InboxUiState.Content)?.notes.orEmpty()
+        val resolvedIds = selected.filter { noteId ->
+            availableNotes.any { it.id == noteId }
+        }
+        if (resolvedIds.isEmpty()) return
+
+        deleteJob?.cancel()
+        deleteJob = viewModelScope.launch {
+            _deleteError.value = null
+            _isDeleting.value = true
+            deleteInboxNotes(config, filesDir, resolvedIds, availableNotes).fold(
+                onSuccess = {
+                    _selectedNoteIds.value = emptySet()
+                    _isDeleting.value = false
+                    onInboxMutated(resolvedIds.map { it.value })
+                    refresh(showFullScreenLoading = false)
+                },
+                onFailure = { error ->
+                    _isDeleting.value = false
+                    _deleteError.value = mapDeleteFailure(error)
+                }
+            )
+        }
     }
 
     private fun refresh(showFullScreenLoading: Boolean) {
@@ -108,20 +167,41 @@ class InboxViewModel(
         }
     }
 
+    private fun mapDeleteFailure(error: Throwable): String {
+        val deleteError = (error as? DeleteInboxNoteException)?.error
+        return when (deleteError) {
+            DeleteInboxNoteError.NotInInbox -> DeleteInboxNotes.NOT_IN_INBOX_MESSAGE
+            DeleteInboxNoteError.StaleEntry -> DeleteInboxNotes.STALE_ENTRY_MESSAGE
+            DeleteInboxNoteError.InvalidWorkspacePath -> WORKSPACE_UNAVAILABLE_MESSAGE
+            DeleteInboxNoteError.WorkspaceMissing -> WORKSPACE_MISSING_MESSAGE
+            is DeleteInboxNoteError.DeleteFailed,
+            is DeleteInboxNoteError.RegistryRefreshFailed,
+            null -> DELETE_ERROR_MESSAGE
+        }
+    }
+
     companion object {
         internal const val REFRESH_INDICATOR_DELAY_MS = 300L
         const val SCAN_ERROR_MESSAGE = "Could not scan workspace notes."
         const val WORKSPACE_UNAVAILABLE_MESSAGE = "Workspace is not available."
         const val WORKSPACE_MISSING_MESSAGE = "Workspace files are missing."
+        const val DELETE_ERROR_MESSAGE = "Could not delete selected entries."
 
         fun factory(
             config: WorkspaceConfig,
             filesDir: File,
-            loadInboxSummaries: LoadInboxSummariesCached
+            loadInboxSummaries: LoadInboxSummariesCached,
+            deleteInboxNotes: DeleteInboxNotes,
+            onInboxMutated: (List<String>) -> Unit = {}
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
-            override fun <T : ViewModel> create(modelClass: Class<T>): T =
-                InboxViewModel(config, filesDir, loadInboxSummaries) as T
+            override fun <T : ViewModel> create(modelClass: Class<T>): T = InboxViewModel(
+                config,
+                filesDir,
+                loadInboxSummaries,
+                deleteInboxNotes,
+                onInboxMutated
+            ) as T
         }
     }
 }
