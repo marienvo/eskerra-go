@@ -8,7 +8,7 @@ import java.io.File
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
-import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -46,7 +46,7 @@ class PlaylistR2PollingHostTest {
                 R2ConditionalResult.NotModified
             })
             h.setAppForeground(true)
-            advanceUntilIdle()
+            runCurrent()
             assertEquals(1, fetchCount)
             h.dispose()
         }
@@ -60,7 +60,7 @@ class PlaylistR2PollingHostTest {
                 R2ConditionalResult.NotModified
             })
         h.setAppForeground(true)
-        advanceUntilIdle()
+        runCurrent()
         assertEquals(0, fetchCount)
         h.dispose()
     }
@@ -73,12 +73,12 @@ class PlaylistR2PollingHostTest {
             R2ConditionalResult.NotModified
         })
         h.setAppForeground(true)
-        advanceUntilIdle()
+        runCurrent()
         h.setAppForeground(false)
-        advanceUntilIdle()
+        runCurrent()
         val countAfterBackground = fetchCount
         // Advance timer — no new ticks expected
-        advanceUntilIdle()
+        runCurrent()
         assertEquals(countAfterBackground, fetchCount)
         h.dispose()
     }
@@ -91,10 +91,10 @@ class PlaylistR2PollingHostTest {
             R2ConditionalResult.NotModified
         })
         h.setAppForeground(true)
-        advanceUntilIdle()
+        runCurrent()
         h.setPlaybackActive(true)
         val countAfterPlay = fetchCount
-        advanceUntilIdle()
+        runCurrent()
         assertEquals(countAfterPlay, fetchCount)
         h.dispose()
     }
@@ -108,11 +108,11 @@ class PlaylistR2PollingHostTest {
                 R2ConditionalResult.NotModified
             })
             h.setAppForeground(true)
-            advanceUntilIdle()
+            runCurrent()
             h.setPlaybackActive(true)
-            advanceUntilIdle()
+            runCurrent()
             h.setPlaybackActive(false)
-            advanceUntilIdle()
+            runCurrent()
             // immediate tick on re-activate → count increased
             assertEquals(true, fetchCount >= 2)
             h.dispose()
@@ -129,7 +129,7 @@ class PlaylistR2PollingHostTest {
         )
         val genBefore = h.playlistSyncGeneration.value
         h.setAppForeground(true)
-        advanceUntilIdle()
+        runCurrent()
         assertEquals(genBefore + 1, h.playlistSyncGeneration.value)
         assertEquals(1, repo.invalidateCount)
         h.dispose()
@@ -146,7 +146,7 @@ class PlaylistR2PollingHostTest {
             val repo = FakePlaylistSyncRepository()
             val h = host(fetch = { results[call++] }, repo = repo)
             h.setAppForeground(true)
-            advanceUntilIdle()
+            runCurrent()
             h.dispose()
             // Enough for 2 ticks via triggerCheck approach — use generation count instead
             assertEquals(true, h.playlistSyncGeneration.value >= 1)
@@ -156,7 +156,7 @@ class PlaylistR2PollingHostTest {
     fun `does not bump generation for not_modified`() = runTest(StandardTestDispatcher()) {
         val h = host(fetch = { R2ConditionalResult.NotModified })
         h.setAppForeground(true)
-        advanceUntilIdle()
+        runCurrent()
         assertEquals(0, h.playlistSyncGeneration.value)
         h.dispose()
     }
