@@ -85,12 +85,22 @@ class VaultSettingsViewModel(
             }
 
             val local = loadLocalSettings()
-            saveLocalSettings(
-                local.copy(
-                    displayName = ready.displayName.trim(),
-                    deviceName = ready.deviceName.trimEnd()
+            val localSaveResult = runCatching {
+                saveLocalSettings(
+                    local.copy(
+                        displayName = ready.displayName.trim(),
+                        deviceName = ready.deviceName.trim()
+                    )
                 )
-            )
+            }
+            if (localSaveResult.isFailure) {
+                val error = localSaveResult.exceptionOrNull()
+                _uiState.value = ready.copy(
+                    isSaving = false,
+                    errorMessage = error?.message ?: "Failed to save local settings."
+                )
+                return@launch
+            }
 
             lastShared = newShared
             _uiState.value = readyFromShared(newShared, loadLocalSettings())

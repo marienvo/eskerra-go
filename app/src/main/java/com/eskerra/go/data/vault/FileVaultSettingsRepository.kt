@@ -15,8 +15,11 @@ import com.eskerra.go.core.vault.EskerraSettingsCodec
 import com.eskerra.go.core.vault.R2Settings
 import com.eskerra.go.core.vault.VaultLayout
 import java.io.File
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
@@ -40,7 +43,8 @@ private const val LEGACY_DISPLAY_NAME_KEY = "displayName"
  */
 class FileVaultSettingsRepository(
     private val dataStore: DataStore<Preferences>,
-    private val localSettingsStore: LocalSettingsStore
+    private val localSettingsStore: LocalSettingsStore,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) : VaultSettingsRepository {
 
     constructor(context: Context) : this(
@@ -54,31 +58,37 @@ class FileVaultSettingsRepository(
     )
 
     override suspend fun loadShared(workspaceRoot: File): Result<EskerraSettings> {
-        migrateNoteboxIfNeeded(workspaceRoot)
+        val fromFile = withContext(ioDispatcher) {
+            migrateNoteboxIfNeeded(workspaceRoot)
 
-        val eskerraDir = File(workspaceRoot, VaultLayout.ESKERRA_DIR)
-        val sharedFile = File(eskerraDir, VaultLayout.SHARED_SETTINGS_FILE)
-        val legacyFile = File(eskerraDir, VaultLayout.LEGACY_SETTINGS_FILE)
+            val eskerraDir = File(workspaceRoot, VaultLayout.ESKERRA_DIR)
+            val sharedFile = File(eskerraDir, VaultLayout.SHARED_SETTINGS_FILE)
+            val legacyFile = File(eskerraDir, VaultLayout.LEGACY_SETTINGS_FILE)
 
-        return when {
-            sharedFile.isFile -> readSharedFile(sharedFile)
-            legacyFile.isFile -> migrateLegacySettings(legacyFile, sharedFile)
-            else -> loadFromDataStore()
+            when {
+                sharedFile.isFile -> readSharedFile(sharedFile)
+                legacyFile.isFile -> migrateLegacySettings(legacyFile, sharedFile)
+                else -> null
+            }
         }
+        return fromFile ?: loadFromDataStore()
     }
 
     override suspend fun saveShared(workspaceRoot: File, settings: EskerraSettings): Result<Unit> {
-        migrateNoteboxIfNeeded(workspaceRoot)
+        val fileResult = withContext(ioDispatcher) {
+            migrateNoteboxIfNeeded(workspaceRoot)
 
-        val eskerraDir = File(workspaceRoot, VaultLayout.ESKERRA_DIR)
-        val sharedFile = File(eskerraDir, VaultLayout.SHARED_SETTINGS_FILE)
-        val writeToFile = sharedFile.isFile || R2Settings.isVaultR2PlaylistConfigured(settings)
+            val eskerraDir = File(workspaceRoot, VaultLayout.ESKERRA_DIR)
+            val sharedFile = File(eskerraDir, VaultLayout.SHARED_SETTINGS_FILE)
+            val writeToFile = sharedFile.isFile || R2Settings.isVaultR2PlaylistConfigured(settings)
 
-        return if (writeToFile) {
-            saveToFile(eskerraDir, sharedFile, settings)
-        } else {
-            saveToDataStore(settings)
+            if (writeToFile) {
+                saveToFile(eskerraDir, sharedFile, settings)
+            } else {
+                null
+            }
         }
+        return fileResult ?: saveToDataStore(settings)
     }
 
     private suspend fun readSharedFile(sharedFile: File): Result<EskerraSettings> {

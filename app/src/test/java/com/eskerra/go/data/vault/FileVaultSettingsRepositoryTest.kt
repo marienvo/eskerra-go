@@ -41,7 +41,7 @@ class FileVaultSettingsRepositoryTest {
     private fun localStore() = DataStoreLocalSettingsStore(buildDataStore())
 
     private fun repo(local: DataStoreLocalSettingsStore = localStore()) =
-        FileVaultSettingsRepository(buildDataStore(), local)
+        FileVaultSettingsRepository(buildDataStore(), local, testDispatcher)
 
     private fun workspaceRoot() = tmp.newFolder("workspace")
 

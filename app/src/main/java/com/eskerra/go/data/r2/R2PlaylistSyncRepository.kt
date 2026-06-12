@@ -12,6 +12,7 @@ import com.eskerra.go.core.repository.VaultSettingsRepository
 import com.eskerra.go.core.vault.R2Settings
 import com.eskerra.go.core.vault.VaultLayout
 import java.io.File
+import java.io.IOException
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -57,7 +58,9 @@ class R2PlaylistSyncRepository(
             result
         } catch (e: CancellationException) {
             dropCache(key, owned)
-            owned.completeExceptionally(e)
+            if (!owned.isCompleted) {
+                owned.completeExceptionally(IOException("Playlist read was cancelled", e))
+            }
             throw e
         } catch (e: Throwable) {
             dropCache(key, owned)
