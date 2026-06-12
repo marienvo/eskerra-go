@@ -20,6 +20,16 @@ import java.time.LocalDateTime
  * preprocessing, standard markdown via the library, custom callout cards, per-tone link colours,
  * tap routing, and reminder pills.
  */
+/**
+ * Shared read-only vault markdown renderer (spec §8): YAML frontmatter strip, wiki→synthetic-link
+ * preprocessing, standard markdown via the library, custom callout cards, per-tone link colours,
+ * tap routing, and reminder pills.
+ *
+ * @param sourceNoteId vault-relative path of the open note; enables relative `.md` link resolution
+ *   (spec §9.3). Pass `null` when the source context is unknown (links will show as muted).
+ * @param onNoteNotFound called when a tapped link cannot be resolved; message reflects [indexStatus]
+ *   ("Note not found", "Still indexing vault", "Vault index unavailable").
+ */
 @Composable
 fun VaultMarkdownView(
     markdown: String,
@@ -28,7 +38,9 @@ fun VaultMarkdownView(
     onOpenInternalNote: (NoteId) -> Unit,
     onOpenExternalUrl: (String) -> Unit,
     onAmbiguousWikiLink: (List<NoteId>, String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    sourceNoteId: NoteId? = null,
+    onNoteNotFound: (String) -> Unit = {}
 ) {
     val now = remember { LocalDateTime.now() }
     val segments = remember(markdown) {
@@ -41,15 +53,27 @@ fun VaultMarkdownView(
     val typography = markdownTypography()
 
     val onLinkTap: (String) -> Unit = { href ->
-        when (val target = VaultReadonlyLink.targetFor(href, registry)) {
+        when (val target = VaultReadonlyLink.targetFor(href, registry, sourceNoteId)) {
             is VaultReadonlyLink.LinkTarget.Internal -> onOpenInternalNote(target.noteId)
             is VaultReadonlyLink.LinkTarget.External -> onOpenExternalUrl(target.url)
             is VaultReadonlyLink.LinkTarget.Ambiguous ->
                 onAmbiguousWikiLink(target.candidates, target.inner)
-            VaultReadonlyLink.LinkTarget.Unresolved -> Unit
+            VaultReadonlyLink.LinkTarget.Unresolved -> onNoteNotFound(
+                when (indexStatus) {
+                    VaultReadonlyLink.IndexStatus.LOADING -> "Still indexing vault"
+                    VaultReadonlyLink.IndexStatus.READY -> "Note not found"
+                    VaultReadonlyLink.IndexStatus.ERROR -> "Vault index unavailable"
+                }
+            )
         }
     }
-    val annotator = VaultMarkdownAnnotator.build(registry, indexStatus, now, onLinkTap)
+    val annotator = VaultMarkdownAnnotator.build(
+        registry,
+        indexStatus,
+        now,
+        onLinkTap,
+        sourceNoteId
+    )
 
     Column(modifier) {
         segments.forEach { segment ->

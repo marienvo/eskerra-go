@@ -38,6 +38,7 @@ fun NoteScreen(
     onOpenInternalNote: (NoteId) -> Unit,
     onOpenExternalUrl: (String) -> Unit,
     onAmbiguousWikiLink: (List<NoteId>, String) -> Unit,
+    onNoteNotFound: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val chrome = LocalShellChromeInsets.current
@@ -65,10 +66,12 @@ fun NoteScreen(
                 canEdit = state.canEdit,
                 markdown = state.document.content.markdown,
                 registry = state.document.registry,
+                sourceNoteId = state.document.note.id,
                 onEdit = onEdit,
                 onOpenInternalNote = onOpenInternalNote,
                 onOpenExternalUrl = onOpenExternalUrl,
-                onAmbiguousWikiLink = onAmbiguousWikiLink
+                onAmbiguousWikiLink = onAmbiguousWikiLink,
+                onNoteNotFound = onNoteNotFound
             )
             NoteReaderUiState.NotFound -> NoteReaderMessage(
                 title = "Note not found",
@@ -109,10 +112,12 @@ private fun NoteReaderContent(
     canEdit: Boolean,
     markdown: String,
     registry: NoteRegistry,
+    sourceNoteId: NoteId,
     onEdit: () -> Unit,
     onOpenInternalNote: (NoteId) -> Unit,
     onOpenExternalUrl: (String) -> Unit,
-    onAmbiguousWikiLink: (List<NoteId>, String) -> Unit
+    onAmbiguousWikiLink: (List<NoteId>, String) -> Unit,
+    onNoteNotFound: (String) -> Unit
 ) {
     val chrome = LocalShellChromeInsets.current
     Column(
@@ -148,6 +153,8 @@ private fun NoteReaderContent(
             onOpenInternalNote = onOpenInternalNote,
             onOpenExternalUrl = onOpenExternalUrl,
             onAmbiguousWikiLink = onAmbiguousWikiLink,
+            sourceNoteId = sourceNoteId,
+            onNoteNotFound = onNoteNotFound,
             modifier = Modifier.fillMaxWidth()
         )
     }

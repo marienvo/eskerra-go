@@ -62,31 +62,50 @@ object VaultReadonlyLink {
             WikiLinkResolver.resolve(it, registry)
         }
 
-    /** Colour bucket for a link href under the current index [status] (spec §8.3). */
-    fun toneFor(href: String, registry: NoteRegistry, status: IndexStatus): LinkTone {
+    /**
+     * Colour bucket for a link href under the current index [status] (spec §8.3).
+     *
+     * When [sourceNoteId] is provided, relative `.md` hrefs are resolved against the source note
+     * via [VaultLink] (Phase 4). Pass `null` for contexts where relative link resolution is not
+     * available (e.g. inbox detail renderer).
+     */
+    fun toneFor(
+        href: String,
+        registry: NoteRegistry,
+        status: IndexStatus,
+        sourceNoteId: NoteId? = null
+    ): LinkTone {
         val inner = decodeWikiHref(href)
         if (inner != null) {
-            if (isExternalHref(inner)) {
-                return LinkTone.EXTERNAL
-            }
+            if (isExternalHref(inner)) return LinkTone.EXTERNAL
             return when (resolveWikiInner(inner, registry)) {
                 is ResolvedWikiLink, is AmbiguousWikiLink -> LinkTone.INTERNAL
                 else -> if (status != IndexStatus.READY) LinkTone.INTERNAL else LinkTone.MUTED
             }
         }
-        if (isExternalHref(href)) {
-            return LinkTone.EXTERNAL
+        if (isExternalHref(href)) return LinkTone.EXTERNAL
+        if (sourceNoteId != null &&
+            VaultLink.resolveVaultRelativeMarkdownHref(
+                sourceNoteId,
+                href,
+                registry
+            ) != null
+        ) {
+            return LinkTone.INTERNAL
         }
         return if (status != IndexStatus.READY) LinkTone.INTERNAL else LinkTone.MUTED
     }
 
-    /** Resolves a tapped link href to a navigation target. */
-    fun targetFor(href: String, registry: NoteRegistry): LinkTarget {
+    /**
+     * Resolves a tapped link href to a navigation target.
+     *
+     * When [sourceNoteId] is provided, relative `.md` hrefs are resolved against the source note
+     * via [VaultLink].
+     */
+    fun targetFor(href: String, registry: NoteRegistry, sourceNoteId: NoteId? = null): LinkTarget {
         val inner = decodeWikiHref(href)
         if (inner != null) {
-            if (isExternalHref(inner)) {
-                return LinkTarget.External(inner.trim())
-            }
+            if (isExternalHref(inner)) return LinkTarget.External(inner.trim())
             return when (val res = resolveWikiInner(inner, registry)) {
                 is ResolvedWikiLink -> LinkTarget.Internal(res.note.id)
                 is AmbiguousWikiLink ->
@@ -94,8 +113,10 @@ object VaultReadonlyLink {
                 else -> LinkTarget.Unresolved
             }
         }
-        if (isExternalHref(href)) {
-            return LinkTarget.External(href.trim())
+        if (isExternalHref(href)) return LinkTarget.External(href.trim())
+        if (sourceNoteId != null) {
+            val relTarget = VaultLink.resolveVaultRelativeMarkdownHref(sourceNoteId, href, registry)
+            if (relTarget != null) return LinkTarget.Internal(relTarget)
         }
         return LinkTarget.Unresolved
     }

@@ -3,6 +3,7 @@ package com.eskerra.go.app
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
 import androidx.lifecycle.SavedStateHandle
 import androidx.navigation.NavHostController
 import com.eskerra.go.core.model.NoteId
@@ -44,4 +45,9 @@ internal fun openExternalUrl(context: Context, url: String) {
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         context.startActivity(intent)
     }
+}
+
+/** Shows a short toast for unresolved link taps (spec §9.2 affordance copy). */
+internal fun showNoteNotFoundToast(context: Context, message: String) {
+    Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
 }

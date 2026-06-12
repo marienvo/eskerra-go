@@ -8,6 +8,7 @@ import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import com.eskerra.go.core.markdown.DateToken
 import com.eskerra.go.core.markdown.VaultReadonlyLink
+import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NoteRegistry
 import com.mikepenz.markdown.model.MarkdownAnnotator
 import com.mikepenz.markdown.model.markdownAnnotator
@@ -27,12 +28,13 @@ object VaultMarkdownAnnotator {
         registry: NoteRegistry,
         status: VaultReadonlyLink.IndexStatus,
         now: LocalDateTime,
-        onLinkTap: (String) -> Unit
+        onLinkTap: (String) -> Unit,
+        sourceNoteId: NoteId? = null
     ): MarkdownAnnotator = markdownAnnotator(
         annotate = { content, node ->
             when (node.type) {
                 MarkdownElementTypes.INLINE_LINK ->
-                    appendLink(this, content, node, registry, status, onLinkTap)
+                    appendLink(this, content, node, registry, status, sourceNoteId, onLinkTap)
                 MarkdownTokenTypes.TEXT ->
                     appendTextWithPills(this, textOf(content, node), now)
                 else -> false
@@ -52,6 +54,7 @@ object VaultMarkdownAnnotator {
         node: ASTNode,
         registry: NoteRegistry,
         status: VaultReadonlyLink.IndexStatus,
+        sourceNoteId: NoteId?,
         onLinkTap: (String) -> Unit
     ): Boolean {
         val labelNode = childOfType(node, MarkdownElementTypes.LINK_TEXT) ?: return false
@@ -59,7 +62,7 @@ object VaultMarkdownAnnotator {
         val label = textOf(content, labelNode).removeSurrounding("[", "]")
         val href = textOf(content, destNode).trim().removeSurrounding("<", ">")
 
-        val tone = VaultReadonlyLink.toneFor(href, registry, status)
+        val tone = VaultReadonlyLink.toneFor(href, registry, status, sourceNoteId)
         val style = TextLinkStyles(style = SpanStyle(color = VaultMarkdownTokens.linkColor(tone)))
         builder.withLink(
             LinkAnnotation.Clickable(

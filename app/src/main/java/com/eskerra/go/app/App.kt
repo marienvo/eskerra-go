@@ -50,6 +50,7 @@ import com.eskerra.go.feature.editor.CreateInboxScreen
 import com.eskerra.go.feature.editor.NoteEditorScreen
 import com.eskerra.go.feature.inbox.InboxUiState
 import com.eskerra.go.feature.menu.MenuScreen
+import com.eskerra.go.feature.note.NoteReaderUiState
 import com.eskerra.go.feature.note.NoteScreen
 import com.eskerra.go.feature.podcasts.PodcastItem
 import com.eskerra.go.feature.podcasts.PodcastsScreen
@@ -57,6 +58,7 @@ import com.eskerra.go.feature.settings.VaultSettingsScreen
 import com.eskerra.go.feature.sync.SyncScreen
 import com.eskerra.go.feature.sync.SyncSettingsScreen
 import com.eskerra.go.feature.sync.SyncUiState
+import com.eskerra.go.ui.markdown.AmbiguousWikiLinkSheet
 import java.io.File
 
 /**
@@ -326,6 +328,8 @@ fun App(
                 }
 
                 val noteReaderContext = LocalContext.current
+                var ambiguousCandidates by remember { mutableStateOf<List<NoteId>?>(null) }
+
                 NoteScreen(
                     state = readerState,
                     onRetry = noteReaderViewModel::retry,
@@ -338,10 +342,25 @@ fun App(
                         openExternalUrl(noteReaderContext, url)
                     },
                     onAmbiguousWikiLink = { candidates: List<NoteId>, _: String ->
-                        // Phase 4 adds an explicit picker; until then open the first candidate.
-                        candidates.firstOrNull()?.let { navController.navigate(AppRoute.note(it)) }
+                        ambiguousCandidates = candidates
+                    },
+                    onNoteNotFound = { message: String ->
+                        showNoteNotFoundToast(noteReaderContext, message)
                     }
                 )
+
+                val registry = (readerState as? NoteReaderUiState.Content)?.document?.registry
+                if (ambiguousCandidates != null && registry != null) {
+                    AmbiguousWikiLinkSheet(
+                        candidates = ambiguousCandidates!!,
+                        registry = registry,
+                        onPickNote = { picked ->
+                            ambiguousCandidates = null
+                            navController.navigate(AppRoute.note(picked))
+                        },
+                        onDismiss = { ambiguousCandidates = null }
+                    )
+                }
             }
 
             composable(

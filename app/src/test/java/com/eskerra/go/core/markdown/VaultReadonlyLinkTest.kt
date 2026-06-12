@@ -105,4 +105,78 @@ class VaultReadonlyLinkTest {
             VaultReadonlyLink.targetFor(wikiHref("Ghost"), registry())
         )
     }
+
+    // ------- Phase 4: relative .md link resolution -------
+
+    private fun reg(vararg paths: String) = NoteRegistry(
+        paths.map { p ->
+            NoteSummary(
+                id = NoteId(p),
+                title = p.substringAfterLast('/').removeSuffix(".md"),
+                snippet = "",
+                isInbox = p.startsWith("Inbox/"),
+                lastModifiedEpochMillis = 0L
+            )
+        }
+    )
+
+    @Test
+    fun tone_relativeMdLinkResolved_isInternal() {
+        val r = reg("Inbox/Beta.md")
+        val src = NoteId("Inbox/alpha.md")
+        assertEquals(
+            LinkTone.INTERNAL,
+            VaultReadonlyLink.toneFor("./Beta.md", r, IndexStatus.READY, src)
+        )
+    }
+
+    @Test
+    fun tone_relativeMdLinkUnresolved_isMutedWhenReady() {
+        val r = reg()
+        val src = NoteId("Inbox/alpha.md")
+        assertEquals(
+            LinkTone.MUTED,
+            VaultReadonlyLink.toneFor("./ghost.md", r, IndexStatus.READY, src)
+        )
+    }
+
+    @Test
+    fun tone_relativeMdLinkUnresolved_isOptimisticWhileLoading() {
+        val r = reg()
+        val src = NoteId("Inbox/alpha.md")
+        assertEquals(
+            LinkTone.INTERNAL,
+            VaultReadonlyLink.toneFor("./ghost.md", r, IndexStatus.LOADING, src)
+        )
+    }
+
+    @Test
+    fun target_relativeMdLinkResolved_returnsInternal() {
+        val r = reg("Inbox/Beta.md")
+        val src = NoteId("Inbox/alpha.md")
+        assertEquals(
+            LinkTarget.Internal(NoteId("Inbox/Beta.md")),
+            VaultReadonlyLink.targetFor("./Beta.md", r, src)
+        )
+    }
+
+    @Test
+    fun target_relativeMdLinkUnresolved_returnsUnresolved() {
+        val r = reg()
+        val src = NoteId("Inbox/alpha.md")
+        assertEquals(
+            LinkTarget.Unresolved,
+            VaultReadonlyLink.targetFor("./ghost.md", r, src)
+        )
+    }
+
+    @Test
+    fun target_relativeMdParentDir_navigatesCorrectly() {
+        val r = reg("Inbox/Beta.md", "Inbox/sub/gamma.md")
+        val src = NoteId("Inbox/sub/gamma.md")
+        assertEquals(
+            LinkTarget.Internal(NoteId("Inbox/Beta.md")),
+            VaultReadonlyLink.targetFor("../Beta.md", r, src)
+        )
+    }
 }
