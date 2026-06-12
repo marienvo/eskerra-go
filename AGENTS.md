@@ -22,7 +22,7 @@ Architecture style (hybrid layering + feature slices) and placement rules for ne
 - Markdown parsing and wiki-link resolution live outside UI.
 - Inbox editability is a domain rule: inbox notes editable, all other notes read-only.
 - No background sync in the PoC (no automatic commit/push/pull; read-only remote `fetch` for the shell indicator is allowed — see [`specs/architecture/sync-hardening-and-recovery.md`](specs/architecture/sync-hardening-and-recovery.md)).
-- No full-text search in the PoC.
+- Full-text search uses **Android's bundled SQLite FTS5** (`SQLiteOpenHelper`). No Rust/RN native module. See [`specs/plans/android-vault-notes-rebuild-plan.md`](specs/plans/android-vault-notes-rebuild-plan.md) (Phase 7) for the index schema, reconcile strategy, and ranker tiers.
 - No multi-workspace support in the PoC.
 - Module budgets enforce file size in CI. New `.kt` files may not exceed **400** lines without a baseline entry; files **≥800** lines may not grow without an intentional baseline bump. See [`specs/team-scalability/README.md`](specs/team-scalability/README.md) and [`scripts/module-budget-baseline.json`](scripts/module-budget-baseline.json).
 - Every feature slice must include at least one unit test for domain/data behavior.
