@@ -2,6 +2,7 @@ package com.eskerra.go.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
+/** Material scaffold colors for the dark-only rebuild (spec §10 screen background). */
 val Purple80 = Color(0xFFD0BCFF)
 val PurpleGrey80 = Color(0xFFCCC2DC)
 val Pink80 = Color(0xFFEFB8C8)

@@ -18,8 +18,6 @@ import androidx.compose.material.icons.filled.Today
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -27,6 +25,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.eskerra.go.ui.theme.EskerraChromeTokens
 
 /**
  * Floating navigation shell. It overlays controls on top of the current screen:
@@ -141,7 +140,11 @@ private fun TaskbarButton(
     selected: Boolean,
     onClick: () -> Unit
 ) {
-    val tint = if (selected) MaterialTheme.colorScheme.primary else LocalContentColor.current
+    val tint = if (selected) {
+        EskerraChromeTokens.HeaderText
+    } else {
+        EskerraChromeTokens.HeaderInactive
+    }
     IconButton(onClick = onClick) {
         Icon(icon, contentDescription = contentDescription, tint = tint)
     }

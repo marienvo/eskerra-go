@@ -36,6 +36,8 @@ import com.eskerra.go.core.datetime.RelativeCalendarLabel
 import com.eskerra.go.core.inbox.InboxTileColor
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NoteSummary
+import com.eskerra.go.ui.markdown.VaultMarkdownTokens
+import com.eskerra.go.ui.theme.EskerraChromeTokens
 
 /**
  * Stateless inbox list. Receives UI state and callbacks only; it knows nothing
@@ -308,11 +310,11 @@ private fun InboxRow(
     onAvatarClick: () -> Unit,
     onClick: () -> Unit
 ) {
-    val mutedColor = Color(0xFFCFCFCF)
+    val mutedColor = VaultMarkdownTokens.Muted
     val tileColor = parseHexColor(
         InboxTileColor.backgroundColor(note.lastModifiedEpochMillis)
     )
-    val dividerColor = Color(0xFF333333)
+    val dividerColor = EskerraChromeTokens.ListDivider
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
