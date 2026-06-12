@@ -8,4 +8,4 @@ Specifications and step documentation live under [`specs/`](../specs/):
 
 Manual verification checklists:
 
-- [`verification/step-09-disposable-repo-manual-test.md`](verification/step-09-disposable-repo-manual-test.md) — run after `JAVA_HOME=/usr/lib/jvm/java-17-temurin-jdk ./gradlew :app:ktlintCheck :app:lintDebug :app:testDebugUnitTest` passes locally.
+- [`verification/step-09-disposable-repo-manual-test.md`](verification/step-09-disposable-repo-manual-test.md) — run after `./scripts/gradle.sh :app:ktlintCheck :app:lintDebug :app:testDebugUnitTest` passes locally.

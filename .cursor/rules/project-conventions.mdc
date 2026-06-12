@@ -30,6 +30,6 @@ After changes under `app/src/**` or `*.gradle.kts`, run before marking work comp
 2. `:app:lintDebug`
 3. `:app:testDebugUnitTest` when domain, data, or logic changed
 
-Use Java 17 for Gradle (set `JAVA_HOME` if the default JDK is newer). Resolve all violations; do not defer to CI.
+Use `./scripts/gradle.sh` for Gradle (sets JDK 17 automatically). Resolve all violations; do not defer to CI.
 
 KtLint uses Android Studio style: keep short parameter lists on one line when they fit. Use `:app:ktlintFormat` only after reviewing the diff.

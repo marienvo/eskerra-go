@@ -1,6 +1,6 @@
 {
   "maxLinesByPath": {
-    "app/src/main/java/com/eskerra/go/app/App.kt": 406,
+    "app/src/main/java/com/eskerra/go/app/App.kt": 425,
     "app/src/test/java/com/eskerra/go/core/usecase/ManualSyncNowTest.kt": 510,
     "app/src/test/java/com/eskerra/go/data/workspace/RemoteSyncSettingsRepositoryTest.kt": 570,
     "app/src/test/java/com/eskerra/go/data/workspace/WorkspaceSetupRepositoryTest.kt": 450

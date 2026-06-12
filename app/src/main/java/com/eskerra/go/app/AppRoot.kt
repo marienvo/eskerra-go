@@ -21,18 +21,23 @@ import com.eskerra.go.core.usecase.BuildSafeSyncDiagnostic
 import com.eskerra.go.core.usecase.BuildSyncPreflight
 import com.eskerra.go.core.usecase.ClearRemoteSyncSettings
 import com.eskerra.go.core.usecase.CreateInboxNote
+import com.eskerra.go.core.usecase.EnsureDeviceInstanceId
 import com.eskerra.go.core.usecase.LoadEditableNote
 import com.eskerra.go.core.usecase.LoadGitStatusSummary
 import com.eskerra.go.core.usecase.LoadInboxSummariesCached
+import com.eskerra.go.core.usecase.LoadLocalSettings
 import com.eskerra.go.core.usecase.LoadNoteForReading
 import com.eskerra.go.core.usecase.LoadRemoteSyncSettings
 import com.eskerra.go.core.usecase.LoadSyncStatus
+import com.eskerra.go.core.usecase.LoadVaultSettings
 import com.eskerra.go.core.usecase.ManualSyncNow
 import com.eskerra.go.core.usecase.ReconcileWorkspaceSyncBranch
 import com.eskerra.go.core.usecase.RecordLastSyncAttempt
 import com.eskerra.go.core.usecase.RefreshRemoteSyncStatus
+import com.eskerra.go.core.usecase.SaveLocalSettings
 import com.eskerra.go.core.usecase.SaveNote
 import com.eskerra.go.core.usecase.SaveRemoteSyncSettings
+import com.eskerra.go.core.usecase.SaveVaultSettings
 import com.eskerra.go.core.usecase.TestRemoteConnection
 import com.eskerra.go.core.usecase.UpdateSyncToken
 import com.eskerra.go.data.workspace.WorkspaceSetupCompletion
@@ -70,6 +75,11 @@ fun AppRoot(
     clearRemoteSyncSettings: ClearRemoteSyncSettings,
     testRemoteConnection: TestRemoteConnection,
     reconcileWorkspaceSyncBranch: ReconcileWorkspaceSyncBranch,
+    loadVaultSettings: LoadVaultSettings,
+    saveVaultSettings: SaveVaultSettings,
+    loadLocalSettings: LoadLocalSettings,
+    saveLocalSettings: SaveLocalSettings,
+    ensureDeviceInstanceId: EnsureDeviceInstanceId,
     onLaunchSettled: () -> Unit = {}
 ) {
     EskerraGoTheme(darkTheme = true) {
@@ -150,6 +160,11 @@ fun AppRoot(
                     clearRemoteSyncSettings = clearRemoteSyncSettings,
                     testRemoteConnection = testRemoteConnection,
                     reconcileWorkspaceSyncBranch = reconcileWorkspaceSyncBranch,
+                    loadVaultSettings = loadVaultSettings,
+                    saveVaultSettings = saveVaultSettings,
+                    loadLocalSettings = loadLocalSettings,
+                    saveLocalSettings = saveLocalSettings,
+                    ensureDeviceInstanceId = ensureDeviceInstanceId,
                     onConfigUpdated = gateViewModel::updateReadyConfig,
                     onInboxUiStateChanged = { inboxUiState = it }
                 )

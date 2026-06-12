@@ -27,18 +27,23 @@ import com.eskerra.go.core.usecase.BuildSafeSyncDiagnostic
 import com.eskerra.go.core.usecase.BuildSyncPreflight
 import com.eskerra.go.core.usecase.ClearRemoteSyncSettings
 import com.eskerra.go.core.usecase.CreateInboxNote
+import com.eskerra.go.core.usecase.EnsureDeviceInstanceId
 import com.eskerra.go.core.usecase.LoadEditableNote
 import com.eskerra.go.core.usecase.LoadGitStatusSummary
 import com.eskerra.go.core.usecase.LoadInboxSummariesCached
+import com.eskerra.go.core.usecase.LoadLocalSettings
 import com.eskerra.go.core.usecase.LoadNoteForReading
 import com.eskerra.go.core.usecase.LoadRemoteSyncSettings
 import com.eskerra.go.core.usecase.LoadSyncStatus
+import com.eskerra.go.core.usecase.LoadVaultSettings
 import com.eskerra.go.core.usecase.ManualSyncNow
 import com.eskerra.go.core.usecase.ReconcileWorkspaceSyncBranch
 import com.eskerra.go.core.usecase.RecordLastSyncAttempt
 import com.eskerra.go.core.usecase.RefreshRemoteSyncStatus
+import com.eskerra.go.core.usecase.SaveLocalSettings
 import com.eskerra.go.core.usecase.SaveNote
 import com.eskerra.go.core.usecase.SaveRemoteSyncSettings
+import com.eskerra.go.core.usecase.SaveVaultSettings
 import com.eskerra.go.core.usecase.TestRemoteConnection
 import com.eskerra.go.core.usecase.UpdateSyncToken
 import com.eskerra.go.feature.editor.CreateInboxScreen
@@ -48,6 +53,7 @@ import com.eskerra.go.feature.menu.MenuScreen
 import com.eskerra.go.feature.note.NoteScreen
 import com.eskerra.go.feature.podcasts.PodcastItem
 import com.eskerra.go.feature.podcasts.PodcastsScreen
+import com.eskerra.go.feature.settings.VaultSettingsScreen
 import com.eskerra.go.feature.sync.SyncScreen
 import com.eskerra.go.feature.sync.SyncSettingsScreen
 import com.eskerra.go.feature.sync.SyncUiState
@@ -79,6 +85,11 @@ fun App(
     clearRemoteSyncSettings: ClearRemoteSyncSettings,
     testRemoteConnection: TestRemoteConnection,
     reconcileWorkspaceSyncBranch: ReconcileWorkspaceSyncBranch,
+    loadVaultSettings: LoadVaultSettings,
+    saveVaultSettings: SaveVaultSettings,
+    loadLocalSettings: LoadLocalSettings,
+    saveLocalSettings: SaveLocalSettings,
+    ensureDeviceInstanceId: EnsureDeviceInstanceId,
     onConfigUpdated: (WorkspaceConfig) -> Unit,
     onInboxUiStateChanged: (InboxUiState) -> Unit = {}
 ) {
@@ -218,7 +229,7 @@ fun App(
                     onItemClick = { item ->
                         when (item) {
                             MENU_SYNC -> navController.navigate(AppRoute.SYNC)
-                            MENU_SETTINGS -> navController.navigate(AppRoute.SYNC_SETTINGS)
+                            MENU_SETTINGS -> navController.navigate(AppRoute.SETTINGS)
                         }
                     }
                 )
@@ -230,6 +241,32 @@ fun App(
                     onSyncNow = appSyncViewModel::syncNow,
                     onRetry = appSyncViewModel::refreshLocalStatus,
                     onOpenSettings = { navController.navigate(AppRoute.SYNC_SETTINGS) }
+                )
+            }
+
+            composable(AppRoute.SETTINGS) {
+                val vaultSettingsViewModel: VaultSettingsViewModel = viewModel(
+                    factory = VaultSettingsViewModel.factory(
+                        config = currentConfig,
+                        filesDir = filesDir,
+                        loadVaultSettings = loadVaultSettings,
+                        saveVaultSettings = saveVaultSettings,
+                        loadLocalSettings = loadLocalSettings,
+                        saveLocalSettings = saveLocalSettings,
+                        ensureDeviceInstanceId = ensureDeviceInstanceId
+                    )
+                )
+                val vaultSettingsState by vaultSettingsViewModel.uiState.collectAsState()
+                VaultSettingsScreen(
+                    state = vaultSettingsState,
+                    onR2EndpointChange = vaultSettingsViewModel::onR2EndpointChange,
+                    onR2JurisdictionChange = vaultSettingsViewModel::onR2JurisdictionChange,
+                    onR2BucketChange = vaultSettingsViewModel::onR2BucketChange,
+                    onR2AccessKeyIdChange = vaultSettingsViewModel::onR2AccessKeyIdChange,
+                    onR2SecretAccessKeyChange = vaultSettingsViewModel::onR2SecretAccessKeyChange,
+                    onDisplayNameChange = vaultSettingsViewModel::onDisplayNameChange,
+                    onDeviceNameChange = vaultSettingsViewModel::onDeviceNameChange,
+                    onSave = vaultSettingsViewModel::save
                 )
             }
 

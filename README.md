@@ -89,11 +89,7 @@ Example on Linux with the default Android Studio SDK location:
 sdk.dir=/home/you/Android/Sdk
 ```
 
-If your shell does not already point at JDK 17:
-
-```bash
-export JAVA_HOME=/usr/lib/jvm/java-17-temurin-jdk
-```
+Gradle commands use JDK 17 via `./scripts/gradle.sh` (auto-detects common JDK 17 paths). Alternatively, export `JAVA_HOME` to JDK 17 and use `./gradlew` directly.
 
 ---
 
@@ -102,7 +98,7 @@ export JAVA_HOME=/usr/lib/jvm/java-17-temurin-jdk
 Build the debug APK:
 
 ```bash
-./gradlew :app:assembleDebug
+./scripts/gradle.sh :app:assembleDebug
 ```
 
 Build, install on a connected phone or emulator, and launch the app in one
@@ -115,7 +111,7 @@ step:
 Or with Gradle only (installs but does not launch):
 
 ```bash
-JAVA_HOME=/usr/lib/jvm/java-17-temurin-jdk ./gradlew :app:installDebug
+./scripts/gradle.sh :app:installDebug
 ```
 
 Prerequisites for device install: USB debugging enabled on the phone (or an
@@ -133,16 +129,16 @@ gradle wrapper --gradle-version 8.11.1
 
 ## Tests
 
-Fast JVM tests (use JDK 17):
+Fast JVM tests:
 
 ```bash
-JAVA_HOME=/usr/lib/jvm/java-17-temurin-jdk ./gradlew :app:testDebugUnitTest
+./scripts/gradle.sh :app:testDebugUnitTest
 ```
 
 Device/emulator instrumentation tests:
 
 ```bash
-JAVA_HOME=/usr/lib/jvm/java-17-temurin-jdk ./gradlew :app:connectedDebugAndroidTest
+./scripts/gradle.sh :app:connectedDebugAndroidTest
 ```
 
 The instrumentation tests cover Android runtime behavior such as app-private
