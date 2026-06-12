@@ -22,6 +22,7 @@ import androidx.navigation.navArgument
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.model.hasSyncWork
+import com.eskerra.go.core.repository.ActiveTodayHubStore
 import com.eskerra.go.core.usecase.BuildSafeSyncDiagnostic
 import com.eskerra.go.core.usecase.BuildSyncPreflight
 import com.eskerra.go.core.usecase.ClearRemoteSyncSettings
@@ -35,6 +36,8 @@ import com.eskerra.go.core.usecase.LoadLocalSettings
 import com.eskerra.go.core.usecase.LoadNoteForReading
 import com.eskerra.go.core.usecase.LoadRemoteSyncSettings
 import com.eskerra.go.core.usecase.LoadSyncStatus
+import com.eskerra.go.core.usecase.LoadTodayHub
+import com.eskerra.go.core.usecase.LoadTodayHubRow
 import com.eskerra.go.core.usecase.LoadVaultSettings
 import com.eskerra.go.core.usecase.ManualSyncNow
 import com.eskerra.go.core.usecase.ReconcileWorkspaceSyncBranch
@@ -53,7 +56,6 @@ import com.eskerra.go.feature.inbox.InboxUiState
 import com.eskerra.go.feature.menu.MenuScreen
 import com.eskerra.go.feature.note.NoteReaderUiState
 import com.eskerra.go.feature.note.NoteScreen
-import com.eskerra.go.feature.podcasts.PodcastItem
 import com.eskerra.go.feature.podcasts.PodcastsScreen
 import com.eskerra.go.feature.settings.VaultSettingsScreen
 import com.eskerra.go.feature.sync.SyncScreen
@@ -77,6 +79,9 @@ fun App(
     loadEditableNote: LoadEditableNote,
     saveNote: SaveNote,
     loadGitStatusSummary: LoadGitStatusSummary,
+    loadTodayHub: LoadTodayHub,
+    loadTodayHubRow: LoadTodayHubRow,
+    activeTodayHubStore: ActiveTodayHubStore,
     loadSyncStatus: LoadSyncStatus,
     refreshRemoteSyncStatus: RefreshRemoteSyncStatus,
     buildSyncPreflight: BuildSyncPreflight,
@@ -224,6 +229,18 @@ fun App(
                     onBack = { navController.popBackStack() },
                     onDraftChange = createViewModel::updateDraft,
                     onSave = createViewModel::save
+                )
+            }
+
+            composable(AppRoute.TODAY_HUB) {
+                AppTodayHubRoute(
+                    currentConfig = currentConfig,
+                    filesDir = filesDir,
+                    loadTodayHub = loadTodayHub,
+                    loadTodayHubRow = loadTodayHubRow,
+                    activeTodayHubStore = activeTodayHubStore,
+                    workspaceRoot = workspaceRoot,
+                    navController = navController
                 )
             }
 
@@ -414,21 +431,3 @@ fun App(
 
 /** ViewModel key for sync screens; includes branch so branch-only updates recreate VMs. */
 private fun WorkspaceConfig.syncViewModelKey(): String = "${remoteUri.orEmpty()}:$branch"
-
-private val fakePodcasts: List<PodcastItem> = listOf(
-    PodcastItem(title = "Note-taking, deeply", author = "Eskerra FM"),
-    PodcastItem(title = "Plain text forever", author = "Markdown Weekly"),
-    PodcastItem(title = "Compose in practice", author = "Android Cafe")
-)
-
-private const val MENU_SYNC = "Sync"
-private const val MENU_SETTINGS = "Settings"
-private const val MENU_WORKSPACES = "Workspaces"
-private const val MENU_ABOUT = "About"
-
-private val menuItems: List<String> = listOf(
-    MENU_SYNC,
-    MENU_SETTINGS,
-    MENU_WORKSPACES,
-    MENU_ABOUT
-)

@@ -10,6 +10,7 @@ import com.eskerra.go.core.model.NoteId
 object AppRoute {
     const val INBOX = "inbox"
     const val CREATE_INBOX = "create-inbox"
+    const val TODAY_HUB = "today-hub"
     const val PODCASTS = "podcasts"
     const val MENU = "menu"
     const val SYNC = "sync"

@@ -16,6 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.eskerra.go.core.repository.ActiveTodayHubStore
 import com.eskerra.go.core.repository.BootCacheStore
 import com.eskerra.go.core.usecase.BuildSafeSyncDiagnostic
 import com.eskerra.go.core.usecase.BuildSyncPreflight
@@ -30,6 +31,8 @@ import com.eskerra.go.core.usecase.LoadLocalSettings
 import com.eskerra.go.core.usecase.LoadNoteForReading
 import com.eskerra.go.core.usecase.LoadRemoteSyncSettings
 import com.eskerra.go.core.usecase.LoadSyncStatus
+import com.eskerra.go.core.usecase.LoadTodayHub
+import com.eskerra.go.core.usecase.LoadTodayHubRow
 import com.eskerra.go.core.usecase.LoadVaultSettings
 import com.eskerra.go.core.usecase.ManualSyncNow
 import com.eskerra.go.core.usecase.ReconcileWorkspaceSyncBranch
@@ -65,6 +68,9 @@ fun AppRoot(
     loadEditableNote: LoadEditableNote,
     saveNote: SaveNote,
     loadGitStatusSummary: LoadGitStatusSummary,
+    loadTodayHub: LoadTodayHub,
+    loadTodayHubRow: LoadTodayHubRow,
+    activeTodayHubStore: ActiveTodayHubStore,
     loadSyncStatus: LoadSyncStatus,
     refreshRemoteSyncStatus: RefreshRemoteSyncStatus,
     buildSyncPreflight: BuildSyncPreflight,
@@ -151,6 +157,9 @@ fun AppRoot(
                     loadEditableNote = loadEditableNote,
                     saveNote = saveNote,
                     loadGitStatusSummary = loadGitStatusSummary,
+                    loadTodayHub = loadTodayHub,
+                    loadTodayHubRow = loadTodayHubRow,
+                    activeTodayHubStore = activeTodayHubStore,
                     loadSyncStatus = loadSyncStatus,
                     refreshRemoteSyncStatus = refreshRemoteSyncStatus,
                     buildSyncPreflight = buildSyncPreflight,

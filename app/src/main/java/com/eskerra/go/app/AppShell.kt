@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Inbox
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Podcasts
+import androidx.compose.material.icons.filled.Today
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -73,6 +74,7 @@ fun AppShell(
             BottomTaskbar(
                 currentRoute = currentRoute,
                 onInbox = { onNavigate(AppRoute.INBOX) },
+                onToday = { onNavigate(AppRoute.TODAY_HUB) },
                 onAdd = { onNavigate(AppRoute.CREATE_INBOX) },
                 onPodcasts = { onNavigate(AppRoute.PODCASTS) },
                 modifier = Modifier
@@ -88,6 +90,7 @@ fun AppShell(
 private fun BottomTaskbar(
     currentRoute: String?,
     onInbox: () -> Unit,
+    onToday: () -> Unit,
     onAdd: () -> Unit,
     onPodcasts: () -> Unit,
     modifier: Modifier = Modifier
@@ -108,6 +111,12 @@ private fun BottomTaskbar(
                 contentDescription = "Inbox",
                 selected = currentRoute == AppRoute.INBOX,
                 onClick = onInbox
+            )
+            TaskbarButton(
+                icon = Icons.Filled.Today,
+                contentDescription = "Today",
+                selected = currentRoute == AppRoute.TODAY_HUB,
+                onClick = onToday
             )
             FloatingActionButton(
                 onClick = onAdd,

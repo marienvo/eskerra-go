@@ -25,6 +25,8 @@ import com.eskerra.go.core.usecase.LoadLocalSettings
 import com.eskerra.go.core.usecase.LoadNoteForReading
 import com.eskerra.go.core.usecase.LoadRemoteSyncSettings
 import com.eskerra.go.core.usecase.LoadSyncStatus
+import com.eskerra.go.core.usecase.LoadTodayHub
+import com.eskerra.go.core.usecase.LoadTodayHubRow
 import com.eskerra.go.core.usecase.LoadVaultSettings
 import com.eskerra.go.core.usecase.ManualSyncNow
 import com.eskerra.go.core.usecase.ReconcileWorkspaceSyncBranch
@@ -44,6 +46,7 @@ import com.eskerra.go.data.notes.FileInboxSnapshotStore
 import com.eskerra.go.data.notes.FileNoteContentRepository
 import com.eskerra.go.data.notes.FileNoteRegistryRepository
 import com.eskerra.go.data.notes.FileNoteWriteRepository
+import com.eskerra.go.data.todayhub.DataStoreActiveTodayHubStore
 import com.eskerra.go.data.vault.DataStoreLocalSettingsStore
 import com.eskerra.go.data.vault.FileVaultSettingsRepository
 import com.eskerra.go.data.workspace.DataStoreWorkspaceStore
@@ -109,6 +112,13 @@ class MainActivity : ComponentActivity() {
             loadGitStatusSummary = loadGitStatusSummary
         )
 
+        val loadTodayHub = LoadTodayHub(
+            registryRepository = noteRegistryRepository,
+            contentRepository = noteContentRepository
+        )
+        val loadTodayHubRow = LoadTodayHubRow(contentRepository = noteContentRepository)
+        val activeTodayHubStore = DataStoreActiveTodayHubStore(applicationContext)
+
         val remoteSyncRepository = JGitRemoteSyncRepository(gitRepository)
         val loadSyncStatus = LoadSyncStatus(remoteSyncRepository)
         val refreshRemoteSyncStatus = RefreshRemoteSyncStatus(
@@ -173,6 +183,9 @@ class MainActivity : ComponentActivity() {
                 loadEditableNote = loadEditableNote,
                 saveNote = saveNote,
                 loadGitStatusSummary = loadGitStatusSummary,
+                loadTodayHub = loadTodayHub,
+                loadTodayHubRow = loadTodayHubRow,
+                activeTodayHubStore = activeTodayHubStore,
                 loadSyncStatus = loadSyncStatus,
                 refreshRemoteSyncStatus = refreshRemoteSyncStatus,
                 buildSyncPreflight = buildSyncPreflight,
