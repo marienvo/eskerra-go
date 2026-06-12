@@ -232,7 +232,8 @@ class VaultSettingsViewModelTest {
         }
     }
 
-    private class FailingLocalSettingsStore : FakeLocalSettingsStore() {
+    private class FailingLocalSettingsStore :
+        FakeLocalSettingsStore(EskerraLocalSettings(deviceInstanceId = "existing-id")) {
         override suspend fun save(settings: EskerraLocalSettings) =
             throw IllegalStateException("disk full")
     }

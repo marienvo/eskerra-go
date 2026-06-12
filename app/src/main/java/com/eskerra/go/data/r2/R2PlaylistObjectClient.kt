@@ -6,11 +6,13 @@ import com.eskerra.go.core.playlist.normalizePlaylistEntryForSync
 import com.eskerra.go.core.playlist.serializePlaylistEntry
 import com.eskerra.go.core.repository.R2PlaylistClient
 import java.time.Instant
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.RequestBody.Companion.toRequestBody
 
 private const val INVALID_STRUCTURE = "R2 playlist.json has an invalid structure."
+private const val INVALID_JSON = "R2 playlist.json is not valid JSON."
 
 /**
  * GET / PUT / DELETE for the R2 `playlist.json` object, mirroring
@@ -32,7 +34,11 @@ class R2PlaylistObjectClient(
                 throw R2PlaylistException(R2ErrorFormatter.format(R2Verb.READ, response.code, body))
             }
             if (body.isBlank()) return null
-            val element = Json.parseToJsonElement(body)
+            val element = try {
+                Json.parseToJsonElement(body)
+            } catch (_: SerializationException) {
+                throw R2PlaylistException(INVALID_JSON)
+            }
             return normalizePlaylistEntryForSync(element)
                 ?: throw R2PlaylistException(INVALID_STRUCTURE)
         }

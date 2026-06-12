@@ -69,6 +69,13 @@ class R2PlaylistObjectClientTest {
     }
 
     @Test
+    fun `get throws on invalid json`() {
+        server.enqueue(MockResponse().setResponseCode(200).setBody("not json{"))
+        val ex = assertThrows(R2PlaylistException::class.java) { client.get(config()) }
+        assertEquals("R2 playlist.json is not valid JSON.", ex.message)
+    }
+
+    @Test
     fun `get throws on invalid structure`() {
         server.enqueue(MockResponse().setResponseCode(200).setBody("{}"))
         val ex = assertThrows(R2PlaylistException::class.java) { client.get(config()) }
