@@ -4,7 +4,6 @@ import com.eskerra.go.core.model.NoteContentError
 import com.eskerra.go.core.model.NoteContentException
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NoteIndexError
-import com.eskerra.go.core.model.NoteReaderSegment
 import com.eskerra.go.core.model.NoteSummary
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.data.notes.FakeNoteContentRepository
@@ -33,7 +32,7 @@ class LoadNoteForReadingTest {
     private val filesDir get() = temp.newFolder("files")
 
     @Test
-    fun resolvedWikiLinksMapToClickablePresentationState() = runTest {
+    fun successReturnsContentMarkdownAndRegistry() = runTest {
         val firstId = NoteId("Inbox/First.md")
         val secondId = NoteId("Second.md")
         val registry = FakeNoteRegistryRepository.withInboxNotes(
@@ -49,69 +48,11 @@ class LoadNoteForReadingTest {
         val result = useCase(config, filesDir, firstId)
 
         assertTrue(result.isSuccess)
-        val segments = result.getOrThrow().segments
-        val link = segments.filterIsInstance<NoteReaderSegment.ResolvedLink>().single()
-        assertEquals("Second", link.label)
-        assertEquals(secondId, link.target)
-    }
-
-    @Test
-    fun missingWikiLinksMapToNonDestructiveDisplayState() = runTest {
-        val noteId = NoteId("Inbox/First.md")
-        val registry = FakeNoteRegistryRepository.withInboxNotes(summary(noteId, "First"))
-        val content = FakeNoteContentRepository.withContent(
-            noteId = noteId,
-            markdown = "Missing: [[Missing Note]]."
-        )
-        val useCase = LoadNoteForReading(registry, content)
-
-        val result = useCase(config, filesDir, noteId)
-
-        assertTrue(result.isSuccess)
-        val link = result.getOrThrow().segments
-            .filterIsInstance<NoteReaderSegment.MissingLink>()
-            .single()
-        assertEquals("Missing Note", link.label)
-    }
-
-    @Test
-    fun ambiguousWikiLinksMapToNonDestructiveDisplayState() = runTest {
-        val noteId = NoteId("Inbox/First.md")
-        val registry = FakeNoteRegistryRepository.withInboxNotes(
-            summary(noteId, "First"),
-            summary(NoteId("Notes/Daily.md"), "Daily"),
-            summary(NoteId("Archive/Daily.md"), "Daily")
-        )
-        val content = FakeNoteContentRepository.withContent(
-            noteId = noteId,
-            markdown = "Ambiguous: [[Daily]]."
-        )
-        val useCase = LoadNoteForReading(registry, content)
-
-        val result = useCase(config, filesDir, noteId)
-
-        assertTrue(result.isSuccess)
-        val link = result.getOrThrow().segments
-            .filterIsInstance<NoteReaderSegment.AmbiguousLink>()
-            .single()
-        assertEquals("Daily", link.label)
-        assertEquals(2, link.candidateCount)
-    }
-
-    @Test
-    fun malformedWikiLinksRemainPlainText() = runTest {
-        val noteId = NoteId("Inbox/First.md")
-        val markdown = "Broken [[unclosed and [[Second]] mixed."
-        val registry = FakeNoteRegistryRepository.withInboxNotes(summary(noteId, "First"))
-        val content = FakeNoteContentRepository.withContent(noteId, markdown)
-        val useCase = LoadNoteForReading(registry, content)
-
-        val result = useCase(config, filesDir, noteId)
-
-        assertTrue(result.isSuccess)
-        val segments = result.getOrThrow().segments
-        assertTrue(segments.all { it is NoteReaderSegment.Text })
-        assertEquals(markdown, segments.joinToString("") { (it as NoteReaderSegment.Text).text })
+        val document = result.getOrThrow()
+        assertEquals(firstId, document.note.id)
+        assertEquals("Open [[Second]].", document.content.markdown)
+        // The renderer resolves wiki links against this registry (see VaultReadonlyLinkTest).
+        assertTrue(document.registry.notes.any { it.id == secondId })
     }
 
     @Test

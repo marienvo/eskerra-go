@@ -3,7 +3,6 @@ package com.eskerra.go.app
 import com.eskerra.go.core.model.NoteContentError
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NoteIndexError
-import com.eskerra.go.core.model.NoteReaderSegment
 import com.eskerra.go.core.model.NoteSummary
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.usecase.LoadNoteForReading
@@ -69,7 +68,7 @@ class NoteReaderViewModelTest {
     }
 
     @Test
-    fun successStateContainsTitlePathAndSegments() = runTest {
+    fun successStateContainsTitlePathAndRegistry() = runTest {
         val noteId = NoteId("Inbox/First.md")
         val secondId = NoteId("Second.md")
         val registry = FakeNoteRegistryRepository.withInboxNotes(
@@ -88,7 +87,8 @@ class NoteReaderViewModelTest {
         assertEquals("First", state.title)
         assertEquals(noteId, state.noteId)
         assertEquals("Inbox/First.md", state.path)
-        assertTrue(state.document.segments.any { it is NoteReaderSegment.ResolvedLink })
+        assertEquals("Hello [[Second]].", state.document.content.markdown)
+        assertTrue(state.document.registry.notes.any { it.id == secondId })
     }
 
     @Test

@@ -8,12 +8,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ProcessLifecycleOwner
-import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -326,13 +325,21 @@ fun App(
                     }
                 }
 
+                val noteReaderContext = LocalContext.current
                 NoteScreen(
                     state = readerState,
                     onRetry = noteReaderViewModel::retry,
                     onBack = { navController.popBackStack() },
                     onEdit = { navController.navigate(AppRoute.editor(noteId)) },
-                    onResolvedWikiLinkClick = { targetId: NoteId ->
+                    onOpenInternalNote = { targetId: NoteId ->
                         navController.navigate(AppRoute.note(targetId))
+                    },
+                    onOpenExternalUrl = { url: String ->
+                        openExternalUrl(noteReaderContext, url)
+                    },
+                    onAmbiguousWikiLink = { candidates: List<NoteId>, _: String ->
+                        // Phase 4 adds an explicit picker; until then open the first candidate.
+                        candidates.firstOrNull()?.let { navController.navigate(AppRoute.note(it)) }
                     }
                 )
             }
@@ -383,31 +390,6 @@ fun App(
 
 /** ViewModel key for sync screens; includes branch so branch-only updates recreate VMs. */
 private fun WorkspaceConfig.syncViewModelKey(): String = "${remoteUri.orEmpty()}:$branch"
-
-internal const val NOTES_CHANGED_KEY = "notesChanged"
-internal const val NOTE_CONTENT_CHANGED_KEY = "noteContentChanged"
-
-internal fun consumeNoteReaderChanged(
-    currentRoute: String?,
-    noteId: NoteId,
-    savedStateHandle: SavedStateHandle
-): Boolean {
-    if (currentRoute != AppRoute.NOTE_PATTERN) return false
-    return savedStateHandle.remove<Boolean>(NOTE_CONTENT_CHANGED_KEY) == true
-}
-
-private fun NavHostController.markInboxNotesChanged() {
-    runCatching {
-        getBackStackEntry(AppRoute.INBOX).savedStateHandle[NOTES_CHANGED_KEY] = true
-    }
-}
-
-private fun NavHostController.markNoteReaderChanged(noteId: NoteId) {
-    runCatching {
-        getBackStackEntry(AppRoute.note(noteId))
-            .savedStateHandle[NOTE_CONTENT_CHANGED_KEY] = true
-    }
-}
 
 private val fakePodcasts: List<PodcastItem> = listOf(
     PodcastItem(title = "Note-taking, deeply", author = "Eskerra FM"),

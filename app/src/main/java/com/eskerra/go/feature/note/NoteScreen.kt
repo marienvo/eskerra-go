@@ -18,23 +18,16 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.LinkAnnotation
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.TextLinkStyles
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.text.withLink
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.eskerra.go.app.LocalShellChromeInsets
+import com.eskerra.go.core.markdown.VaultReadonlyLink
 import com.eskerra.go.core.model.NoteId
-import com.eskerra.go.core.model.NoteReaderSegment
+import com.eskerra.go.core.model.NoteRegistry
+import com.eskerra.go.ui.markdown.VaultMarkdownView
 
 /**
- * Stateless read-only note reader. Renders precomputed [NoteReaderUiState] and reports
- * navigation through callbacks only.
+ * Stateless read-only note reader. Renders precomputed [NoteReaderUiState] through the shared §8
+ * markdown renderer and reports navigation through callbacks only.
  */
 @Composable
 fun NoteScreen(
@@ -42,7 +35,9 @@ fun NoteScreen(
     onRetry: () -> Unit,
     onBack: () -> Unit,
     onEdit: () -> Unit,
-    onResolvedWikiLinkClick: (NoteId) -> Unit,
+    onOpenInternalNote: (NoteId) -> Unit,
+    onOpenExternalUrl: (String) -> Unit,
+    onAmbiguousWikiLink: (List<NoteId>, String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val chrome = LocalShellChromeInsets.current
@@ -68,9 +63,12 @@ fun NoteScreen(
                 title = state.title,
                 path = state.path,
                 canEdit = state.canEdit,
-                segments = state.document.segments,
+                markdown = state.document.content.markdown,
+                registry = state.document.registry,
                 onEdit = onEdit,
-                onResolvedWikiLinkClick = onResolvedWikiLinkClick
+                onOpenInternalNote = onOpenInternalNote,
+                onOpenExternalUrl = onOpenExternalUrl,
+                onAmbiguousWikiLink = onAmbiguousWikiLink
             )
             NoteReaderUiState.NotFound -> NoteReaderMessage(
                 title = "Note not found",
@@ -109,9 +107,12 @@ private fun NoteReaderContent(
     title: String,
     path: String,
     canEdit: Boolean,
-    segments: List<NoteReaderSegment>,
+    markdown: String,
+    registry: NoteRegistry,
     onEdit: () -> Unit,
-    onResolvedWikiLinkClick: (NoteId) -> Unit
+    onOpenInternalNote: (NoteId) -> Unit,
+    onOpenExternalUrl: (String) -> Unit,
+    onAmbiguousWikiLink: (List<NoteId>, String) -> Unit
 ) {
     val chrome = LocalShellChromeInsets.current
     Column(
@@ -140,15 +141,14 @@ private fun NoteReaderContent(
                 Text("Edit")
             }
         }
-        Text(
-            text = buildReaderText(
-                segments = segments,
-                onResolvedWikiLinkClick = onResolvedWikiLinkClick,
-                bodyColor = MaterialTheme.colorScheme.onSurface,
-                mutedColor = MaterialTheme.colorScheme.onSurfaceVariant
-            ),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface
+        VaultMarkdownView(
+            markdown = markdown,
+            registry = registry,
+            indexStatus = VaultReadonlyLink.IndexStatus.READY,
+            onOpenInternalNote = onOpenInternalNote,
+            onOpenExternalUrl = onOpenExternalUrl,
+            onAmbiguousWikiLink = onAmbiguousWikiLink,
+            modifier = Modifier.fillMaxWidth()
         )
     }
 }
@@ -179,50 +179,6 @@ private fun NoteReaderMessage(title: String, body: String, onRetry: (() -> Unit)
                 modifier = Modifier.padding(top = 16.dp)
             ) {
                 Text("Retry")
-            }
-        }
-    }
-}
-
-private fun buildReaderText(
-    segments: List<NoteReaderSegment>,
-    onResolvedWikiLinkClick: (NoteId) -> Unit,
-    bodyColor: Color,
-    mutedColor: Color
-): AnnotatedString = buildAnnotatedString {
-    val bodyStyle = SpanStyle(color = bodyColor)
-    val mutedStyle = SpanStyle(color = mutedColor)
-    val linkStyle = SpanStyle(color = bodyColor, textDecoration = TextDecoration.Underline)
-
-    segments.forEach { segment ->
-        when (segment) {
-            is NoteReaderSegment.Text -> withStyle(bodyStyle) {
-                append(segment.text)
-            }
-            is NoteReaderSegment.ResolvedLink -> {
-                withLink(
-                    LinkAnnotation.Clickable(
-                        tag = segment.target.value,
-                        styles = TextLinkStyles(style = linkStyle),
-                        linkInteractionListener = {
-                            onResolvedWikiLinkClick(segment.target)
-                        }
-                    )
-                ) {
-                    append(segment.label)
-                }
-            }
-            is NoteReaderSegment.MissingLink -> {
-                withStyle(mutedStyle) {
-                    append(segment.label)
-                    append(" (missing)")
-                }
-            }
-            is NoteReaderSegment.AmbiguousLink -> {
-                withStyle(mutedStyle) {
-                    append(segment.label)
-                    append(" (ambiguous: ${segment.candidateCount} matches)")
-                }
             }
         }
     }

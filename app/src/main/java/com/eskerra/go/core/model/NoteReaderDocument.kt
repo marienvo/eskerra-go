@@ -1,18 +1,12 @@
 package com.eskerra.go.core.model
 
-/** Reader presentation for a loaded note, including pre-resolved wiki-link segments. */
+/**
+ * Reader presentation for a loaded note: the note summary, its content, and the vault registry the
+ * renderer resolves wiki / internal links against (spec §8). The plaintext segment model was
+ * retired in Phase 3 in favour of in-renderer link annotation.
+ */
 data class NoteReaderDocument(
     val note: NoteSummary,
     val content: NoteContent,
-    val segments: List<NoteReaderSegment>
+    val registry: NoteRegistry
 )
-
-sealed interface NoteReaderSegment {
-    data class Text(val text: String) : NoteReaderSegment
-
-    data class ResolvedLink(val label: String, val target: NoteId) : NoteReaderSegment
-
-    data class MissingLink(val label: String, val reason: MissingWikiLinkReason) : NoteReaderSegment
-
-    data class AmbiguousLink(val label: String, val candidateCount: Int) : NoteReaderSegment
-}
