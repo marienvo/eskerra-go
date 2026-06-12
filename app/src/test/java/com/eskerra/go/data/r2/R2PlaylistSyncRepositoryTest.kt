@@ -9,12 +9,18 @@ import com.eskerra.go.core.repository.LocalSettingsStore
 import com.eskerra.go.core.repository.R2PlaylistClient
 import com.eskerra.go.core.repository.VaultSettingsRepository
 import java.io.File
+import java.io.IOException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -105,6 +111,55 @@ class R2PlaylistSyncRepositoryTest {
         assertEquals(first, second)
         assertEquals(1, client.getCount)
     }
+
+    @Test
+    fun `readPlaylist coalesced waiters receive failure not cancellation when owner cancelled`() =
+        runTest {
+            val hangingSettings = object : VaultSettingsRepository {
+                override suspend fun loadShared(workspaceRoot: File): Result<EskerraSettings> {
+                    awaitCancellation()
+                }
+
+                override suspend fun saveShared(
+                    workspaceRoot: File,
+                    settings: EskerraSettings
+                ): Result<Unit> = Result.success(Unit)
+            }
+            val client = FakeR2Client(getResult = entry(updatedAt = 1))
+            val repo = R2PlaylistSyncRepository(
+                settingsRepository = hangingSettings,
+                localSettingsStore = FakeLocalSettingsStore(),
+                r2Client = client,
+                ioDispatcher = StandardTestDispatcher(testScheduler)
+            )
+
+            var waiterError: Throwable? = null
+            val owner = launch { repo.readPlaylist(tempFolder.root) }
+            yield()
+            val waiter = launch {
+                try {
+                    repo.readPlaylist(tempFolder.root)
+                } catch (e: Throwable) {
+                    waiterError = e
+                }
+            }
+            yield()
+            owner.cancel()
+            owner.join()
+            waiter.join()
+
+            assertNotNull(waiterError)
+            assertTrue(waiterError is IOException)
+            assertFalse(waiterError is CancellationException)
+
+            repo.invalidateReadCache(tempFolder.root)
+            val fastRepo = repo(
+                EskerraSettings(r2 = r2Config),
+                FakeLocalSettingsStore(),
+                client
+            )
+            assertEquals(entry(updatedAt = 1), fastRepo.readPlaylist(tempFolder.root))
+        }
 
     @Test
     fun `invalidateReadCache forces a fresh read`() = runTest {

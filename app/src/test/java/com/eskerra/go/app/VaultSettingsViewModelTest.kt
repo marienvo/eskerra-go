@@ -160,16 +160,29 @@ class VaultSettingsViewModelTest {
     }
 
     @Test
-    fun `save persists display name trimmed and device name trimEnd`() = runTest {
+    fun `save persists display name and device name trimmed`() = runTest {
         vm = buildVm()
         testDispatcher.scheduler.advanceUntilIdle()
         vm.onDisplayNameChange("  Alice  ")
-        vm.onDeviceNameChange("Phone  ")
+        vm.onDeviceNameChange("  Phone  ")
         vm.save()
         testDispatcher.scheduler.advanceUntilIdle()
 
         assertEquals("Alice", localStore.stored.displayName)
         assertEquals("Phone", localStore.stored.deviceName)
+    }
+
+    @Test
+    fun `save shows error when local settings persist fails`() = runTest {
+        localStore = FailingLocalSettingsStore()
+        vm = buildVm()
+        testDispatcher.scheduler.advanceUntilIdle()
+        vm.save()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val ready = vm.uiState.first() as VaultSettingsUiState.Ready
+        assertEquals("disk full", ready.errorMessage)
+        assertNull(ready.statusMessage)
     }
 
     @Test
@@ -210,12 +223,17 @@ class VaultSettingsViewModelTest {
         assertNotNull(savedSettings.extras[themeKey])
     }
 
-    private class FakeLocalSettingsStore(
+    private open class FakeLocalSettingsStore(
         var stored: EskerraLocalSettings = EskerraLocalSettings()
     ) : LocalSettingsStore {
         override suspend fun load(): EskerraLocalSettings = stored
         override suspend fun save(settings: EskerraLocalSettings) {
             stored = settings
         }
+    }
+
+    private class FailingLocalSettingsStore : FakeLocalSettingsStore() {
+        override suspend fun save(settings: EskerraLocalSettings) =
+            throw IllegalStateException("disk full")
     }
 }
