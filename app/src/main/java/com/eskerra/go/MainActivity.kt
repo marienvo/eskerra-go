@@ -15,6 +15,7 @@ import com.eskerra.go.core.usecase.BuildSafeSyncDiagnostic
 import com.eskerra.go.core.usecase.BuildSyncPreflight
 import com.eskerra.go.core.usecase.ClearRemoteSyncSettings
 import com.eskerra.go.core.usecase.CreateInboxNote
+import com.eskerra.go.core.usecase.DeleteInboxNotes
 import com.eskerra.go.core.usecase.EnsureDeviceInstanceId
 import com.eskerra.go.core.usecase.LoadEditableNote
 import com.eskerra.go.core.usecase.LoadGitStatusSummary
@@ -93,6 +94,11 @@ class MainActivity : ComponentActivity() {
             registryRepository = noteRegistryRepository,
             loadGitStatusSummary = loadGitStatusSummary
         )
+        val deleteInboxNotes = DeleteInboxNotes(
+            writeRepository = noteWriteRepository,
+            registryRepository = noteRegistryRepository,
+            loadGitStatusSummary = loadGitStatusSummary
+        )
         val loadEditableNote = LoadEditableNote(
             registryRepository = noteRegistryRepository,
             contentRepository = noteContentRepository
@@ -163,6 +169,7 @@ class MainActivity : ComponentActivity() {
                 loadInboxSummaries = loadInboxSummaries,
                 loadNoteForReading = loadNoteForReading,
                 createInboxNote = createInboxNote,
+                deleteInboxNotes = deleteInboxNotes,
                 loadEditableNote = loadEditableNote,
                 saveNote = saveNote,
                 loadGitStatusSummary = loadGitStatusSummary,

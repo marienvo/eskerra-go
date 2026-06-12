@@ -1,5 +1,6 @@
 package com.eskerra.go.core.usecase
 
+import com.eskerra.go.core.inbox.InboxNotePath
 import com.eskerra.go.core.model.CreateInboxNoteResult
 import com.eskerra.go.core.model.CreateNoteError
 import com.eskerra.go.core.model.CreateNoteException
@@ -12,7 +13,6 @@ import com.eskerra.go.core.model.NoteWriteException
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.NoteRegistryRepository
 import com.eskerra.go.core.repository.NoteWriteRepository
-import com.eskerra.go.data.notes.MarkdownNoteScanner
 import java.io.File
 
 /** Creates a new inbox markdown note from compose draft text, refreshes registry, returns Git status. */
@@ -120,7 +120,7 @@ class CreateInboxNote(
     }
 
     internal companion object {
-        const val INBOX_PREFIX = "${MarkdownNoteScanner.INBOX_DIRECTORY}/"
+        const val INBOX_PREFIX = "${InboxNotePath.INBOX_DIRECTORY}/"
         const val MARKDOWN_SUFFIX = ".md"
 
         private fun mapWriteFailure(error: Throwable): CreateNoteException {
@@ -131,9 +131,11 @@ class CreateInboxNote(
                     NoteWriteError.WorkspaceMissing ->
                         CreateNoteError.WorkspaceMissing
                     NoteWriteError.InvalidNotePath,
-                    is NoteWriteError.WriteFailed ->
+                    is NoteWriteError.WriteFailed,
+                    is NoteWriteError.DeleteFailed ->
                         CreateNoteError.WriteFailed(
                             (error.error as? NoteWriteError.WriteFailed)?.detail
+                                ?: (error.error as? NoteWriteError.DeleteFailed)?.detail
                         )
                 }
                 return CreateNoteException(mapped)

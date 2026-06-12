@@ -71,6 +71,25 @@ class FileNoteWriteRepository(private val gitRepository: WorkspaceGitRepository)
         )
     }
 
+    override suspend fun delete(
+        config: WorkspaceConfig,
+        filesDir: File,
+        notePath: NotePath
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        val workspaceDir = resolveWorkspace(config, filesDir).getOrElse {
+            return@withContext Result.failure(it)
+        }
+
+        gitRepository.deleteFile(workspaceDir, notePath.value).fold(
+            onSuccess = { Result.success(Unit) },
+            onFailure = { error ->
+                Result.failure(
+                    NoteWriteException(NoteWriteError.DeleteFailed(error.message))
+                )
+            }
+        )
+    }
+
     private fun resolveWorkspace(config: WorkspaceConfig, filesDir: File): Result<File> {
         val workspaceResult = WorkspacePaths.resolve(filesDir, config.relativePath)
         if (workspaceResult.isFailure) {

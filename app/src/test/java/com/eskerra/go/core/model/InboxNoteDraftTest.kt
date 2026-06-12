@@ -39,22 +39,25 @@ class InboxNoteDraftTest {
     }
 
     @Test
-    fun toMarkdown_singleLineEndsWithBlankLine() {
-        assertEquals("# Title only\n\n", InboxNoteDraft.toMarkdown("Title only"))
+    fun toMarkdown_singleLineEndsWithSingleNewline() {
+        assertEquals("# Title only\n", InboxNoteDraft.toMarkdown("Title only"))
     }
 
     @Test
     fun toFilenameStem_preservesSpacesAndCase() {
-        assertEquals("Mijn idee", InboxNoteDraft.toFilenameStem("Mijn idee"))
+        assertEquals("Mijn idee", InboxNoteDraft.toFilenameStem("Mijn idee", nowEpochMillis = 1L))
     }
 
     @Test
     fun toFilenameStem_removesInvalidPathCharacters() {
-        assertEquals("My note bad name", InboxNoteDraft.toFilenameStem("My/note\\bad:name"))
+        assertEquals(
+            "Mynotebadname",
+            InboxNoteDraft.toFilenameStem("My/note\\bad:name", nowEpochMillis = 1L)
+        )
     }
 
     @Test
-    fun toFilenameStem_fallsBackToUntitledWhenBlank() {
-        assertEquals(InboxNoteDraft.UNTITLED_STEM, InboxNoteDraft.toFilenameStem("   "))
+    fun toFilenameStem_fallsBackToTimestampWhenBlank() {
+        assertEquals("note-999", InboxNoteDraft.toFilenameStem("   ", nowEpochMillis = 999))
     }
 }

@@ -9,6 +9,7 @@ import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.WorkspaceConfig
+import com.eskerra.go.core.usecase.DeleteInboxNotes
 import com.eskerra.go.core.usecase.LoadInboxSummariesCached
 import com.eskerra.go.feature.inbox.InboxScreen
 import com.eskerra.go.feature.inbox.InboxUiState
@@ -19,6 +20,7 @@ internal fun AppInboxRoute(
     currentConfig: WorkspaceConfig,
     filesDir: File,
     loadInboxSummaries: LoadInboxSummariesCached,
+    deleteInboxNotes: DeleteInboxNotes,
     currentRoute: String?,
     entry: NavBackStackEntry,
     navController: NavHostController,
@@ -30,11 +32,19 @@ internal fun AppInboxRoute(
         factory = InboxViewModel.factory(
             config = currentConfig,
             filesDir = filesDir,
-            loadInboxSummaries = loadInboxSummaries
+            loadInboxSummaries = loadInboxSummaries,
+            deleteInboxNotes = deleteInboxNotes,
+            onInboxMutated = {
+                entry.savedStateHandle[NOTES_CHANGED_KEY] = true
+                appSyncViewModel.refreshLocalStatusQuietly()
+            }
         )
     )
     val inboxState by inboxViewModel.uiState.collectAsState()
     val showRefreshIndicator by inboxViewModel.showRefreshIndicator.collectAsState()
+    val selectedNoteIds by inboxViewModel.selectedNoteIds.collectAsState()
+    val isDeleting by inboxViewModel.isDeleting.collectAsState()
+    val deleteError by inboxViewModel.deleteError.collectAsState()
 
     LaunchedEffect(inboxState) {
         onInboxUiStateChanged(inboxState)
@@ -50,10 +60,21 @@ internal fun AppInboxRoute(
 
     InboxScreen(
         state = inboxState,
+        selectedNoteIds = selectedNoteIds,
+        isDeleting = isDeleting,
+        deleteError = deleteError,
         showRefreshIndicator = showRefreshIndicator,
         onRetry = inboxViewModel::refresh,
         onNoteClick = { noteId: NoteId ->
             navController.navigate(AppRoute.note(noteId))
+        },
+        onAvatarClick = inboxViewModel::toggleSelection,
+        onClearSelection = inboxViewModel::clearSelection,
+        onDeleteSelected = inboxViewModel::deleteSelected,
+        onOpenSettings = {
+            navController.navigate(AppRoute.MENU) {
+                launchSingleTop = true
+            }
         }
     )
 }

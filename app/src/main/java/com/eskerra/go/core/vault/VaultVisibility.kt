@@ -17,11 +17,9 @@ object VaultVisibility {
      * Returns true if a markdown file with this name is eligible for indexing.
      * Rejects dot-prefixed names and sync-conflict filenames.
      */
-    fun isEligibleMarkdownFileName(name: String): Boolean {
-        return !name.startsWith(".") && !isSyncConflictFileName(name)
-    }
+    fun isEligibleMarkdownFileName(name: String): Boolean =
+        !name.startsWith(".") && !isSyncConflictFileName(name)
 
     /** Returns true for `*.md.sync-conflict-*` filenames (Syncthing conflict pattern). */
-    fun isSyncConflictFileName(name: String): Boolean =
-        name.contains(".md.sync-conflict-")
+    fun isSyncConflictFileName(name: String): Boolean = name.contains(".md.sync-conflict-")
 }

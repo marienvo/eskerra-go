@@ -14,4 +14,6 @@ interface NoteWriteRepository {
     ): Result<Unit>
 
     suspend fun exists(config: WorkspaceConfig, filesDir: File, notePath: NotePath): Result<Boolean>
+
+    suspend fun delete(config: WorkspaceConfig, filesDir: File, notePath: NotePath): Result<Unit>
 }

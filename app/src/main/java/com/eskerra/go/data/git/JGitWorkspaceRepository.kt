@@ -137,6 +137,30 @@ class JGitWorkspaceRepository(
             target.writeText(content)
         }
 
+    override fun deleteFile(workingDir: File, relativePath: String): Result<Unit> = runCatching {
+        require(relativePath.isNotBlank()) { "relativePath must not be blank" }
+        require(!File(relativePath).isAbsolute) {
+            "relativePath must be relative: $relativePath"
+        }
+        val segments = relativePath.split('/', '\\')
+        require(segments.none { it == ".." }) {
+            "relativePath must not contain '..': $relativePath"
+        }
+        require(segments.none { it == ".git" }) {
+            "relativePath must not contain '.git' segment: $relativePath"
+        }
+
+        val base = workingDir.canonicalFile
+        val target = File(base, relativePath).canonicalFile
+        require(target.toPath().startsWith(base.toPath())) {
+            "resolved path escapes workingDir: $relativePath"
+        }
+
+        if (target.exists()) {
+            check(target.delete()) { "failed to delete file: $relativePath" }
+        }
+    }
+
     override fun stageAll(workingDir: File): Result<Unit> = runCatching {
         Git.open(workingDir).use { git ->
             // Stage new and modified files.

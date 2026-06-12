@@ -69,6 +69,9 @@ class CredentialRecordingGitRepository(
     override fun writeFile(workingDir: File, relativePath: String, content: String): Result<Unit> =
         delegate.writeFile(workingDir, relativePath, content)
 
+    override fun deleteFile(workingDir: File, relativePath: String): Result<Unit> =
+        delegate.deleteFile(workingDir, relativePath)
+
     override fun stageAll(workingDir: File): Result<Unit> = delegate.stageAll(workingDir)
 
     override fun commit(workingDir: File, message: String): Result<String> =

@@ -76,13 +76,13 @@ class NoteEditorErrorMappingTest {
             loadGitStatusSummary = loadGitStatusSummary()
         )
 
-        viewModel.updateDraft("# Editable\n\nChanged")
+        viewModel.updateDraft("Editable\n\nChanged")
         viewModel.save()
         advanceUntilIdle()
 
         val state = viewModel.uiState.value as NoteEditorUiState.Content
         assertEquals("This note is read-only.", state.errorMessage)
-        assertEquals("# Editable\n\nChanged", state.draftMarkdown)
+        assertEquals("Editable\n\nChanged", state.draftMarkdown)
     }
 
     @Test
@@ -110,13 +110,13 @@ class NoteEditorErrorMappingTest {
             loadGitStatusSummary = loadGitStatusSummary()
         )
 
-        viewModel.updateDraft("# First\n\nEdited")
+        viewModel.updateDraft("First\n\nEdited")
         viewModel.save()
         advanceUntilIdle()
 
         val state = viewModel.uiState.value as NoteEditorUiState.Content
         assertEquals(NoteEditorViewModel.REGISTRY_REFRESH_ERROR_MESSAGE, state.errorMessage)
-        assertEquals("# First\n\nEdited", state.draftMarkdown)
+        assertEquals("First\n\nEdited", state.draftMarkdown)
     }
 
     private class CountingRegistryRepository(private val responses: List<Result<NoteRegistry>>) :

@@ -21,6 +21,7 @@ import com.eskerra.go.core.usecase.BuildSafeSyncDiagnostic
 import com.eskerra.go.core.usecase.BuildSyncPreflight
 import com.eskerra.go.core.usecase.ClearRemoteSyncSettings
 import com.eskerra.go.core.usecase.CreateInboxNote
+import com.eskerra.go.core.usecase.DeleteInboxNotes
 import com.eskerra.go.core.usecase.EnsureDeviceInstanceId
 import com.eskerra.go.core.usecase.LoadEditableNote
 import com.eskerra.go.core.usecase.LoadGitStatusSummary
@@ -60,6 +61,7 @@ fun AppRoot(
     loadInboxSummaries: LoadInboxSummariesCached,
     loadNoteForReading: LoadNoteForReading,
     createInboxNote: CreateInboxNote,
+    deleteInboxNotes: DeleteInboxNotes,
     loadEditableNote: LoadEditableNote,
     saveNote: SaveNote,
     loadGitStatusSummary: LoadGitStatusSummary,
@@ -145,6 +147,7 @@ fun AppRoot(
                     loadInboxSummaries = loadInboxSummaries,
                     loadNoteForReading = loadNoteForReading,
                     createInboxNote = createInboxNote,
+                    deleteInboxNotes = deleteInboxNotes,
                     loadEditableNote = loadEditableNote,
                     saveNote = saveNote,
                     loadGitStatusSummary = loadGitStatusSummary,

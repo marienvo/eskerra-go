@@ -10,4 +10,6 @@ data class NoteSummary(
     val snippet: String,
     val isInbox: Boolean,
     val lastModifiedEpochMillis: Long = 0L
-)
+) {
+    val fileName: String get() = id.value.substringAfterLast('/')
+}

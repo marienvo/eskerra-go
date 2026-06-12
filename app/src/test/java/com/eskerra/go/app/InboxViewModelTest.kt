@@ -4,10 +4,14 @@ import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NoteIndexError
 import com.eskerra.go.core.model.NoteSummary
 import com.eskerra.go.core.model.WorkspaceConfig
+import com.eskerra.go.core.usecase.DeleteInboxNotes
+import com.eskerra.go.core.usecase.LoadGitStatusSummary
 import com.eskerra.go.core.usecase.LoadInboxSummaries
 import com.eskerra.go.core.usecase.LoadInboxSummariesCached
+import com.eskerra.go.data.git.JGitWorkspaceRepository
 import com.eskerra.go.data.notes.FakeInboxSnapshotStore
 import com.eskerra.go.data.notes.FakeNoteRegistryRepository
+import com.eskerra.go.data.notes.FakeNoteWriteRepository
 import com.eskerra.go.data.workspace.WorkspacePaths
 import com.eskerra.go.feature.inbox.InboxUiState
 import java.io.File
@@ -307,6 +311,11 @@ class InboxViewModelTest {
         loadInboxSummaries = LoadInboxSummariesCached(
             delegate = LoadInboxSummaries(repository),
             snapshotStore = snapshotStore
+        ),
+        deleteInboxNotes = DeleteInboxNotes(
+            writeRepository = FakeNoteWriteRepository(),
+            registryRepository = repository,
+            loadGitStatusSummary = LoadGitStatusSummary(JGitWorkspaceRepository())
         )
     )
 }

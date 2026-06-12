@@ -89,6 +89,7 @@ class CreateInboxNoteTest {
 
         val result = useCase(config, filesDir, "Mijn idee").getOrThrow()
 
+        assertEquals("# Mijn idee\n", result.note.markdown)
         assertEquals("Inbox/Mijn idee.md", result.note.path.value)
     }
 
