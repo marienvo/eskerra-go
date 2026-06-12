@@ -100,6 +100,16 @@ class EskerraSettingsCodecTest {
     }
 
     @Test
+    fun `parse invalid r2 nested field type returns failure`() {
+        val json =
+            """{"r2":{"endpoint":{},"bucket":"b","accessKeyId":"k","secretAccessKey":"s"}}"""
+        val result = EskerraSettingsCodec.parse(json)
+        assertTrue(result.isFailure)
+        val ex = result.exceptionOrNull() as VaultSettingsException
+        assertEquals("settings-shared.json has an invalid structure.", ex.error.message)
+    }
+
+    @Test
     fun `serialize empty settings produces empty object with trailing newline`() {
         val output = EskerraSettingsCodec.serialize(EskerraSettings())
         assertEquals("{}\n", output)

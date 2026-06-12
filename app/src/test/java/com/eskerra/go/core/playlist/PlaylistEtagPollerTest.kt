@@ -7,7 +7,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
-import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -45,7 +45,7 @@ class PlaylistEtagPollerTest {
         val p =
             poller(fetch = { R2ConditionalResult.NotModified }, onDataChanged = { called = true })
         p.setActive(true)
-        advanceUntilIdle()
+        runCurrent()
         assertEquals(false, called)
         p.dispose()
     }
@@ -58,7 +58,7 @@ class PlaylistEtagPollerTest {
             onDataChanged = { received = it }
         )
         p.setActive(true)
-        advanceUntilIdle()
+        runCurrent()
         assertEquals(entry, received)
         assertEquals("\"x\"", p.getEtag())
         p.dispose()
@@ -76,18 +76,18 @@ class PlaylistEtagPollerTest {
             }
         )
         p.setActive(true)
-        advanceUntilIdle() // immediate tick starts (in flight)
+        runCurrent() // immediate tick starts (in flight)
         assertEquals(1, fetchCount)
 
         advanceTimeBy(500) // timer fires → in flight, skip
-        advanceUntilIdle()
+        runCurrent()
         assertEquals(1, fetchCount)
 
         hang.complete(R2ConditionalResult.NotModified)
-        advanceUntilIdle() // first tick finishes
+        runCurrent() // first tick finishes
 
         advanceTimeBy(500) // timer fires again → now idle
-        advanceUntilIdle()
+        runCurrent()
         assertEquals(2, fetchCount)
         p.dispose()
     }
@@ -103,7 +103,7 @@ class PlaylistEtagPollerTest {
             }
         )
         p.setActive(true)
-        advanceUntilIdle()
+        runCurrent()
         assertEquals(1, fetchCount)
         p.dispose()
     }
@@ -117,16 +117,16 @@ class PlaylistEtagPollerTest {
             hang.await()
         })
         p.setActive(true)
-        advanceUntilIdle()
+        runCurrent()
         assertEquals(1, fetchCount)
 
         p.setActive(false)
         hang.complete(R2ConditionalResult.NotModified)
-        advanceUntilIdle()
+        runCurrent()
 
         // Timer should be cancelled — no extra calls
         advanceTimeBy(2000)
-        advanceUntilIdle()
+        runCurrent()
         assertEquals(1, fetchCount)
         p.dispose()
     }
@@ -146,11 +146,11 @@ class PlaylistEtagPollerTest {
                 onRemoteCleared = { clearCount++ }
             )
             p.setActive(true)
-            advanceUntilIdle()
+            runCurrent()
             assertEquals("\"a\"", p.getEtag())
 
             advanceTimeBy(10)
-            advanceUntilIdle()
+            runCurrent()
             assertNull(p.getEtag())
             assertEquals(1, clearCount)
             p.dispose()
@@ -165,7 +165,7 @@ class PlaylistEtagPollerTest {
                 onRemoteCleared = { clearCount++ }
             )
             p.setActive(true)
-            advanceUntilIdle()
+            runCurrent()
             assertEquals(0, clearCount)
             p.dispose()
         }
@@ -186,15 +186,15 @@ class PlaylistEtagPollerTest {
                 onRemoteCleared = { clearCount++ }
             )
             p.setActive(true)
-            advanceUntilIdle()
+            runCurrent()
             assertEquals(1, fetchCount)
 
             p.triggerCheck()
-            advanceUntilIdle()
+            runCurrent()
             assertEquals(2, fetchCount)
 
             p.triggerCheck()
-            advanceUntilIdle()
+            runCurrent()
             assertEquals(3, fetchCount)
             assertEquals(1, clearCount)
             p.dispose()
@@ -216,12 +216,12 @@ class PlaylistEtagPollerTest {
                 onRemoteCleared = { clearCount++ }
             )
             p.setActive(true)
-            advanceUntilIdle()
+            runCurrent()
             p.triggerCheck()
-            advanceUntilIdle()
+            runCurrent()
             assertEquals(1, clearCount)
             p.triggerCheck()
-            advanceUntilIdle()
+            runCurrent()
             assertEquals(1, clearCount)
             p.dispose()
         }
@@ -235,7 +235,7 @@ class PlaylistEtagPollerTest {
             onTransientError = { caught = it }
         )
         p.setActive(true)
-        advanceUntilIdle()
+        runCurrent()
         assertEquals(boom, caught)
         p.dispose()
     }
@@ -254,21 +254,21 @@ class PlaylistEtagPollerTest {
                 fetch = { results[fetchCount++] }
             )
             p.setActive(true)
-            advanceUntilIdle()
+            runCurrent()
             assertEquals(1, fetchCount)
             assertEquals("\"etag1\"", p.getEtag())
 
             advanceTimeBy(1000)
-            advanceUntilIdle()
+            runCurrent()
             assertEquals(2, fetchCount)
 
             p.setIntervalMs(5000)
             advanceTimeBy(1000)
-            advanceUntilIdle()
+            runCurrent()
             assertEquals(2, fetchCount) // no extra tick on reschedule
 
             advanceTimeBy(4000)
-            advanceUntilIdle()
+            runCurrent()
             assertEquals(3, fetchCount)
             assertEquals("\"etag1\"", p.getEtag())
             p.dispose()
@@ -287,15 +287,15 @@ class PlaylistEtagPollerTest {
             )
             p.setIntervalMs(3000)
             p.setActive(true)
-            advanceUntilIdle()
+            runCurrent()
             assertEquals(1, fetchCount) // immediate tick
 
             advanceTimeBy(1000)
-            advanceUntilIdle()
+            runCurrent()
             assertEquals(1, fetchCount) // 1 s should not fire at 3 s interval
 
             advanceTimeBy(2000)
-            advanceUntilIdle()
+            runCurrent()
             assertEquals(2, fetchCount)
             p.dispose()
         }
