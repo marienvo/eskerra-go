@@ -6,6 +6,7 @@ import com.eskerra.go.core.model.NoteIndexException
 import com.eskerra.go.core.model.NotePath
 import com.eskerra.go.core.model.NoteRegistry
 import com.eskerra.go.core.model.NoteSummary
+import com.eskerra.go.core.vault.VaultVisibility
 import java.io.File
 import java.nio.file.FileVisitResult
 import java.nio.file.Files
@@ -37,7 +38,8 @@ class MarkdownNoteScanner : NoteWorkspaceScanner {
                         dir: Path,
                         attrs: BasicFileAttributes
                     ): FileVisitResult {
-                        if (dir.fileName.toString() == GIT_DIRECTORY) {
+                        val name = dir.fileName.toString()
+                        if (VaultVisibility.isExcludedDirectorySegment(name)) {
                             return FileVisitResult.SKIP_SUBTREE
                         }
                         return FileVisitResult.CONTINUE
@@ -53,6 +55,9 @@ class MarkdownNoteScanner : NoteWorkspaceScanner {
 
                         val file = path.toFile()
                         if (!isMarkdownFile(file)) return FileVisitResult.CONTINUE
+                        if (!VaultVisibility.isEligibleMarkdownFileName(file.name)) {
+                            return FileVisitResult.CONTINUE
+                        }
 
                         val relativePath = root.toPath()
                             .relativize(path)
@@ -130,7 +135,6 @@ class MarkdownNoteScanner : NoteWorkspaceScanner {
 
     companion object {
         const val INBOX_DIRECTORY = "Inbox"
-        private const val GIT_DIRECTORY = ".git"
         private const val MARKDOWN_EXTENSION = "md"
         private const val MARKDOWN_ALT_EXTENSION = "markdown"
         private const val H1_PREFIX = "# "
