@@ -7,6 +7,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
@@ -39,6 +40,7 @@ import com.eskerra.go.core.usecase.LoadSyncStatus
 import com.eskerra.go.core.usecase.LoadTodayHub
 import com.eskerra.go.core.usecase.LoadTodayHubRow
 import com.eskerra.go.core.usecase.LoadVaultSettings
+import com.eskerra.go.core.usecase.MaintainVaultSearchIndex
 import com.eskerra.go.core.usecase.ManualSyncNow
 import com.eskerra.go.core.usecase.ReconcileWorkspaceSyncBranch
 import com.eskerra.go.core.usecase.RecordLastSyncAttempt
@@ -47,7 +49,9 @@ import com.eskerra.go.core.usecase.SaveLocalSettings
 import com.eskerra.go.core.usecase.SaveNote
 import com.eskerra.go.core.usecase.SaveRemoteSyncSettings
 import com.eskerra.go.core.usecase.SaveVaultSettings
+import com.eskerra.go.core.usecase.SearchVault
 import com.eskerra.go.core.usecase.TestRemoteConnection
+import com.eskerra.go.core.usecase.TouchVaultSearchPaths
 import com.eskerra.go.core.usecase.UpdateSyncToken
 import com.eskerra.go.data.workspace.WorkspacePaths
 import com.eskerra.go.feature.editor.CreateInboxScreen
@@ -99,6 +103,9 @@ fun App(
     loadLocalSettings: LoadLocalSettings,
     saveLocalSettings: SaveLocalSettings,
     ensureDeviceInstanceId: EnsureDeviceInstanceId,
+    searchVault: SearchVault,
+    maintainVaultSearchIndex: MaintainVaultSearchIndex,
+    touchVaultSearchPaths: TouchVaultSearchPaths,
     onConfigUpdated: (WorkspaceConfig) -> Unit,
     onInboxUiStateChanged: (InboxUiState) -> Unit = {}
 ) {
@@ -107,6 +114,7 @@ fun App(
         WorkspacePaths.resolve(filesDir, currentConfig.relativePath).getOrNull()
     }
     val navController = rememberNavController()
+    val scope = rememberCoroutineScope()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     val markInboxNotesChanged = {
@@ -140,6 +148,11 @@ fun App(
         appSyncViewModel = appSyncViewModel,
         onConfigUpdated = onConfigUpdated,
         onConfigChanged = { updated -> currentConfig = updated }
+    )
+    AppSearchIndexEffects(
+        config = currentConfig,
+        filesDir = filesDir,
+        maintainVaultSearchIndex = maintainVaultSearchIndex
     )
 
     DisposableEffect(appSyncViewModel) {
@@ -198,6 +211,7 @@ fun App(
                     entry = entry,
                     navController = navController,
                     appSyncViewModel = appSyncViewModel,
+                    touchVaultSearchPaths = touchVaultSearchPaths,
                     onInboxUiStateChanged = onInboxUiStateChanged
                 )
             }
@@ -217,6 +231,12 @@ fun App(
                         if (noteId != null) {
                             markInboxNotesChanged()
                             appSyncViewModel.refreshLocalStatusQuietly()
+                            scope.touchVaultSearchPathsAsync(
+                                touchVaultSearchPaths,
+                                currentConfig,
+                                filesDir,
+                                listOf(noteId.value)
+                            )
                             navController.navigate(AppRoute.note(noteId)) {
                                 popUpTo(AppRoute.CREATE_INBOX) { inclusive = true }
                             }
@@ -229,6 +249,16 @@ fun App(
                     onBack = { navController.popBackStack() },
                     onDraftChange = createViewModel::updateDraft,
                     onSave = createViewModel::save
+                )
+            }
+
+            composable(AppRoute.SEARCH) {
+                AppSearchRoute(
+                    currentConfig = currentConfig,
+                    filesDir = filesDir,
+                    searchVault = searchVault,
+                    maintainVaultSearchIndex = maintainVaultSearchIndex,
+                    navController = navController
                 )
             }
 
@@ -253,6 +283,7 @@ fun App(
                     items = menuItems,
                     onItemClick = { item ->
                         when (item) {
+                            MENU_SEARCH -> navController.navigate(AppRoute.SEARCH)
                             MENU_SYNC -> navController.navigate(AppRoute.SYNC)
                             MENU_SETTINGS -> navController.navigate(AppRoute.SETTINGS)
                         }
@@ -409,6 +440,12 @@ fun App(
                     editorViewModel.noteSavedEvents.collect {
                         markInboxNotesChanged()
                         appSyncViewModel.refreshLocalStatusQuietly()
+                        scope.touchVaultSearchPathsAsync(
+                            touchVaultSearchPaths,
+                            currentConfig,
+                            filesDir,
+                            listOf(noteId.value)
+                        )
                         navController.markNoteReaderChanged(noteId)
                         navController.navigate(AppRoute.note(noteId)) {
                             popUpTo(AppRoute.editor(noteId)) { inclusive = true }

@@ -25,7 +25,7 @@ class InboxViewModel(
     private val filesDir: File,
     private val loadInboxSummaries: LoadInboxSummariesCached,
     private val deleteInboxNotes: DeleteInboxNotes,
-    private val onInboxMutated: () -> Unit = {}
+    private val onInboxMutated: (List<String>) -> Unit = {}
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<InboxUiState>(InboxUiState.Loading)
@@ -92,7 +92,7 @@ class InboxViewModel(
                 onSuccess = {
                     _selectedNoteIds.value = emptySet()
                     _isDeleting.value = false
-                    onInboxMutated()
+                    onInboxMutated(resolvedIds.map { it.value })
                     refresh(showFullScreenLoading = false)
                 },
                 onFailure = { error ->
@@ -192,7 +192,7 @@ class InboxViewModel(
             filesDir: File,
             loadInboxSummaries: LoadInboxSummariesCached,
             deleteInboxNotes: DeleteInboxNotes,
-            onInboxMutated: () -> Unit = {}
+            onInboxMutated: (List<String>) -> Unit = {}
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T = InboxViewModel(

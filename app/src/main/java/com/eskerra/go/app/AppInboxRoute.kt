@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
@@ -11,6 +12,7 @@ import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.usecase.DeleteInboxNotes
 import com.eskerra.go.core.usecase.LoadInboxSummariesCached
+import com.eskerra.go.core.usecase.TouchVaultSearchPaths
 import com.eskerra.go.feature.inbox.InboxScreen
 import com.eskerra.go.feature.inbox.InboxUiState
 import java.io.File
@@ -25,8 +27,10 @@ internal fun AppInboxRoute(
     entry: NavBackStackEntry,
     navController: NavHostController,
     appSyncViewModel: AppSyncViewModel,
+    touchVaultSearchPaths: TouchVaultSearchPaths,
     onInboxUiStateChanged: (InboxUiState) -> Unit
 ) {
+    val scope = rememberCoroutineScope()
     val inboxViewModel: InboxViewModel = viewModel(
         key = currentConfig.remoteUri,
         factory = InboxViewModel.factory(
@@ -34,9 +38,15 @@ internal fun AppInboxRoute(
             filesDir = filesDir,
             loadInboxSummaries = loadInboxSummaries,
             deleteInboxNotes = deleteInboxNotes,
-            onInboxMutated = {
+            onInboxMutated = { paths ->
                 entry.savedStateHandle[NOTES_CHANGED_KEY] = true
                 appSyncViewModel.refreshLocalStatusQuietly()
+                scope.touchVaultSearchPathsAsync(
+                    touchVaultSearchPaths,
+                    currentConfig,
+                    filesDir,
+                    paths
+                )
             }
         )
     )

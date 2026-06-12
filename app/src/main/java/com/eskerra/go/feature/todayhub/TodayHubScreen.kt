@@ -12,6 +12,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.UnfoldMore
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -53,6 +54,7 @@ fun TodayHubScreen(
     onOpenExternalUrl: (String) -> Unit,
     onAmbiguousWikiLink: (List<NoteId>, String) -> Unit,
     onNoteNotFound: (String) -> Unit = {},
+    onOpenSearch: () -> Unit = {},
     workspaceRoot: File? = null,
     modifier: Modifier = Modifier
 ) {
@@ -80,6 +82,7 @@ fun TodayHubScreen(
                 onOpenExternalUrl = onOpenExternalUrl,
                 onAmbiguousWikiLink = onAmbiguousWikiLink,
                 onNoteNotFound = onNoteNotFound,
+                onOpenSearch = onOpenSearch,
                 workspaceRoot = workspaceRoot
             )
         }
@@ -98,6 +101,7 @@ private fun TodayHubContent(
     onOpenExternalUrl: (String) -> Unit,
     onAmbiguousWikiLink: (List<NoteId>, String) -> Unit,
     onNoteNotFound: (String) -> Unit,
+    onOpenSearch: () -> Unit,
     workspaceRoot: File?
 ) {
     var pickerVisible by remember { mutableStateOf(false) }
@@ -111,7 +115,8 @@ private fun TodayHubContent(
         HubHeader(
             folderLabel = state.folderLabel,
             showPicker = state.showHubPicker,
-            onOpenPicker = { pickerVisible = true }
+            onOpenPicker = { pickerVisible = true },
+            onOpenSearch = onOpenSearch
         )
         WeekNavBar(
             label = state.weekRangeLabel,
@@ -175,7 +180,12 @@ private fun TodayHubContent(
 }
 
 @Composable
-private fun HubHeader(folderLabel: String, showPicker: Boolean, onOpenPicker: () -> Unit) {
+private fun HubHeader(
+    folderLabel: String,
+    showPicker: Boolean,
+    onOpenPicker: () -> Unit,
+    onOpenSearch: () -> Unit
+) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -186,6 +196,13 @@ private fun HubHeader(folderLabel: String, showPicker: Boolean, onOpenPicker: ()
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f)
         )
+        IconButton(onClick = onOpenSearch) {
+            Icon(
+                imageVector = Icons.Filled.Search,
+                contentDescription = "Search vault",
+                tint = com.eskerra.go.ui.theme.EskerraChromeTokens.HeaderText
+            )
+        }
         if (showPicker) {
             TextButton(onClick = onOpenPicker) {
                 Icon(

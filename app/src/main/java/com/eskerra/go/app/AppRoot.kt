@@ -34,6 +34,7 @@ import com.eskerra.go.core.usecase.LoadSyncStatus
 import com.eskerra.go.core.usecase.LoadTodayHub
 import com.eskerra.go.core.usecase.LoadTodayHubRow
 import com.eskerra.go.core.usecase.LoadVaultSettings
+import com.eskerra.go.core.usecase.MaintainVaultSearchIndex
 import com.eskerra.go.core.usecase.ManualSyncNow
 import com.eskerra.go.core.usecase.ReconcileWorkspaceSyncBranch
 import com.eskerra.go.core.usecase.RecordLastSyncAttempt
@@ -42,7 +43,9 @@ import com.eskerra.go.core.usecase.SaveLocalSettings
 import com.eskerra.go.core.usecase.SaveNote
 import com.eskerra.go.core.usecase.SaveRemoteSyncSettings
 import com.eskerra.go.core.usecase.SaveVaultSettings
+import com.eskerra.go.core.usecase.SearchVault
 import com.eskerra.go.core.usecase.TestRemoteConnection
+import com.eskerra.go.core.usecase.TouchVaultSearchPaths
 import com.eskerra.go.core.usecase.UpdateSyncToken
 import com.eskerra.go.data.workspace.WorkspaceSetupCompletion
 import com.eskerra.go.data.workspace.WorkspaceStore
@@ -88,6 +91,9 @@ fun AppRoot(
     loadLocalSettings: LoadLocalSettings,
     saveLocalSettings: SaveLocalSettings,
     ensureDeviceInstanceId: EnsureDeviceInstanceId,
+    searchVault: SearchVault,
+    maintainVaultSearchIndex: MaintainVaultSearchIndex,
+    touchVaultSearchPaths: TouchVaultSearchPaths,
     onLaunchSettled: () -> Unit = {}
 ) {
     EskerraGoTheme(darkTheme = true) {
@@ -177,6 +183,9 @@ fun AppRoot(
                     loadLocalSettings = loadLocalSettings,
                     saveLocalSettings = saveLocalSettings,
                     ensureDeviceInstanceId = ensureDeviceInstanceId,
+                    searchVault = searchVault,
+                    maintainVaultSearchIndex = maintainVaultSearchIndex,
+                    touchVaultSearchPaths = touchVaultSearchPaths,
                     onConfigUpdated = gateViewModel::updateReadyConfig,
                     onInboxUiStateChanged = { inboxUiState = it }
                 )

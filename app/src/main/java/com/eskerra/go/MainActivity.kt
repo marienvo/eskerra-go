@@ -28,6 +28,7 @@ import com.eskerra.go.core.usecase.LoadSyncStatus
 import com.eskerra.go.core.usecase.LoadTodayHub
 import com.eskerra.go.core.usecase.LoadTodayHubRow
 import com.eskerra.go.core.usecase.LoadVaultSettings
+import com.eskerra.go.core.usecase.MaintainVaultSearchIndex
 import com.eskerra.go.core.usecase.ManualSyncNow
 import com.eskerra.go.core.usecase.ReconcileWorkspaceSyncBranch
 import com.eskerra.go.core.usecase.RecordLastSyncAttempt
@@ -36,7 +37,9 @@ import com.eskerra.go.core.usecase.SaveLocalSettings
 import com.eskerra.go.core.usecase.SaveNote
 import com.eskerra.go.core.usecase.SaveRemoteSyncSettings
 import com.eskerra.go.core.usecase.SaveVaultSettings
+import com.eskerra.go.core.usecase.SearchVault
 import com.eskerra.go.core.usecase.TestRemoteConnection
+import com.eskerra.go.core.usecase.TouchVaultSearchPaths
 import com.eskerra.go.core.usecase.UpdateSyncToken
 import com.eskerra.go.data.credentials.AndroidKeystoreTokenCipher
 import com.eskerra.go.data.credentials.EncryptedCredentialStore
@@ -46,6 +49,7 @@ import com.eskerra.go.data.notes.FileInboxSnapshotStore
 import com.eskerra.go.data.notes.FileNoteContentRepository
 import com.eskerra.go.data.notes.FileNoteRegistryRepository
 import com.eskerra.go.data.notes.FileNoteWriteRepository
+import com.eskerra.go.data.search.SqliteVaultSearchRepository
 import com.eskerra.go.data.todayhub.DataStoreActiveTodayHubStore
 import com.eskerra.go.data.vault.DataStoreLocalSettingsStore
 import com.eskerra.go.data.vault.FileVaultSettingsRepository
@@ -170,6 +174,11 @@ class MainActivity : ComponentActivity() {
         val clearRemoteSyncSettings = ClearRemoteSyncSettings(remoteSyncSettingsRepository)
         val testRemoteConnection = TestRemoteConnection(remoteSyncSettingsRepository)
 
+        val vaultSearchRepository = SqliteVaultSearchRepository(applicationContext)
+        val searchVault = SearchVault(vaultSearchRepository)
+        val maintainVaultSearchIndex = MaintainVaultSearchIndex(vaultSearchRepository)
+        val touchVaultSearchPaths = TouchVaultSearchPaths(vaultSearchRepository)
+
         setContent {
             AppRoot(
                 workspaceStore = workspaceStore,
@@ -203,6 +212,9 @@ class MainActivity : ComponentActivity() {
                 loadLocalSettings = loadLocalSettings,
                 saveLocalSettings = saveLocalSettings,
                 ensureDeviceInstanceId = ensureDeviceInstanceId,
+                searchVault = searchVault,
+                maintainVaultSearchIndex = maintainVaultSearchIndex,
+                touchVaultSearchPaths = touchVaultSearchPaths,
                 onLaunchSettled = {
                     if (keepSplashOnScreen) {
                         keepSplashOnScreen = false
