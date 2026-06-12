@@ -13,7 +13,6 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * Pure parse/serialize for `EskerraSettings` with exact byte contract:
@@ -39,23 +38,18 @@ object EskerraSettingsCodec {
                     )
                 }
 
-        val r2Config =
-            obj["r2"]?.let { r2El ->
-                if (r2El is JsonNull) return@let null
+        val r2Config = when (val r2El = obj["r2"]) {
+            null, is JsonNull -> null
+            else -> {
                 val r2Obj =
                     runCatching { r2El.jsonObject }.getOrElse {
                         return Result.failure(
                             VaultSettingsException(VaultSettingsError.ParseError(PARSE_ERROR_MSG))
                         )
                     }
-                R2Config(
-                    endpoint = r2Obj["endpoint"]?.jsonPrimitive?.content.orEmpty(),
-                    bucket = r2Obj["bucket"]?.jsonPrimitive?.content.orEmpty(),
-                    accessKeyId = r2Obj["accessKeyId"]?.jsonPrimitive?.content.orEmpty(),
-                    secretAccessKey = r2Obj["secretAccessKey"]?.jsonPrimitive?.content.orEmpty(),
-                    jurisdiction = parseJurisdiction(r2Obj["jurisdiction"]?.jsonPrimitive?.content)
-                )
+                parseR2Config(r2Obj).getOrElse { return Result.failure(it) }
             }
+        }
 
         val extras = obj.entries
             .filterNot { it.key in KNOWN_KEYS }
@@ -80,6 +74,36 @@ object EskerraSettingsCodec {
         }
         map.putAll(settings.extras)
         return prettyJson.encodeToString(JsonObject.serializer(), JsonObject(map)) + "\n"
+    }
+
+    private fun parseR2Config(r2Obj: JsonObject): Result<R2Config> {
+        val endpoint = parseR2StringField(r2Obj, "endpoint").getOrElse { return Result.failure(it) }
+        val bucket = parseR2StringField(r2Obj, "bucket").getOrElse { return Result.failure(it) }
+        val accessKeyId =
+            parseR2StringField(r2Obj, "accessKeyId").getOrElse { return Result.failure(it) }
+        val secretAccessKey =
+            parseR2StringField(r2Obj, "secretAccessKey").getOrElse { return Result.failure(it) }
+        val jurisdictionRaw =
+            parseR2StringField(r2Obj, "jurisdiction").getOrElse { return Result.failure(it) }
+        return Result.success(
+            R2Config(
+                endpoint = endpoint,
+                bucket = bucket,
+                accessKeyId = accessKeyId,
+                secretAccessKey = secretAccessKey,
+                jurisdiction = parseJurisdiction(jurisdictionRaw.takeIf { it.isNotEmpty() })
+            )
+        )
+    }
+
+    private fun parseR2StringField(r2Obj: JsonObject, key: String): Result<String> {
+        val el = r2Obj[key] ?: return Result.success("")
+        if (el !is JsonPrimitive) {
+            return Result.failure(
+                VaultSettingsException(VaultSettingsError.ParseError(PARSE_ERROR_MSG))
+            )
+        }
+        return Result.success(el.content)
     }
 
     private fun parseJurisdiction(raw: String?): R2Jurisdiction = when (raw?.lowercase()) {
