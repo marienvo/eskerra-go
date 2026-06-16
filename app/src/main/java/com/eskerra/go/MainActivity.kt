@@ -33,6 +33,7 @@ import com.eskerra.go.core.usecase.ManualSyncNow
 import com.eskerra.go.core.usecase.ReconcileWorkspaceSyncBranch
 import com.eskerra.go.core.usecase.RecordLastSyncAttempt
 import com.eskerra.go.core.usecase.RefreshRemoteSyncStatus
+import com.eskerra.go.core.usecase.RepairVaultSearchIndex
 import com.eskerra.go.core.usecase.SaveLocalSettings
 import com.eskerra.go.core.usecase.SaveNote
 import com.eskerra.go.core.usecase.SaveRemoteSyncSettings
@@ -177,6 +178,7 @@ class MainActivity : ComponentActivity() {
         val vaultSearchRepository = SqliteVaultSearchRepository(applicationContext)
         val searchVault = SearchVault(vaultSearchRepository)
         val maintainVaultSearchIndex = MaintainVaultSearchIndex(vaultSearchRepository)
+        val repairVaultSearchIndex = RepairVaultSearchIndex(vaultSearchRepository)
         val touchVaultSearchPaths = TouchVaultSearchPaths(vaultSearchRepository)
 
         setContent {
@@ -214,6 +216,7 @@ class MainActivity : ComponentActivity() {
                 ensureDeviceInstanceId = ensureDeviceInstanceId,
                 searchVault = searchVault,
                 maintainVaultSearchIndex = maintainVaultSearchIndex,
+                repairVaultSearchIndex = repairVaultSearchIndex,
                 touchVaultSearchPaths = touchVaultSearchPaths,
                 onLaunchSettled = {
                     if (keepSplashOnScreen) {

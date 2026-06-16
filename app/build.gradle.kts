@@ -105,6 +105,10 @@ dependencies {
     // Date/time for relative labels, reminder-pill tone, Today Hub week math (Phase 2+)
     implementation(libs.kotlinx.datetime)
 
+    // Bundled SQLite includes FTS5; stock Android SQLite often omits the fts5 module.
+    implementation(libs.androidx.sqlite)
+    implementation(libs.androidx.sqlite.bundled)
+
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.okhttp.mockwebserver)

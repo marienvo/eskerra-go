@@ -4,7 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.eskerra.go.core.model.WorkspaceConfig
+import com.eskerra.go.core.search.VaultSearchException
 import com.eskerra.go.core.usecase.MaintainVaultSearchIndex
+import com.eskerra.go.core.usecase.RepairVaultSearchIndex
 import com.eskerra.go.core.usecase.SearchVault
 import com.eskerra.go.feature.search.SearchUiState
 import java.io.File
@@ -19,7 +21,8 @@ class SearchViewModel(
     private val config: WorkspaceConfig,
     private val filesDir: File,
     private val searchVault: SearchVault,
-    private val maintainVaultSearchIndex: MaintainVaultSearchIndex
+    private val maintainVaultSearchIndex: MaintainVaultSearchIndex,
+    private val repairVaultSearchIndex: RepairVaultSearchIndex
 ) : ViewModel() {
 
     private val _query = MutableStateFlow("")
@@ -49,8 +52,31 @@ class SearchViewModel(
             } else {
                 SearchUiState.Opening(_query.value, lastResults)
             }
-            maintainVaultSearchIndex(config, filesDir)
-            scheduleSearch(immediate = _query.value.isBlank())
+            maintainVaultSearchIndex(config, filesDir).fold(
+                onSuccess = {
+                    scheduleSearch(immediate = _query.value.isBlank())
+                },
+                onFailure = { error ->
+                    _uiState.value = searchErrorState(error)
+                }
+            )
+        }
+    }
+
+    fun retryIndex() {
+        viewModelScope.launch {
+            val previousQuery = _query.value
+            _uiState.value = if (previousQuery.isBlank()) {
+                SearchUiState.Opening("", lastResults)
+            } else {
+                SearchUiState.Opening(previousQuery, lastResults)
+            }
+            repairVaultSearchIndex(config, filesDir).fold(
+                onSuccess = { warmIndex() },
+                onFailure = { error ->
+                    _uiState.value = searchErrorState(error)
+                }
+            )
         }
     }
 
@@ -75,8 +101,8 @@ class SearchViewModel(
             val searchId = ++activeSearchId
             _uiState.value = SearchUiState.Searching(trimmed, lastResults)
             delay(HOLD_PREVIOUS_MS)
-            val outcome = searchVault(config, filesDir, trimmed, searchId).getOrElse {
-                _uiState.value = SearchUiState.Error("Search is unavailable.")
+            val outcome = searchVault(config, filesDir, trimmed, searchId).getOrElse { error ->
+                _uiState.value = searchErrorState(error)
                 return@launch
             }
             if (searchId != activeSearchId) return@launch
@@ -109,6 +135,15 @@ class SearchViewModel(
         }
     }
 
+    private fun searchErrorState(error: Throwable): SearchUiState.Error {
+        val mapped = error as? VaultSearchException
+        return SearchUiState.Error(
+            message = mapped?.error?.message() ?: "Search is unavailable.",
+            canRetry = mapped?.error?.canRetry() == true,
+            detail = mapped?.diagnosticDetail
+        )
+    }
+
     companion object {
         private const val DEBOUNCE_MS = 260L
         private const val HOLD_PREVIOUS_MS = 100L
@@ -117,11 +152,17 @@ class SearchViewModel(
             config: WorkspaceConfig,
             filesDir: File,
             searchVault: SearchVault,
-            maintainVaultSearchIndex: MaintainVaultSearchIndex
+            maintainVaultSearchIndex: MaintainVaultSearchIndex,
+            repairVaultSearchIndex: RepairVaultSearchIndex
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
-            override fun <T : ViewModel> create(modelClass: Class<T>): T =
-                SearchViewModel(config, filesDir, searchVault, maintainVaultSearchIndex) as T
+            override fun <T : ViewModel> create(modelClass: Class<T>): T = SearchViewModel(
+                config,
+                filesDir,
+                searchVault,
+                maintainVaultSearchIndex,
+                repairVaultSearchIndex
+            ) as T
         }
     }
 }

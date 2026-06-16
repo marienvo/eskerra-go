@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -32,6 +33,7 @@ fun SearchScreen(
     onQueryChange: (String) -> Unit,
     onBack: () -> Unit,
     onOpenNote: (NoteId) -> Unit,
+    onRetryIndex: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val chrome = LocalShellChromeInsets.current
@@ -81,7 +83,12 @@ fun SearchScreen(
                 onOpenNote = onOpenNote
             )
             is SearchUiState.NoMatches -> SearchHint(text = "No matches.")
-            is SearchUiState.Error -> SearchHint(text = state.message)
+            is SearchUiState.Error -> SearchErrorHint(
+                message = state.message,
+                detail = state.detail,
+                canRetry = state.canRetry,
+                onRetryIndex = onRetryIndex
+            )
         }
     }
 }
@@ -124,6 +131,39 @@ private fun SearchStatusLine(state: SearchUiState, modifier: Modifier = Modifier
                 color = EskerraChromeTokens.Subtitle,
                 modifier = Modifier.padding(top = 4.dp)
             )
+        }
+    }
+}
+
+@Composable
+private fun SearchErrorHint(
+    message: String,
+    detail: String?,
+    canRetry: Boolean,
+    onRetryIndex: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(text = message, color = EskerraChromeTokens.Subtitle)
+        if (!detail.isNullOrBlank()) {
+            Text(
+                text = detail,
+                style = MaterialTheme.typography.labelSmall,
+                color = EskerraChromeTokens.Subtitle,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+        }
+        if (canRetry) {
+            Button(
+                onClick = onRetryIndex,
+                modifier = Modifier.padding(top = 12.dp)
+            ) {
+                Text("Retry indexing")
+            }
         }
     }
 }

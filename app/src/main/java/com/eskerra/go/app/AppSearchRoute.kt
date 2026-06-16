@@ -8,6 +8,7 @@ import androidx.navigation.NavHostController
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.usecase.MaintainVaultSearchIndex
+import com.eskerra.go.core.usecase.RepairVaultSearchIndex
 import com.eskerra.go.core.usecase.SearchVault
 import com.eskerra.go.feature.search.SearchScreen
 import java.io.File
@@ -18,6 +19,7 @@ internal fun AppSearchRoute(
     filesDir: File,
     searchVault: SearchVault,
     maintainVaultSearchIndex: MaintainVaultSearchIndex,
+    repairVaultSearchIndex: RepairVaultSearchIndex,
     navController: NavHostController
 ) {
     val searchViewModel: SearchViewModel = viewModel(
@@ -26,7 +28,8 @@ internal fun AppSearchRoute(
             config = currentConfig,
             filesDir = filesDir,
             searchVault = searchVault,
-            maintainVaultSearchIndex = maintainVaultSearchIndex
+            maintainVaultSearchIndex = maintainVaultSearchIndex,
+            repairVaultSearchIndex = repairVaultSearchIndex
         )
     )
     val query by searchViewModel.query.collectAsState()
@@ -37,6 +40,7 @@ internal fun AppSearchRoute(
         query = query,
         onQueryChange = searchViewModel::onQueryChange,
         onBack = { navController.popBackStack() },
-        onOpenNote = { noteId: NoteId -> navController.navigate(AppRoute.note(noteId)) }
+        onOpenNote = { noteId: NoteId -> navController.navigate(AppRoute.note(noteId)) },
+        onRetryIndex = searchViewModel::retryIndex
     )
 }
