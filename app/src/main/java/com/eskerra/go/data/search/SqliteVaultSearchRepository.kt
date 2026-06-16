@@ -46,7 +46,6 @@ class SqliteVaultSearchRepository(private val appContext: Context) : VaultSearch
                 if (mapped.error.canRetry()) {
                     mutex.withLock {
                         repairLocked(config, filesDir)
-                        runMaintainLocked(config, filesDir)
                     }
                 } else {
                     throw mapped
@@ -131,9 +130,7 @@ class SqliteVaultSearchRepository(private val appContext: Context) : VaultSearch
         val workspace = resolveWorkspace(config, filesDir).getOrThrow()
         closeHelper()
         val dbFile = VaultSearchPathHasher.indexDatabaseFile(filesDir, workspace)
-        if (dbFile.exists()) {
-            dbFile.delete()
-        }
+        deleteIndexDatabaseFiles(dbFile)
         dbFile.parentFile?.mkdirs()
         openDatabase(config, filesDir)
             ?: throw VaultSearchException(
@@ -216,6 +213,16 @@ class SqliteVaultSearchRepository(private val appContext: Context) : VaultSearch
         openHelper?.close()
         openHelper = null
         openWorkspaceKey = null
+    }
+
+    private fun deleteIndexDatabaseFiles(dbFile: File) {
+        listOf(dbFile, File(dbFile.path + "-wal"), File(dbFile.path + "-shm")).forEach { file ->
+            if (file.exists() && !file.delete()) {
+                throw VaultSearchException(
+                    com.eskerra.go.core.search.VaultSearchError.IndexOpenFailed
+                )
+            }
+        }
     }
 
     private fun resolveWorkspace(config: WorkspaceConfig, filesDir: File): Result<File> {
