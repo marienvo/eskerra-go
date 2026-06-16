@@ -209,6 +209,10 @@ fun App(
                     filesDir = filesDir,
                     loadInboxSummaries = loadInboxSummaries,
                     deleteInboxNotes = deleteInboxNotes,
+                    loadTodayHub = loadTodayHub,
+                    loadTodayHubRow = loadTodayHubRow,
+                    activeTodayHubStore = activeTodayHubStore,
+                    workspaceRoot = workspaceRoot,
                     currentRoute = currentRoute,
                     entry = entry,
                     navController = navController,
@@ -261,18 +265,6 @@ fun App(
                     searchVault = searchVault,
                     maintainVaultSearchIndex = maintainVaultSearchIndex,
                     repairVaultSearchIndex = repairVaultSearchIndex,
-                    navController = navController
-                )
-            }
-
-            composable(AppRoute.TODAY_HUB) {
-                AppTodayHubRoute(
-                    currentConfig = currentConfig,
-                    filesDir = filesDir,
-                    loadTodayHub = loadTodayHub,
-                    loadTodayHubRow = loadTodayHubRow,
-                    activeTodayHubStore = activeTodayHubStore,
-                    workspaceRoot = workspaceRoot,
                     navController = navController
                 )
             }

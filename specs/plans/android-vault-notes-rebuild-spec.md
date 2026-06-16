@@ -81,12 +81,12 @@ Reuse or reimplement these `@eskerra/core` modules for identical behavior:
 
 | Tab / stack | Screens relevant to this spec |
 | ----------- | ------------------------------ |
-| **Inbox** | `InboxScreen` → `NoteDetailScreen` → `AddNoteScreen` (edit) |
+| **Home** (Inbox route) | `InboxScreen` (inbox list + embedded Today Hub) → `NoteDetailScreen` → `AddNoteScreen` (edit) |
 | **Entry** | `AddNoteScreen` (create) |
-| **Today** (Vault tab) | `VaultScreen` → `VaultNoteReadScreen` (linked notes); `VaultSearchScreen` |
-| Tab bar | Week prev/next when Today hub visible (`VaultTodayHubContext`) |
+| **Podcasts** | Podcasts placeholder tab |
+| Tab bar | Home, Add (FAB), Podcasts — week prev/next on the Today Hub section embedded below the inbox list |
 
-Search is opened from the Today tab header (magnifier). Picking a search result opens `VaultNoteReadScreen` on top of search (back restores query + results).
+Search is opened from the Today Hub header on the home screen (magnifier). Picking a search result opens `VaultNoteReadScreen` on top of search (back restores query + results).
 
 ---
 

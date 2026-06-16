@@ -11,10 +11,9 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Inbox
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Podcasts
-import androidx.compose.material.icons.filled.Today
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -29,7 +28,7 @@ import com.eskerra.go.ui.theme.EskerraChromeTokens
 
 /**
  * Floating navigation shell. It overlays controls on top of the current screen:
- * - a bottom floating taskbar with Inbox, a large centered Add, and Podcasts
+ * - a bottom floating taskbar with Home, a large centered Add, and Podcasts
  * - a top-right sync button (when remote is configured) and hamburger Menu button
  *
  * The shell owns no app state. It reports navigation intents through [onNavigate]
@@ -72,8 +71,7 @@ fun AppShell(
 
             BottomTaskbar(
                 currentRoute = currentRoute,
-                onInbox = { onNavigate(AppRoute.INBOX) },
-                onToday = { onNavigate(AppRoute.TODAY_HUB) },
+                onHome = { onNavigate(AppRoute.INBOX) },
                 onAdd = { onNavigate(AppRoute.CREATE_INBOX) },
                 onPodcasts = { onNavigate(AppRoute.PODCASTS) },
                 modifier = Modifier
@@ -88,8 +86,7 @@ fun AppShell(
 @Composable
 private fun BottomTaskbar(
     currentRoute: String?,
-    onInbox: () -> Unit,
-    onToday: () -> Unit,
+    onHome: () -> Unit,
     onAdd: () -> Unit,
     onPodcasts: () -> Unit,
     modifier: Modifier = Modifier
@@ -106,16 +103,10 @@ private fun BottomTaskbar(
             horizontalArrangement = Arrangement.spacedBy(24.dp)
         ) {
             TaskbarButton(
-                icon = Icons.Filled.Inbox,
-                contentDescription = "Inbox",
+                icon = Icons.Filled.Home,
+                contentDescription = "Home",
                 selected = currentRoute == AppRoute.INBOX,
-                onClick = onInbox
-            )
-            TaskbarButton(
-                icon = Icons.Filled.Today,
-                contentDescription = "Today",
-                selected = currentRoute == AppRoute.TODAY_HUB,
-                onClick = onToday
+                onClick = onHome
             )
             FloatingActionButton(
                 onClick = onAdd,

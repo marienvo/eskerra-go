@@ -107,8 +107,11 @@ class InboxViewModel(
         refreshJob?.cancel()
         refreshJob = viewModelScope.launch {
             var indicatorJob: Job? = null
-            if (showFullScreenLoading) {
+            if (showFullScreenLoading && _uiState.value !is InboxUiState.Content) {
                 _uiState.value = InboxUiState.Loading
+                _showRefreshIndicator.value = false
+            } else if (showFullScreenLoading) {
+                markRefreshing()
                 _showRefreshIndicator.value = false
             } else {
                 markRefreshing()

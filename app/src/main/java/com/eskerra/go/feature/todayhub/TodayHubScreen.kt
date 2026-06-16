@@ -1,14 +1,10 @@
 package com.eskerra.go.feature.todayhub
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -30,7 +26,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.eskerra.go.app.LocalShellChromeInsets
 import com.eskerra.go.core.markdown.VaultReadonlyLink
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NoteRegistry
@@ -39,12 +34,11 @@ import com.eskerra.go.ui.markdown.VaultMarkdownView
 import java.io.File
 
 /**
- * Stateless Today Hub screen (spec §11). Renders the active hub intro and the selected week's
- * columns through the shared §8 markdown renderer, with week navigation and an optional hub picker.
- * All state and navigation are reported through callbacks.
+ * Embeddable Today Hub block for the home screen (spec §11). Renders inline loading/empty/error
+ * states or the active hub intro and selected week's columns. Parent owns scroll and top chrome.
  */
 @Composable
-fun TodayHubScreen(
+fun TodayHubSection(
     state: TodayHubUiState,
     onPreviousWeek: () -> Unit,
     onNextWeek: () -> Unit,
@@ -58,42 +52,42 @@ fun TodayHubScreen(
     workspaceRoot: File? = null,
     modifier: Modifier = Modifier
 ) {
-    val chrome = LocalShellChromeInsets.current
-    Box(modifier = modifier.fillMaxSize()) {
-        when (state) {
-            TodayHubUiState.Loading -> CenteredMessage(spinner = true, body = "Loading vault…")
-            TodayHubUiState.Empty -> CenteredMessage(
-                spinner = false,
-                body = "Open search to browse notes in this vault."
-            )
-            is TodayHubUiState.Error -> CenteredMessage(
-                spinner = false,
-                body = state.message,
-                onRetry = onRetry
-            )
-            is TodayHubUiState.Content -> TodayHubContent(
-                state = state,
-                topInset = chrome.top,
-                bottomInset = chrome.bottom,
-                onPreviousWeek = onPreviousWeek,
-                onNextWeek = onNextWeek,
-                onSelectHub = onSelectHub,
-                onOpenInternalNote = onOpenInternalNote,
-                onOpenExternalUrl = onOpenExternalUrl,
-                onAmbiguousWikiLink = onAmbiguousWikiLink,
-                onNoteNotFound = onNoteNotFound,
-                onOpenSearch = onOpenSearch,
-                workspaceRoot = workspaceRoot
-            )
-        }
+    when (state) {
+        TodayHubUiState.Loading -> InlineStatusMessage(
+            spinner = false,
+            body = "Loading vault…",
+            modifier = modifier
+        )
+        TodayHubUiState.Empty -> InlineStatusMessage(
+            spinner = false,
+            body = "Open search to browse notes in this vault.",
+            modifier = modifier
+        )
+        is TodayHubUiState.Error -> InlineStatusMessage(
+            spinner = false,
+            body = state.message,
+            onRetry = onRetry,
+            modifier = modifier
+        )
+        is TodayHubUiState.Content -> TodayHubSectionContent(
+            state = state,
+            onPreviousWeek = onPreviousWeek,
+            onNextWeek = onNextWeek,
+            onSelectHub = onSelectHub,
+            onOpenInternalNote = onOpenInternalNote,
+            onOpenExternalUrl = onOpenExternalUrl,
+            onAmbiguousWikiLink = onAmbiguousWikiLink,
+            onNoteNotFound = onNoteNotFound,
+            onOpenSearch = onOpenSearch,
+            workspaceRoot = workspaceRoot,
+            modifier = modifier
+        )
     }
 }
 
 @Composable
-private fun TodayHubContent(
+private fun TodayHubSectionContent(
     state: TodayHubUiState.Content,
-    topInset: androidx.compose.ui.unit.Dp,
-    bottomInset: androidx.compose.ui.unit.Dp,
     onPreviousWeek: () -> Unit,
     onNextWeek: () -> Unit,
     onSelectHub: (NoteId) -> Unit,
@@ -102,16 +96,12 @@ private fun TodayHubContent(
     onAmbiguousWikiLink: (List<NoteId>, String) -> Unit,
     onNoteNotFound: (String) -> Unit,
     onOpenSearch: () -> Unit,
-    workspaceRoot: File?
+    workspaceRoot: File?,
+    modifier: Modifier = Modifier
 ) {
     var pickerVisible by remember { mutableStateOf(false) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(top = topInset, bottom = bottomInset, start = 16.dp, end = 16.dp)
-    ) {
+    Column(modifier = modifier.fillMaxWidth()) {
         HubHeader(
             folderLabel = state.folderLabel,
             showPicker = state.showHubPicker,
@@ -176,6 +166,35 @@ private fun TodayHubContent(
             },
             onDismiss = { pickerVisible = false }
         )
+    }
+}
+
+@Composable
+private fun InlineStatusMessage(
+    spinner: Boolean,
+    body: String,
+    onRetry: (() -> Unit)? = null,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        if (spinner) {
+            CircularProgressIndicator(modifier = Modifier.padding(bottom = 12.dp))
+        }
+        Text(
+            text = body,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        if (onRetry != null) {
+            Button(onClick = onRetry, modifier = Modifier.padding(top = 12.dp)) {
+                Text("Retry")
+            }
+        }
     }
 }
 
@@ -296,33 +315,6 @@ private fun HubColumn(
                 onNoteNotFound = onNoteNotFound,
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
             )
-        }
-    }
-}
-
-@Composable
-private fun CenteredMessage(spinner: Boolean, body: String, onRetry: (() -> Unit)? = null) {
-    val chrome = LocalShellChromeInsets.current
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(top = chrome.top, bottom = chrome.bottom, start = 32.dp, end = 32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        if (spinner) {
-            CircularProgressIndicator(modifier = Modifier.padding(bottom = 16.dp))
-        }
-        Text(
-            text = body,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-        )
-        if (onRetry != null) {
-            Button(onClick = onRetry, modifier = Modifier.padding(top = 16.dp)) {
-                Text("Retry")
-            }
         }
     }
 }
