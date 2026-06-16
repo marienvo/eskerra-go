@@ -29,7 +29,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.eskerra.go.app.LocalShellChromeInsets
 import com.eskerra.go.app.shellScrollContentPadding
 import com.eskerra.go.core.datetime.RelativeCalendarLabel
 import com.eskerra.go.core.inbox.InboxTileColor
@@ -122,116 +121,116 @@ private fun InboxScrollBody(
     modifier: Modifier = Modifier
 ) {
     val hasSelection = selectedNoteIds.isNotEmpty()
-    val chrome = LocalShellChromeInsets.current
 
-    Column(modifier = modifier.fillMaxSize()) {
-        InboxHeaderBar(
-            hasSelection = hasSelection,
-            selectedCount = selectedNoteIds.size,
-            isDeleting = isDeleting,
-            onClearSelection = onClearSelection,
-            onDeleteSelected = onDeleteSelected,
-            topInset = chrome.top
-        )
-
-        deleteError?.let { message ->
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = shellScrollContentPadding()
+    ) {
+        item {
+            InboxHeaderBar(
+                hasSelection = hasSelection,
+                selectedCount = selectedNoteIds.size,
+                isDeleting = isDeleting,
+                onClearSelection = onClearSelection,
+                onDeleteSelected = onDeleteSelected
             )
         }
 
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = shellScrollContentPadding()
-        ) {
-            if (showRefreshIndicator) {
+        deleteError?.let { message ->
+            item {
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            }
+        }
+
+        if (showRefreshIndicator) {
+            item {
+                CircularProgressIndicator(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp)
+                        .padding(horizontal = 16.dp)
+                )
+            }
+        }
+
+        when (state) {
+            InboxUiState.Loading -> Unit
+            is InboxUiState.Error -> {
                 item {
-                    CircularProgressIndicator(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(bottom = 8.dp)
-                            .padding(horizontal = 16.dp)
-                    )
-                }
-            }
-
-            when (state) {
-                InboxUiState.Loading -> Unit
-                is InboxUiState.Error -> {
-                    item {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 16.dp, horizontal = 16.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
+                            .padding(vertical = 16.dp, horizontal = 16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = state.message,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Button(
+                            onClick = onRetry,
+                            modifier = Modifier.padding(top = 12.dp)
                         ) {
-                            Text(
-                                text = state.message,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Button(
-                                onClick = onRetry,
-                                modifier = Modifier.padding(top = 12.dp)
-                            ) {
-                                Text("Retry")
-                            }
+                            Text("Retry")
                         }
                     }
                 }
-                InboxUiState.Empty -> {
-                    item {
-                        Text(
-                            text = "No inbox notes yet. Tap + to add one.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 12.dp, horizontal = 16.dp)
-                        )
-                    }
-                }
-                is InboxUiState.Content -> {
-                    items(state.notes) { note ->
-                        InboxRow(
-                            note = note,
-                            isSelected = note.id in selectedNoteIds,
-                            isDeleting = isDeleting,
-                            onAvatarClick = { onAvatarClick(note.id) },
-                            onClick = { onNoteClick(note.id) }
-                        )
-                    }
+            }
+            InboxUiState.Empty -> {
+                item {
+                    Text(
+                        text = "No inbox notes yet. Tap + to add one.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp, bottom = 12.dp, start = 16.dp, end = 16.dp)
+                    )
                 }
             }
-
-            item {
-                HorizontalDivider(
-                    color = EskerraChromeTokens.ListDivider,
-                    modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
-                )
+            is InboxUiState.Content -> {
+                items(state.notes) { note ->
+                    InboxRow(
+                        note = note,
+                        isSelected = note.id in selectedNoteIds,
+                        isDeleting = isDeleting,
+                        onAvatarClick = { onAvatarClick(note.id) },
+                        onClick = { onNoteClick(note.id) }
+                    )
+                }
             }
+        }
 
-            item {
-                TodayHubSection(
-                    state = todayHubState,
-                    onPreviousWeek = onPreviousWeek,
-                    onNextWeek = onNextWeek,
-                    onSelectHub = onSelectHub,
-                    onRetry = onRetryTodayHub,
-                    onOpenInternalNote = onOpenInternalNote,
-                    onOpenExternalUrl = onOpenExternalUrl,
-                    onAmbiguousWikiLink = onAmbiguousWikiLink,
-                    onNoteNotFound = onNoteNotFound,
-                    onOpenSearch = onOpenSearch,
-                    workspaceRoot = workspaceRoot,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                )
-            }
+        item {
+            HorizontalDivider(
+                color = EskerraChromeTokens.ListDivider,
+                modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+            )
+        }
+
+        item {
+            TodayHubSection(
+                state = todayHubState,
+                onPreviousWeek = onPreviousWeek,
+                onNextWeek = onNextWeek,
+                onSelectHub = onSelectHub,
+                onRetry = onRetryTodayHub,
+                onOpenInternalNote = onOpenInternalNote,
+                onOpenExternalUrl = onOpenExternalUrl,
+                onAmbiguousWikiLink = onAmbiguousWikiLink,
+                onNoteNotFound = onNoteNotFound,
+                onOpenSearch = onOpenSearch,
+                workspaceRoot = workspaceRoot,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            )
         }
     }
 }
@@ -242,13 +241,12 @@ private fun InboxHeaderBar(
     selectedCount: Int,
     isDeleting: Boolean,
     onClearSelection: () -> Unit,
-    onDeleteSelected: () -> Unit,
-    topInset: androidx.compose.ui.unit.Dp
+    onDeleteSelected: () -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = topInset, start = 8.dp, end = 8.dp, bottom = 8.dp),
+            .padding(start = 8.dp, end = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (hasSelection) {
