@@ -30,11 +30,12 @@ internal object VaultSearchIndexer {
         val inDb = readMetaSnapshots(db)
         if (inDb.isEmpty()) {
             buildTitles(workspaceDir, db)
+            fillPendingBodiesBatch(workspaceDir, db, BODY_BATCH_SIZE * BODY_BATCHES_PER_MAINTAIN)
         } else {
             val diff = ReconcileDiffer.diff(inDb, onDisk)
             applyDiff(workspaceDir, db, diff)
+            fillBodiesAfterDiff(workspaceDir, db, diff)
         }
-        fillPendingBodiesBatch(workspaceDir, db, BODY_BATCH_SIZE * BODY_BATCHES_PER_MAINTAIN)
         VaultSearchDatabase.setMeta(
             db,
             VaultSearchDatabase.KEY_LAST_RECONCILED_AT,
@@ -52,7 +53,7 @@ internal object VaultSearchIndexer {
         val subsetInDb = touched.mapNotNull { path -> inDb[path]?.let { path to it } }.toMap()
         val diff = ReconcileDiffer.diff(subsetInDb, subsetOnDisk)
         applyDiff(workspaceDir, db, diff)
-        fillPendingBodiesBatch(workspaceDir, db, BODY_BATCH_SIZE * BODY_BATCHES_PER_MAINTAIN)
+        fillBodiesAfterDiff(workspaceDir, db, diff)
         VaultSearchDatabase.setMeta(
             db,
             VaultSearchDatabase.KEY_LAST_RECONCILED_AT,
@@ -82,12 +83,58 @@ internal object VaultSearchIndexer {
         )
     }
 
+    private fun fillBodiesAfterDiff(
+        workspaceDir: File,
+        db: VaultSearchSqlSession,
+        diff: com.eskerra.go.core.search.ReconcileDiffResult
+    ) {
+        val maxEntries = BODY_BATCH_SIZE * BODY_BATCHES_PER_MAINTAIN
+        val priorityUris = (diff.added + diff.updated).toSet()
+        val priorityFilled = if (priorityUris.isEmpty()) {
+            0
+        } else {
+            fillBodiesForUris(workspaceDir, db, priorityUris, maxEntries)
+        }
+        val remaining = maxEntries - priorityFilled
+        if (remaining > 0) {
+            fillPendingBodiesBatch(workspaceDir, db, remaining, excludeUris = priorityUris)
+        } else {
+            markBodiesCompleteIfDone(db)
+        }
+    }
+
+    private fun fillBodiesForUris(
+        workspaceDir: File,
+        db: VaultSearchSqlSession,
+        uris: Set<String>,
+        maxEntries: Int
+    ): Int {
+        if (uris.isEmpty() || maxEntries <= 0) return 0
+        val entriesByUri = VaultSearchWorkspaceWalker.walk(workspaceDir).associateBy { it.uri }
+        val batch = uris.mapNotNull { uri -> entriesByUri[uri] }.take(maxEntries)
+        if (batch.isEmpty()) return 0
+        batch.chunked(BODY_BATCH_SIZE).forEach { chunk ->
+            db.beginTransaction()
+            try {
+                for (entry in chunk) {
+                    upsertWithBody(db, entry)
+                }
+                db.setTransactionSuccessful()
+            } finally {
+                db.endTransaction()
+            }
+        }
+        markBodiesCompleteIfDone(db)
+        return batch.size
+    }
+
     private fun fillPendingBodiesBatch(
         workspaceDir: File,
         db: VaultSearchSqlSession,
-        maxEntries: Int
+        maxEntries: Int,
+        excludeUris: Set<String> = emptySet()
     ) {
-        val pendingUris = readPendingBodyUris(db, maxEntries)
+        val pendingUris = readPendingBodyUris(db, maxEntries, excludeUris)
         if (pendingUris.isEmpty()) {
             markBodiesCompleteIfDone(db)
             return
@@ -112,15 +159,24 @@ internal object VaultSearchIndexer {
         markBodiesCompleteIfDone(db)
     }
 
-    private fun readPendingBodyUris(db: VaultSearchSqlSession, limit: Int): List<String> {
+    private fun readPendingBodyUris(
+        db: VaultSearchSqlSession,
+        limit: Int,
+        excludeUris: Set<String> = emptySet()
+    ): List<String> {
+        if (limit <= 0) return emptyList()
         val out = mutableListOf<String>()
+        val fetchLimit = if (excludeUris.isEmpty()) limit else limit + excludeUris.size
         db.rawQuery(
             "SELECT uri FROM note_meta WHERE body_indexed = 0 LIMIT ?",
-            arrayOf(limit.toString())
+            arrayOf(fetchLimit.toString())
         ).use { cursor ->
             val uriIndex = cursor.getColumnIndexOrThrow("uri")
-            while (cursor.moveToNext()) {
-                out += cursor.getString(uriIndex)
+            while (cursor.moveToNext() && out.size < limit) {
+                val uri = cursor.getString(uriIndex)
+                if (uri !in excludeUris) {
+                    out += uri
+                }
             }
         }
         return out
@@ -294,12 +350,6 @@ internal object VaultSearchIndexer {
         val titlesAt =
             VaultSearchDatabase.getMeta(db, VaultSearchDatabase.KEY_LAST_TITLES_AT)?.toLongOrNull()
                 ?: 0L
-        val bodiesAt =
-            VaultSearchDatabase.getMeta(
-                db,
-                VaultSearchDatabase.KEY_LAST_FULL_BUILD_AT
-            )?.toLongOrNull()
-                ?: 0L
         val vaultInstanceId = VaultSearchDatabase.getMeta(
             db,
             VaultSearchDatabase.KEY_VAULT_INSTANCE_ID
@@ -307,10 +357,16 @@ internal object VaultSearchIndexer {
         val indexedNotes = db.rawQuery("SELECT COUNT(*) FROM note_meta", null).use { cursor ->
             if (!cursor.moveToFirst()) 0 else cursor.getInt(0)
         }
+        val pendingBodies = db.rawQuery(
+            "SELECT COUNT(*) FROM note_meta WHERE body_indexed = 0",
+            null
+        ).use { cursor ->
+            if (!cursor.moveToFirst()) 0 else cursor.getInt(0)
+        }
         return com.eskerra.go.core.search.VaultSearchIndexStatus(
             vaultInstanceId = vaultInstanceId,
             indexReady = titlesAt > 0L,
-            bodiesIndexReady = bodiesAt > 0L,
+            bodiesIndexReady = titlesAt > 0L && pendingBodies == 0,
             indexedNotes = indexedNotes
         )
     }
