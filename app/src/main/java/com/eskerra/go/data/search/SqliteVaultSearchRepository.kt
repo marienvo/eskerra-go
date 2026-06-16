@@ -50,7 +50,7 @@ class SqliteVaultSearchRepository(private val appContext: Context) : VaultSearch
                 } else {
                     throw mapped
                 }
-            }
+            }.mapFailure()
         }
 
     override suspend fun touchPaths(
