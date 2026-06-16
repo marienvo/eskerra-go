@@ -28,6 +28,7 @@ import com.eskerra.go.ui.theme.EskerraChromeTokens
 
 /**
  * Floating navigation shell. It overlays controls on top of the current screen:
+ * - top and bottom edge scrims so content fades under the status bar and taskbar
  * - a bottom floating taskbar with Home, a large centered Add, and Podcasts
  * - a top-right sync button (when remote is configured) and hamburger Menu button
  *
@@ -49,6 +50,9 @@ fun AppShell(
     CompositionLocalProvider(LocalShellChromeInsets provides chromeInsets) {
         Box(modifier = Modifier.fillMaxSize()) {
             content(Modifier.fillMaxSize())
+
+            ShellTopEdgeScrim(modifier = Modifier.align(Alignment.TopCenter))
+            ShellBottomEdgeScrim(modifier = Modifier.align(Alignment.BottomCenter))
 
             Row(
                 modifier = Modifier

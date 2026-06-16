@@ -327,6 +327,7 @@ Rebuild app is **dark mode only**. Match reference dark chrome:
 | Tab bar | White active tint; inactive `rgba(255,255,255,0.72)` |
 | List dividers | `#333333` (`LIST_DIVIDER_DARK`) |
 | Screen background | App default dark (Gluestack `dark` in reference) |
+| Edge scrims | Shell top/bottom gradient fades (`MaterialTheme.colorScheme.background` → transparent) for readability under system bars and floating chrome |
 | Modal sheets (hub picker, wiki ambiguous) | Background `#1d1d1d`–`#1e1e1e`; title `#f5f5f5`; subtitle `#b0b0b0` |
 
 Do not ship light-mode-specific palettes in the rebuild; `@eskerra/tokens` dark link colors (§8.3) are authoritative.
