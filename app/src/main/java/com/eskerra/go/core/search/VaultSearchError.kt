@@ -40,4 +40,8 @@ sealed interface VaultSearchError {
     }
 }
 
-class VaultSearchException(val error: VaultSearchError) : Exception(error.message())
+class VaultSearchException(
+    val error: VaultSearchError,
+    cause: Throwable? = null,
+    val diagnosticDetail: String? = null
+) : Exception(error.message(), cause)

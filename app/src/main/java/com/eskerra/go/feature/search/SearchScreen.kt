@@ -85,6 +85,7 @@ fun SearchScreen(
             is SearchUiState.NoMatches -> SearchHint(text = "No matches.")
             is SearchUiState.Error -> SearchErrorHint(
                 message = state.message,
+                detail = state.detail,
                 canRetry = state.canRetry,
                 onRetryIndex = onRetryIndex
             )
@@ -135,7 +136,12 @@ private fun SearchStatusLine(state: SearchUiState, modifier: Modifier = Modifier
 }
 
 @Composable
-private fun SearchErrorHint(message: String, canRetry: Boolean, onRetryIndex: () -> Unit) {
+private fun SearchErrorHint(
+    message: String,
+    detail: String?,
+    canRetry: Boolean,
+    onRetryIndex: () -> Unit
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -143,6 +149,14 @@ private fun SearchErrorHint(message: String, canRetry: Boolean, onRetryIndex: ()
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(text = message, color = EskerraChromeTokens.Subtitle)
+        if (!detail.isNullOrBlank()) {
+            Text(
+                text = detail,
+                style = MaterialTheme.typography.labelSmall,
+                color = EskerraChromeTokens.Subtitle,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+        }
         if (canRetry) {
             Button(
                 onClick = onRetryIndex,

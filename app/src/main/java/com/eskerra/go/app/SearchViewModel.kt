@@ -136,10 +136,11 @@ class SearchViewModel(
     }
 
     private fun searchErrorState(error: Throwable): SearchUiState.Error {
-        val vaultError = (error as? VaultSearchException)?.error
+        val mapped = error as? VaultSearchException
         return SearchUiState.Error(
-            message = vaultError?.message() ?: "Search is unavailable.",
-            canRetry = vaultError?.canRetry() == true
+            message = mapped?.error?.message() ?: "Search is unavailable.",
+            canRetry = mapped?.error?.canRetry() == true,
+            detail = mapped?.diagnosticDetail
         )
     }
 

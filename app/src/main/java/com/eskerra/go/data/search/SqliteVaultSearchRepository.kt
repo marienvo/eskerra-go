@@ -1,7 +1,7 @@
 package com.eskerra.go.data.search
 
 import android.content.Context
-import android.database.sqlite.SQLiteException
+import androidx.sqlite.SQLiteException
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.SearchOutcome
 import com.eskerra.go.core.repository.VaultSearchRepository
@@ -136,10 +136,14 @@ class SqliteVaultSearchRepository(private val appContext: Context) : VaultSearch
         }
         dbFile.parentFile?.mkdirs()
         openDatabase(config, filesDir)
+            ?: throw VaultSearchException(
+                com.eskerra.go.core.search.VaultSearchError.IndexOpenFailed
+            )
+        runMaintainLocked(config, filesDir)
     }
 
     private fun queryCandidates(
-        db: android.database.sqlite.SQLiteDatabase,
+        db: VaultSearchSqlSession,
         matchExpr: String
     ): List<SearchCandidate> = try {
         runQueryCandidates(db, matchExpr, useBm25 = true)
@@ -152,7 +156,7 @@ class SqliteVaultSearchRepository(private val appContext: Context) : VaultSearch
     }
 
     private fun runQueryCandidates(
-        db: android.database.sqlite.SQLiteDatabase,
+        db: VaultSearchSqlSession,
         matchExpr: String,
         useBm25: Boolean
     ): List<SearchCandidate> {
@@ -199,14 +203,7 @@ class SqliteVaultSearchRepository(private val appContext: Context) : VaultSearch
         dbFile.parentFile?.mkdirs()
         return try {
             val helper = VaultSearchDatabase(appContext, dbFile)
-            val db = helper.ensureOpen()
-            val storedVersion = VaultSearchDatabase.getMeta(
-                db,
-                VaultSearchDatabase.KEY_SCHEMA_VERSION
-            )?.toIntOrNull()
-            if (storedVersion != VaultSearchDatabase.SCHEMA_VERSION) {
-                helper.rebuildSchema(db)
-            }
+            helper.ensureOpen()
             openHelper = helper
             openWorkspaceKey = key
             helper

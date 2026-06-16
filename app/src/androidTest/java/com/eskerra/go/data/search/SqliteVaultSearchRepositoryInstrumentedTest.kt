@@ -43,6 +43,22 @@ class SqliteVaultSearchRepositoryInstrumentedTest {
     }
 
     @Test
+    fun maintain_bootstrapsEmptyDatabaseFile() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val workspace = File(filesDir, WorkspacePaths.DEFAULT_RELATIVE_PATH).apply { mkdirs() }
+        val dbFile = VaultSearchPathHasher.indexDatabaseFile(filesDir, workspace.canonicalFile)
+        dbFile.parentFile?.mkdirs()
+        check(dbFile.createNewFile()) { "expected empty database file" }
+
+        val maintain = MaintainVaultSearchIndex(repository)
+        assertTrue(maintain(config, filesDir).isSuccess)
+
+        val helper = VaultSearchDatabase(context, dbFile)
+        assertTrue(VaultSearchDatabase.hasTable(helper.ensureOpen(), "index_meta"))
+        helper.close()
+    }
+
+    @Test
     fun maintainAndSearch_findsTitleMatch() = runBlocking {
         val maintain = MaintainVaultSearchIndex(repository)
         val search = SearchVault(repository)

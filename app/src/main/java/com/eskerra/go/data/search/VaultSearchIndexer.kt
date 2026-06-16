@@ -1,6 +1,5 @@
 package com.eskerra.go.data.search
 
-import android.database.sqlite.SQLiteDatabase
 import com.eskerra.go.core.search.ReconcileDiffer
 import java.io.File
 import java.util.UUID
@@ -10,7 +9,7 @@ internal object VaultSearchIndexer {
     private const val BODY_BATCH_SIZE = 25
     private const val BODY_BATCHES_PER_MAINTAIN = 4
 
-    fun ensureVaultInstance(db: SQLiteDatabase, basePathHash: String): String {
+    fun ensureVaultInstance(db: VaultSearchSqlSession, basePathHash: String): String {
         val existingHash = VaultSearchDatabase.getMeta(db, VaultSearchDatabase.KEY_BASE_PATH_HASH)
         val existingId = VaultSearchDatabase.getMeta(db, VaultSearchDatabase.KEY_VAULT_INSTANCE_ID)
         if (existingHash == basePathHash && !existingId.isNullOrBlank()) {
@@ -25,7 +24,7 @@ internal object VaultSearchIndexer {
         return newId
     }
 
-    fun maintain(workspaceDir: File, db: SQLiteDatabase, basePathHash: String): String {
+    fun maintain(workspaceDir: File, db: VaultSearchSqlSession, basePathHash: String): String {
         val vaultInstanceId = ensureVaultInstance(db, basePathHash)
         val onDisk = VaultSearchWorkspaceWalker.snapshot(workspaceDir)
         val inDb = readMetaSnapshots(db)
@@ -44,7 +43,7 @@ internal object VaultSearchIndexer {
         return vaultInstanceId
     }
 
-    fun touchPaths(workspaceDir: File, db: SQLiteDatabase, paths: List<String>) {
+    fun touchPaths(workspaceDir: File, db: VaultSearchSqlSession, paths: List<String>) {
         val onDisk = VaultSearchWorkspaceWalker.snapshot(workspaceDir)
         val touched = paths.filter { it in onDisk.keys }
         if (touched.isEmpty()) return
@@ -61,7 +60,7 @@ internal object VaultSearchIndexer {
         )
     }
 
-    private fun buildTitles(workspaceDir: File, db: SQLiteDatabase) {
+    private fun buildTitles(workspaceDir: File, db: VaultSearchSqlSession) {
         db.execSQL("DELETE FROM vault_search_notes")
         db.execSQL("DELETE FROM note_meta")
         val entries = VaultSearchWorkspaceWalker.walk(workspaceDir)
@@ -83,7 +82,11 @@ internal object VaultSearchIndexer {
         )
     }
 
-    private fun fillPendingBodiesBatch(workspaceDir: File, db: SQLiteDatabase, maxEntries: Int) {
+    private fun fillPendingBodiesBatch(
+        workspaceDir: File,
+        db: VaultSearchSqlSession,
+        maxEntries: Int
+    ) {
         val pendingUris = readPendingBodyUris(db, maxEntries)
         if (pendingUris.isEmpty()) {
             markBodiesCompleteIfDone(db)
@@ -109,7 +112,7 @@ internal object VaultSearchIndexer {
         markBodiesCompleteIfDone(db)
     }
 
-    private fun readPendingBodyUris(db: SQLiteDatabase, limit: Int): List<String> {
+    private fun readPendingBodyUris(db: VaultSearchSqlSession, limit: Int): List<String> {
         val out = mutableListOf<String>()
         db.rawQuery(
             "SELECT uri FROM note_meta WHERE body_indexed = 0 LIMIT ?",
@@ -123,7 +126,7 @@ internal object VaultSearchIndexer {
         return out
     }
 
-    private fun markBodiesCompleteIfDone(db: SQLiteDatabase) {
+    private fun markBodiesCompleteIfDone(db: VaultSearchSqlSession) {
         val pending = db.rawQuery(
             "SELECT COUNT(*) FROM note_meta WHERE body_indexed = 0",
             null
@@ -141,7 +144,7 @@ internal object VaultSearchIndexer {
 
     private fun applyDiff(
         workspaceDir: File,
-        db: SQLiteDatabase,
+        db: VaultSearchSqlSession,
         diff: com.eskerra.go.core.search.ReconcileDiffResult
     ) {
         if (diff.removed.isEmpty() && diff.added.isEmpty() && diff.updated.isEmpty()) return
@@ -163,7 +166,7 @@ internal object VaultSearchIndexer {
         }
     }
 
-    private fun removeUri(db: SQLiteDatabase, uri: String) {
+    private fun removeUri(db: VaultSearchSqlSession, uri: String) {
         val rowid = readFtsRowid(db, uri)
         if (rowid != null) {
             db.execSQL("DELETE FROM vault_search_notes WHERE rowid = ?", arrayOf(rowid))
@@ -171,7 +174,7 @@ internal object VaultSearchIndexer {
         db.execSQL("DELETE FROM note_meta WHERE uri = ?", arrayOf(uri))
     }
 
-    private fun readFtsRowid(db: SQLiteDatabase, uri: String): Long? {
+    private fun readFtsRowid(db: VaultSearchSqlSession, uri: String): Long? {
         db.rawQuery("SELECT fts_rowid FROM note_meta WHERE uri = ?", arrayOf(uri)).use { cursor ->
             if (!cursor.moveToFirst()) return null
             val rowid = cursor.getLong(0)
@@ -179,7 +182,7 @@ internal object VaultSearchIndexer {
         }
     }
 
-    private fun upsertTitleOnly(db: SQLiteDatabase, entry: VaultSearchFileEntry) {
+    private fun upsertTitleOnly(db: VaultSearchSqlSession, entry: VaultSearchFileEntry) {
         removeUri(db, entry.uri)
         val rowid = insertFtsRow(
             db,
@@ -208,7 +211,7 @@ internal object VaultSearchIndexer {
         )
     }
 
-    private fun upsertWithBody(db: SQLiteDatabase, entry: VaultSearchFileEntry) {
+    private fun upsertWithBody(db: VaultSearchSqlSession, entry: VaultSearchFileEntry) {
         removeUri(db, entry.uri)
         val rowid = insertFtsRow(
             db,
@@ -246,7 +249,7 @@ internal object VaultSearchIndexer {
     }
 
     private fun insertFtsRow(
-        db: SQLiteDatabase,
+        db: VaultSearchSqlSession,
         uri: String,
         relPath: String,
         title: String,
@@ -259,16 +262,18 @@ internal object VaultSearchIndexer {
             VALUES(?, ?, ?, ?, ?)
             """.trimIndent()
         )
-        statement.bindString(1, uri)
-        statement.bindString(2, relPath)
-        statement.bindString(3, title)
-        statement.bindString(4, filename)
-        statement.bindString(5, body)
-        return statement.executeInsert()
+        statement.use {
+            it.bindString(1, uri)
+            it.bindString(2, relPath)
+            it.bindString(3, title)
+            it.bindString(4, filename)
+            it.bindString(5, body)
+            return it.executeInsert()
+        }
     }
 
     private fun readMetaSnapshots(
-        db: SQLiteDatabase
+        db: VaultSearchSqlSession
     ): Map<String, com.eskerra.go.core.search.FileSnapshot> {
         val out = linkedMapOf<String, com.eskerra.go.core.search.FileSnapshot>()
         db.rawQuery("SELECT uri, size, last_modified FROM note_meta", null).use { cursor ->
@@ -285,7 +290,7 @@ internal object VaultSearchIndexer {
         return out
     }
 
-    fun readStatus(db: SQLiteDatabase): com.eskerra.go.core.search.VaultSearchIndexStatus {
+    fun readStatus(db: VaultSearchSqlSession): com.eskerra.go.core.search.VaultSearchIndexStatus {
         val titlesAt =
             VaultSearchDatabase.getMeta(db, VaultSearchDatabase.KEY_LAST_TITLES_AT)?.toLongOrNull()
                 ?: 0L

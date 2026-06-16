@@ -29,5 +29,9 @@ sealed interface SearchUiState {
         val bodiesIndexReady: Boolean
     ) : SearchUiState
 
-    data class Error(val message: String, val canRetry: Boolean = false) : SearchUiState
+    data class Error(
+        val message: String,
+        val canRetry: Boolean = false,
+        val detail: String? = null
+    ) : SearchUiState
 }
