@@ -54,7 +54,7 @@ fun TodayHubSection(
 ) {
     when (state) {
         TodayHubUiState.Loading -> InlineStatusMessage(
-            spinner = false,
+            spinner = true,
             body = "Loading vault…",
             modifier = modifier
         )

@@ -161,7 +161,18 @@ private fun InboxScrollBody(
         }
 
         when (state) {
-            InboxUiState.Loading -> Unit
+            InboxUiState.Loading -> {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                }
+            }
             is InboxUiState.Error -> {
                 item {
                     Column(
