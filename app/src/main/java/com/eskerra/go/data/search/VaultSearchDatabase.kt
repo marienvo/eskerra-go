@@ -48,7 +48,7 @@ internal class VaultSearchDatabase(context: Context, databaseFile: File) :
             )
         }
 
-        const val SCHEMA_VERSION = 1
+        const val SCHEMA_VERSION = 2
         const val KEY_SCHEMA_VERSION = "schema_version"
         const val KEY_BASE_PATH_HASH = "base_path_hash"
         const val KEY_VAULT_INSTANCE_ID = "vault_instance_id"
@@ -78,7 +78,8 @@ internal class VaultSearchDatabase(context: Context, databaseFile: File) :
                   title TEXT NOT NULL,
                   size INTEGER NOT NULL,
                   last_modified INTEGER NOT NULL,
-                  body_indexed INTEGER NOT NULL DEFAULT 0
+                  body_indexed INTEGER NOT NULL DEFAULT 0,
+                  fts_rowid INTEGER NOT NULL DEFAULT 0
                 );
                 """.trimIndent()
             )

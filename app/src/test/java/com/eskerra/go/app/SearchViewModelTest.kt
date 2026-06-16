@@ -4,9 +4,12 @@ import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.SearchOutcome
 import com.eskerra.go.core.repository.VaultSearchRepository
 import com.eskerra.go.core.search.VaultSearchBestField
+import com.eskerra.go.core.search.VaultSearchError
+import com.eskerra.go.core.search.VaultSearchException
 import com.eskerra.go.core.search.VaultSearchIndexStatus
 import com.eskerra.go.core.search.VaultSearchNoteResult
 import com.eskerra.go.core.usecase.MaintainVaultSearchIndex
+import com.eskerra.go.core.usecase.RepairVaultSearchIndex
 import com.eskerra.go.core.usecase.SearchVault
 import com.eskerra.go.data.workspace.WorkspacePaths
 import com.eskerra.go.feature.search.SearchUiState
@@ -55,12 +58,7 @@ class SearchViewModelTest {
     @Test
     fun debouncesQueryBeforeSearching() = runTest(dispatcher) {
         val repository = FakeVaultSearchRepository()
-        val viewModel = SearchViewModel(
-            config = config,
-            filesDir = filesDir,
-            searchVault = SearchVault(repository),
-            maintainVaultSearchIndex = MaintainVaultSearchIndex(repository)
-        )
+        val viewModel = viewModel(repository)
 
         viewModel.onQueryChange("alpha")
         advanceTimeBy(200)
@@ -80,12 +78,7 @@ class SearchViewModelTest {
     @Test
     fun emptyQueryReturnsIdle() = runTest(dispatcher) {
         val repository = FakeVaultSearchRepository()
-        val viewModel = SearchViewModel(
-            config = config,
-            filesDir = filesDir,
-            searchVault = SearchVault(repository),
-            maintainVaultSearchIndex = MaintainVaultSearchIndex(repository)
-        )
+        val viewModel = viewModel(repository)
 
         viewModel.onQueryChange("note")
         advanceTimeBy(400)
@@ -98,7 +91,49 @@ class SearchViewModelTest {
         assertEquals(SearchUiState.Idle, viewModel.uiState.value)
     }
 
-    private class FakeVaultSearchRepository : VaultSearchRepository {
+    @Test
+    fun maintainFailure_surfacesRetryableError() = runTest(dispatcher) {
+        val repository = FakeVaultSearchRepository(
+            maintainResult = Result.failure(
+                VaultSearchException(VaultSearchError.IndexOpenFailed)
+            )
+        )
+        val viewModel = viewModel(repository)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value as SearchUiState.Error
+        assertEquals("Search index could not be opened.", state.message)
+        assertTrue(state.canRetry)
+    }
+
+    @Test
+    fun searchFailure_surfacesMappedMessage() = runTest(dispatcher) {
+        val repository = FakeVaultSearchRepository(
+            searchResult = Result.failure(VaultSearchException(VaultSearchError.QueryFailed))
+        )
+        val viewModel = viewModel(repository)
+
+        viewModel.onQueryChange("alpha")
+        advanceTimeBy(400)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value as SearchUiState.Error
+        assertEquals("Search query failed. Try a simpler term.", state.message)
+        assertTrue(state.canRetry)
+    }
+
+    private fun viewModel(repository: FakeVaultSearchRepository): SearchViewModel = SearchViewModel(
+        config = config,
+        filesDir = filesDir,
+        searchVault = SearchVault(repository),
+        maintainVaultSearchIndex = MaintainVaultSearchIndex(repository),
+        repairVaultSearchIndex = RepairVaultSearchIndex(repository)
+    )
+
+    private class FakeVaultSearchRepository(
+        private val maintainResult: Result<Unit> = Result.success(Unit),
+        private val searchResult: Result<SearchOutcome>? = null
+    ) : VaultSearchRepository {
         override suspend fun status(
             config: WorkspaceConfig,
             filesDir: File
@@ -106,7 +141,7 @@ class SearchViewModelTest {
             VaultSearchIndexStatus("vault-1", indexReady = true, bodiesIndexReady = true)
 
         override suspend fun maintain(config: WorkspaceConfig, filesDir: File): Result<Unit> =
-            Result.success(Unit)
+            maintainResult
 
         override suspend fun touchPaths(
             config: WorkspaceConfig,
@@ -114,12 +149,15 @@ class SearchViewModelTest {
             paths: List<String>
         ): Result<Unit> = Result.success(Unit)
 
+        override suspend fun repairIndex(config: WorkspaceConfig, filesDir: File): Result<Unit> =
+            Result.success(Unit)
+
         override suspend fun search(
             config: WorkspaceConfig,
             filesDir: File,
             query: String,
             searchId: Long
-        ): Result<SearchOutcome> = Result.success(
+        ): Result<SearchOutcome> = searchResult ?: Result.success(
             SearchOutcome(
                 searchId = searchId,
                 vaultInstanceId = "vault-1",

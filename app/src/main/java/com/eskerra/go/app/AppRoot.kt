@@ -39,6 +39,7 @@ import com.eskerra.go.core.usecase.ManualSyncNow
 import com.eskerra.go.core.usecase.ReconcileWorkspaceSyncBranch
 import com.eskerra.go.core.usecase.RecordLastSyncAttempt
 import com.eskerra.go.core.usecase.RefreshRemoteSyncStatus
+import com.eskerra.go.core.usecase.RepairVaultSearchIndex
 import com.eskerra.go.core.usecase.SaveLocalSettings
 import com.eskerra.go.core.usecase.SaveNote
 import com.eskerra.go.core.usecase.SaveRemoteSyncSettings
@@ -93,6 +94,7 @@ fun AppRoot(
     ensureDeviceInstanceId: EnsureDeviceInstanceId,
     searchVault: SearchVault,
     maintainVaultSearchIndex: MaintainVaultSearchIndex,
+    repairVaultSearchIndex: RepairVaultSearchIndex,
     touchVaultSearchPaths: TouchVaultSearchPaths,
     onLaunchSettled: () -> Unit = {}
 ) {
@@ -185,6 +187,7 @@ fun AppRoot(
                     ensureDeviceInstanceId = ensureDeviceInstanceId,
                     searchVault = searchVault,
                     maintainVaultSearchIndex = maintainVaultSearchIndex,
+                    repairVaultSearchIndex = repairVaultSearchIndex,
                     touchVaultSearchPaths = touchVaultSearchPaths,
                     onConfigUpdated = gateViewModel::updateReadyConfig,
                     onInboxUiStateChanged = { inboxUiState = it }

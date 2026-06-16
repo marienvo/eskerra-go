@@ -1,12 +1,14 @@
 package com.eskerra.go.data.search
 
 import android.content.Context
+import android.database.sqlite.SQLiteException
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.SearchOutcome
 import com.eskerra.go.core.repository.VaultSearchRepository
 import com.eskerra.go.core.search.Fts5Query
 import com.eskerra.go.core.search.SearchCandidate
 import com.eskerra.go.core.search.SearchRanker
+import com.eskerra.go.core.search.VaultSearchException
 import com.eskerra.go.core.search.VaultSearchIndexStatus
 import com.eskerra.go.core.search.compareVaultSearchNotes
 import com.eskerra.go.core.search.rankedNoteToResult
@@ -25,23 +27,29 @@ class SqliteVaultSearchRepository(private val appContext: Context) : VaultSearch
 
     override suspend fun status(config: WorkspaceConfig, filesDir: File): VaultSearchIndexStatus =
         withContext(Dispatchers.IO) {
-            mutex.withLock {
-                val db = openDatabase(config, filesDir) ?: return@withContext emptyStatus()
-                VaultSearchIndexer.readStatus(db.ensureOpen())
-            }
+            runCatching {
+                mutex.withLock {
+                    val db = openDatabase(config, filesDir) ?: return@withContext emptyStatus()
+                    VaultSearchIndexer.readStatus(db.ensureOpen())
+                }
+            }.getOrElse { emptyStatus() }
         }
 
     override suspend fun maintain(config: WorkspaceConfig, filesDir: File): Result<Unit> =
         withContext(Dispatchers.IO) {
             runCatching {
                 mutex.withLock {
-                    val workspace = resolveWorkspace(config, filesDir).getOrThrow()
-                    val helper =
-                        openDatabase(config, filesDir)
-                            ?: throw IllegalStateException("Search DB unavailable")
-                    val baseHash = VaultSearchPathHasher.sha1Hex(workspace.canonicalPath)
-                    VaultSearchIndexer.maintain(workspace, helper.ensureOpen(), baseHash)
-                    Unit
+                    runMaintainLocked(config, filesDir)
+                }
+            }.recoverCatching { error ->
+                val mapped = VaultSearchSqliteErrorMapper.map(error)
+                if (mapped.error.canRetry()) {
+                    mutex.withLock {
+                        repairLocked(config, filesDir)
+                        runMaintainLocked(config, filesDir)
+                    }
+                } else {
+                    throw mapped
                 }
             }
         }
@@ -58,7 +66,7 @@ class SqliteVaultSearchRepository(private val appContext: Context) : VaultSearch
                 val helper = openDatabase(config, filesDir) ?: return@runCatching
                 VaultSearchIndexer.touchPaths(workspace, helper.ensureOpen(), paths)
             }
-        }
+        }.mapFailure()
     }
 
     override suspend fun search(
@@ -97,17 +105,62 @@ class SqliteVaultSearchRepository(private val appContext: Context) : VaultSearch
                     status = status
                 )
             }
+        }.mapFailure()
+    }
+
+    override suspend fun repairIndex(config: WorkspaceConfig, filesDir: File): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                mutex.withLock {
+                    repairLocked(config, filesDir)
+                }
+            }.mapFailure()
         }
+
+    private fun runMaintainLocked(config: WorkspaceConfig, filesDir: File) {
+        val workspace = resolveWorkspace(config, filesDir).getOrThrow()
+        val helper = openDatabase(config, filesDir)
+            ?: throw VaultSearchException(
+                com.eskerra.go.core.search.VaultSearchError.IndexOpenFailed
+            )
+        val baseHash = VaultSearchPathHasher.sha1Hex(workspace.canonicalPath)
+        VaultSearchIndexer.maintain(workspace, helper.ensureOpen(), baseHash)
+    }
+
+    private fun repairLocked(config: WorkspaceConfig, filesDir: File) {
+        val workspace = resolveWorkspace(config, filesDir).getOrThrow()
+        closeHelper()
+        val dbFile = VaultSearchPathHasher.indexDatabaseFile(filesDir, workspace)
+        if (dbFile.exists()) {
+            dbFile.delete()
+        }
+        dbFile.parentFile?.mkdirs()
+        openDatabase(config, filesDir)
     }
 
     private fun queryCandidates(
         db: android.database.sqlite.SQLiteDatabase,
         matchExpr: String
+    ): List<SearchCandidate> = try {
+        runQueryCandidates(db, matchExpr, useBm25 = true)
+    } catch (first: SQLiteException) {
+        try {
+            runQueryCandidates(db, matchExpr, useBm25 = false)
+        } catch (_: SQLiteException) {
+            throw VaultSearchSqliteErrorMapper.map(first)
+        }
+    }
+
+    private fun runQueryCandidates(
+        db: android.database.sqlite.SQLiteDatabase,
+        matchExpr: String,
+        useBm25: Boolean
     ): List<SearchCandidate> {
+        val rankExpr = if (useBm25) "bm25(vault_search_notes)" else "rank"
         val out = mutableListOf<SearchCandidate>()
         db.rawQuery(
             """
-            SELECT uri, rel_path, title, filename, body, bm25(vault_search_notes) AS rk
+            SELECT uri, rel_path, title, filename, body, $rankExpr AS rk
             FROM vault_search_notes
             WHERE vault_search_notes MATCH ?
             ORDER BY rk
@@ -144,18 +197,22 @@ class SqliteVaultSearchRepository(private val appContext: Context) : VaultSearch
         closeHelper()
         val dbFile = VaultSearchPathHasher.indexDatabaseFile(filesDir, workspace)
         dbFile.parentFile?.mkdirs()
-        val helper = VaultSearchDatabase(appContext, dbFile)
-        val db = helper.ensureOpen()
-        val storedVersion = VaultSearchDatabase.getMeta(
-            db,
-            VaultSearchDatabase.KEY_SCHEMA_VERSION
-        )?.toIntOrNull()
-        if (storedVersion != VaultSearchDatabase.SCHEMA_VERSION) {
-            helper.rebuildSchema(db)
+        return try {
+            val helper = VaultSearchDatabase(appContext, dbFile)
+            val db = helper.ensureOpen()
+            val storedVersion = VaultSearchDatabase.getMeta(
+                db,
+                VaultSearchDatabase.KEY_SCHEMA_VERSION
+            )?.toIntOrNull()
+            if (storedVersion != VaultSearchDatabase.SCHEMA_VERSION) {
+                helper.rebuildSchema(db)
+            }
+            openHelper = helper
+            openWorkspaceKey = key
+            helper
+        } catch (error: SQLiteException) {
+            throw VaultSearchSqliteErrorMapper.map(error)
         }
-        openHelper = helper
-        openWorkspaceKey = key
-        return helper
     }
 
     private fun closeHelper() {
@@ -169,7 +226,11 @@ class SqliteVaultSearchRepository(private val appContext: Context) : VaultSearch
         if (workspaceResult.isFailure) return workspaceResult
         val workspaceDir = workspaceResult.getOrThrow()
         if (!workspaceDir.isDirectory) {
-            return Result.failure(IllegalStateException("Workspace missing"))
+            return Result.failure(
+                VaultSearchException(
+                    com.eskerra.go.core.search.VaultSearchError.WorkspaceUnavailable
+                )
+            )
         }
         return Result.success(workspaceDir)
     }
@@ -180,6 +241,10 @@ class SqliteVaultSearchRepository(private val appContext: Context) : VaultSearch
         bodiesIndexReady = false,
         indexedNotes = 0
     )
+
+    private fun <T> Result<T>.mapFailure(): Result<T> = recoverCatching { error ->
+        throw VaultSearchSqliteErrorMapper.map(error)
+    }
 
     companion object {
         private const val FTS_CANDIDATE_LIMIT = 100

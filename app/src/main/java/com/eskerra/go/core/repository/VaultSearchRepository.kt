@@ -22,6 +22,9 @@ interface VaultSearchRepository {
         query: String,
         searchId: Long
     ): Result<SearchOutcome>
+
+    /** Deletes the local FTS index file and rebuilds title indexing from scratch. */
+    suspend fun repairIndex(config: WorkspaceConfig, filesDir: File): Result<Unit>
 }
 
 data class SearchOutcome(

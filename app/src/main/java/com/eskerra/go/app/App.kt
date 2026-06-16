@@ -45,6 +45,7 @@ import com.eskerra.go.core.usecase.ManualSyncNow
 import com.eskerra.go.core.usecase.ReconcileWorkspaceSyncBranch
 import com.eskerra.go.core.usecase.RecordLastSyncAttempt
 import com.eskerra.go.core.usecase.RefreshRemoteSyncStatus
+import com.eskerra.go.core.usecase.RepairVaultSearchIndex
 import com.eskerra.go.core.usecase.SaveLocalSettings
 import com.eskerra.go.core.usecase.SaveNote
 import com.eskerra.go.core.usecase.SaveRemoteSyncSettings
@@ -105,6 +106,7 @@ fun App(
     ensureDeviceInstanceId: EnsureDeviceInstanceId,
     searchVault: SearchVault,
     maintainVaultSearchIndex: MaintainVaultSearchIndex,
+    repairVaultSearchIndex: RepairVaultSearchIndex,
     touchVaultSearchPaths: TouchVaultSearchPaths,
     onConfigUpdated: (WorkspaceConfig) -> Unit,
     onInboxUiStateChanged: (InboxUiState) -> Unit = {}
@@ -258,6 +260,7 @@ fun App(
                     filesDir = filesDir,
                     searchVault = searchVault,
                     maintainVaultSearchIndex = maintainVaultSearchIndex,
+                    repairVaultSearchIndex = repairVaultSearchIndex,
                     navController = navController
                 )
             }

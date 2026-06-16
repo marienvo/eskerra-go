@@ -8,6 +8,7 @@ import java.util.UUID
 internal object VaultSearchIndexer {
     private const val TITLE_BATCH_SIZE = 50
     private const val BODY_BATCH_SIZE = 25
+    private const val BODY_BATCHES_PER_MAINTAIN = 4
 
     fun ensureVaultInstance(db: SQLiteDatabase, basePathHash: String): String {
         val existingHash = VaultSearchDatabase.getMeta(db, VaultSearchDatabase.KEY_BASE_PATH_HASH)
@@ -29,11 +30,12 @@ internal object VaultSearchIndexer {
         val onDisk = VaultSearchWorkspaceWalker.snapshot(workspaceDir)
         val inDb = readMetaSnapshots(db)
         if (inDb.isEmpty()) {
-            fullBuild(workspaceDir, db)
+            buildTitles(workspaceDir, db)
         } else {
             val diff = ReconcileDiffer.diff(inDb, onDisk)
             applyDiff(workspaceDir, db, diff)
         }
+        fillPendingBodiesBatch(workspaceDir, db, BODY_BATCH_SIZE * BODY_BATCHES_PER_MAINTAIN)
         VaultSearchDatabase.setMeta(
             db,
             VaultSearchDatabase.KEY_LAST_RECONCILED_AT,
@@ -51,6 +53,7 @@ internal object VaultSearchIndexer {
         val subsetInDb = touched.mapNotNull { path -> inDb[path]?.let { path to it } }.toMap()
         val diff = ReconcileDiffer.diff(subsetInDb, subsetOnDisk)
         applyDiff(workspaceDir, db, diff)
+        fillPendingBodiesBatch(workspaceDir, db, BODY_BATCH_SIZE * BODY_BATCHES_PER_MAINTAIN)
         VaultSearchDatabase.setMeta(
             db,
             VaultSearchDatabase.KEY_LAST_RECONCILED_AT,
@@ -58,7 +61,7 @@ internal object VaultSearchIndexer {
         )
     }
 
-    private fun fullBuild(workspaceDir: File, db: SQLiteDatabase) {
+    private fun buildTitles(workspaceDir: File, db: SQLiteDatabase) {
         db.execSQL("DELETE FROM vault_search_notes")
         db.execSQL("DELETE FROM note_meta")
         val entries = VaultSearchWorkspaceWalker.walk(workspaceDir)
@@ -78,16 +81,24 @@ internal object VaultSearchIndexer {
             VaultSearchDatabase.KEY_LAST_TITLES_AT,
             System.currentTimeMillis().toString()
         )
-        fillBodies(workspaceDir, db, entries.map { it.uri }.toSet())
     }
 
-    private fun fillBodies(workspaceDir: File, db: SQLiteDatabase, onlyUris: Set<String>? = null) {
-        val entries = VaultSearchWorkspaceWalker.walk(workspaceDir)
-            .filter { onlyUris == null || it.uri in onlyUris }
-        entries.chunked(BODY_BATCH_SIZE).forEach { batch ->
+    private fun fillPendingBodiesBatch(workspaceDir: File, db: SQLiteDatabase, maxEntries: Int) {
+        val pendingUris = readPendingBodyUris(db, maxEntries)
+        if (pendingUris.isEmpty()) {
+            markBodiesCompleteIfDone(db)
+            return
+        }
+        val entriesByUri = VaultSearchWorkspaceWalker.walk(workspaceDir).associateBy { it.uri }
+        val batch = pendingUris.mapNotNull { uri -> entriesByUri[uri] }
+        if (batch.isEmpty()) {
+            markBodiesCompleteIfDone(db)
+            return
+        }
+        batch.chunked(BODY_BATCH_SIZE).forEach { chunk ->
             db.beginTransaction()
             try {
-                for (entry in batch) {
+                for (entry in chunk) {
                     upsertWithBody(db, entry)
                 }
                 db.setTransactionSuccessful()
@@ -95,11 +106,37 @@ internal object VaultSearchIndexer {
                 db.endTransaction()
             }
         }
-        VaultSearchDatabase.setMeta(
-            db,
-            VaultSearchDatabase.KEY_LAST_FULL_BUILD_AT,
-            System.currentTimeMillis().toString()
-        )
+        markBodiesCompleteIfDone(db)
+    }
+
+    private fun readPendingBodyUris(db: SQLiteDatabase, limit: Int): List<String> {
+        val out = mutableListOf<String>()
+        db.rawQuery(
+            "SELECT uri FROM note_meta WHERE body_indexed = 0 LIMIT ?",
+            arrayOf(limit.toString())
+        ).use { cursor ->
+            val uriIndex = cursor.getColumnIndexOrThrow("uri")
+            while (cursor.moveToNext()) {
+                out += cursor.getString(uriIndex)
+            }
+        }
+        return out
+    }
+
+    private fun markBodiesCompleteIfDone(db: SQLiteDatabase) {
+        val pending = db.rawQuery(
+            "SELECT COUNT(*) FROM note_meta WHERE body_indexed = 0",
+            null
+        ).use { cursor ->
+            if (!cursor.moveToFirst()) 0 else cursor.getInt(0)
+        }
+        if (pending == 0) {
+            VaultSearchDatabase.setMeta(
+                db,
+                VaultSearchDatabase.KEY_LAST_FULL_BUILD_AT,
+                System.currentTimeMillis().toString()
+            )
+        }
     }
 
     private fun applyDiff(
@@ -124,37 +161,40 @@ internal object VaultSearchIndexer {
         } finally {
             db.endTransaction()
         }
-        val bodyTargets = (diff.added + diff.updated).toSet()
-        if (bodyTargets.isNotEmpty()) {
-            fillBodies(workspaceDir, db, bodyTargets)
-        }
     }
 
     private fun removeUri(db: SQLiteDatabase, uri: String) {
+        val rowid = readFtsRowid(db, uri)
+        if (rowid != null) {
+            db.execSQL("DELETE FROM vault_search_notes WHERE rowid = ?", arrayOf(rowid))
+        }
         db.execSQL("DELETE FROM note_meta WHERE uri = ?", arrayOf(uri))
-        db.execSQL("DELETE FROM vault_search_notes WHERE uri = ?", arrayOf(uri))
+    }
+
+    private fun readFtsRowid(db: SQLiteDatabase, uri: String): Long? {
+        db.rawQuery("SELECT fts_rowid FROM note_meta WHERE uri = ?", arrayOf(uri)).use { cursor ->
+            if (!cursor.moveToFirst()) return null
+            val rowid = cursor.getLong(0)
+            return rowid.takeIf { it > 0L }
+        }
     }
 
     private fun upsertTitleOnly(db: SQLiteDatabase, entry: VaultSearchFileEntry) {
-        db.execSQL("DELETE FROM vault_search_notes WHERE uri = ?", arrayOf(entry.uri))
-        db.execSQL(
-            """
-            INSERT INTO vault_search_notes(uri, rel_path, title, filename, body)
-            VALUES(?, ?, ?, ?, '')
-            """.trimIndent(),
-            arrayOf(entry.uri, entry.relPath, entry.title, entry.filename)
+        removeUri(db, entry.uri)
+        val rowid = insertFtsRow(
+            db,
+            entry.uri,
+            entry.relPath,
+            entry.title,
+            entry.filename,
+            ""
         )
         db.execSQL(
             """
-            INSERT INTO note_meta(uri, rel_path, filename, title, size, last_modified, body_indexed)
-            VALUES(?, ?, ?, ?, ?, ?, 0)
-            ON CONFLICT(uri) DO UPDATE SET
-              rel_path = excluded.rel_path,
-              filename = excluded.filename,
-              title = excluded.title,
-              size = excluded.size,
-              last_modified = excluded.last_modified,
-              body_indexed = 0
+            INSERT INTO note_meta(
+              uri, rel_path, filename, title, size, last_modified, body_indexed, fts_rowid
+            )
+            VALUES(?, ?, ?, ?, ?, ?, 0, ?)
             """.trimIndent(),
             arrayOf(
                 entry.uri,
@@ -162,31 +202,36 @@ internal object VaultSearchIndexer {
                 entry.filename,
                 entry.title,
                 entry.size,
-                entry.lastModified
+                entry.lastModified,
+                rowid
             )
         )
     }
 
     private fun upsertWithBody(db: SQLiteDatabase, entry: VaultSearchFileEntry) {
-        db.execSQL("DELETE FROM vault_search_notes WHERE uri = ?", arrayOf(entry.uri))
-        db.execSQL(
-            """
-            INSERT INTO vault_search_notes(uri, rel_path, title, filename, body)
-            VALUES(?, ?, ?, ?, ?)
-            """.trimIndent(),
-            arrayOf(entry.uri, entry.relPath, entry.title, entry.filename, entry.body)
+        removeUri(db, entry.uri)
+        val rowid = insertFtsRow(
+            db,
+            entry.uri,
+            entry.relPath,
+            entry.title,
+            entry.filename,
+            entry.body
         )
         db.execSQL(
             """
-            INSERT INTO note_meta(uri, rel_path, filename, title, size, last_modified, body_indexed)
-            VALUES(?, ?, ?, ?, ?, ?, 1)
+            INSERT INTO note_meta(
+              uri, rel_path, filename, title, size, last_modified, body_indexed, fts_rowid
+            )
+            VALUES(?, ?, ?, ?, ?, ?, 1, ?)
             ON CONFLICT(uri) DO UPDATE SET
               rel_path = excluded.rel_path,
               filename = excluded.filename,
               title = excluded.title,
               size = excluded.size,
               last_modified = excluded.last_modified,
-              body_indexed = 1
+              body_indexed = 1,
+              fts_rowid = excluded.fts_rowid
             """.trimIndent(),
             arrayOf(
                 entry.uri,
@@ -194,9 +239,32 @@ internal object VaultSearchIndexer {
                 entry.filename,
                 entry.title,
                 entry.size,
-                entry.lastModified
+                entry.lastModified,
+                rowid
             )
         )
+    }
+
+    private fun insertFtsRow(
+        db: SQLiteDatabase,
+        uri: String,
+        relPath: String,
+        title: String,
+        filename: String,
+        body: String
+    ): Long {
+        val statement = db.compileStatement(
+            """
+            INSERT INTO vault_search_notes(uri, rel_path, title, filename, body)
+            VALUES(?, ?, ?, ?, ?)
+            """.trimIndent()
+        )
+        statement.bindString(1, uri)
+        statement.bindString(2, relPath)
+        statement.bindString(3, title)
+        statement.bindString(4, filename)
+        statement.bindString(5, body)
+        return statement.executeInsert()
     }
 
     private fun readMetaSnapshots(
