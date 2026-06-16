@@ -3,9 +3,12 @@ package com.eskerra.go.data.notes
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.data.workspace.WorkspacePaths
 import java.io.File
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -67,5 +70,58 @@ class CoalescingNoteRegistryRepositoryTest {
 
         assertTrue(result.isSuccess)
         assertEquals(1, result.getOrThrow().inboxSummaries.size)
+    }
+
+    @Test
+    fun refresh_earlyConcurrentJoinCoalescesToSingleScan() = runTest {
+        val filesDir = temp.newFolder("files")
+        val delegate = FakeNoteRegistryRepository(refreshDelayMs = 100)
+        val repository = CoalescingNoteRegistryRepository(delegate)
+
+        coroutineScope {
+            val first = async { repository.refresh(config, filesDir) }
+            val second = async { repository.refresh(config, filesDir) }
+            first.await()
+            second.await()
+        }
+
+        assertEquals(1, delegate.refreshCount)
+    }
+
+    @Test
+    fun refresh_lateJoinAfterInFlightStartRunsSecondScan() = runBlocking {
+        val filesDir = temp.newFolder("files")
+        val delegate = FakeNoteRegistryRepository(refreshDelayMs = 100)
+        val repository = CoalescingNoteRegistryRepository(delegate)
+
+        val first = async { repository.refresh(config, filesDir) }
+        delay(60)
+        val second = async { repository.refresh(config, filesDir) }
+        first.await()
+        second.await()
+
+        assertEquals(2, delegate.refreshCount)
+    }
+
+    @Test
+    fun refresh_waiterGetsResultWhenOwnerCancelled() = runTest {
+        val filesDir = temp.newFolder("files")
+        val delegate = FakeNoteRegistryRepository(refreshDelayMs = 150)
+        val repository = CoalescingNoteRegistryRepository(delegate)
+
+        val waiter = async {
+            delay(30)
+            repository.refresh(config, filesDir)
+        }
+        val owner = launch {
+            try {
+                repository.refresh(config, filesDir)
+            } catch (_: CancellationException) {
+            }
+        }
+        delay(80)
+        owner.cancel()
+        assertTrue(waiter.await().isSuccess)
+        assertEquals(1, delegate.refreshCount)
     }
 }

@@ -92,6 +92,7 @@ internal fun AppInboxRoute(
         val notesChanged = entry.savedStateHandle.remove<Boolean>(NOTES_CHANGED_KEY) == true
         if (currentRoute == AppRoute.INBOX && notesChanged) {
             inboxViewModel.refresh()
+            todayHubViewModel.retry()
             appSyncViewModel.refreshLocalStatusQuietly()
         }
     }

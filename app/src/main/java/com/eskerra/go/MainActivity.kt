@@ -85,9 +85,8 @@ class MainActivity : ComponentActivity() {
             credentialStore = credentialStore
         )
 
-        val noteRegistryRepository = CoalescingNoteRegistryRepository(
-            FileNoteRegistryRepository()
-        )
+        val fileNoteRegistryRepository = FileNoteRegistryRepository()
+        val noteRegistryRepository = CoalescingNoteRegistryRepository(fileNoteRegistryRepository)
         val noteContentRepository = FileNoteContentRepository()
         val noteWriteRepository = FileNoteWriteRepository(gitRepository)
         val loadGitStatusSummary = LoadGitStatusSummary(gitRepository)
@@ -102,12 +101,12 @@ class MainActivity : ComponentActivity() {
         )
         val createInboxNote = CreateInboxNote(
             writeRepository = noteWriteRepository,
-            registryRepository = noteRegistryRepository,
+            registryRepository = fileNoteRegistryRepository,
             loadGitStatusSummary = loadGitStatusSummary
         )
         val deleteInboxNotes = DeleteInboxNotes(
             writeRepository = noteWriteRepository,
-            registryRepository = noteRegistryRepository,
+            registryRepository = fileNoteRegistryRepository,
             loadGitStatusSummary = loadGitStatusSummary
         )
         val loadEditableNote = LoadEditableNote(
@@ -116,7 +115,7 @@ class MainActivity : ComponentActivity() {
         )
         val saveNote = SaveNote(
             writeRepository = noteWriteRepository,
-            registryRepository = noteRegistryRepository,
+            registryRepository = fileNoteRegistryRepository,
             loadGitStatusSummary = loadGitStatusSummary
         )
 
@@ -151,7 +150,7 @@ class MainActivity : ComponentActivity() {
         val manualSyncNow = ManualSyncNow(
             remoteSyncRepository = remoteSyncRepository,
             credentialStore = credentialStore,
-            registryRepository = noteRegistryRepository,
+            registryRepository = fileNoteRegistryRepository,
             loadSyncStatus = loadSyncStatus,
             reconcileWorkspaceSyncBranch = reconcileWorkspaceSyncBranch
         )

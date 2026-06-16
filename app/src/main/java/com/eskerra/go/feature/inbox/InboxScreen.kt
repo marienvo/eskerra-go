@@ -227,21 +227,23 @@ private fun InboxScrollBody(
             )
         }
 
-        item {
-            TodayHubSection(
-                state = todayHubState,
-                onPreviousWeek = onPreviousWeek,
-                onNextWeek = onNextWeek,
-                onSelectHub = onSelectHub,
-                onRetry = onRetryTodayHub,
-                onOpenInternalNote = onOpenInternalNote,
-                onOpenExternalUrl = onOpenExternalUrl,
-                onAmbiguousWikiLink = onAmbiguousWikiLink,
-                onNoteNotFound = onNoteNotFound,
-                onOpenSearch = onOpenSearch,
-                workspaceRoot = workspaceRoot,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-            )
+        if (state !is InboxUiState.Loading || todayHubState is TodayHubUiState.Content) {
+            item {
+                TodayHubSection(
+                    state = todayHubState,
+                    onPreviousWeek = onPreviousWeek,
+                    onNextWeek = onNextWeek,
+                    onSelectHub = onSelectHub,
+                    onRetry = onRetryTodayHub,
+                    onOpenInternalNote = onOpenInternalNote,
+                    onOpenExternalUrl = onOpenExternalUrl,
+                    onAmbiguousWikiLink = onAmbiguousWikiLink,
+                    onNoteNotFound = onNoteNotFound,
+                    onOpenSearch = onOpenSearch,
+                    workspaceRoot = workspaceRoot,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            }
         }
     }
 }

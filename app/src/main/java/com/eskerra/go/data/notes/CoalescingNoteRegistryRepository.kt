@@ -7,6 +7,8 @@ import java.io.File
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 
 /**
  * Deduplicates concurrent [refresh] calls for the same workspace so parallel callers
@@ -15,41 +17,82 @@ import kotlinx.coroutines.Deferred
 class CoalescingNoteRegistryRepository(private val delegate: NoteRegistryRepository) :
     NoteRegistryRepository {
 
-    private val inFlight = mutableMapOf<String, Deferred<Result<NoteRegistry>>>()
+    private val inFlight = mutableMapOf<String, InFlightScan>()
+    private val pendingRescan = mutableSetOf<String>()
 
     override suspend fun refresh(config: WorkspaceConfig, filesDir: File): Result<NoteRegistry> {
         val key = cacheKey(config, filesDir)
-        val existing: Deferred<Result<NoteRegistry>>?
-        val owned = CompletableDeferred<Result<NoteRegistry>>()
-        synchronized(inFlight) {
-            existing = inFlight[key]
-            if (existing == null) inFlight[key] = owned
-        }
-        existing?.let { return it.await() }
-
-        return try {
-            val result = delegate.refresh(config, filesDir)
-            owned.complete(result)
-            result
-        } catch (e: CancellationException) {
-            dropInFlight(key, owned)
-            if (!owned.isCompleted) {
-                owned.completeExceptionally(e)
+        while (true) {
+            val joinTarget = synchronized(inFlight) { inFlight[key] }
+            if (joinTarget != null) {
+                markPendingRescanIfLateJoin(key, joinTarget)
+                val result = joinTarget.deferred.await()
+                if (synchronized(inFlight) { pendingRescan.remove(key) == true }) {
+                    continue
+                }
+                return result
             }
-            throw e
-        } catch (e: Throwable) {
-            dropInFlight(key, owned)
-            owned.completeExceptionally(e)
-            throw e
-        } finally {
-            dropInFlight(key, owned)
+
+            val owned = CompletableDeferred<Result<NoteRegistry>>()
+            val scan = InFlightScan(deferred = owned, startedAtNanos = System.nanoTime())
+            val becameOwner = synchronized(inFlight) {
+                if (inFlight[key] != null) {
+                    false
+                } else {
+                    inFlight[key] = scan
+                    true
+                }
+            }
+            if (!becameOwner) continue
+
+            val result = try {
+                withContext(NonCancellable) {
+                    delegate.refresh(config, filesDir)
+                }
+            } catch (e: CancellationException) {
+                synchronized(inFlight) {
+                    if (inFlight[key] === scan) inFlight.remove(key)
+                }
+                if (!owned.isCompleted) {
+                    owned.cancel(e)
+                }
+                throw e
+            } catch (e: Throwable) {
+                synchronized(inFlight) {
+                    if (inFlight[key] === scan) inFlight.remove(key)
+                }
+                owned.completeExceptionally(e)
+                throw e
+            }
+
+            owned.complete(result)
+            synchronized(inFlight) {
+                if (inFlight[key] === scan) inFlight.remove(key)
+            }
+
+            if (synchronized(inFlight) { pendingRescan.remove(key) == true }) {
+                continue
+            }
+            return result
+        }
+    }
+
+    private fun markPendingRescanIfLateJoin(key: String, scan: InFlightScan) {
+        val elapsedNanos = System.nanoTime() - scan.startedAtNanos
+        if (elapsedNanos >= LATE_JOIN_THRESHOLD_NANOS) {
+            synchronized(inFlight) { pendingRescan.add(key) }
         }
     }
 
     private fun cacheKey(config: WorkspaceConfig, filesDir: File): String =
         "${filesDir.path}:${config.relativePath}"
 
-    private fun dropInFlight(key: String, owned: Deferred<Result<NoteRegistry>>) {
-        synchronized(inFlight) { if (inFlight[key] === owned) inFlight.remove(key) }
+    private data class InFlightScan(
+        val deferred: Deferred<Result<NoteRegistry>>,
+        val startedAtNanos: Long
+    )
+
+    private companion object {
+        private const val LATE_JOIN_THRESHOLD_NANOS = 50L * 1_000_000L
     }
 }

@@ -44,18 +44,13 @@ internal class VaultSearchDatabase(
     private fun ensureSchema(connection: SQLiteConnection) {
         val session = VaultSearchSqlSession(connection)
         if (!hasTable(session, INDEX_META_TABLE)) {
-            bootstrapSchema(session)
+            rebuildSchema(session)
             return
         }
         val storedVersion = getMeta(session, KEY_SCHEMA_VERSION)?.toIntOrNull()
         if (storedVersion == null || storedVersion != SCHEMA_VERSION) {
             rebuildSchema(session)
         }
-    }
-
-    private fun bootstrapSchema(session: VaultSearchSqlSession) {
-        createTables(session, appContext)
-        setMeta(session, KEY_SCHEMA_VERSION, SCHEMA_VERSION.toString())
     }
 
     companion object {
