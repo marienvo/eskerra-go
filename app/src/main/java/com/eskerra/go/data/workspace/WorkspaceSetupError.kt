@@ -117,7 +117,7 @@ internal fun isBranchRefError(message: String, branch: String): Boolean {
 
 internal fun isInvalidRepositoryError(message: String): Boolean {
     if (message.contains("remote branch not found", ignoreCase = true)) return false
-    if (message.startsWith("file://", ignoreCase = true) &&
+    if (message.startsWith("file:", ignoreCase = true) &&
         message.contains(": not found", ignoreCase = true)
     ) {
         return true

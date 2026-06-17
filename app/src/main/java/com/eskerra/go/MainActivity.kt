@@ -47,6 +47,7 @@ import com.eskerra.go.data.credentials.AndroidKeystoreTokenCipher
 import com.eskerra.go.data.credentials.EncryptedCredentialStore
 import com.eskerra.go.data.git.JGitRemoteSyncRepository
 import com.eskerra.go.data.git.JGitWorkspaceRepository
+import com.eskerra.go.data.notes.CoalescingNoteRegistryRepository
 import com.eskerra.go.data.notes.FileInboxSnapshotStore
 import com.eskerra.go.data.notes.FileNoteContentRepository
 import com.eskerra.go.data.notes.FileNoteRegistryRepository
@@ -88,7 +89,8 @@ class MainActivity : ComponentActivity() {
             credentialStore = credentialStore
         )
 
-        val noteRegistryRepository = FileNoteRegistryRepository()
+        val fileNoteRegistryRepository = FileNoteRegistryRepository()
+        val noteRegistryRepository = CoalescingNoteRegistryRepository(fileNoteRegistryRepository)
         val noteContentCache = NoteContentCache(FileNoteContentRepository())
         val noteWriteRepository = FileNoteWriteRepository(gitRepository)
         val loadGitStatusSummary = LoadGitStatusSummary(gitRepository)

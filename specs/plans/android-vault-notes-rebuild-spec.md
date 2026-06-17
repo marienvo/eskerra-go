@@ -81,12 +81,12 @@ Reuse or reimplement these `@eskerra/core` modules for identical behavior:
 
 | Tab / stack | Screens relevant to this spec |
 | ----------- | ------------------------------ |
-| **Inbox** | `InboxScreen` → `NoteDetailScreen` → `AddNoteScreen` (edit) |
+| **Home** (Inbox route) | `InboxScreen` (inbox list + embedded Today Hub) → `NoteDetailScreen` → `AddNoteScreen` (edit) |
 | **Entry** | `AddNoteScreen` (create) |
-| **Today** (Vault tab) | `VaultScreen` → `VaultNoteReadScreen` (linked notes); `VaultSearchScreen` |
-| Tab bar | Week prev/next when Today hub visible (`VaultTodayHubContext`) |
+| **Podcasts** | Podcasts placeholder tab |
+| Tab bar | Home, Add (FAB), Podcasts — week prev/next on the Today Hub section embedded below the inbox list |
 
-Search is opened from the Today tab header (magnifier). Picking a search result opens `VaultNoteReadScreen` on top of search (back restores query + results).
+Search is opened from the Today Hub header on the home screen (magnifier). Picking a search result opens `VaultNoteReadScreen` on top of search (back restores query + results).
 
 ---
 
@@ -327,6 +327,7 @@ Rebuild app is **dark mode only**. Match reference dark chrome:
 | Tab bar | White active tint; inactive `rgba(255,255,255,0.72)` |
 | List dividers | `#333333` (`LIST_DIVIDER_DARK`) |
 | Screen background | App default dark (Gluestack `dark` in reference) |
+| Edge scrims | Shell top/bottom gradient fades (`MaterialTheme.colorScheme.background` → transparent) for readability under system bars and floating chrome |
 | Modal sheets (hub picker, wiki ambiguous) | Background `#1d1d1d`–`#1e1e1e`; title `#f5f5f5`; subtitle `#b0b0b0` |
 
 Do not ship light-mode-specific palettes in the rebuild; `@eskerra/tokens` dark link colors (§8.3) are authoritative.

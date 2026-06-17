@@ -88,7 +88,9 @@ class TodayHubViewModel(
         loadJob?.cancel()
         rowJob?.cancel()
         loadJob = viewModelScope.launch {
-            _uiState.value = TodayHubUiState.Loading
+            if (_uiState.value !is TodayHubUiState.Content) {
+                _uiState.value = TodayHubUiState.Loading
+            }
             val preferred = preferredHubId
                 ?: if (restoreFromStore) activeTodayHubStore.read()?.let { NoteId(it) } else null
 
