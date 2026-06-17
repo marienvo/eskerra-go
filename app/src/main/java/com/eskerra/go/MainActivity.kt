@@ -30,6 +30,7 @@ import com.eskerra.go.core.usecase.LoadTodayHubRow
 import com.eskerra.go.core.usecase.LoadVaultSettings
 import com.eskerra.go.core.usecase.MaintainVaultSearchIndex
 import com.eskerra.go.core.usecase.ManualSyncNow
+import com.eskerra.go.core.usecase.PrefetchLinkedNotes
 import com.eskerra.go.core.usecase.ReconcileWorkspaceSyncBranch
 import com.eskerra.go.core.usecase.RecordLastSyncAttempt
 import com.eskerra.go.core.usecase.RefreshRemoteSyncStatus
@@ -105,6 +106,7 @@ class MainActivity : ComponentActivity() {
             registryCache = noteRegistryCache,
             contentRepository = noteContentCache
         )
+        val prefetchLinkedNotes = PrefetchLinkedNotes(contentCache = noteContentCache)
         val createInboxNote = CreateInboxNote(
             writeRepository = noteWriteRepository,
             registryCache = noteRegistryCache,
@@ -199,6 +201,7 @@ class MainActivity : ComponentActivity() {
                 filesDir = filesDir,
                 loadInboxSummaries = loadInboxSummaries,
                 loadNoteForReading = loadNoteForReading,
+                prefetchLinkedNotes = prefetchLinkedNotes,
                 createInboxNote = createInboxNote,
                 deleteInboxNotes = deleteInboxNotes,
                 loadEditableNote = loadEditableNote,

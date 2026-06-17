@@ -36,6 +36,7 @@ import com.eskerra.go.core.usecase.LoadTodayHubRow
 import com.eskerra.go.core.usecase.LoadVaultSettings
 import com.eskerra.go.core.usecase.MaintainVaultSearchIndex
 import com.eskerra.go.core.usecase.ManualSyncNow
+import com.eskerra.go.core.usecase.PrefetchLinkedNotes
 import com.eskerra.go.core.usecase.ReconcileWorkspaceSyncBranch
 import com.eskerra.go.core.usecase.RecordLastSyncAttempt
 import com.eskerra.go.core.usecase.RefreshRemoteSyncStatus
@@ -67,6 +68,7 @@ fun AppRoot(
     filesDir: File,
     loadInboxSummaries: LoadInboxSummariesCached,
     loadNoteForReading: LoadNoteForReading,
+    prefetchLinkedNotes: PrefetchLinkedNotes,
     createInboxNote: CreateInboxNote,
     deleteInboxNotes: DeleteInboxNotes,
     loadEditableNote: LoadEditableNote,
@@ -160,6 +162,7 @@ fun AppRoot(
                     filesDir = filesDir,
                     loadInboxSummaries = loadInboxSummaries,
                     loadNoteForReading = loadNoteForReading,
+                    prefetchLinkedNotes = prefetchLinkedNotes,
                     createInboxNote = createInboxNote,
                     deleteInboxNotes = deleteInboxNotes,
                     loadEditableNote = loadEditableNote,
