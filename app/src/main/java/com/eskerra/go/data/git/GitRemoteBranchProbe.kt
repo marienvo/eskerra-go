@@ -1,5 +1,7 @@
 package com.eskerra.go.data.git
 
+import java.io.File
+import java.net.URI
 import org.eclipse.jgit.api.Git
 
 /** Resolves a configured branch name against ls-remote results. */
@@ -10,6 +12,7 @@ internal object GitRemoteBranchProbe {
         branch: String,
         httpsToken: String?
     ): Result<String> = runCatching {
+        validateFileRemoteExists(remoteUri)
         val lsRemote = Git.lsRemoteRepository().setRemote(remoteUri)
         httpsToken?.let { token ->
             lsRemote.setTransportConfigCallback(
@@ -22,9 +25,20 @@ internal object GitRemoteBranchProbe {
         val effectiveBranch = SyncBranchNames.reconcileLegacyDefault(branch) { name ->
             remoteBranches.contains(name)
         }
+        if (remoteBranches.isEmpty()) {
+            error("Remote repository not found: $remoteUri")
+        }
         if (!remoteBranches.contains(effectiveBranch)) {
             error("remote branch not found: $effectiveBranch")
         }
         effectiveBranch
+    }
+
+    private fun validateFileRemoteExists(remoteUri: String) {
+        if (!remoteUri.startsWith("file:", ignoreCase = true)) return
+        val path = File(URI(remoteUri))
+        if (!path.exists()) {
+            error("$remoteUri: not found")
+        }
     }
 }

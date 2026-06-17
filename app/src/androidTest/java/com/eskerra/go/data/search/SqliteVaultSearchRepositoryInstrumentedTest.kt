@@ -149,4 +149,27 @@ class SqliteVaultSearchRepositoryInstrumentedTest {
         val outcome = search(config, filesDir, "prioritytouchxyz", searchId = 4L).getOrThrow()
         assertTrue(outcome.notes.any { it.title == "Touched" })
     }
+
+    @Test
+    fun maintain_rebuildsWhenIndexMetaMissing() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val maintain = MaintainVaultSearchIndex(repository)
+        val search = SearchVault(repository)
+
+        maintain(config, filesDir).getOrThrow()
+
+        val workspace = File(filesDir, WorkspacePaths.DEFAULT_RELATIVE_PATH)
+        val dbFile = VaultSearchPathHasher.indexDatabaseFile(filesDir, workspace.canonicalFile)
+        val helper = VaultSearchDatabase(context, dbFile)
+        val session = helper.ensureOpen()
+        session.execSQL("DROP TABLE IF EXISTS vault_search_notes")
+        session.execSQL("DROP TABLE IF EXISTS index_meta")
+        helper.close()
+
+        assertTrue(maintain(config, filesDir).isSuccess)
+
+        val outcome = search(config, filesDir, "alpha", searchId = 50L).getOrThrow()
+        assertTrue(outcome.notes.any { it.title == "Alpha" })
+        assertTrue(outcome.status.indexReady)
+    }
 }

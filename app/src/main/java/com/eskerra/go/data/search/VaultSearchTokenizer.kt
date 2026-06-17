@@ -6,8 +6,8 @@ import android.os.Build
 /**
  * FTS5 tokenizer for vault search (spec §12).
  *
- * Preferred option uses `remove_diacritics`; some device SQLite builds reject it even on
- * recent API levels. [clauseCandidates] lists fallbacks used when creating the FTS table.
+ * Preferred option uses `remove_diacritics`; [clauseCandidates] lists fallbacks used when
+ * creating the FTS table. With [BundledSQLiteDriver], try mode 2 on all SDK levels first.
  */
 internal object VaultSearchTokenizer {
     fun clause(context: Context): String = clauseForSdk(Build.VERSION.SDK_INT)
@@ -18,11 +18,8 @@ internal object VaultSearchTokenizer {
         clauseCandidatesForSdk(Build.VERSION.SDK_INT)
 
     fun clauseCandidatesForSdk(sdkInt: Int): List<String> = buildList {
-        if (sdkInt >= Build.VERSION_CODES.R) {
-            add(FTS_TOKENIZE_API_30_PLUS)
-        } else {
-            add(FTS_TOKENIZE_LEGACY)
-        }
+        add(FTS_TOKENIZE_API_30_PLUS)
+        add(FTS_TOKENIZE_LEGACY)
         add(FTS_TOKENIZE_UNICODE61)
         add(FTS_TOKENIZE_PORTER)
     }

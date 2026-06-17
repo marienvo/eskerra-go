@@ -108,7 +108,7 @@ unit per commit; keep commits small and phase-tagged (`feat: phase 7x — …`).
     vault."*; *"No matches."* when ready). Row = highlighted title/path + optional `{lineNumber} · {text}`
     snippet (≤2 lines); tap → `AppRoute.note(...)`.
 15. Route + nav: add `AppRoute.SEARCH`, an `AppShell` entry (search affordance), and an `app/SearchRoute.kt`
-    extracted like `AppTodayHubRoute` (keep `App.kt` under its 440 baseline — extract, don't inline).
+    extracted like `AppInboxRoute` / other feature routes (keep `App.kt` under its 440 baseline — extract, don't inline).
     Wire DI through `MainActivity → AppRoot → App`.
 
 ### 7e — index warm lifecycle
@@ -139,7 +139,7 @@ split is intentional, refresh caps via `./scripts/update-module-budget-baseline.
 2. **Module budget.** Ranker + indexer are the likely 400-line offenders — the split in §1 is
    deliberate; do not merge query/rank/snippet into one file.
 3. **`App.kt` baseline (440).** Already near cap after Phase 6; the search route **must** be a
-   separate `SearchRoute.kt`, mirroring `AppTodayHubRoute.kt`.
+   separate `SearchRoute.kt`, mirroring other extracted `app/*Route.kt` files.
 4. **No background sync rule.** Foreground-only reconcile; WorkManager stays out of the PoC. Document
    the deferral in the spec if revisited.
 5. **Stale results / vault switch.** `vaultInstanceId` must rotate on rebuild/new DB/base-hash change;

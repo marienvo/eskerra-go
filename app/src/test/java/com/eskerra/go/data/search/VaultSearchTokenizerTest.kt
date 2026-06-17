@@ -16,11 +16,18 @@ class VaultSearchTokenizerTest {
     }
 
     @Test
-    fun clauseForSdk_belowApi30_usesRemoveDiacritics1() {
+    fun clauseForSdk_belowApi30_prefersRemoveDiacritics2() {
         assertEquals(
-            VaultSearchTokenizer.FTS_TOKENIZE_LEGACY,
+            VaultSearchTokenizer.FTS_TOKENIZE_API_30_PLUS,
             VaultSearchTokenizer.clauseForSdk(Build.VERSION_CODES.Q)
         )
+    }
+
+    @Test
+    fun clauseCandidates_belowApi30_tryMode2BeforeLegacy() {
+        val candidates = VaultSearchTokenizer.clauseCandidatesForSdk(Build.VERSION_CODES.Q)
+        assertEquals(VaultSearchTokenizer.FTS_TOKENIZE_API_30_PLUS, candidates.first())
+        assertTrue(VaultSearchTokenizer.FTS_TOKENIZE_LEGACY in candidates)
     }
 
     @Test

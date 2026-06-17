@@ -17,7 +17,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DeleteOutline
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -30,22 +29,25 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.eskerra.go.app.LocalShellChromeInsets
 import com.eskerra.go.app.shellScrollContentPadding
 import com.eskerra.go.core.datetime.RelativeCalendarLabel
 import com.eskerra.go.core.inbox.InboxTileColor
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NoteSummary
+import com.eskerra.go.feature.todayhub.TodayHubSection
+import com.eskerra.go.feature.todayhub.TodayHubUiState
 import com.eskerra.go.ui.markdown.VaultMarkdownTokens
 import com.eskerra.go.ui.theme.EskerraChromeTokens
+import java.io.File
 
 /**
- * Stateless inbox list. Receives UI state and callbacks only; it knows nothing
- * about where the notes come from.
+ * Stateless home screen: inbox list (or empty/error) with Today Hub below.
+ * Receives UI state and callbacks only; it knows nothing about where data comes from.
  */
 @Composable
 fun InboxScreen(
     state: InboxUiState,
+    todayHubState: TodayHubUiState,
     selectedNoteIds: Set<NoteId>,
     isDeleting: Boolean,
     deleteError: String?,
@@ -54,37 +56,49 @@ fun InboxScreen(
     onAvatarClick: (NoteId) -> Unit,
     onClearSelection: () -> Unit,
     onDeleteSelected: () -> Unit,
-    onOpenSettings: () -> Unit,
+    onPreviousWeek: () -> Unit,
+    onNextWeek: () -> Unit,
+    onSelectHub: (NoteId) -> Unit,
+    onRetryTodayHub: () -> Unit,
+    onOpenInternalNote: (NoteId) -> Unit,
+    onOpenExternalUrl: (String) -> Unit,
+    onAmbiguousWikiLink: (List<NoteId>, String) -> Unit,
+    onNoteNotFound: (String) -> Unit = {},
+    onOpenSearch: () -> Unit = {},
+    workspaceRoot: File? = null,
     showRefreshIndicator: Boolean = false,
     modifier: Modifier = Modifier
 ) {
-    when (state) {
-        InboxUiState.Loading -> InboxLoading(modifier)
-        is InboxUiState.Error -> InboxError(
-            message = state.message,
-            onRetry = onRetry,
-            modifier = modifier
-        )
-        InboxUiState.Empty,
-        is InboxUiState.Content -> InboxScrollBody(
-            state = state,
-            selectedNoteIds = selectedNoteIds,
-            isDeleting = isDeleting,
-            deleteError = deleteError,
-            showRefreshIndicator = showRefreshIndicator,
-            onNoteClick = onNoteClick,
-            onAvatarClick = onAvatarClick,
-            onClearSelection = onClearSelection,
-            onDeleteSelected = onDeleteSelected,
-            onOpenSettings = onOpenSettings,
-            modifier = modifier
-        )
-    }
+    InboxScrollBody(
+        state = state,
+        todayHubState = todayHubState,
+        selectedNoteIds = selectedNoteIds,
+        isDeleting = isDeleting,
+        deleteError = deleteError,
+        showRefreshIndicator = showRefreshIndicator,
+        onNoteClick = onNoteClick,
+        onAvatarClick = onAvatarClick,
+        onClearSelection = onClearSelection,
+        onDeleteSelected = onDeleteSelected,
+        onRetry = onRetry,
+        onPreviousWeek = onPreviousWeek,
+        onNextWeek = onNextWeek,
+        onSelectHub = onSelectHub,
+        onRetryTodayHub = onRetryTodayHub,
+        onOpenInternalNote = onOpenInternalNote,
+        onOpenExternalUrl = onOpenExternalUrl,
+        onAmbiguousWikiLink = onAmbiguousWikiLink,
+        onNoteNotFound = onNoteNotFound,
+        onOpenSearch = onOpenSearch,
+        workspaceRoot = workspaceRoot,
+        modifier = modifier
+    )
 }
 
 @Composable
 private fun InboxScrollBody(
     state: InboxUiState,
+    todayHubState: TodayHubUiState,
     selectedNoteIds: Set<NoteId>,
     isDeleting: Boolean,
     deleteError: String?,
@@ -93,81 +107,142 @@ private fun InboxScrollBody(
     onAvatarClick: (NoteId) -> Unit,
     onClearSelection: () -> Unit,
     onDeleteSelected: () -> Unit,
-    onOpenSettings: () -> Unit,
+    onRetry: () -> Unit,
+    onPreviousWeek: () -> Unit,
+    onNextWeek: () -> Unit,
+    onSelectHub: (NoteId) -> Unit,
+    onRetryTodayHub: () -> Unit,
+    onOpenInternalNote: (NoteId) -> Unit,
+    onOpenExternalUrl: (String) -> Unit,
+    onAmbiguousWikiLink: (List<NoteId>, String) -> Unit,
+    onNoteNotFound: (String) -> Unit,
+    onOpenSearch: () -> Unit,
+    workspaceRoot: File?,
     modifier: Modifier = Modifier
 ) {
     val hasSelection = selectedNoteIds.isNotEmpty()
-    val chrome = LocalShellChromeInsets.current
 
-    Column(modifier = modifier.fillMaxSize()) {
-        InboxHeaderBar(
-            hasSelection = hasSelection,
-            selectedCount = selectedNoteIds.size,
-            isDeleting = isDeleting,
-            onClearSelection = onClearSelection,
-            onDeleteSelected = onDeleteSelected,
-            onOpenSettings = onOpenSettings,
-            topInset = chrome.top
-        )
-
-        deleteError?.let { message ->
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = shellScrollContentPadding()
+    ) {
+        item {
+            InboxHeaderBar(
+                hasSelection = hasSelection,
+                selectedCount = selectedNoteIds.size,
+                isDeleting = isDeleting,
+                onClearSelection = onClearSelection,
+                onDeleteSelected = onDeleteSelected
             )
         }
 
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = shellScrollContentPadding()
-        ) {
-            if (showRefreshIndicator) {
+        deleteError?.let { message ->
+            item {
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            }
+        }
+
+        if (showRefreshIndicator) {
+            item {
+                CircularProgressIndicator(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp)
+                        .padding(horizontal = 16.dp)
+                )
+            }
+        }
+
+        when (state) {
+            InboxUiState.Loading -> {
                 item {
-                    CircularProgressIndicator(
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(bottom = 8.dp)
-                            .padding(horizontal = 16.dp)
+                            .padding(vertical = 16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                }
+            }
+            is InboxUiState.Error -> {
+                item {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 16.dp, horizontal = 16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = state.message,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Button(
+                            onClick = onRetry,
+                            modifier = Modifier.padding(top = 12.dp)
+                        ) {
+                            Text("Retry")
+                        }
+                    }
+                }
+            }
+            InboxUiState.Empty -> {
+                item {
+                    Text(
+                        text = "No inbox notes yet. Tap + to add one.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp, bottom = 12.dp, start = 16.dp, end = 16.dp)
                     )
                 }
             }
+            is InboxUiState.Content -> {
+                items(state.notes) { note ->
+                    InboxRow(
+                        note = note,
+                        isSelected = note.id in selectedNoteIds,
+                        isDeleting = isDeleting,
+                        onAvatarClick = { onAvatarClick(note.id) },
+                        onClick = { onNoteClick(note.id) }
+                    )
+                }
+            }
+        }
 
-            when (state) {
-                InboxUiState.Empty -> {
-                    item {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 32.dp, horizontal = 16.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "No markdown entries found in Inbox. " +
-                                    "Add one via the Entry tab.",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
-                    item { TodayHubPlaceholder() }
-                }
-                is InboxUiState.Content -> {
-                    items(state.notes) { note ->
-                        InboxRow(
-                            note = note,
-                            isSelected = note.id in selectedNoteIds,
-                            isDeleting = isDeleting,
-                            onAvatarClick = { onAvatarClick(note.id) },
-                            onClick = { onNoteClick(note.id) }
-                        )
-                    }
-                    item { TodayHubPlaceholder() }
-                }
-                else -> Unit
+        item {
+            HorizontalDivider(
+                color = EskerraChromeTokens.ListDivider,
+                modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+            )
+        }
+
+        if (state !is InboxUiState.Loading || todayHubState is TodayHubUiState.Content) {
+            item {
+                TodayHubSection(
+                    state = todayHubState,
+                    onPreviousWeek = onPreviousWeek,
+                    onNextWeek = onNextWeek,
+                    onSelectHub = onSelectHub,
+                    onRetry = onRetryTodayHub,
+                    onOpenInternalNote = onOpenInternalNote,
+                    onOpenExternalUrl = onOpenExternalUrl,
+                    onAmbiguousWikiLink = onAmbiguousWikiLink,
+                    onNoteNotFound = onNoteNotFound,
+                    onOpenSearch = onOpenSearch,
+                    workspaceRoot = workspaceRoot,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
             }
         }
     }
@@ -179,14 +254,12 @@ private fun InboxHeaderBar(
     selectedCount: Int,
     isDeleting: Boolean,
     onClearSelection: () -> Unit,
-    onDeleteSelected: () -> Unit,
-    onOpenSettings: () -> Unit,
-    topInset: androidx.compose.ui.unit.Dp
+    onDeleteSelected: () -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = topInset, start = 8.dp, end = 8.dp, bottom = 8.dp),
+            .padding(start = 8.dp, end = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (hasSelection) {
@@ -226,78 +299,6 @@ private fun InboxHeaderBar(
                     .weight(1f)
                     .padding(start = 8.dp)
             )
-            IconButton(onClick = onOpenSettings) {
-                Icon(
-                    imageVector = Icons.Filled.Settings,
-                    contentDescription = "Settings",
-                    tint = Color.White
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun TodayHubPlaceholder(modifier: Modifier = Modifier) {
-    Text(
-        text = "placeholder todayhub",
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp)
-    )
-}
-
-@Composable
-private fun InboxLoading(modifier: Modifier = Modifier) {
-    val chrome = LocalShellChromeInsets.current
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(chrome.asPaddingValues()),
-        contentAlignment = Alignment.Center
-    ) {
-        CircularProgressIndicator()
-    }
-}
-
-@Composable
-private fun InboxError(message: String, onRetry: () -> Unit, modifier: Modifier = Modifier) {
-    val chrome = LocalShellChromeInsets.current
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(chrome.asPaddingValues())
-            .padding(horizontal = 16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = "Inbox",
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 12.dp)
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = message,
-                    style = MaterialTheme.typography.bodyLarge
-                )
-                Button(
-                    onClick = onRetry,
-                    modifier = Modifier.padding(top = 16.dp)
-                ) {
-                    Text("Retry")
-                }
-            }
         }
     }
 }
