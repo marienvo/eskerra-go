@@ -196,6 +196,7 @@ class ManualSyncNow(
         }
 
         onProgress(SyncProgressStep.RefreshingNotes)
+        registryCache.invalidate(config, filesDir)
         val registryRefreshed = registryCache.refresh(config, filesDir).isSuccess
 
         onProgress(SyncProgressStep.Complete)

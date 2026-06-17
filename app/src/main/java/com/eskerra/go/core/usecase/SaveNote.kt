@@ -53,6 +53,7 @@ class SaveNote(
             return Result.failure(mapWriteFailure(error))
         }
 
+        registryCache.invalidate(config, filesDir)
         val refreshedRegistry = registryCache.refresh(config, filesDir)
         if (refreshedRegistry.isFailure) {
             return Result.failure(
