@@ -268,6 +268,37 @@ class InboxViewModelTest {
     }
 
     @Test
+    fun fastRevalidationWithTrustedSnapshot_doesNotShowRefreshIndicator() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(dispatcher)
+
+        val filesDir = temp.newFolder("files")
+        val note = NoteSummary(
+            id = NoteId("Inbox/cached.md"),
+            title = "Cached",
+            snippet = "",
+            isInbox = true
+        )
+        val repository = FakeNoteRegistryRepository(
+            result = Result.success(
+                com.eskerra.go.core.model.NoteRegistry.fromNotes(listOf(note))
+            ),
+            refreshDelayMs = 0L
+        )
+        val snapshotStore = FakeInboxSnapshotStore()
+        snapshotStore.save(config, filesDir, listOf(note))
+
+        val viewModel = inboxViewModel(
+            filesDir = filesDir,
+            repository = repository,
+            snapshotStore = snapshotStore
+        )
+        advanceUntilIdle()
+
+        assertFalse(viewModel.showRefreshIndicator.value)
+    }
+
+    @Test
     fun refresh_retriesLoad() = runTest {
         val filesDir = temp.newFolder("files")
         val repository = FakeNoteRegistryRepository.failing()

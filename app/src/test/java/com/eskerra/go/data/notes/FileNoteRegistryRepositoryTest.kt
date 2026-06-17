@@ -69,6 +69,41 @@ class FileNoteRegistryRepositoryTest {
     }
 
     @Test
+    fun refresh_passesPreviousRegistryToScanner() = runTest {
+        val filesDir = temp.newFolder("files")
+        val workspaceDir = File(filesDir, WorkspacePaths.DEFAULT_RELATIVE_PATH)
+        workspaceDir.mkdirs()
+        File(workspaceDir, "Inbox").mkdirs()
+        File(workspaceDir, "Inbox/hello.md").writeText("# Hello\n\nBody.")
+
+        val previous = NoteRegistry.fromNotes(
+            listOf(
+                com.eskerra.go.core.model.NoteSummary(
+                    id = com.eskerra.go.core.model.NoteId("Inbox/hello.md"),
+                    title = "Stale",
+                    snippet = "",
+                    isInbox = true
+                )
+            )
+        )
+        var capturedPrevious: NoteRegistry? = null
+        val recordingScanner = object : NoteWorkspaceScanner {
+            override fun scan(
+                workspaceDir: File,
+                previousRegistry: NoteRegistry?
+            ): Result<NoteRegistry> {
+                capturedPrevious = previousRegistry
+                return MarkdownNoteScanner().scan(workspaceDir, previousRegistry)
+            }
+        }
+        val repository = FileNoteRegistryRepository(scanner = recordingScanner)
+
+        repository.refresh(config, filesDir, previous)
+
+        assertEquals(previous, capturedPrevious)
+    }
+
+    @Test
     fun refresh_whenScannerFails_returnsScanFailed() = runTest {
         val filesDir = temp.newFolder("files")
         val workspaceDir = File(filesDir, WorkspacePaths.DEFAULT_RELATIVE_PATH)

@@ -8,6 +8,7 @@ import com.eskerra.go.core.model.NoteSummary
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.data.notes.FakeNoteContentRepository
 import com.eskerra.go.data.notes.FakeNoteRegistryRepository
+import com.eskerra.go.data.notes.NoteContentCache
 import com.eskerra.go.data.notes.NoteRegistryCache
 import com.eskerra.go.data.workspace.WorkspacePaths
 import kotlinx.coroutines.test.runTest
@@ -31,6 +32,21 @@ class LoadNoteForReadingTest {
     )
 
     private val filesDir get() = temp.newFolder("files")
+
+    @Test
+    fun secondOpen_hitsWarmContentCache() = runTest {
+        val filesDir = temp.newFolder("files")
+        val noteId = NoteId("Inbox/First.md")
+        val fakeRepo = FakeNoteRegistryRepository.withInboxNotes(summary(noteId, "First"))
+        val content = FakeNoteContentRepository.withContent(noteId, "# First\n\nBody.")
+        val cache = NoteContentCache(content)
+        val useCase = LoadNoteForReading(NoteRegistryCache(fakeRepo), cache)
+
+        useCase(config, filesDir, noteId).getOrThrow()
+        useCase(config, filesDir, noteId).getOrThrow()
+
+        assertEquals(1, content.loadCount)
+    }
 
     @Test
     fun successReturnsContentMarkdownAndRegistry() = runTest {

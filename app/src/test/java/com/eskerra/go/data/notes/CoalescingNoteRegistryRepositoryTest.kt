@@ -1,5 +1,6 @@
 package com.eskerra.go.data.notes
 
+import com.eskerra.go.core.model.NoteRegistry
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.data.workspace.WorkspacePaths
 import java.io.File
@@ -28,6 +29,18 @@ class CoalescingNoteRegistryRepositoryTest {
         branch = "master",
         setupCompletedAtEpochMs = 1_700_000_000_000L
     )
+
+    @Test
+    fun refresh_forwardsPreviousRegistryToDelegate() = runTest {
+        val filesDir = temp.newFolder("files")
+        val previous = NoteRegistry.fromNotes(emptyList())
+        val delegate = FakeNoteRegistryRepository()
+        val repository = CoalescingNoteRegistryRepository(delegate)
+
+        repository.refresh(config, filesDir, previous)
+
+        assertEquals(previous, delegate.lastPreviousRegistry)
+    }
 
     @Test
     fun refresh_coalescesConcurrentCallsForSameWorkspace() = runTest {

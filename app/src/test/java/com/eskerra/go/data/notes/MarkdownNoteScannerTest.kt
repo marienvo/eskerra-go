@@ -188,6 +188,21 @@ class MarkdownNoteScannerTest {
     }
 
     @Test
+    fun scan_readsFileWhenSizeChangedSinceLastScan() {
+        val workspace = temp.newFolder("workspace")
+        val noteFile = write(workspace, "Notes/note.md", "# Original\n\nOld snippet.")
+
+        val first = scanner.scan(workspace, null).getOrThrow()
+        assertEquals("Original", first.notes.single().title)
+
+        noteFile.appendText("\nMore content at end.")
+
+        val second = scanner.scan(workspace, first).getOrThrow()
+        assertEquals("Original", second.notes.single().title)
+        assertTrue(second.notes.single().sizeBytes > first.notes.single().sizeBytes)
+    }
+
+    @Test
     fun scan_sortsResultsByRelativePath() {
         val workspace = temp.newFolder("workspace")
         write(workspace, "Inbox/z-last.md", "# Z")
