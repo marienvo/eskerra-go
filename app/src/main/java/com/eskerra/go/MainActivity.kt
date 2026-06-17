@@ -50,6 +50,7 @@ import com.eskerra.go.data.notes.FileInboxSnapshotStore
 import com.eskerra.go.data.notes.FileNoteContentRepository
 import com.eskerra.go.data.notes.FileNoteRegistryRepository
 import com.eskerra.go.data.notes.FileNoteWriteRepository
+import com.eskerra.go.data.notes.NoteRegistryCache
 import com.eskerra.go.data.search.SqliteVaultSearchRepository
 import com.eskerra.go.data.todayhub.DataStoreActiveTodayHubStore
 import com.eskerra.go.data.vault.DataStoreLocalSettingsStore
@@ -89,22 +90,24 @@ class MainActivity : ComponentActivity() {
         val noteWriteRepository = FileNoteWriteRepository(gitRepository)
         val loadGitStatusSummary = LoadGitStatusSummary(gitRepository)
 
+        val noteRegistryCache = NoteRegistryCache(noteRegistryRepository)
+
         val loadInboxSummaries = LoadInboxSummariesCached(
-            delegate = LoadInboxSummaries(noteRegistryRepository),
+            delegate = LoadInboxSummaries(noteRegistryCache),
             snapshotStore = FileInboxSnapshotStore()
         )
         val loadNoteForReading = LoadNoteForReading(
-            registryRepository = noteRegistryRepository,
+            registryCache = noteRegistryCache,
             contentRepository = noteContentRepository
         )
         val createInboxNote = CreateInboxNote(
             writeRepository = noteWriteRepository,
-            registryRepository = noteRegistryRepository,
+            registryCache = noteRegistryCache,
             loadGitStatusSummary = loadGitStatusSummary
         )
         val deleteInboxNotes = DeleteInboxNotes(
             writeRepository = noteWriteRepository,
-            registryRepository = noteRegistryRepository,
+            registryCache = noteRegistryCache,
             loadGitStatusSummary = loadGitStatusSummary
         )
         val loadEditableNote = LoadEditableNote(
@@ -113,12 +116,12 @@ class MainActivity : ComponentActivity() {
         )
         val saveNote = SaveNote(
             writeRepository = noteWriteRepository,
-            registryRepository = noteRegistryRepository,
+            registryCache = noteRegistryCache,
             loadGitStatusSummary = loadGitStatusSummary
         )
 
         val loadTodayHub = LoadTodayHub(
-            registryRepository = noteRegistryRepository,
+            registryCache = noteRegistryCache,
             contentRepository = noteContentRepository
         )
         val loadTodayHubRow = LoadTodayHubRow(contentRepository = noteContentRepository)
@@ -148,7 +151,7 @@ class MainActivity : ComponentActivity() {
         val manualSyncNow = ManualSyncNow(
             remoteSyncRepository = remoteSyncRepository,
             credentialStore = credentialStore,
-            registryRepository = noteRegistryRepository,
+            registryCache = noteRegistryCache,
             loadSyncStatus = loadSyncStatus,
             reconcileWorkspaceSyncBranch = reconcileWorkspaceSyncBranch
         )

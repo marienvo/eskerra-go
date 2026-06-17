@@ -11,6 +11,7 @@ import com.eskerra.go.data.notes.FakeNoteRegistryRepository
 import com.eskerra.go.data.notes.FakeNoteWriteRepository
 import com.eskerra.go.data.notes.FileNoteRegistryRepository
 import com.eskerra.go.data.notes.FileNoteWriteRepository
+import com.eskerra.go.data.notes.NoteRegistryCache
 import com.eskerra.go.data.workspace.WorkspacePaths
 import java.io.File
 import kotlinx.coroutines.test.runTest
@@ -39,10 +40,9 @@ class CreateInboxNoteTest {
         val workspaceDir = gitWorkspace(filesDir)
         val gitRepository = JGitWorkspaceRepository()
         val writeRepository = FileNoteWriteRepository(gitRepository)
-        val registryRepository = FileNoteRegistryRepository()
         val useCase = CreateInboxNote(
             writeRepository = writeRepository,
-            registryRepository = registryRepository,
+            registryCache = NoteRegistryCache(FileNoteRegistryRepository()),
             loadGitStatusSummary = LoadGitStatusSummary(gitRepository)
         )
 
@@ -62,10 +62,9 @@ class CreateInboxNoteTest {
         gitWorkspace(filesDir)
         val gitRepository = JGitWorkspaceRepository()
         val writeRepository = FileNoteWriteRepository(gitRepository)
-        val registryRepository = FileNoteRegistryRepository()
         val useCase = CreateInboxNote(
             writeRepository = writeRepository,
-            registryRepository = registryRepository,
+            registryCache = NoteRegistryCache(FileNoteRegistryRepository()),
             loadGitStatusSummary = LoadGitStatusSummary(gitRepository)
         )
 
@@ -80,10 +79,9 @@ class CreateInboxNoteTest {
         gitWorkspace(filesDir)
         val gitRepository = JGitWorkspaceRepository()
         val writeRepository = FileNoteWriteRepository(gitRepository)
-        val registryRepository = FileNoteRegistryRepository()
         val useCase = CreateInboxNote(
             writeRepository = writeRepository,
-            registryRepository = registryRepository,
+            registryCache = NoteRegistryCache(FileNoteRegistryRepository()),
             loadGitStatusSummary = LoadGitStatusSummary(gitRepository)
         )
 
@@ -102,10 +100,9 @@ class CreateInboxNoteTest {
 
         val gitRepository = JGitWorkspaceRepository()
         val writeRepository = FileNoteWriteRepository(gitRepository)
-        val registryRepository = FileNoteRegistryRepository()
         val useCase = CreateInboxNote(
             writeRepository = writeRepository,
-            registryRepository = registryRepository,
+            registryCache = NoteRegistryCache(FileNoteRegistryRepository()),
             loadGitStatusSummary = LoadGitStatusSummary(gitRepository)
         )
 
@@ -122,7 +119,7 @@ class CreateInboxNoteTest {
         val writeRepository = FakeNoteWriteRepository()
         val useCase = CreateInboxNote(
             writeRepository = writeRepository,
-            registryRepository = registry,
+            registryCache = NoteRegistryCache(registry),
             loadGitStatusSummary = LoadGitStatusSummary(JGitWorkspaceRepository())
         )
 
@@ -153,10 +150,9 @@ class CreateInboxNoteTest {
         gitWorkspace(filesDir)
         val gitRepository = JGitWorkspaceRepository()
         val writeRepository = FileNoteWriteRepository(gitRepository)
-        val registryRepository = FileNoteRegistryRepository()
         val useCase = CreateInboxNote(
             writeRepository = writeRepository,
-            registryRepository = registryRepository,
+            registryCache = NoteRegistryCache(FileNoteRegistryRepository()),
             loadGitStatusSummary = LoadGitStatusSummary(gitRepository)
         )
 
@@ -173,7 +169,7 @@ class CreateInboxNoteTest {
         val registry = FakeNoteRegistryRepository.failing()
         val useCase = CreateInboxNote(
             writeRepository = FakeNoteWriteRepository(),
-            registryRepository = registry,
+            registryCache = NoteRegistryCache(registry),
             loadGitStatusSummary = LoadGitStatusSummary(JGitWorkspaceRepository())
         )
 

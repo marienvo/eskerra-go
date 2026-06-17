@@ -12,6 +12,7 @@ import com.eskerra.go.data.git.JGitWorkspaceRepository
 import com.eskerra.go.data.notes.FakeInboxSnapshotStore
 import com.eskerra.go.data.notes.FakeNoteRegistryRepository
 import com.eskerra.go.data.notes.FakeNoteWriteRepository
+import com.eskerra.go.data.notes.NoteRegistryCache
 import com.eskerra.go.data.workspace.WorkspacePaths
 import com.eskerra.go.feature.inbox.InboxUiState
 import java.io.File
@@ -305,17 +306,20 @@ class InboxViewModelTest {
         filesDir: File,
         repository: FakeNoteRegistryRepository,
         snapshotStore: FakeInboxSnapshotStore = FakeInboxSnapshotStore()
-    ): InboxViewModel = InboxViewModel(
-        config = config,
-        filesDir = filesDir,
-        loadInboxSummaries = LoadInboxSummariesCached(
-            delegate = LoadInboxSummaries(repository),
-            snapshotStore = snapshotStore
-        ),
-        deleteInboxNotes = DeleteInboxNotes(
-            writeRepository = FakeNoteWriteRepository(),
-            registryRepository = repository,
-            loadGitStatusSummary = LoadGitStatusSummary(JGitWorkspaceRepository())
+    ): InboxViewModel {
+        val cache = NoteRegistryCache(repository)
+        return InboxViewModel(
+            config = config,
+            filesDir = filesDir,
+            loadInboxSummaries = LoadInboxSummariesCached(
+                delegate = LoadInboxSummaries(cache),
+                snapshotStore = snapshotStore
+            ),
+            deleteInboxNotes = DeleteInboxNotes(
+                writeRepository = FakeNoteWriteRepository(),
+                registryCache = cache,
+                loadGitStatusSummary = LoadGitStatusSummary(JGitWorkspaceRepository())
+            )
         )
-    )
+    }
 }

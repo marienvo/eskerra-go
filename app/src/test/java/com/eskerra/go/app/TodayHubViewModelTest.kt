@@ -12,6 +12,7 @@ import com.eskerra.go.core.repository.NoteContentRepository
 import com.eskerra.go.core.usecase.LoadTodayHub
 import com.eskerra.go.core.usecase.LoadTodayHubRow
 import com.eskerra.go.data.notes.FakeNoteRegistryRepository
+import com.eskerra.go.data.notes.NoteRegistryCache
 import com.eskerra.go.data.workspace.WorkspacePaths
 import com.eskerra.go.feature.todayhub.TodayHubUiState
 import java.io.File
@@ -81,7 +82,7 @@ class TodayHubViewModelTest {
     ): TodayHubViewModel = TodayHubViewModel(
         config = config,
         filesDir = temp.newFolder("files"),
-        loadTodayHub = LoadTodayHub(registry, content),
+        loadTodayHub = LoadTodayHub(NoteRegistryCache(registry), content),
         loadTodayHubRow = LoadTodayHubRow(content),
         activeTodayHubStore = store,
         today = fixedToday

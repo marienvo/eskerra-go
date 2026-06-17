@@ -10,6 +10,7 @@ import com.eskerra.go.data.notes.FakeNoteRegistryRepository
 import com.eskerra.go.data.notes.FakeNoteWriteRepository
 import com.eskerra.go.data.notes.FileNoteRegistryRepository
 import com.eskerra.go.data.notes.FileNoteWriteRepository
+import com.eskerra.go.data.notes.NoteRegistryCache
 import com.eskerra.go.data.workspace.WorkspacePaths
 import java.io.File
 import kotlinx.coroutines.test.runTest
@@ -44,7 +45,7 @@ class DeleteInboxNotesTest {
         val gitRepository = JGitWorkspaceRepository()
         val useCase = DeleteInboxNotes(
             writeRepository = FileNoteWriteRepository(gitRepository),
-            registryRepository = FileNoteRegistryRepository(),
+            registryCache = NoteRegistryCache(FileNoteRegistryRepository()),
             loadGitStatusSummary = LoadGitStatusSummary(gitRepository)
         )
         val note = summary(NoteId("Inbox/delete-me.md"))
@@ -61,7 +62,7 @@ class DeleteInboxNotesTest {
         gitWorkspace(filesDir)
         val useCase = DeleteInboxNotes(
             writeRepository = FakeNoteWriteRepository(),
-            registryRepository = FakeNoteRegistryRepository(),
+            registryCache = NoteRegistryCache(FakeNoteRegistryRepository()),
             loadGitStatusSummary = LoadGitStatusSummary(JGitWorkspaceRepository())
         )
 
@@ -84,7 +85,7 @@ class DeleteInboxNotesTest {
         val writeRepository = FakeNoteWriteRepository()
         val useCase = DeleteInboxNotes(
             writeRepository = writeRepository,
-            registryRepository = FakeNoteRegistryRepository(),
+            registryCache = NoteRegistryCache(FakeNoteRegistryRepository()),
             loadGitStatusSummary = LoadGitStatusSummary(JGitWorkspaceRepository())
         )
         val note = NoteSummary(

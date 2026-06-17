@@ -14,6 +14,7 @@ import com.eskerra.go.data.git.JGitWorkspaceRepository
 import com.eskerra.go.data.notes.FakeNoteContentRepository
 import com.eskerra.go.data.notes.FakeNoteRegistryRepository
 import com.eskerra.go.data.notes.FakeNoteWriteRepository
+import com.eskerra.go.data.notes.NoteRegistryCache
 import com.eskerra.go.data.workspace.WorkspacePaths
 import com.eskerra.go.feature.editor.NoteEditorUiState
 import java.io.File
@@ -70,7 +71,7 @@ class NoteEditorErrorMappingTest {
             loadEditableNote = LoadEditableNote(loadRegistry, content),
             saveNote = SaveNote(
                 writeRepository = FakeNoteWriteRepository(),
-                registryRepository = saveRegistry,
+                registryCache = NoteRegistryCache(saveRegistry),
                 loadGitStatusSummary = loadGitStatusSummary()
             ),
             loadGitStatusSummary = loadGitStatusSummary()
@@ -104,7 +105,7 @@ class NoteEditorErrorMappingTest {
             loadEditableNote = LoadEditableNote(loadRegistry, content),
             saveNote = SaveNote(
                 writeRepository = FakeNoteWriteRepository(),
-                registryRepository = saveRegistry,
+                registryCache = NoteRegistryCache(saveRegistry),
                 loadGitStatusSummary = loadGitStatusSummary()
             ),
             loadGitStatusSummary = loadGitStatusSummary()

@@ -8,6 +8,7 @@ import com.eskerra.go.core.usecase.LoadGitStatusSummary
 import com.eskerra.go.data.git.JGitWorkspaceRepository
 import com.eskerra.go.data.notes.FakeNoteRegistryRepository
 import com.eskerra.go.data.notes.FakeNoteWriteRepository
+import com.eskerra.go.data.notes.NoteRegistryCache
 import com.eskerra.go.data.workspace.WorkspacePaths
 import com.eskerra.go.feature.editor.CreateInboxUiState
 import kotlinx.coroutines.Dispatchers
@@ -66,7 +67,7 @@ class CreateInboxNoteViewModelTest {
         )
         val useCase = CreateInboxNote(
             writeRepository = FakeNoteWriteRepository(),
-            registryRepository = registry,
+            registryCache = NoteRegistryCache(registry),
             loadGitStatusSummary = loadGitStatusSummary()
         )
         val viewModel = CreateInboxNoteViewModel(
@@ -86,7 +87,7 @@ class CreateInboxNoteViewModelTest {
         val registry = FakeNoteRegistryRepository.failing()
         val useCase = CreateInboxNote(
             writeRepository = FakeNoteWriteRepository(),
-            registryRepository = registry,
+            registryCache = NoteRegistryCache(registry),
             loadGitStatusSummary = loadGitStatusSummary()
         )
         val viewModel = CreateInboxNoteViewModel(
@@ -106,7 +107,7 @@ class CreateInboxNoteViewModelTest {
     private fun createViewModel(): CreateInboxNoteViewModel {
         val useCase = CreateInboxNote(
             writeRepository = FakeNoteWriteRepository(),
-            registryRepository = FakeNoteRegistryRepository.withInboxNotes(),
+            registryCache = NoteRegistryCache(FakeNoteRegistryRepository.withInboxNotes()),
             loadGitStatusSummary = loadGitStatusSummary()
         )
         return CreateInboxNoteViewModel(

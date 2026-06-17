@@ -5,11 +5,11 @@ import com.eskerra.go.core.model.SyncException
 import com.eskerra.go.core.model.SyncProgressStep
 import com.eskerra.go.core.model.SyncResult
 import com.eskerra.go.core.model.WorkspaceConfig
-import com.eskerra.go.core.repository.NoteRegistryRepository
 import com.eskerra.go.core.repository.RemoteSyncRepository
 import com.eskerra.go.data.credentials.CredentialStore
 import com.eskerra.go.data.git.GitBranchNameValidator
 import com.eskerra.go.data.git.SyncGitErrorMapper
+import com.eskerra.go.data.notes.NoteRegistryCache
 import com.eskerra.go.data.workspace.RemoteUriSecurity
 import com.eskerra.go.data.workspace.WorkspacePaths
 import java.io.File
@@ -25,7 +25,7 @@ import kotlinx.coroutines.withContext
 class ManualSyncNow(
     private val remoteSyncRepository: RemoteSyncRepository,
     private val credentialStore: CredentialStore,
-    private val registryRepository: NoteRegistryRepository,
+    private val registryCache: NoteRegistryCache,
     private val loadSyncStatus: LoadSyncStatus,
     private val reconcileWorkspaceSyncBranch: ReconcileWorkspaceSyncBranch? = null,
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO
@@ -196,7 +196,7 @@ class ManualSyncNow(
         }
 
         onProgress(SyncProgressStep.RefreshingNotes)
-        val registryRefreshed = registryRepository.refresh(config, filesDir).isSuccess
+        val registryRefreshed = registryCache.refresh(config, filesDir).isSuccess
 
         onProgress(SyncProgressStep.Complete)
         val status = loadSyncStatus(config, filesDir)

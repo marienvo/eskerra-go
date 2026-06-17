@@ -10,6 +10,7 @@ import com.eskerra.go.data.git.JGitWorkspaceRepository
 import com.eskerra.go.data.git.TestGitRepos
 import com.eskerra.go.data.notes.FileNoteRegistryRepository
 import com.eskerra.go.data.notes.MarkdownNoteScanner
+import com.eskerra.go.data.notes.NoteRegistryCache
 import com.eskerra.go.data.workspace.WorkspacePaths
 import java.io.File
 import kotlinx.coroutines.async
@@ -37,7 +38,7 @@ class ManualSyncNowTest {
     private val manualSync = ManualSyncNow(
         remoteSyncRepository = remoteSync,
         credentialStore = credentials,
-        registryRepository = registry,
+        registryCache = NoteRegistryCache(registry),
         loadSyncStatus = loadSyncStatus
     )
 
@@ -156,7 +157,7 @@ class ManualSyncNowTest {
         val unsafeSync = ManualSyncNow(
             remoteSyncRepository = UnsafePathRemoteSyncRepository(),
             credentialStore = credentials,
-            registryRepository = registry,
+            registryCache = NoteRegistryCache(registry),
             loadSyncStatus = loadSyncStatus
         )
 
@@ -264,7 +265,7 @@ class ManualSyncNowTest {
                 pushError = RuntimeException("push rejected for refs/heads/main: REJECTED")
             ),
             credentialStore = credentials,
-            registryRepository = registry,
+            registryCache = NoteRegistryCache(registry),
             loadSyncStatus = loadSyncStatus
         )
 
@@ -286,7 +287,7 @@ class ManualSyncNowTest {
                 fetchError = RuntimeException("authentication failed for user")
             ),
             credentialStore = credentials,
-            registryRepository = registry,
+            registryCache = NoteRegistryCache(registry),
             loadSyncStatus = loadSyncStatus
         )
         val config = setup.config.copy(remoteUri = "https://github.com/example/notes.git")
@@ -308,7 +309,7 @@ class ManualSyncNowTest {
         val httpsSync = ManualSyncNow(
             remoteSyncRepository = recording,
             credentialStore = credentials,
-            registryRepository = registry,
+            registryCache = NoteRegistryCache(registry),
             loadSyncStatus = LoadSyncStatus(recording)
         )
         val config = setup.config.copy(remoteUri = "https://github.com/example/notes.git")
@@ -429,7 +430,7 @@ class ManualSyncNowTest {
         val slowSync = ManualSyncNow(
             remoteSyncRepository = remoteSync,
             credentialStore = credentials,
-            registryRepository = slowRegistry,
+            registryCache = NoteRegistryCache(slowRegistry),
             loadSyncStatus = loadSyncStatus,
             dispatcher = testDispatcher
         )
@@ -454,7 +455,7 @@ class ManualSyncNowTest {
         val partialSync = ManualSyncNow(
             remoteSyncRepository = remoteSync,
             credentialStore = credentials,
-            registryRepository = failingRegistry,
+            registryCache = NoteRegistryCache(failingRegistry),
             loadSyncStatus = loadSyncStatus
         )
 

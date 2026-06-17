@@ -11,14 +11,14 @@ import com.eskerra.go.core.model.NotePath
 import com.eskerra.go.core.model.NoteWriteError
 import com.eskerra.go.core.model.NoteWriteException
 import com.eskerra.go.core.model.WorkspaceConfig
-import com.eskerra.go.core.repository.NoteRegistryRepository
 import com.eskerra.go.core.repository.NoteWriteRepository
+import com.eskerra.go.data.notes.NoteRegistryCache
 import java.io.File
 
 /** Creates a new inbox markdown note from compose draft text, refreshes registry, returns Git status. */
 class CreateInboxNote(
     private val writeRepository: NoteWriteRepository,
-    private val registryRepository: NoteRegistryRepository,
+    private val registryCache: NoteRegistryCache,
     private val loadGitStatusSummary: LoadGitStatusSummary,
     private val maxCollisionAttempts: Int = 100
 ) {
@@ -43,7 +43,7 @@ class CreateInboxNote(
             return Result.failure(mapWriteFailure(error))
         }
 
-        val registryResult = registryRepository.refresh(config, filesDir)
+        val registryResult = registryCache.refresh(config, filesDir)
         if (registryResult.isFailure) {
             return Result.failure(
                 CreateNoteException(

@@ -8,11 +8,11 @@ import com.eskerra.go.core.model.NoteIndexError
 import com.eskerra.go.core.model.NoteIndexException
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.NoteContentRepository
-import com.eskerra.go.core.repository.NoteRegistryRepository
 import com.eskerra.go.core.todayhub.TodayHubData
 import com.eskerra.go.core.todayhub.TodayHubDiscovery
 import com.eskerra.go.core.todayhub.TodayHubFrontmatter
 import com.eskerra.go.core.todayhub.TodayHubRef
+import com.eskerra.go.data.notes.NoteRegistryCache
 import java.io.File
 
 /**
@@ -21,7 +21,7 @@ import java.io.File
  * fetched separately via [LoadTodayHubRow] (spec §11.4).
  */
 class LoadTodayHub(
-    private val registryRepository: NoteRegistryRepository,
+    private val registryCache: NoteRegistryCache,
     private val contentRepository: NoteContentRepository
 ) {
 
@@ -30,7 +30,7 @@ class LoadTodayHub(
         filesDir: File,
         preferredHubId: NoteId?
     ): Result<TodayHubData?> {
-        val registryResult = registryRepository.refresh(config, filesDir)
+        val registryResult = registryCache.refresh(config, filesDir)
         if (registryResult.isFailure) {
             return Result.failure(registryFailure(registryResult.exceptionOrNull()))
         }

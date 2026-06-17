@@ -9,7 +9,7 @@ import com.eskerra.go.core.model.NotePath
 import com.eskerra.go.core.model.NoteReaderDocument
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.NoteContentRepository
-import com.eskerra.go.core.repository.NoteRegistryRepository
+import com.eskerra.go.data.notes.NoteRegistryCache
 import com.eskerra.go.data.perf.SnappyPerfLog
 import java.io.File
 
@@ -19,7 +19,7 @@ import java.io.File
  * ([com.eskerra.go.core.markdown.VaultReadonlyLink]); this use case no longer pre-computes segments.
  */
 class LoadNoteForReading(
-    private val registryRepository: NoteRegistryRepository,
+    private val registryCache: NoteRegistryCache,
     private val contentRepository: NoteContentRepository
 ) {
 
@@ -34,7 +34,7 @@ class LoadNoteForReading(
         }
 
         val registryStartNanos = System.nanoTime()
-        val registryResult = registryRepository.refresh(config, filesDir)
+        val registryResult = registryCache.refresh(config, filesDir)
         val registryMs = SnappyPerfLog.elapsedMs(registryStartNanos)
         if (registryResult.isFailure) {
             return Result.failure(registryFailure(registryResult.exceptionOrNull()))

@@ -15,6 +15,7 @@ import com.eskerra.go.core.usecase.RefreshRemoteSyncStatus
 import com.eskerra.go.data.credentials.FakeCredentialStore
 import com.eskerra.go.data.git.JGitWorkspaceRepository
 import com.eskerra.go.data.notes.FakeNoteRegistryRepository
+import com.eskerra.go.data.notes.NoteRegistryCache
 import com.eskerra.go.data.workspace.FakeWorkspaceStore
 import com.eskerra.go.data.workspace.WorkspacePaths
 import com.eskerra.go.feature.sync.SyncUiState
@@ -307,7 +308,7 @@ class AppSyncViewModelTest {
             manualSyncNow = ManualSyncNow(
                 remoteSyncRepository = fakeRemote,
                 credentialStore = credentials,
-                registryRepository = registry,
+                registryCache = NoteRegistryCache(registry),
                 loadSyncStatus = loadSyncStatus,
                 dispatcher = ioDispatcher
             ),
