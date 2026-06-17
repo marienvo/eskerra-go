@@ -17,8 +17,9 @@ import java.nio.file.SimpleFileVisitor
 import java.nio.file.attribute.BasicFileAttributes
 
 /** Scans a workspace directory and returns indexed note summaries. */
-fun interface NoteWorkspaceScanner {
-    fun scan(workspaceDir: File): Result<NoteRegistry>
+interface NoteWorkspaceScanner {
+    fun scan(workspaceDir: File, previousRegistry: NoteRegistry?): Result<NoteRegistry>
+    fun scan(workspaceDir: File): Result<NoteRegistry> = scan(workspaceDir, null)
 }
 
 /**
@@ -27,10 +28,11 @@ fun interface NoteWorkspaceScanner {
  */
 class MarkdownNoteScanner : NoteWorkspaceScanner {
 
-    override fun scan(workspaceDir: File): Result<NoteRegistry> {
+    override fun scan(workspaceDir: File, previousRegistry: NoteRegistry?): Result<NoteRegistry> {
         val scanStartNanos = System.nanoTime()
         val root = workspaceDir.canonicalFile
         val summaries = mutableListOf<NoteSummary>()
+        val previousByPath = previousRegistry?.notes?.associateBy { it.id.value } ?: emptyMap()
 
         try {
             Files.walkFileTree(
@@ -69,14 +71,26 @@ class MarkdownNoteScanner : NoteWorkspaceScanner {
                             throw NoteIndexException(NoteIndexError.ScanFailed(error.message))
                         }
                         val isInbox = isInboxNote(notePath.value)
-                        val (title, snippet) = extractTitleAndSnippet(file)
+                        val mtime = attrs.lastModifiedTime().toMillis()
+                        val size = attrs.size()
+                        val previous = previousByPath[relativePath]
+                        val (title, snippet) = if (
+                            previous != null &&
+                            previous.lastModifiedEpochMillis == mtime &&
+                            previous.sizeBytes == size
+                        ) {
+                            previous.title to previous.snippet
+                        } else {
+                            extractTitleAndSnippet(file)
+                        }
 
                         summaries += NoteSummary(
                             id = NoteId(notePath.value),
                             title = title,
                             snippet = snippet,
                             isInbox = isInbox,
-                            lastModifiedEpochMillis = attrs.lastModifiedTime().toMillis()
+                            lastModifiedEpochMillis = mtime,
+                            sizeBytes = size
                         )
                         return FileVisitResult.CONTINUE
                     }
