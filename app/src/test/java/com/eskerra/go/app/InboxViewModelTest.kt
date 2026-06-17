@@ -228,6 +228,46 @@ class InboxViewModelTest {
     }
 
     @Test
+    fun revalidation_withUnchangedNotes_doesNotReplaceNotesList() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(dispatcher)
+
+        val filesDir = temp.newFolder("files")
+        val note = NoteSummary(
+            id = NoteId("Inbox/stable.md"),
+            title = "Stable",
+            snippet = "",
+            isInbox = true
+        )
+        val snapshotStore = FakeInboxSnapshotStore()
+        snapshotStore.save(config, filesDir, listOf(note))
+        val repository = FakeNoteRegistryRepository(
+            result = Result.success(
+                com.eskerra.go.core.model.NoteRegistry.fromNotes(listOf(note))
+            ),
+            refreshDelayMs = 1_000L
+        )
+
+        val viewModel = inboxViewModel(
+            filesDir = filesDir,
+            repository = repository,
+            snapshotStore = snapshotStore
+        )
+        dispatcher.scheduler.runCurrent()
+
+        val initial = viewModel.uiState.value as InboxUiState.Content
+        assertTrue(initial.isRefreshing)
+        val snapshotNotes = initial.notes
+
+        advanceUntilIdle()
+
+        val final = viewModel.uiState.value as InboxUiState.Content
+        assertFalse(final.isRefreshing)
+        // Revalidation returned equal data → notes list reference is preserved, no reflow.
+        assertSame(snapshotNotes, final.notes)
+    }
+
+    @Test
     fun refresh_retriesLoad() = runTest {
         val filesDir = temp.newFolder("files")
         val repository = FakeNoteRegistryRepository.failing()

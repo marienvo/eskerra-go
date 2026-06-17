@@ -125,7 +125,12 @@ class InboxViewModel(
             loadInboxSummaries(config, filesDir).fold(
                 onSuccess = { notes ->
                     _showRefreshIndicator.value = false
-                    _uiState.value = notes.toInboxUiState(isRefreshing = false)
+                    val currentNotes = (_uiState.value as? InboxUiState.Content)?.notes
+                    if (notes == currentNotes) {
+                        markRefreshing(isRefreshing = false)
+                    } else {
+                        _uiState.value = notes.toInboxUiState(isRefreshing = false)
+                    }
                 },
                 onFailure = { error ->
                     _showRefreshIndicator.value = false
