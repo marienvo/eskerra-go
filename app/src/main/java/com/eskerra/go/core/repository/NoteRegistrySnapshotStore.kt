@@ -7,7 +7,6 @@ import java.io.File
 /**
  * Persists the full note registry for stale-while-revalidate cold start, keyed by the local
  * workspace fingerprint. Mirrors [InboxSnapshotStore] but stores every note, not just the inbox.
- * The concrete file-backed codec arrives in a later phase; [NoteRegistryCache] consumes this seam.
  */
 interface NoteRegistrySnapshotStore {
     suspend fun read(config: WorkspaceConfig, filesDir: File): NoteRegistry?

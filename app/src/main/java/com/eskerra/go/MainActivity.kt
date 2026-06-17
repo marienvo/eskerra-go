@@ -49,6 +49,7 @@ import com.eskerra.go.data.git.JGitWorkspaceRepository
 import com.eskerra.go.data.notes.FileInboxSnapshotStore
 import com.eskerra.go.data.notes.FileNoteContentRepository
 import com.eskerra.go.data.notes.FileNoteRegistryRepository
+import com.eskerra.go.data.notes.FileNoteRegistrySnapshotStore
 import com.eskerra.go.data.notes.FileNoteWriteRepository
 import com.eskerra.go.data.notes.NoteRegistryCache
 import com.eskerra.go.data.search.SqliteVaultSearchRepository
@@ -90,7 +91,10 @@ class MainActivity : ComponentActivity() {
         val noteWriteRepository = FileNoteWriteRepository(gitRepository)
         val loadGitStatusSummary = LoadGitStatusSummary(gitRepository)
 
-        val noteRegistryCache = NoteRegistryCache(noteRegistryRepository)
+        val noteRegistryCache = NoteRegistryCache(
+            repository = noteRegistryRepository,
+            snapshotStore = FileNoteRegistrySnapshotStore()
+        )
 
         val loadInboxSummaries = LoadInboxSummariesCached(
             delegate = LoadInboxSummaries(noteRegistryCache),
