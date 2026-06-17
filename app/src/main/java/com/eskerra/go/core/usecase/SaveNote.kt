@@ -10,6 +10,7 @@ import com.eskerra.go.core.model.SaveNoteException
 import com.eskerra.go.core.model.SaveNoteResult
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.NoteWriteRepository
+import com.eskerra.go.data.notes.NoteContentCache
 import com.eskerra.go.data.notes.NoteRegistryCache
 import java.io.File
 
@@ -17,7 +18,8 @@ import java.io.File
 class SaveNote(
     private val writeRepository: NoteWriteRepository,
     private val registryCache: NoteRegistryCache,
-    private val loadGitStatusSummary: LoadGitStatusSummary
+    private val loadGitStatusSummary: LoadGitStatusSummary,
+    private val contentCache: NoteContentCache? = null
 ) {
 
     suspend operator fun invoke(
@@ -53,6 +55,7 @@ class SaveNote(
             return Result.failure(mapWriteFailure(error))
         }
 
+        contentCache?.evict(noteId)
         registryCache.invalidate(config, filesDir)
         val refreshedRegistry = registryCache.refresh(config, filesDir)
         if (refreshedRegistry.isFailure) {

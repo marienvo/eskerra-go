@@ -9,6 +9,7 @@ import com.eskerra.go.core.repository.RemoteSyncRepository
 import com.eskerra.go.data.credentials.CredentialStore
 import com.eskerra.go.data.git.GitBranchNameValidator
 import com.eskerra.go.data.git.SyncGitErrorMapper
+import com.eskerra.go.data.notes.NoteContentCache
 import com.eskerra.go.data.notes.NoteRegistryCache
 import com.eskerra.go.data.workspace.RemoteUriSecurity
 import com.eskerra.go.data.workspace.WorkspacePaths
@@ -26,6 +27,7 @@ class ManualSyncNow(
     private val remoteSyncRepository: RemoteSyncRepository,
     private val credentialStore: CredentialStore,
     private val registryCache: NoteRegistryCache,
+    private val contentCache: NoteContentCache? = null,
     private val loadSyncStatus: LoadSyncStatus,
     private val reconcileWorkspaceSyncBranch: ReconcileWorkspaceSyncBranch? = null,
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO
@@ -196,6 +198,7 @@ class ManualSyncNow(
         }
 
         onProgress(SyncProgressStep.RefreshingNotes)
+        contentCache?.evictAll()
         registryCache.invalidate(config, filesDir)
         val registryRefreshed = registryCache.refresh(config, filesDir).isSuccess
 
