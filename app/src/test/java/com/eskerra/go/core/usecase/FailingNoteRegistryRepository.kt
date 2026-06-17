@@ -13,10 +13,14 @@ class FailingNoteRegistryRepository(private val delegate: NoteRegistryRepository
 
     var failRefresh: Boolean = true
 
-    override suspend fun refresh(config: WorkspaceConfig, filesDir: File): Result<NoteRegistry> {
+    override suspend fun refresh(
+        config: WorkspaceConfig,
+        filesDir: File,
+        previousRegistry: NoteRegistry?
+    ): Result<NoteRegistry> {
         if (failRefresh) {
             return Result.failure(NoteIndexException(NoteIndexError.ScanFailed("refresh failed")))
         }
-        return delegate.refresh(config, filesDir)
+        return delegate.refresh(config, filesDir, previousRegistry)
     }
 }

@@ -125,7 +125,8 @@ class NoteEditorErrorMappingTest {
 
         override suspend fun refresh(
             config: WorkspaceConfig,
-            filesDir: File
+            filesDir: File,
+            previousRegistry: NoteRegistry?
         ): Result<NoteRegistry> {
             val response = responses.getOrElse(refreshCount) { responses.last() }
             refreshCount += 1
