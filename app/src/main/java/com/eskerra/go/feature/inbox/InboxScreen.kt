@@ -66,7 +66,6 @@ fun InboxScreen(
     onNoteNotFound: (String) -> Unit = {},
     onOpenSearch: () -> Unit = {},
     workspaceRoot: File? = null,
-    showRefreshIndicator: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     InboxScrollBody(
@@ -75,7 +74,6 @@ fun InboxScreen(
         selectedNoteIds = selectedNoteIds,
         isDeleting = isDeleting,
         deleteError = deleteError,
-        showRefreshIndicator = showRefreshIndicator,
         onNoteClick = onNoteClick,
         onAvatarClick = onAvatarClick,
         onClearSelection = onClearSelection,
@@ -102,7 +100,6 @@ private fun InboxScrollBody(
     selectedNoteIds: Set<NoteId>,
     isDeleting: Boolean,
     deleteError: String?,
-    showRefreshIndicator: Boolean,
     onNoteClick: (NoteId) -> Unit,
     onAvatarClick: (NoteId) -> Unit,
     onClearSelection: () -> Unit,
@@ -145,17 +142,6 @@ private fun InboxScrollBody(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 8.dp)
-                )
-            }
-        }
-
-        if (showRefreshIndicator) {
-            item {
-                CircularProgressIndicator(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 8.dp)
-                        .padding(horizontal = 16.dp)
                 )
             }
         }

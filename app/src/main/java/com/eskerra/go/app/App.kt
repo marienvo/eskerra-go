@@ -1,5 +1,7 @@
 package com.eskerra.go.app
 
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -24,6 +26,7 @@ import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.model.hasSyncWork
 import com.eskerra.go.core.repository.ActiveTodayHubStore
+import com.eskerra.go.core.repository.TodayHubSnapshotStore
 import com.eskerra.go.core.usecase.BuildSafeSyncDiagnostic
 import com.eskerra.go.core.usecase.BuildSyncPreflight
 import com.eskerra.go.core.usecase.ClearRemoteSyncSettings
@@ -89,6 +92,7 @@ fun App(
     loadTodayHub: LoadTodayHub,
     loadTodayHubRow: LoadTodayHubRow,
     activeTodayHubStore: ActiveTodayHubStore,
+    todayHubSnapshotStore: TodayHubSnapshotStore,
     loadSyncStatus: LoadSyncStatus,
     refreshRemoteSyncStatus: RefreshRemoteSyncStatus,
     buildSyncPreflight: BuildSyncPreflight,
@@ -172,7 +176,6 @@ fun App(
     }
 
     val syncIndicator = shellSyncIndicatorState(syncState, remoteConfigured)
-
     AppShell(
         currentRoute = currentRoute,
         syncIndicator = syncIndicator,
@@ -203,7 +206,11 @@ fun App(
         NavHost(
             navController = navController,
             startDestination = AppRoute.INBOX,
-            modifier = contentModifier
+            modifier = contentModifier,
+            enterTransition = { EnterTransition.None },
+            exitTransition = { ExitTransition.None },
+            popEnterTransition = { EnterTransition.None },
+            popExitTransition = { ExitTransition.None }
         ) {
             composable(AppRoute.INBOX) { entry ->
                 AppInboxRoute(
@@ -214,6 +221,7 @@ fun App(
                     loadTodayHub = loadTodayHub,
                     loadTodayHubRow = loadTodayHubRow,
                     activeTodayHubStore = activeTodayHubStore,
+                    todayHubSnapshotStore = todayHubSnapshotStore,
                     workspaceRoot = workspaceRoot,
                     currentRoute = currentRoute,
                     entry = entry,

@@ -15,6 +15,7 @@ import androidx.navigation.NavHostController
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.ActiveTodayHubStore
+import com.eskerra.go.core.repository.TodayHubSnapshotStore
 import com.eskerra.go.core.usecase.DeleteInboxNotes
 import com.eskerra.go.core.usecase.LoadInboxSummariesCached
 import com.eskerra.go.core.usecase.LoadTodayHub
@@ -35,6 +36,7 @@ internal fun AppInboxRoute(
     loadTodayHub: LoadTodayHub,
     loadTodayHubRow: LoadTodayHubRow,
     activeTodayHubStore: ActiveTodayHubStore,
+    todayHubSnapshotStore: TodayHubSnapshotStore,
     workspaceRoot: File?,
     currentRoute: String?,
     entry: NavBackStackEntry,
@@ -73,12 +75,12 @@ internal fun AppInboxRoute(
             filesDir = filesDir,
             loadTodayHub = loadTodayHub,
             loadTodayHubRow = loadTodayHubRow,
-            activeTodayHubStore = activeTodayHubStore
+            activeTodayHubStore = activeTodayHubStore,
+            todayHubSnapshotStore = todayHubSnapshotStore
         )
     )
 
     val inboxState by inboxViewModel.uiState.collectAsState()
-    val showRefreshIndicator by inboxViewModel.showRefreshIndicator.collectAsState()
     val selectedNoteIds by inboxViewModel.selectedNoteIds.collectAsState()
     val isDeleting by inboxViewModel.isDeleting.collectAsState()
     val deleteError by inboxViewModel.deleteError.collectAsState()
@@ -103,7 +105,6 @@ internal fun AppInboxRoute(
         selectedNoteIds = selectedNoteIds,
         isDeleting = isDeleting,
         deleteError = deleteError,
-        showRefreshIndicator = showRefreshIndicator,
         onRetry = inboxViewModel::refresh,
         onNoteClick = { noteId: NoteId ->
             navController.navigate(AppRoute.note(noteId))

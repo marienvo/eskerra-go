@@ -57,6 +57,7 @@ import com.eskerra.go.data.notes.NoteContentCache
 import com.eskerra.go.data.notes.NoteRegistryCache
 import com.eskerra.go.data.search.SqliteVaultSearchRepository
 import com.eskerra.go.data.todayhub.DataStoreActiveTodayHubStore
+import com.eskerra.go.data.todayhub.FileTodayHubSnapshotStore
 import com.eskerra.go.data.vault.DataStoreLocalSettingsStore
 import com.eskerra.go.data.vault.FileVaultSettingsRepository
 import com.eskerra.go.data.workspace.DataStoreWorkspaceStore
@@ -136,6 +137,7 @@ class MainActivity : ComponentActivity() {
         )
         val loadTodayHubRow = LoadTodayHubRow(contentRepository = noteContentCache)
         val activeTodayHubStore = DataStoreActiveTodayHubStore(applicationContext)
+        val todayHubSnapshotStore = FileTodayHubSnapshotStore()
 
         val remoteSyncRepository = JGitRemoteSyncRepository(gitRepository)
         val loadSyncStatus = LoadSyncStatus(remoteSyncRepository)
@@ -212,6 +214,7 @@ class MainActivity : ComponentActivity() {
                 loadTodayHub = loadTodayHub,
                 loadTodayHubRow = loadTodayHubRow,
                 activeTodayHubStore = activeTodayHubStore,
+                todayHubSnapshotStore = todayHubSnapshotStore,
                 loadSyncStatus = loadSyncStatus,
                 refreshRemoteSyncStatus = refreshRemoteSyncStatus,
                 buildSyncPreflight = buildSyncPreflight,

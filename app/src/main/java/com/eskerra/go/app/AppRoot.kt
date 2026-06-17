@@ -18,6 +18,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.eskerra.go.core.repository.ActiveTodayHubStore
 import com.eskerra.go.core.repository.BootCacheStore
+import com.eskerra.go.core.repository.TodayHubSnapshotStore
 import com.eskerra.go.core.usecase.BuildSafeSyncDiagnostic
 import com.eskerra.go.core.usecase.BuildSyncPreflight
 import com.eskerra.go.core.usecase.ClearRemoteSyncSettings
@@ -77,6 +78,7 @@ fun AppRoot(
     loadTodayHub: LoadTodayHub,
     loadTodayHubRow: LoadTodayHubRow,
     activeTodayHubStore: ActiveTodayHubStore,
+    todayHubSnapshotStore: TodayHubSnapshotStore,
     loadSyncStatus: LoadSyncStatus,
     refreshRemoteSyncStatus: RefreshRemoteSyncStatus,
     buildSyncPreflight: BuildSyncPreflight,
@@ -171,6 +173,7 @@ fun AppRoot(
                     loadTodayHub = loadTodayHub,
                     loadTodayHubRow = loadTodayHubRow,
                     activeTodayHubStore = activeTodayHubStore,
+                    todayHubSnapshotStore = todayHubSnapshotStore,
                     loadSyncStatus = loadSyncStatus,
                     refreshRemoteSyncStatus = refreshRemoteSyncStatus,
                     buildSyncPreflight = buildSyncPreflight,

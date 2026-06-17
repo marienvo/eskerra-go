@@ -6,6 +6,7 @@ import com.eskerra.go.core.model.NoteContentException
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NoteIndexError
 import com.eskerra.go.core.model.NoteIndexException
+import com.eskerra.go.core.model.NoteRegistry
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.NoteContentRepository
 import com.eskerra.go.core.todayhub.TodayHubData
@@ -24,6 +25,9 @@ class LoadTodayHub(
     private val registryCache: NoteRegistryCache,
     private val contentRepository: NoteContentRepository
 ) {
+
+    suspend fun currentRegistry(config: WorkspaceConfig, filesDir: File): NoteRegistry? =
+        registryCache.current(config, filesDir)
 
     suspend operator fun invoke(
         config: WorkspaceConfig,

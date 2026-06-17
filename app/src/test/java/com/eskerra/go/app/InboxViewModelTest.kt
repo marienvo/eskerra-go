@@ -110,11 +110,10 @@ class InboxViewModelTest {
         assertEquals(listOf(cachedNote), state.notes)
         assertTrue(state.isRefreshing)
         assertTrue(viewModel.uiState.value !is InboxUiState.Loading)
-        assertFalse(viewModel.showRefreshIndicator.value)
     }
 
     @Test
-    fun backgroundRefresh_showsIndicatorOnlyAfterDebounce() = runTest {
+    fun backgroundRefresh_neverLeavesContentStateForIndicator() = runTest {
         val filesDir = temp.newFolder("files")
         val cachedNote = NoteSummary(
             id = NoteId("Inbox/cached.md"),
@@ -141,15 +140,11 @@ class InboxViewModelTest {
         )
         dispatcher.scheduler.runCurrent()
 
-        assertFalse(viewModel.showRefreshIndicator.value)
-
-        dispatcher.scheduler.advanceTimeBy(InboxViewModel.REFRESH_INDICATOR_DELAY_MS - 1)
+        dispatcher.scheduler.advanceTimeBy(1_000L)
         dispatcher.scheduler.runCurrent()
-        assertFalse(viewModel.showRefreshIndicator.value)
 
-        dispatcher.scheduler.advanceTimeBy(1)
-        dispatcher.scheduler.runCurrent()
-        assertTrue(viewModel.showRefreshIndicator.value)
+        val state = viewModel.uiState.value as InboxUiState.Content
+        assertEquals(listOf(cachedNote), state.notes)
     }
 
     @Test
@@ -268,7 +263,7 @@ class InboxViewModelTest {
     }
 
     @Test
-    fun fastRevalidationWithTrustedSnapshot_doesNotShowRefreshIndicator() = runTest {
+    fun fastRevalidationWithTrustedSnapshot_staysSilent() = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
         Dispatchers.setMain(dispatcher)
 
@@ -295,7 +290,9 @@ class InboxViewModelTest {
         )
         advanceUntilIdle()
 
-        assertFalse(viewModel.showRefreshIndicator.value)
+        val state = viewModel.uiState.value as InboxUiState.Content
+        assertEquals(listOf(note), state.notes)
+        assertFalse(state.isRefreshing)
     }
 
     @Test
