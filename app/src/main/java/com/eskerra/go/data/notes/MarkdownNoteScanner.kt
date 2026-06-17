@@ -114,30 +114,31 @@ class MarkdownNoteScanner : NoteWorkspaceScanner {
 
     private fun extractTitleAndSnippet(file: File): Pair<String, String> {
         val fallbackTitle = file.nameWithoutExtension
-        val lines = file.readText().lines()
         var title: String? = null
         var titleLineIndex = -1
+        var snippet: String? = null
 
-        for ((index, line) in lines.withIndex()) {
-            val trimmed = line.trim()
-            if (trimmed.startsWith(H1_PREFIX) && trimmed.length > H1_PREFIX.length) {
-                title = trimmed.removePrefix(H1_PREFIX).trim()
-                titleLineIndex = index
-                break
+        file.bufferedReader().use { reader ->
+            var index = 0
+            while (true) {
+                val line = reader.readLine() ?: break
+                val trimmed = line.trim()
+                if (title == null &&
+                    trimmed.startsWith(H1_PREFIX) &&
+                    trimmed.length > H1_PREFIX.length
+                ) {
+                    title = trimmed.removePrefix(H1_PREFIX).trim()
+                    titleLineIndex = index
+                }
+                if (snippet == null && index != titleLineIndex && trimmed.isNotBlank()) {
+                    snippet = trimmed
+                }
+                if (title != null && snippet != null) break
+                index++
             }
         }
 
-        val resolvedTitle = title ?: fallbackTitle
-        val snippet = lines.asSequence()
-            .withIndex()
-            .filter { (index, line) ->
-                index != titleLineIndex && line.isNotBlank()
-            }
-            .map { (_, line) -> line.trim() }
-            .firstOrNull()
-            .orEmpty()
-
-        return resolvedTitle to snippet
+        return (title ?: fallbackTitle) to (snippet ?: "")
     }
 
     companion object {

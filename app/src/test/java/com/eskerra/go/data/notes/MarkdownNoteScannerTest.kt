@@ -109,6 +109,17 @@ class MarkdownNoteScannerTest {
     }
 
     @Test
+    fun scan_usesContentBeforeH1AsSnippet() {
+        val workspace = temp.newFolder("workspace")
+        write(workspace, "Inbox/intro.md", "Intro line.\n# My Title\n\nMore content.")
+
+        val note = scanner.scan(workspace).getOrThrow().notes.single()
+
+        assertEquals("My Title", note.title)
+        assertEquals("Intro line.", note.snippet)
+    }
+
+    @Test
     fun scan_fallsBackToFilenameWhenNoH1() {
         val workspace = temp.newFolder("workspace")
         write(workspace, "Inbox/no-title.md", "Just body text.")
