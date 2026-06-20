@@ -113,6 +113,19 @@ class NoteRegistryCacheTest {
     }
 
     @Test
+    fun refresh_succeedsWhenSnapshotSaveFails() = runTest {
+        val fresh = registryOf("Fresh")
+        val store = FailingSnapshotStore()
+        val cache = NoteRegistryCache(repositoryReturning(fresh), store)
+
+        val result = cache.refresh(config, filesDir)
+
+        assertEquals(fresh, result.getOrThrow())
+        assertEquals(fresh, cache.registry.value)
+        assertEquals(1, store.saveCount)
+    }
+
+    @Test
     fun invalidate_dropsInMemoryAndSnapshot() = runTest {
         val store = FakeSnapshotStore()
         val cache = NoteRegistryCache(repositoryReturning(registryOf("A")), store)
@@ -183,6 +196,21 @@ class NoteRegistryCacheTest {
             }
             return results[index]
         }
+    }
+
+    private class FailingSnapshotStore : NoteRegistrySnapshotStore {
+
+        var saveCount = 0
+            private set
+
+        override suspend fun read(config: WorkspaceConfig, filesDir: File): NoteRegistry? = null
+
+        override suspend fun save(config: WorkspaceConfig, filesDir: File, registry: NoteRegistry) {
+            saveCount += 1
+            throw RuntimeException("disk full")
+        }
+
+        override suspend fun clear(config: WorkspaceConfig, filesDir: File) = Unit
     }
 
     private class FakeSnapshotStore(var stored: NoteRegistry? = null) : NoteRegistrySnapshotStore {

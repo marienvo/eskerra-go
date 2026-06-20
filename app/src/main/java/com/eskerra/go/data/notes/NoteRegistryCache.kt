@@ -61,7 +61,7 @@ class NoteRegistryCache(
         mutex.withLock {
             repository.refresh(config, filesDir, _registry.value).onSuccess { fresh ->
                 _registry.value = fresh
-                snapshotStore?.save(config, filesDir, fresh)
+                runCatching { snapshotStore?.save(config, filesDir, fresh) }
             }
         }
 
