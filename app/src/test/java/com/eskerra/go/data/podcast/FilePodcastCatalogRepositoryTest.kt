@@ -63,6 +63,37 @@ class FilePodcastCatalogRepositoryTest {
     }
 
     @Test
+    fun load_enrichesSectionsAndEpisodesWithRssFeedUrlFromHub() = runTest {
+        val filesDir = temp.newFolder("files")
+        val workspaceDir = workspace(filesDir)
+        val generalDir = File(workspaceDir, FilePodcastCatalogRepository.GENERAL_DIRECTORY)
+        generalDir.mkdirs()
+        File(generalDir, "2026 News - podcasts.md").writeText(
+            "- [ ] 2026-03-15; Fresh episode [$play](https://cdn/fresh.mp3) (Daily News)\n"
+        )
+        File(generalDir, "2026 News.md").writeText(
+            "- [ ] [[📻 Daily News.md]]\n"
+        )
+        File(generalDir, "📻 Daily News.md").writeText(
+            """
+            ---
+            rssFeedUrl: https://feed.example/rss.xml
+            ---
+            # Daily News
+            """.trimIndent()
+        )
+
+        val catalog = FilePodcastCatalogRepository(currentYear = { 2026 })
+            .load(config, filesDir)
+            .getOrThrow()
+
+        val feedUrl = "https://feed.example/rss.xml"
+        assertEquals(feedUrl, catalog.sections.single().rssFeedUrl)
+        assertEquals(feedUrl, catalog.sections.single().episodes.single().rssFeedUrl)
+        assertEquals(feedUrl, catalog.allEpisodes.single().rssFeedUrl)
+    }
+
+    @Test
     fun load_deduplicatesSameMp3AcrossStubFiles() = runTest {
         val filesDir = temp.newFolder("files")
         val workspaceDir = workspace(filesDir)

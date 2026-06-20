@@ -51,10 +51,11 @@ fun AppShell(
 
     CompositionLocalProvider(LocalShellChromeInsets provides chromeInsets) {
         Box(modifier = Modifier.fillMaxSize()) {
-            content(Modifier.fillMaxSize())
-
-            ShellTopEdgeScrim(modifier = Modifier.align(Alignment.TopCenter))
-            ShellBottomEdgeScrim(modifier = Modifier.align(Alignment.BottomCenter))
+            content(
+                Modifier
+                    .fillMaxSize()
+                    .shellEdgeScrimOverlay()
+            )
 
             Row(
                 modifier = Modifier

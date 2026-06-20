@@ -410,9 +410,9 @@ class PodcastsViewModelTest {
         advanceUntilIdle()
 
         viewModel.runVaultRefresh()
-        advanceUntilIdle()
-
         assertTrue(viewModel.refreshState.value.active)
+
+        advanceUntilIdle()
         assertEquals(50, viewModel.refreshState.value.percent)
 
         gate.complete(Unit)

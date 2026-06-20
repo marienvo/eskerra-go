@@ -127,8 +127,8 @@ class PodcastsViewModel(
     /** Serialized RSS vault refresh (fetch + merge + commit), then catalog reload. */
     fun runVaultRefresh() {
         if (_refreshState.value.active) return
+        _refreshState.value = PodcastRefreshState(active = true)
         viewModelScope.launch {
-            _refreshState.value = PodcastRefreshState(active = true)
             try {
                 val result = syncPodcastVaultRefresh(config, filesDir) { progress ->
                     _refreshState.value = _refreshState.value.copy(percent = progress.percent)

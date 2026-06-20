@@ -6,7 +6,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -16,6 +18,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -28,7 +31,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.pullToRefresh
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,7 +44,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.eskerra.go.app.shellScrollContentPadding
+import com.eskerra.go.app.LocalShellChromeInsets
 import com.eskerra.go.core.datetime.RelativeCalendarLabel
 import com.eskerra.go.core.model.PodcastEpisode
 import com.eskerra.go.core.model.PodcastPlaybackPhase
@@ -89,51 +93,59 @@ fun PodcastsScreen(
             .background(PodcastUiTokens.ListBackground)
     ) {
         RefreshStrip(refreshState)
+        val chrome = LocalShellChromeInsets.current
+        val pullRefreshState = rememberPullToRefreshState()
+        val listState = rememberLazyListState()
         val fillItemModifier = Modifier
             .fillMaxWidth()
             .heightIn(min = LocalConfiguration.current.screenHeightDp.dp)
-        PullToRefreshBox(
-            isRefreshing = refreshState.active,
-            onRefresh = onRefresh,
-            indicator = {},
+        LazyColumn(
+            state = listState,
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
+                .pullToRefresh(
+                    isRefreshing = refreshState.active,
+                    state = pullRefreshState,
+                    onRefresh = onRefresh
+                ),
+            contentPadding = PaddingValues(horizontal = 16.dp)
         ) {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = shellScrollContentPadding()
-            ) {
-                when (state) {
-                    PodcastsUiState.Loading -> item(key = "loading") {
-                        LoadingContent(modifier = fillItemModifier)
-                    }
-                    PodcastsUiState.Empty -> item(key = "empty") {
-                        EmptyContent(modifier = fillItemModifier)
-                    }
-                    is PodcastsUiState.Error -> item(key = "error") {
-                        ErrorContent(
-                            message = state.message,
-                            onRetry = onRetry,
-                            modifier = fillItemModifier
-                        )
-                    }
-                    is PodcastsUiState.Content -> podcastCatalogItems(
-                        sections = state.sections,
-                        playerState = state.playerState,
-                        selectedEpisodeIds = state.selectedEpisodeIds,
-                        markInFlight = state.markInFlight,
-                        markError = state.markError,
-                        refreshError = refreshState.error,
-                        config = config,
-                        filesDir = filesDir,
-                        loadPodcastArtwork = loadPodcastArtwork,
-                        onEpisodeClick = onEpisodeClick,
-                        onEpisodeArtworkClick = onEpisodeArtworkClick,
-                        onClearSelection = onClearSelection,
-                        onMarkSelected = onMarkSelected
+            item(key = "top-chrome") {
+                Spacer(Modifier.height(chrome.top))
+            }
+            when (state) {
+                PodcastsUiState.Loading -> item(key = "loading") {
+                    LoadingContent(modifier = fillItemModifier)
+                }
+                PodcastsUiState.Empty -> item(key = "empty") {
+                    EmptyContent(modifier = fillItemModifier)
+                }
+                is PodcastsUiState.Error -> item(key = "error") {
+                    ErrorContent(
+                        message = state.message,
+                        onRetry = onRetry,
+                        modifier = fillItemModifier
                     )
                 }
+                is PodcastsUiState.Content -> podcastCatalogItems(
+                    sections = state.sections,
+                    playerState = state.playerState,
+                    selectedEpisodeIds = state.selectedEpisodeIds,
+                    markInFlight = state.markInFlight,
+                    markError = state.markError,
+                    refreshError = refreshState.error,
+                    config = config,
+                    filesDir = filesDir,
+                    loadPodcastArtwork = loadPodcastArtwork,
+                    onEpisodeClick = onEpisodeClick,
+                    onEpisodeArtworkClick = onEpisodeArtworkClick,
+                    onClearSelection = onClearSelection,
+                    onMarkSelected = onMarkSelected
+                )
+            }
+            item(key = "bottom-chrome") {
+                Spacer(Modifier.height(chrome.bottom))
             }
         }
     }

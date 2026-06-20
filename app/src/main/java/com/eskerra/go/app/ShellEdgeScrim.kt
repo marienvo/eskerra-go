@@ -11,8 +11,13 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /** Extra fade below the status bar inset for the top edge scrim. */
@@ -34,6 +39,49 @@ internal fun bottomEdgeScrimColors(background: Color): List<Color> = listOf(
     background.copy(alpha = SCRIM_MID_ALPHA),
     background
 )
+
+/** Draws edge scrims over content without intercepting touch events. */
+@Composable
+fun Modifier.shellEdgeScrimOverlay(): Modifier {
+    val background = MaterialTheme.colorScheme.background
+    val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val navigationBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val topHeight = statusBarTop + ShellTopScrimExtra
+    val bottomHeight = navigationBarBottom + ShellBottomScrimExtra
+    return drawWithContent {
+        drawContent()
+        drawTopEdgeScrim(background, topHeight)
+        drawBottomEdgeScrim(background, bottomHeight)
+    }
+}
+
+internal fun DrawScope.drawTopEdgeScrim(background: Color, height: Dp) {
+    val heightPx = height.toPx()
+    if (heightPx <= 0f) return
+    drawRect(
+        brush = Brush.verticalGradient(
+            colors = topEdgeScrimColors(background),
+            startY = 0f,
+            endY = heightPx
+        ),
+        size = Size(size.width, heightPx)
+    )
+}
+
+internal fun DrawScope.drawBottomEdgeScrim(background: Color, height: Dp) {
+    val heightPx = height.toPx()
+    if (heightPx <= 0f) return
+    val topY = size.height - heightPx
+    drawRect(
+        brush = Brush.verticalGradient(
+            colors = bottomEdgeScrimColors(background),
+            startY = topY,
+            endY = size.height
+        ),
+        topLeft = Offset(0f, topY),
+        size = Size(size.width, heightPx)
+    )
+}
 
 /** Subtle top vignette so scrolling content fades before the status bar. */
 @Composable

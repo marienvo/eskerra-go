@@ -1,6 +1,7 @@
 package com.eskerra.go.data.podcast.rss
 
 import com.eskerra.go.core.model.WorkspaceConfig
+import com.eskerra.go.core.podcast.PodcastHubRssLinks
 import com.eskerra.go.core.podcast.parsePodcastFileDetails
 import com.eskerra.go.core.podcast.rss.PodcastRssFileSync
 import com.eskerra.go.core.podcast.rss.PodcastsMdMerge
@@ -64,7 +65,7 @@ class FilePodcastRssVaultSync(
             val details = parsePodcastFileDetails(stub.name, year) ?: continue
             val hubFile = File(generalDir, "${details.year} ${details.sectionTitle}.md")
             val rssNames = if (isRegularFile(hubFile)) {
-                parseUncheckedRssLinks(hubFile.readText(Charsets.UTF_8))
+                PodcastHubRssLinks.parseUncheckedRssLinkNames(hubFile.readText(Charsets.UTF_8))
             } else {
                 emptyList()
             }
@@ -127,16 +128,7 @@ class FilePodcastRssVaultSync(
     private fun isRegularFile(file: File): Boolean =
         Files.isRegularFile(file.toPath(), LinkOption.NOFOLLOW_LINKS)
 
-    private fun parseUncheckedRssLinks(hubContent: String): List<String> = hubContent.lineSequence()
-        .mapNotNull { line -> UNCHECKED_RSS_LINK.find(line)?.groupValues?.get(1)?.trim() }
-        .filter { it.startsWith(RSS_PREFIX) }
-        .map { if (it.endsWith(".md", ignoreCase = true)) it else "$it.md" }
-        .toList()
-
     companion object {
         const val GENERAL_DIRECTORY = "General"
-        private val RSS_PREFIX = String(Character.toChars(0x1F4FB))
-        private val UNCHECKED_RSS_LINK =
-            Regex("""^\s*-\s*\[ ]\s*\[\[([^\]]+)]]""")
     }
 }

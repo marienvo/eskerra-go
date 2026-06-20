@@ -8,6 +8,7 @@ import com.eskerra.go.core.podcast.PodcastMarkdownFile
 import com.eskerra.go.core.podcast.buildPodcastSections
 import com.eskerra.go.core.podcast.isPodcastEpisodesFile
 import com.eskerra.go.core.podcast.parsePodcastFiles
+import com.eskerra.go.core.podcast.resolveSectionFeedUrls
 import com.eskerra.go.core.repository.PodcastCatalogRepository
 import com.eskerra.go.data.workspace.WorkspacePaths
 import java.io.File
@@ -60,10 +61,24 @@ class FilePodcastCatalogRepository(private val currentYear: () -> Int = { Year.n
                     .toList()
 
                 val parsed = parsePodcastFiles(stubFiles, year)
+                val feedUrlsBySection = resolveSectionFeedUrls(generalDir, year)
+                val enrichedEpisodes = parsed.allEpisodes.map { episode ->
+                    val feedUrl = feedUrlsBySection[episode.sectionTitle]
+                    if (feedUrl == null) episode else episode.copy(rssFeedUrl = feedUrl)
+                }
+                val sections = buildPodcastSections(enrichedEpisodes).map { section ->
+                    val feedUrl = feedUrlsBySection[section.title]
+                    section.copy(
+                        rssFeedUrl = feedUrl,
+                        episodes = section.episodes.map { episode ->
+                            if (feedUrl == null) episode else episode.copy(rssFeedUrl = feedUrl)
+                        }
+                    )
+                }
                 Result.success(
                     PodcastCatalog(
-                        allEpisodes = parsed.allEpisodes,
-                        sections = buildPodcastSections(parsed.allEpisodes)
+                        allEpisodes = enrichedEpisodes,
+                        sections = sections
                     )
                 )
             } catch (error: Exception) {
