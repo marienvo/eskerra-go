@@ -37,6 +37,7 @@ class NoteReaderViewModel(
     }
 
     fun retry() {
+        _uiState.value = NoteReaderUiState.Loading
         load()
     }
 
@@ -44,8 +45,7 @@ class NoteReaderViewModel(
         loadJob?.cancel()
         prefetchJob?.cancel()
         loadJob = viewModelScope.launch {
-            _uiState.value = NoteReaderUiState.Loading
-            loadNoteForReading(config, filesDir, noteId).fold(
+            loadNoteForReading(config, filesDir, noteId, viewModelScope).fold(
                 onSuccess = { document ->
                     _uiState.value = NoteReaderUiState.Content(
                         title = document.note.title,

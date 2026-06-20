@@ -11,11 +11,20 @@ import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.NoteContentRepository
 import com.eskerra.go.core.repository.NoteRegistryCachePort
 import java.io.File
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 
 /**
- * Refreshes the note registry, loads markdown for [noteId], and returns a reader document carrying
- * the content plus the registry. Wiki / internal link resolution happens in the renderer
- * ([com.eskerra.go.core.markdown.VaultReadonlyLink]); this use case no longer pre-computes segments.
+ * Loads the registry and markdown for [noteId] and returns a reader document.
+ *
+ * Registry strategy (SWR): if a registry is already cached, it is served immediately on the
+ * critical path and an incremental [NoteRegistryCachePort.refresh] is dispatched on
+ * [backgroundScope] so the next open benefits from an up-to-date index. On a cold miss the
+ * critical path awaits [refresh] before continuing.
+ *
+ * Wiki / internal link resolution happens in the renderer
+ * ([com.eskerra.go.core.markdown.VaultReadonlyLink]); this use case no longer pre-computes
+ * segments.
  */
 class LoadNoteForReading(
     private val registryCache: NoteRegistryCachePort,
@@ -25,18 +34,23 @@ class LoadNoteForReading(
     suspend operator fun invoke(
         config: WorkspaceConfig,
         filesDir: File,
-        noteId: NoteId
+        noteId: NoteId,
+        backgroundScope: CoroutineScope? = null
     ): Result<NoteReaderDocument> {
         if (NotePath.fromRelativePath(noteId.value).isFailure) {
             return Result.failure(NoteContentException(NoteContentError.InvalidNoteId))
         }
 
-        val registryResult = registryCache.refresh(config, filesDir)
-        if (registryResult.isFailure) {
-            return Result.failure(registryFailure(registryResult.exceptionOrNull()))
+        val cachedRegistry = registryCache.current(config, filesDir)
+        val registry = if (cachedRegistry != null) {
+            backgroundScope?.launch { registryCache.refresh(config, filesDir) }
+            cachedRegistry
+        } else {
+            val result = registryCache.refresh(config, filesDir)
+            if (result.isFailure) return Result.failure(registryFailure(result.exceptionOrNull()))
+            result.getOrThrow()
         }
 
-        val registry = registryResult.getOrThrow()
         val summary = registry.notes.find { it.id == noteId }
             ?: return Result.failure(NoteContentException(NoteContentError.NotFound))
 

@@ -34,6 +34,22 @@ class LoadNoteForReadingTest {
     private val filesDir get() = temp.newFolder("files")
 
     @Test
+    fun warmRegistry_doesNotTriggerRefresh() = runTest {
+        val filesDir = temp.newFolder("files")
+        val noteId = NoteId("Inbox/First.md")
+        val fakeRepo = FakeNoteRegistryRepository.withInboxNotes(summary(noteId, "First"))
+        val content = FakeNoteContentRepository.withContent(noteId, "# First")
+        val useCase = LoadNoteForReading(NoteRegistryCache(fakeRepo), content)
+
+        useCase(config, filesDir, noteId).getOrThrow() // cold miss: warms registry via refresh()
+        val refreshesAfterColdMiss = fakeRepo.refreshCount
+
+        useCase(config, filesDir, noteId).getOrThrow() // warm hit: uses current(), no refresh
+
+        assertEquals(refreshesAfterColdMiss, fakeRepo.refreshCount)
+    }
+
+    @Test
     fun secondOpen_hitsWarmContentCache() = runTest {
         val filesDir = temp.newFolder("files")
         val noteId = NoteId("Inbox/First.md")
