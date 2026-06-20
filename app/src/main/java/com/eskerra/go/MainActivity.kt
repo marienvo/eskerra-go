@@ -31,6 +31,7 @@ import com.eskerra.go.core.usecase.LoadTodayHubRow
 import com.eskerra.go.core.usecase.LoadVaultSettings
 import com.eskerra.go.core.usecase.MaintainVaultSearchIndex
 import com.eskerra.go.core.usecase.ManualSyncNow
+import com.eskerra.go.core.usecase.MarkPodcastEpisodesPlayed
 import com.eskerra.go.core.usecase.PrefetchLinkedNotes
 import com.eskerra.go.core.usecase.ReconcileWorkspaceSyncBranch
 import com.eskerra.go.core.usecase.RecordLastSyncAttempt
@@ -41,11 +42,13 @@ import com.eskerra.go.core.usecase.SaveNote
 import com.eskerra.go.core.usecase.SaveRemoteSyncSettings
 import com.eskerra.go.core.usecase.SaveVaultSettings
 import com.eskerra.go.core.usecase.SearchVault
+import com.eskerra.go.core.usecase.SyncPodcastChange
 import com.eskerra.go.core.usecase.TestRemoteConnection
 import com.eskerra.go.core.usecase.TouchVaultSearchPaths
 import com.eskerra.go.core.usecase.UpdateSyncToken
 import com.eskerra.go.data.credentials.AndroidKeystoreTokenCipher
 import com.eskerra.go.data.credentials.EncryptedCredentialStore
+import com.eskerra.go.data.git.GitSyncMutex
 import com.eskerra.go.data.git.JGitRemoteSyncRepository
 import com.eskerra.go.data.git.JGitWorkspaceRepository
 import com.eskerra.go.data.notes.CoalescingNoteRegistryRepository
@@ -58,6 +61,7 @@ import com.eskerra.go.data.notes.NoteContentCache
 import com.eskerra.go.data.notes.NoteRegistryCache
 import com.eskerra.go.data.notes.ParsedMarkdownCache
 import com.eskerra.go.data.podcast.FilePodcastCatalogRepository
+import com.eskerra.go.data.podcast.FilePodcastFileRepository
 import com.eskerra.go.data.search.SqliteVaultSearchRepository
 import com.eskerra.go.data.todayhub.DataStoreActiveTodayHubStore
 import com.eskerra.go.data.todayhub.FileTodayHubSnapshotStore
@@ -167,13 +171,15 @@ class MainActivity : ComponentActivity() {
             credentialStore = credentialStore,
             remoteSyncRepository = remoteSyncRepository
         )
+        val gitSyncMutex = GitSyncMutex()
         val manualSyncNow = ManualSyncNow(
             remoteSyncRepository = remoteSyncRepository,
             credentialStore = credentialStore,
             registryCache = noteRegistryCache,
             contentCache = noteContentCache,
             loadSyncStatus = loadSyncStatus,
-            reconcileWorkspaceSyncBranch = reconcileWorkspaceSyncBranch
+            reconcileWorkspaceSyncBranch = reconcileWorkspaceSyncBranch,
+            gitSyncMutex = gitSyncMutex
         )
 
         val localSettingsStore = DataStoreLocalSettingsStore(applicationContext)
@@ -205,6 +211,16 @@ class MainActivity : ComponentActivity() {
         val touchVaultSearchPaths = TouchVaultSearchPaths(vaultSearchRepository)
 
         val loadPodcastCatalog = LoadPodcastCatalog(FilePodcastCatalogRepository())
+        val syncMarkPlayedChange = SyncPodcastChange(
+            remoteSyncRepository = remoteSyncRepository,
+            credentialStore = credentialStore,
+            gitSyncMutex = gitSyncMutex,
+            commitMessage = "Mark podcast episodes played"
+        )
+        val markPodcastEpisodesPlayed = MarkPodcastEpisodesPlayed(
+            podcastFileRepository = FilePodcastFileRepository(),
+            syncPodcastChange = syncMarkPlayedChange::invoke
+        )
 
         setContent {
             AppRoot(
@@ -247,6 +263,7 @@ class MainActivity : ComponentActivity() {
                 repairVaultSearchIndex = repairVaultSearchIndex,
                 touchVaultSearchPaths = touchVaultSearchPaths,
                 loadPodcastCatalog = loadPodcastCatalog,
+                markPodcastEpisodesPlayed = markPodcastEpisodesPlayed,
                 onLaunchSettled = {
                     if (keepSplashOnScreen) {
                         keepSplashOnScreen = false

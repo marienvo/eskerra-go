@@ -24,7 +24,7 @@ All JGit mutations share one process-wide **mutex** so manual inbox sync and pod
 | Channel | Use case | Stage | Commit message (example) |
 | --- | --- | --- | --- |
 | Manual inbox sync | User taps sync | `Inbox/` only | `Update inbox notes from Eskerra Go` |
-| Podcast auto-sync | Mark-as-played or RSS refresh complete | Changed podcast paths under `General/` only | `Mark podcast episode(s) played` / `Refresh podcast episodes` |
+| Podcast auto-sync | Mark-as-played or RSS refresh complete | Changed podcast paths under `General/` only | `Mark podcast episodes played` / `Update podcasts from Eskerra Go` |
 
 **Podcast auto-sync flow** (per operation):
 

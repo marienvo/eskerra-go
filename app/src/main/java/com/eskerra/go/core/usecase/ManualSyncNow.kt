@@ -10,13 +10,13 @@ import com.eskerra.go.core.repository.NoteRegistryCachePort
 import com.eskerra.go.core.repository.RemoteSyncRepository
 import com.eskerra.go.data.credentials.CredentialStore
 import com.eskerra.go.data.git.GitBranchNameValidator
+import com.eskerra.go.data.git.GitSyncMutex
 import com.eskerra.go.data.git.SyncGitErrorMapper
 import com.eskerra.go.data.workspace.RemoteUriSecurity
 import com.eskerra.go.data.workspace.WorkspacePaths
 import java.io.File
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
 
 /**
@@ -30,17 +30,16 @@ class ManualSyncNow(
     private val contentCache: NoteContentCachePort? = null,
     private val loadSyncStatus: LoadSyncStatus,
     private val reconcileWorkspaceSyncBranch: ReconcileWorkspaceSyncBranch? = null,
+    private val gitSyncMutex: GitSyncMutex = GitSyncMutex(),
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO
 ) {
-
-    private val syncMutex = Mutex()
 
     suspend operator fun invoke(
         config: WorkspaceConfig,
         filesDir: File,
         onProgress: (SyncProgressStep) -> Unit = {}
     ): Result<SyncResult> = withContext(dispatcher) {
-        if (!syncMutex.tryLock()) {
+        if (!gitSyncMutex.mutex.tryLock()) {
             return@withContext Result.failure(SyncException(SyncError.SyncAlreadyRunning))
         }
         try {
@@ -56,7 +55,7 @@ class ManualSyncNow(
                 }
             }
         } finally {
-            syncMutex.unlock()
+            gitSyncMutex.mutex.unlock()
         }
     }
 

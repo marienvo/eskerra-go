@@ -39,6 +39,9 @@ class FakeRemoteSyncRepository(
 
     override fun stageInboxChanges(workingDir: File): Result<Unit> = Result.success(Unit)
 
+    override fun stagePaths(workingDir: File, relativePaths: Set<String>): Result<Unit> =
+        Result.success(Unit)
+
     override fun commitStaged(workingDir: File, message: String): Result<String> =
         Result.success("abc123")
 

@@ -39,6 +39,7 @@ import com.eskerra.go.core.usecase.LoadTodayHubRow
 import com.eskerra.go.core.usecase.LoadVaultSettings
 import com.eskerra.go.core.usecase.MaintainVaultSearchIndex
 import com.eskerra.go.core.usecase.ManualSyncNow
+import com.eskerra.go.core.usecase.MarkPodcastEpisodesPlayed
 import com.eskerra.go.core.usecase.PrefetchLinkedNotes
 import com.eskerra.go.core.usecase.ReconcileWorkspaceSyncBranch
 import com.eskerra.go.core.usecase.RecordLastSyncAttempt
@@ -107,6 +108,7 @@ fun AppRoot(
     repairVaultSearchIndex: RepairVaultSearchIndex,
     touchVaultSearchPaths: TouchVaultSearchPaths,
     loadPodcastCatalog: LoadPodcastCatalog,
+    markPodcastEpisodesPlayed: MarkPodcastEpisodesPlayed,
     onLaunchSettled: () -> Unit = {}
 ) {
     EskerraGoTheme(darkTheme = true) {
@@ -209,6 +211,7 @@ fun AppRoot(
                         repairVaultSearchIndex = repairVaultSearchIndex,
                         touchVaultSearchPaths = touchVaultSearchPaths,
                         loadPodcastCatalog = loadPodcastCatalog,
+                        markPodcastEpisodesPlayed = markPodcastEpisodesPlayed,
                         onConfigUpdated = gateViewModel::updateReadyConfig,
                         onInboxUiStateChanged = { inboxUiState = it },
                         onTodayHubUiStateChanged = { todayHubUiState = it }

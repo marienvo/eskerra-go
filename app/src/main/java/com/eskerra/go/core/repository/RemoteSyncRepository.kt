@@ -23,6 +23,9 @@ interface RemoteSyncRepository {
 
     fun stageInboxChanges(workingDir: File): Result<Unit>
 
+    /** Stages the given repo-relative [relativePaths] (additions, edits, and deletions). */
+    fun stagePaths(workingDir: File, relativePaths: Set<String>): Result<Unit>
+
     fun commitStaged(workingDir: File, message: String): Result<String>
 
     fun fetch(workingDir: File, httpsToken: String?): Result<Unit>

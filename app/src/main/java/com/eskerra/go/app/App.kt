@@ -45,6 +45,7 @@ import com.eskerra.go.core.usecase.LoadTodayHubRow
 import com.eskerra.go.core.usecase.LoadVaultSettings
 import com.eskerra.go.core.usecase.MaintainVaultSearchIndex
 import com.eskerra.go.core.usecase.ManualSyncNow
+import com.eskerra.go.core.usecase.MarkPodcastEpisodesPlayed
 import com.eskerra.go.core.usecase.PrefetchLinkedNotes
 import com.eskerra.go.core.usecase.ReconcileWorkspaceSyncBranch
 import com.eskerra.go.core.usecase.RecordLastSyncAttempt
@@ -114,6 +115,7 @@ fun App(
     repairVaultSearchIndex: RepairVaultSearchIndex,
     touchVaultSearchPaths: TouchVaultSearchPaths,
     loadPodcastCatalog: LoadPodcastCatalog,
+    markPodcastEpisodesPlayed: MarkPodcastEpisodesPlayed,
     onConfigUpdated: (WorkspaceConfig) -> Unit,
     onInboxUiStateChanged: (InboxUiState) -> Unit = {},
     onTodayHubUiStateChanged: (TodayHubUiState) -> Unit = {}
@@ -271,7 +273,8 @@ fun App(
                 AppPodcastsRoute(
                     currentConfig = currentConfig,
                     filesDir = filesDir,
-                    loadPodcastCatalog = loadPodcastCatalog
+                    loadPodcastCatalog = loadPodcastCatalog,
+                    markPodcastEpisodesPlayed = markPodcastEpisodesPlayed
                 )
             }
 

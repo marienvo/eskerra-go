@@ -34,6 +34,9 @@ object SyncRecoveryGuidance {
         SyncError.NonInboxStagedChanges -> SyncRecoveryAction(
             hint = "Unstage or commit non-Inbox/ files with Git on a computer before syncing."
         )
+        SyncError.UnexpectedStagedChanges -> SyncRecoveryAction(
+            hint = "Unstage unexpected files with Git on a computer before podcast sync runs."
+        )
         SyncError.UnsafeLocalPath -> SyncRecoveryAction(
             hint = "Fix unsafe working tree paths with Git on a computer before syncing."
         )

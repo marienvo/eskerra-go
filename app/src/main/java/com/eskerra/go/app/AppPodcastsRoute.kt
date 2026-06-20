@@ -6,6 +6,7 @@ import androidx.compose.runtime.getValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.usecase.LoadPodcastCatalog
+import com.eskerra.go.core.usecase.MarkPodcastEpisodesPlayed
 import com.eskerra.go.feature.podcasts.PodcastsScreen
 import com.eskerra.go.feature.podcasts.PodcastsViewModel
 import java.io.File
@@ -14,14 +15,16 @@ import java.io.File
 internal fun AppPodcastsRoute(
     currentConfig: WorkspaceConfig,
     filesDir: File,
-    loadPodcastCatalog: LoadPodcastCatalog
+    loadPodcastCatalog: LoadPodcastCatalog,
+    markPodcastEpisodesPlayed: MarkPodcastEpisodesPlayed
 ) {
     val podcastsViewModel: PodcastsViewModel = viewModel(
         key = "${currentConfig.remoteUri.orEmpty()}:${currentConfig.branch}",
         factory = PodcastsViewModel.factory(
             config = currentConfig,
             filesDir = filesDir,
-            loadPodcastCatalog = loadPodcastCatalog
+            loadPodcastCatalog = loadPodcastCatalog,
+            markPodcastEpisodesPlayed = markPodcastEpisodesPlayed
         )
     )
     val podcastsState by podcastsViewModel.uiState.collectAsState()

@@ -81,6 +81,11 @@ sealed interface SyncError {
             "Sync stopped because non-Inbox/ files are staged. Resolve them with Git before syncing."
     }
 
+    data object UnexpectedStagedChanges : SyncError {
+        override fun message() =
+            "Podcast sync stopped because unexpected files are staged. Resolve them with Git first."
+    }
+
     data object RegistryRefreshFailed : SyncError {
         override fun message() =
             "Sync updated the repository, but the note list could not refresh. Local notes are still available."

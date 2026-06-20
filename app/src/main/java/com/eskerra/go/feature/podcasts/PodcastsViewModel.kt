@@ -8,6 +8,7 @@ import com.eskerra.go.core.model.PodcastCatalogException
 import com.eskerra.go.core.model.PodcastEpisode
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.usecase.LoadPodcastCatalog
+import com.eskerra.go.core.usecase.MarkPodcastEpisodesPlayed
 import java.io.File
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,7 +19,8 @@ import kotlinx.coroutines.launch
 class PodcastsViewModel(
     private val config: WorkspaceConfig,
     private val filesDir: File,
-    private val loadPodcastCatalog: LoadPodcastCatalog
+    private val loadPodcastCatalog: LoadPodcastCatalog,
+    private val markPodcastEpisodesPlayed: MarkPodcastEpisodesPlayed
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<PodcastsUiState>(PodcastsUiState.Loading)
@@ -55,6 +57,19 @@ class PodcastsViewModel(
         // Playback wiring lands in phase 4.
     }
 
+    /**
+     * Marks one or more episodes as played: flips the markdown checkbox, commits the
+     * change to git on its own channel, and reloads the catalog so the played
+     * episodes disappear from the list.
+     */
+    fun markEpisodesPlayed(episodes: List<PodcastEpisode>) {
+        if (episodes.isEmpty()) return
+        viewModelScope.launch {
+            markPodcastEpisodesPlayed(config, filesDir, episodes)
+                .onSuccess { result -> if (result.updated) refresh() }
+        }
+    }
+
     private fun mapFailure(error: Throwable): String {
         val catalogError = (error as? PodcastCatalogException)?.error
         return when (catalogError) {
@@ -73,13 +88,15 @@ class PodcastsViewModel(
         fun factory(
             config: WorkspaceConfig,
             filesDir: File,
-            loadPodcastCatalog: LoadPodcastCatalog
+            loadPodcastCatalog: LoadPodcastCatalog,
+            markPodcastEpisodesPlayed: MarkPodcastEpisodesPlayed
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T = PodcastsViewModel(
                 config,
                 filesDir,
-                loadPodcastCatalog
+                loadPodcastCatalog,
+                markPodcastEpisodesPlayed
             ) as T
         }
     }
