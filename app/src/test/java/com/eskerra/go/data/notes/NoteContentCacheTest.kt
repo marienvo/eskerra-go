@@ -22,6 +22,13 @@ class NoteContentCacheTest {
         branch = "master",
         setupCompletedAtEpochMs = 1_700_000_000_000L
     )
+    private val config2 = WorkspaceConfig(
+        name = "My Notes",
+        relativePath = "vault",
+        remoteUri = null,
+        branch = "feature/other",
+        setupCompletedAtEpochMs = 1_700_000_000_000L
+    )
     private val filesDir = File("/tmp/does-not-matter")
 
     private fun noteId(name: String) = NoteId("Inbox/$name.md")
@@ -131,6 +138,23 @@ class NoteContentCacheTest {
         cache.load(config, filesDir, b)
 
         assertEquals(4, repo.callCount)
+    }
+
+    @Test
+    fun load_fingerprintChange_clearsCacheAndDelegatesAgain() = runTest {
+        val id = noteId("A")
+        val repo = repo(id to "# A")
+        val cache = NoteContentCache(repo)
+
+        cache.load(config, filesDir, id) // miss → delegate; fingerprint = FP1
+        cache.load(config, filesDir, id) // hit
+        assertEquals(1, repo.callCount)
+
+        cache.load(config2, filesDir, id) // fingerprint changed → clear → delegate
+        assertEquals(2, repo.callCount)
+
+        cache.load(config2, filesDir, id) // hit under FP2
+        assertEquals(2, repo.callCount)
     }
 
     private class MultiNoteRepository(private val notes: Map<NoteId, String>) :
