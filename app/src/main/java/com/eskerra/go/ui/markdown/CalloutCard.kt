@@ -12,27 +12,32 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.eskerra.go.core.markdown.CalloutBlocks
+import com.eskerra.go.core.markdown.CalloutHeader
 import com.eskerra.go.core.model.NoteId
 import com.mikepenz.markdown.compose.Markdown
 import com.mikepenz.markdown.model.MarkdownColors
 import com.mikepenz.markdown.model.MarkdownTypography
+import com.mikepenz.markdown.model.State
 import java.io.File
 
 /**
  * Renders a single Obsidian callout block (spec §8) as a tinted card with an accent title and the
- * inner body rendered as standard markdown.
+ * inner body rendered as standard markdown. The body is pre-parsed (see
+ * [com.eskerra.go.core.markdown.PreparedSegment.Callout]) so it paints together with the rest of the
+ * note; [body] is `null` when the callout has no body.
  */
 @Composable
 fun CalloutCard(
-    callout: CalloutBlocks.Segment.Callout,
+    resolved: CalloutHeader.ResolvedCallout,
+    title: String,
+    body: State?,
     colors: MarkdownColors,
     typography: MarkdownTypography,
     modifier: Modifier = Modifier,
     workspaceRoot: File? = null,
     sourceNoteId: NoteId? = null
 ) {
-    val accent = VaultMarkdownTokens.calloutAccent(callout.resolved.color)
+    val accent = VaultMarkdownTokens.calloutAccent(resolved.color)
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -43,14 +48,14 @@ fun CalloutCard(
     ) {
         Column {
             Text(
-                text = callout.title,
+                text = title,
                 color = accent,
                 fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(bottom = if (callout.body.isEmpty()) 0.dp else 6.dp)
+                modifier = Modifier.padding(bottom = if (body == null) 0.dp else 6.dp)
             )
-            if (callout.body.isNotEmpty()) {
+            if (body != null) {
                 Markdown(
-                    content = callout.body,
+                    body,
                     colors = colors,
                     typography = typography,
                     components = vaultMarkdownComponents(workspaceRoot, sourceNoteId),
