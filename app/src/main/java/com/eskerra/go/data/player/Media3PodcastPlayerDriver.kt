@@ -63,7 +63,7 @@ class Media3PodcastPlayerDriver(context: Context) : PodcastPlayerDriver {
         connect()
     }
 
-    override fun play(episode: PodcastEpisode) {
+    override fun play(episode: PodcastEpisode, startPositionMs: Long) {
         reduce(PodcastPlayerEvent.EpisodePlayRequested(episode))
         withController { mediaController ->
             val item = MediaItem.Builder()
@@ -78,9 +78,16 @@ class Media3PodcastPlayerDriver(context: Context) : PodcastPlayerDriver {
                 .build()
             mediaController.setMediaItem(item)
             mediaController.prepare()
+            if (startPositionMs > 0L) {
+                mediaController.seekTo(startPositionMs)
+            }
             mediaController.play()
             publishNativeSnapshot(mediaController)
         }
+    }
+
+    override fun hydrate(episode: PodcastEpisode, positionMs: Long, durationMs: Long?) {
+        reduce(PodcastPlayerEvent.PlaylistHydrated(episode, positionMs, durationMs))
     }
 
     override fun pause() {

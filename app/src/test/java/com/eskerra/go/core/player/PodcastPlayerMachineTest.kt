@@ -10,6 +10,23 @@ import org.junit.Test
 class PodcastPlayerMachineTest {
 
     @Test
+    fun playlistHydrated_movesToPrimedWithPosition() {
+        val episode = sampleEpisode()
+        val next = PodcastPlayerMachine.reduce(
+            PodcastPlaybackState(),
+            PodcastPlayerEvent.PlaylistHydrated(
+                episode = episode,
+                positionMs = 15_000L,
+                durationMs = 60_000L
+            )
+        )
+
+        assertEquals(PodcastPlaybackPhase.PRIMED, next.phase)
+        assertEquals(15_000L, next.positionMs)
+        assertEquals(episode.id, next.activeEpisode?.id)
+    }
+
+    @Test
     fun playRequested_movesToLoadingWithEpisode() {
         val next = PodcastPlayerMachine.reduce(
             PodcastPlaybackState(),

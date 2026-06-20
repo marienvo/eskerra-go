@@ -340,12 +340,13 @@ private fun rowStatusText(episode: PodcastEpisode, playerState: PodcastPlaybackS
 }
 
 private fun playerStatusText(playerState: PodcastPlaybackState): String = when (playerState.phase) {
+    PodcastPlaybackPhase.PRIMED,
+    PodcastPlaybackPhase.PAUSED -> "Paused"
     PodcastPlaybackPhase.LOADING -> when {
         playerState.positionMs >= 10_000L -> "Resuming..."
         else -> "Starting..."
     }
     PodcastPlaybackPhase.PLAYING -> "Playing"
-    PodcastPlaybackPhase.PAUSED -> "Paused"
     PodcastPlaybackPhase.NEAR_END_PLAYING,
     PodcastPlaybackPhase.NEAR_END_PAUSED -> "Almost done"
     PodcastPlaybackPhase.ENDED -> "Ended"

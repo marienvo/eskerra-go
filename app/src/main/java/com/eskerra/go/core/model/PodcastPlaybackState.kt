@@ -2,6 +2,7 @@ package com.eskerra.go.core.model
 
 enum class PodcastPlaybackPhase {
     IDLE,
+    PRIMED,
     LOADING,
     PLAYING,
     PAUSED,

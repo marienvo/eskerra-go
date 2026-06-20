@@ -14,6 +14,12 @@ enum class PodcastNativePlaybackState {
 }
 
 sealed interface PodcastPlayerEvent {
+    data class PlaylistHydrated(
+        val episode: PodcastEpisode,
+        val positionMs: Long,
+        val durationMs: Long?
+    ) : PodcastPlayerEvent
+
     data class EpisodePlayRequested(val episode: PodcastEpisode) : PodcastPlayerEvent
     data object PauseRequested : PodcastPlayerEvent
     data object ResumeRequested : PodcastPlayerEvent
@@ -36,6 +42,14 @@ object PodcastPlayerMachine {
 
     fun reduce(state: PodcastPlaybackState, event: PodcastPlayerEvent): PodcastPlaybackState =
         when (event) {
+            is PodcastPlayerEvent.PlaylistHydrated -> PodcastPlaybackState(
+                activeEpisode = event.episode,
+                phase = PodcastPlaybackPhase.PRIMED,
+                positionMs = sanitizedPosition(event.positionMs),
+                durationMs = event.durationMs?.takeIf { it > 0L },
+                transportBusy = false
+            )
+
             is PodcastPlayerEvent.EpisodePlayRequested -> PodcastPlaybackState(
                 activeEpisode = event.episode,
                 phase = PodcastPlaybackPhase.LOADING,

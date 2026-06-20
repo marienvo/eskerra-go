@@ -117,6 +117,7 @@ fun App(
     touchVaultSearchPaths: TouchVaultSearchPaths,
     loadPodcastCatalog: LoadPodcastCatalog,
     markPodcastEpisodesPlayed: MarkPodcastEpisodesPlayed,
+    podcastPlaylistWiring: PodcastPlaylistWiring,
     podcastPlayerDriver: PodcastPlayerDriver,
     onConfigUpdated: (WorkspaceConfig) -> Unit,
     onInboxUiStateChanged: (InboxUiState) -> Unit = {},
@@ -126,6 +127,13 @@ fun App(
     val workspaceRoot = remember(currentConfig, filesDir) {
         WorkspacePaths.resolve(filesDir, currentConfig.relativePath).getOrNull()
     }
+    val playlistPollingHost = rememberPlaylistR2PollingHost(
+        workspaceRoot = workspaceRoot,
+        loadVaultSettings = loadVaultSettings,
+        playlistSyncRepository = podcastPlaylistWiring.repository,
+        playlistR2ConditionalFetch = podcastPlaylistWiring.conditionalFetch,
+        podcastPlayerDriver = podcastPlayerDriver
+    )
     val navController = rememberNavController()
     val scope = rememberCoroutineScope()
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -277,7 +285,9 @@ fun App(
                     filesDir = filesDir,
                     loadPodcastCatalog = loadPodcastCatalog,
                     markPodcastEpisodesPlayed = markPodcastEpisodesPlayed,
-                    podcastPlayerDriver = podcastPlayerDriver
+                    podcastPlaylistSync = podcastPlaylistWiring.sync,
+                    podcastPlayerDriver = podcastPlayerDriver,
+                    playlistPollingHost = playlistPollingHost
                 )
             }
 

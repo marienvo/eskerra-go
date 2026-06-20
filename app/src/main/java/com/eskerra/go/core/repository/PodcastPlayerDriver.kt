@@ -7,7 +7,9 @@ import kotlinx.coroutines.flow.StateFlow
 interface PodcastPlayerDriver {
     val state: StateFlow<PodcastPlaybackState>
 
-    fun play(episode: PodcastEpisode)
+    fun play(episode: PodcastEpisode, startPositionMs: Long = 0L)
+
+    fun hydrate(episode: PodcastEpisode, positionMs: Long, durationMs: Long?)
 
     fun pause()
 

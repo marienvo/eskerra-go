@@ -11,9 +11,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.eskerra.go.app.AppRoot
+import com.eskerra.go.app.PodcastPlaylistWiring
 import com.eskerra.go.core.repository.PodcastPlayerDriver
 import com.eskerra.go.core.usecase.BuildSafeSyncDiagnostic
 import com.eskerra.go.core.usecase.BuildSyncPreflight
+import com.eskerra.go.core.usecase.ClearPlaylist
 import com.eskerra.go.core.usecase.ClearRemoteSyncSettings
 import com.eskerra.go.core.usecase.CreateInboxNote
 import com.eskerra.go.core.usecase.DeleteInboxNotes
@@ -33,7 +35,9 @@ import com.eskerra.go.core.usecase.LoadVaultSettings
 import com.eskerra.go.core.usecase.MaintainVaultSearchIndex
 import com.eskerra.go.core.usecase.ManualSyncNow
 import com.eskerra.go.core.usecase.MarkPodcastEpisodesPlayed
+import com.eskerra.go.core.usecase.PodcastPlaylistSync
 import com.eskerra.go.core.usecase.PrefetchLinkedNotes
+import com.eskerra.go.core.usecase.ReadPlaylist
 import com.eskerra.go.core.usecase.ReconcileWorkspaceSyncBranch
 import com.eskerra.go.core.usecase.RecordLastSyncAttempt
 import com.eskerra.go.core.usecase.RefreshRemoteSyncStatus
@@ -47,6 +51,7 @@ import com.eskerra.go.core.usecase.SyncPodcastChange
 import com.eskerra.go.core.usecase.TestRemoteConnection
 import com.eskerra.go.core.usecase.TouchVaultSearchPaths
 import com.eskerra.go.core.usecase.UpdateSyncToken
+import com.eskerra.go.core.usecase.WritePlaylist
 import com.eskerra.go.data.credentials.AndroidKeystoreTokenCipher
 import com.eskerra.go.data.credentials.EncryptedCredentialStore
 import com.eskerra.go.data.git.GitSyncMutex
@@ -64,6 +69,10 @@ import com.eskerra.go.data.notes.ParsedMarkdownCache
 import com.eskerra.go.data.player.Media3PodcastPlayerDriver
 import com.eskerra.go.data.podcast.FilePodcastCatalogRepository
 import com.eskerra.go.data.podcast.FilePodcastFileRepository
+import com.eskerra.go.data.r2.PlaylistR2ConditionalFetch
+import com.eskerra.go.data.r2.R2PlaylistConditionalClient
+import com.eskerra.go.data.r2.R2PlaylistObjectClient
+import com.eskerra.go.data.r2.R2PlaylistSyncRepository
 import com.eskerra.go.data.search.SqliteVaultSearchRepository
 import com.eskerra.go.data.todayhub.DataStoreActiveTodayHubStore
 import com.eskerra.go.data.todayhub.FileTodayHubSnapshotStore
@@ -73,6 +82,7 @@ import com.eskerra.go.data.workspace.DataStoreWorkspaceStore
 import com.eskerra.go.data.workspace.DefaultRemoteSyncSettingsRepository
 import com.eskerra.go.data.workspace.DefaultWorkspaceSetupCompletion
 import com.eskerra.go.data.workspace.DefaultWorkspaceSetupRepository
+import okhttp3.OkHttpClient
 
 /** Single entry point. Hosts the Compose UI and nothing else. */
 class MainActivity : ComponentActivity() {
@@ -228,6 +238,34 @@ class MainActivity : ComponentActivity() {
         val podcastPlayerDriver = Media3PodcastPlayerDriver(applicationContext)
             .also { this.podcastPlayerDriver = it }
 
+        val r2HttpClient = OkHttpClient()
+        val r2PlaylistObjectClient = R2PlaylistObjectClient(r2HttpClient)
+        val playlistSyncRepository = R2PlaylistSyncRepository(
+            settingsRepository = vaultSettingsRepository,
+            localSettingsStore = localSettingsStore,
+            r2Client = r2PlaylistObjectClient
+        )
+        val readPlaylist = ReadPlaylist(playlistSyncRepository)
+        val writePlaylist = WritePlaylist(playlistSyncRepository)
+        val clearPlaylist = ClearPlaylist(playlistSyncRepository)
+        val podcastPlaylistSync = PodcastPlaylistSync(
+            readPlaylist = readPlaylist,
+            writePlaylist = writePlaylist,
+            clearPlaylist = clearPlaylist,
+            loadVaultSettings = loadVaultSettings,
+            ensureDeviceInstanceId = ensureDeviceInstanceId
+        )
+        val playlistR2ConditionalFetch = PlaylistR2ConditionalFetch(
+            loadVaultSettings = loadVaultSettings,
+            conditionalClient = R2PlaylistConditionalClient(r2HttpClient)
+        )
+
+        val podcastPlaylistWiring = PodcastPlaylistWiring(
+            sync = podcastPlaylistSync,
+            repository = playlistSyncRepository,
+            conditionalFetch = playlistR2ConditionalFetch
+        )
+
         setContent {
             AppRoot(
                 workspaceStore = workspaceStore,
@@ -270,6 +308,7 @@ class MainActivity : ComponentActivity() {
                 touchVaultSearchPaths = touchVaultSearchPaths,
                 loadPodcastCatalog = loadPodcastCatalog,
                 markPodcastEpisodesPlayed = markPodcastEpisodesPlayed,
+                podcastPlaylistWiring = podcastPlaylistWiring,
                 podcastPlayerDriver = podcastPlayerDriver,
                 onLaunchSettled = {
                     if (keepSplashOnScreen) {

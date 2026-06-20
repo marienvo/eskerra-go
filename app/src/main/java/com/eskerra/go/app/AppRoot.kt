@@ -110,6 +110,7 @@ fun AppRoot(
     touchVaultSearchPaths: TouchVaultSearchPaths,
     loadPodcastCatalog: LoadPodcastCatalog,
     markPodcastEpisodesPlayed: MarkPodcastEpisodesPlayed,
+    podcastPlaylistWiring: PodcastPlaylistWiring,
     podcastPlayerDriver: PodcastPlayerDriver,
     onLaunchSettled: () -> Unit = {}
 ) {
@@ -214,6 +215,7 @@ fun AppRoot(
                         touchVaultSearchPaths = touchVaultSearchPaths,
                         loadPodcastCatalog = loadPodcastCatalog,
                         markPodcastEpisodesPlayed = markPodcastEpisodesPlayed,
+                        podcastPlaylistWiring = podcastPlaylistWiring,
                         podcastPlayerDriver = podcastPlayerDriver,
                         onConfigUpdated = gateViewModel::updateReadyConfig,
                         onInboxUiStateChanged = { inboxUiState = it },

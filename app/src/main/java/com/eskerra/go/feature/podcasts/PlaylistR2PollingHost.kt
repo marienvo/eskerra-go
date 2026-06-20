@@ -19,8 +19,7 @@ import kotlinx.coroutines.flow.asStateFlow
  * - Bumps [playlistSyncGeneration] so observers can re-fetch.
  * - Invalidates the [PlaylistSyncRepository] coalesced read cache.
  *
- * Player integration is a TODO (see §1.6 / Phase 9 plan).
- * Activate via [ProcessLifecycleOwner] in App; call [setPlaybackActive] from the audio player.
+ * Player integration: call [setPlaybackActive] from the audio player via [AppPodcastPlaylistEffects].
  */
 class PlaylistR2PollingHost(
     private val syncRepository: PlaylistSyncRepository,
@@ -59,7 +58,6 @@ class PlaylistR2PollingHost(
 
     /**
      * Call from the audio player when playback starts/stops.
-     * TODO: wire to the podcast player (Phase 9 / player follow-up).
      */
     fun setPlaybackActive(playing: Boolean) {
         if (playbackActive == playing) return
