@@ -118,7 +118,7 @@ class ManualSyncNowTest {
     }
 
     @Test
-    fun divergedHistory_stopsWithTypedError() = runTest {
+    fun divergedHistory_mergesAndSyncs() = runTest {
         val setup = cloneSeededWorkspace()
         gitRepo.writeFile(setup.workspaceDir, "Inbox/local.md", "local").getOrThrow()
         gitRepo.stageAll(setup.workspaceDir).getOrThrow()
@@ -133,22 +133,64 @@ class ManualSyncNowTest {
 
         val result = manualSync(setup.config, setup.filesDir)
 
-        assertTrue(result.isFailure)
-        val error = (result.exceptionOrNull() as SyncException).error
-        assertTrue(error is SyncError.Diverged)
+        assertTrue(result.isSuccess)
+        val syncResult = result.getOrThrow()
+        assertTrue(syncResult.pulled)
+        assertTrue(syncResult.pushed)
+        // Remote change is integrated locally, and no conflict (different files).
+        assertTrue(File(setup.workspaceDir, "Projects/remote.md").isFile)
+        assertTrue(syncResult.conflictCopies.isEmpty())
+        // Local commit reached the remote.
+        val verify = temp.newFolder("verify-diverged")
+        gitRepo.cloneFrom(setup.remoteUri, verify).getOrThrow()
+        assertTrue(File(verify, "Inbox/local.md").isFile)
     }
 
     @Test
-    fun syncRefuses_localNonInboxChanges() = runTest {
+    fun conflictingChange_savesLocalCopyAndRemoteWins() = runTest {
+        val setup = cloneSeededWorkspace()
+        // Remote edits a tracked file.
+        val producer = temp.newFolder("producer")
+        gitRepo.cloneFrom(setup.remoteUri, producer).getOrThrow()
+        gitRepo.writeFile(producer, "Projects/read.md", "REMOTE VERSION\n").getOrThrow()
+        gitRepo.stageAll(producer).getOrThrow()
+        gitRepo.commit(producer, "remote edit").getOrThrow()
+        gitRepo.push(producer).getOrThrow()
+        // Local edits the same file differently (uncommitted).
+        gitRepo.writeFile(setup.workspaceDir, "Projects/read.md", "LOCAL VERSION\n").getOrThrow()
+
+        val result = manualSync(setup.config, setup.filesDir)
+
+        assertTrue(result.isSuccess)
+        val syncResult = result.getOrThrow()
+        assertTrue(syncResult.pushed)
+        // Remote wins the canonical file.
+        assertEquals("REMOTE VERSION\n", File(setup.workspaceDir, "Projects/read.md").readText())
+        // Local version is preserved as a sidecar copy.
+        assertEquals(1, syncResult.conflictCopies.size)
+        val copyPath = syncResult.conflictCopies.single()
+        assertTrue(copyPath.startsWith("Projects/read (conflict "))
+        assertTrue(copyPath.endsWith(").md"))
+        assertEquals("LOCAL VERSION\n", File(setup.workspaceDir, copyPath).readText())
+        // The copy reached the remote too, so nothing is lost.
+        val verify = temp.newFolder("verify-conflict")
+        gitRepo.cloneFrom(setup.remoteUri, verify).getOrThrow()
+        assertTrue(File(verify, copyPath).isFile)
+    }
+
+    @Test
+    fun localNonInboxChange_isCommittedAndPushed() = runTest {
         val setup = cloneSeededWorkspace()
         gitRepo.writeFile(setup.workspaceDir, "Projects/local-edit.md", "edit").getOrThrow()
 
         val result = manualSync(setup.config, setup.filesDir)
 
-        assertTrue(result.isFailure)
-        assertTrue(
-            (result.exceptionOrNull() as SyncException).error is SyncError.NonInboxLocalChanges
-        )
+        assertTrue(result.isSuccess)
+        assertTrue(result.getOrThrow().committed)
+        assertTrue(result.getOrThrow().pushed)
+        val verify = temp.newFolder("verify-noninbox")
+        gitRepo.cloneFrom(setup.remoteUri, verify).getOrThrow()
+        assertTrue(File(verify, "Projects/local-edit.md").isFile)
     }
 
     @Test
@@ -343,7 +385,7 @@ class ManualSyncNowTest {
     }
 
     @Test
-    fun syncRefuses_preStagedNonInboxFile() = runTest {
+    fun preStagedNonInboxFile_isCommittedAndPushed() = runTest {
         val setup = cloneSeededWorkspace()
         gitRepo.writeFile(setup.workspaceDir, "Projects/staged.md", "staged").getOrThrow()
         org.eclipse.jgit.api.Git.open(setup.workspaceDir).use { git ->
@@ -352,11 +394,11 @@ class ManualSyncNowTest {
 
         val result = manualSync(setup.config, setup.filesDir)
 
-        assertTrue(result.isFailure)
-        val error = (result.exceptionOrNull() as SyncException).error
-        assertTrue(
-            error is SyncError.NonInboxStagedChanges || error is SyncError.NonInboxLocalChanges
-        )
+        assertTrue(result.isSuccess)
+        assertTrue(result.getOrThrow().pushed)
+        val verify = temp.newFolder("verify-staged")
+        gitRepo.cloneFrom(setup.remoteUri, verify).getOrThrow()
+        assertTrue(File(verify, "Projects/staged.md").isFile)
     }
 
     @Test
@@ -373,9 +415,10 @@ class ManualSyncNowTest {
     }
 
     @Test
-    fun syncCommit_containsOnlyInboxPaths() = runTest {
+    fun syncCommit_containsAllChangedPaths() = runTest {
         val setup = cloneSeededWorkspace()
         gitRepo.writeFile(setup.workspaceDir, "Inbox/only-inbox.md", "# Only inbox\n").getOrThrow()
+        gitRepo.writeFile(setup.workspaceDir, "Projects/also-this.md", "# Also\n").getOrThrow()
 
         manualSync(setup.config, setup.filesDir).getOrThrow()
 
@@ -402,23 +445,21 @@ class ManualSyncNowTest {
                     else -> entry.newPath.takeIf { it != "/dev/null" }
                 }
             }
-            assertTrue(changedPaths.isNotEmpty())
-            assertTrue(changedPaths.all { it == "Inbox" || it.startsWith("Inbox/") })
+            assertTrue(changedPaths.contains("Inbox/only-inbox.md"))
+            assertTrue(changedPaths.contains("Projects/also-this.md"))
         }
     }
 
     @Test
-    fun mergeInProgress_blocksSync() = runTest {
+    fun mergeInProgress_isAbortedThenSyncs() = runTest {
         val setup = cloneSeededWorkspace()
         File(setup.workspaceDir, ".git/MERGE_HEAD").writeText("deadbeef")
 
         val result = manualSync(setup.config, setup.filesDir)
 
-        assertTrue(result.isFailure)
-        assertTrue(
-            (result.exceptionOrNull() as SyncException).error
-                is SyncError.ManualInterventionRequired
-        )
+        assertTrue(result.isSuccess)
+        // The half-finished merge state is gone afterwards.
+        assertFalse(File(setup.workspaceDir, ".git/MERGE_HEAD").exists())
     }
 
     @Test

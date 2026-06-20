@@ -8,5 +8,7 @@ data class SyncResult(
     val pushed: Boolean,
     val pulled: Boolean,
     val registryRefreshed: Boolean = true,
-    val updatedConfig: WorkspaceConfig? = null
+    val updatedConfig: WorkspaceConfig? = null,
+    /** Sidecar copies written to preserve local versions of conflicting files. */
+    val conflictCopies: List<String> = emptyList()
 )

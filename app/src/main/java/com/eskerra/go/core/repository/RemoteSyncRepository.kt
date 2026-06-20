@@ -1,6 +1,7 @@
 package com.eskerra.go.core.repository
 
 import com.eskerra.go.core.model.GitWorkspaceStatus
+import com.eskerra.go.core.model.MergeOutcome
 import com.eskerra.go.core.model.RemoteBranchComparison
 import com.eskerra.go.core.model.SyncChangePartition
 import com.eskerra.go.core.model.SyncStatusSummary
@@ -22,6 +23,27 @@ interface RemoteSyncRepository {
     fun partitionChanges(changedPaths: Set<String>): SyncChangePartition
 
     fun stageInboxChanges(workingDir: File): Result<Unit>
+
+    /** Stages every working-tree change (adds, edits, deletes); skips `.git` internals. */
+    fun stageAllChanges(workingDir: File): Result<Unit> = stageInboxChanges(workingDir)
+
+    /**
+     * Aborts any in-progress merge, rebase, cherry-pick, or revert, restoring a clean
+     * HEAD so sync can proceed instead of refusing. A no-op when nothing is in progress.
+     */
+    fun abortInProgressOperation(workingDir: File): Result<Unit> = Result.success(Unit)
+
+    /**
+     * Merges `origin/[branch]` into the current branch and always ends conflict-free.
+     * Non-conflicting changes merge normally. For each conflicting path the local
+     * ("ours") version is saved to a sidecar copy named with [conflictLabel] and the
+     * remote ("theirs") version becomes canonical (remote-wins).
+     */
+    fun mergeRemote(
+        workingDir: File,
+        branch: String,
+        conflictLabel: String
+    ): Result<MergeOutcome> = Result.success(MergeOutcome(merged = false))
 
     /** Stages the given repo-relative [relativePaths] (additions, edits, and deletions). */
     fun stagePaths(workingDir: File, relativePaths: Set<String>): Result<Unit>

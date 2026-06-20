@@ -125,17 +125,18 @@ class BuildSyncPreflight(
         val aheadCount = comparison?.aheadCount ?: 0
         val behindCount = comparison?.behindCount ?: 0
 
+        // Local changes outside Inbox/ no longer block: they are committed and synced.
+        // Only genuinely unsafe paths (.git internals, `..`) stop a sync.
         val blockReason = when {
             unsafePathCount > 0 -> SyncError.UnsafeLocalPath
-            nonInboxChangeCount > 0 -> SyncError.NonInboxLocalChanges
             stagedUnsafeCount > 0 -> SyncError.UnsafeLocalPath
-            stagedNonInboxCount > 0 -> SyncError.NonInboxStagedChanges
             else -> null
         }
 
+        val localChangeCount = inboxChangeCount + nonInboxChangeCount
         val userMessage = when {
             blockReason != null -> blockReason.message()
-            inboxChangeCount > 0 -> "Ready to sync $inboxChangeCount Inbox change(s)."
+            localChangeCount > 0 -> "Ready to sync $localChangeCount local change(s)."
             behindCount > 0 -> "Ready to sync. Remote has $behindCount commit(s) to integrate."
             aheadCount > 0 -> "Ready to sync. Local branch is $aheadCount commit(s) ahead."
             else -> "Ready to sync."

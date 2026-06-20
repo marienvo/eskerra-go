@@ -11,6 +11,7 @@ import com.eskerra.go.data.workspace.WorkspacePaths
 import java.io.File
 import kotlinx.coroutines.test.runTest
 import org.eclipse.jgit.api.Git
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -49,14 +50,15 @@ class BuildSyncPreflightTest {
     }
 
     @Test
-    fun nonInboxWorkingTreeChanges_blockSync() = runTest {
+    fun nonInboxWorkingTreeChanges_canSync() = runTest {
         val setup = cloneSeededWorkspace()
         gitRepo.writeFile(setup.workspaceDir, "Projects/edit.md", "edit").getOrThrow()
 
         val preflight = buildPreflight(setup.config, setup.filesDir)
 
-        assertFalse(preflight.canSync)
-        assertTrue(preflight.blockReason is SyncError.NonInboxLocalChanges)
+        assertTrue(preflight.canSync)
+        assertEquals(null, preflight.blockReason)
+        assertTrue(preflight.nonInboxChangeCount > 0)
     }
 
     @Test
@@ -71,7 +73,7 @@ class BuildSyncPreflightTest {
     }
 
     @Test
-    fun stagedNonInboxFile_blocksSync() = runTest {
+    fun stagedNonInboxFile_canSync() = runTest {
         val setup = cloneSeededWorkspace()
         gitRepo.writeFile(setup.workspaceDir, "Projects/staged.md", "staged").getOrThrow()
         Git.open(setup.workspaceDir).use { git ->
@@ -80,11 +82,8 @@ class BuildSyncPreflightTest {
 
         val preflight = buildPreflight(setup.config, setup.filesDir)
 
-        assertFalse(preflight.canSync)
-        assertTrue(
-            preflight.blockReason is SyncError.NonInboxStagedChanges ||
-                preflight.blockReason is SyncError.NonInboxLocalChanges
-        )
+        assertTrue(preflight.canSync)
+        assertEquals(null, preflight.blockReason)
     }
 
     private data class Setup(
