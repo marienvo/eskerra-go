@@ -54,6 +54,7 @@ import com.eskerra.go.core.usecase.SaveRemoteSyncSettings
 import com.eskerra.go.core.usecase.SaveVaultSettings
 import com.eskerra.go.core.usecase.SearchVault
 import com.eskerra.go.core.usecase.SyncPodcastChange
+import com.eskerra.go.core.usecase.SyncPodcastChangesViaVaultSync
 import com.eskerra.go.core.usecase.SyncPodcastVaultRefresh
 import com.eskerra.go.core.usecase.TestRemoteConnection
 import com.eskerra.go.core.usecase.TouchVaultSearchPaths
@@ -248,11 +249,9 @@ class MainActivity : ComponentActivity() {
             podcastFileRepository = FilePodcastFileRepository(),
             syncPodcastChange = syncMarkPlayedChange::invoke
         )
-        val syncRefreshChange = SyncPodcastChange(
-            remoteSyncRepository = remoteSyncRepository,
-            credentialStore = credentialStore,
-            gitSyncMutex = gitSyncMutex,
-            commitMessage = "Refresh podcast episodes"
+        // Podcast refresh commits + merges + pushes through the unconditional sync engine.
+        val syncRefreshChange = SyncPodcastChangesViaVaultSync(
+            runVaultSync = { cfg, files -> manualSyncNow(cfg, files) }
         )
         val okHttpClient = OkHttpClient()
         val rssFeedFetcher = OkHttpRssFeedFetcher(okHttpClient)
