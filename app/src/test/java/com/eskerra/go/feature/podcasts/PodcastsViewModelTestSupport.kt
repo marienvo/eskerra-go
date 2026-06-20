@@ -16,6 +16,9 @@ import com.eskerra.go.core.repository.PlaylistSyncRepository
 import com.eskerra.go.core.repository.PodcastCatalogRepository
 import com.eskerra.go.core.repository.PodcastFileRepository
 import com.eskerra.go.core.repository.PodcastPlayerDriver
+import com.eskerra.go.core.repository.PodcastRefreshProgress
+import com.eskerra.go.core.repository.PodcastRssVaultSync
+import com.eskerra.go.core.repository.PodcastRssVaultSyncSummary
 import com.eskerra.go.core.repository.VaultSettingsRepository
 import com.eskerra.go.core.usecase.ClearPlaylist
 import com.eskerra.go.core.usecase.EnsureDeviceInstanceId
@@ -23,6 +26,7 @@ import com.eskerra.go.core.usecase.LoadVaultSettings
 import com.eskerra.go.core.usecase.MarkPodcastEpisodesPlayed
 import com.eskerra.go.core.usecase.PodcastPlaylistSync
 import com.eskerra.go.core.usecase.ReadPlaylist
+import com.eskerra.go.core.usecase.SyncPodcastVaultRefresh
 import com.eskerra.go.core.usecase.WritePlaylist
 import java.io.File
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -43,6 +47,17 @@ internal fun samplePodcastEpisode() = PodcastEpisode(
 
 internal fun noopMarkPodcastEpisodesPlayed() = MarkPodcastEpisodesPlayed(
     podcastFileRepository = InMemoryPodcastFileRepository(mutableMapOf()),
+    syncPodcastChange = { _, _ -> Result.success(PodcastSyncResult.NOTHING_TO_COMMIT) }
+)
+
+internal fun noopSyncPodcastVaultRefresh() = SyncPodcastVaultRefresh(
+    vaultSync = object : PodcastRssVaultSync {
+        override suspend fun refresh(
+            config: WorkspaceConfig,
+            filesDir: File,
+            onProgress: (PodcastRefreshProgress) -> Unit
+        ): Result<PodcastRssVaultSyncSummary> = Result.success(PodcastRssVaultSyncSummary.EMPTY)
+    },
     syncPodcastChange = { _, _ -> Result.success(PodcastSyncResult.NOTHING_TO_COMMIT) }
 )
 

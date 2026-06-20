@@ -67,7 +67,8 @@ class PodcastsViewModelTest {
             ),
             markPodcastEpisodesPlayed = noopMarkPodcastEpisodesPlayed(),
             podcastPlaylistSync = noopPodcastPlaylistSync(),
-            podcastPlayerDriver = FakePodcastPlayerDriver()
+            podcastPlayerDriver = FakePodcastPlayerDriver(),
+            syncPodcastVaultRefresh = noopSyncPodcastVaultRefresh()
         )
 
         advanceUntilIdle()
@@ -86,7 +87,8 @@ class PodcastsViewModelTest {
             ),
             markPodcastEpisodesPlayed = noopMarkPodcastEpisodesPlayed(),
             podcastPlaylistSync = noopPodcastPlaylistSync(),
-            podcastPlayerDriver = FakePodcastPlayerDriver()
+            podcastPlayerDriver = FakePodcastPlayerDriver(),
+            syncPodcastVaultRefresh = noopSyncPodcastVaultRefresh()
         )
 
         advanceUntilIdle()
@@ -106,7 +108,8 @@ class PodcastsViewModelTest {
             ),
             markPodcastEpisodesPlayed = noopMarkPodcastEpisodesPlayed(),
             podcastPlaylistSync = noopPodcastPlaylistSync(),
-            podcastPlayerDriver = FakePodcastPlayerDriver()
+            podcastPlayerDriver = FakePodcastPlayerDriver(),
+            syncPodcastVaultRefresh = noopSyncPodcastVaultRefresh()
         )
 
         advanceUntilIdle()
@@ -151,7 +154,8 @@ class PodcastsViewModelTest {
                 }
             ),
             podcastPlaylistSync = noopPodcastPlaylistSync(),
-            podcastPlayerDriver = FakePodcastPlayerDriver()
+            podcastPlayerDriver = FakePodcastPlayerDriver(),
+            syncPodcastVaultRefresh = noopSyncPodcastVaultRefresh()
         )
         advanceUntilIdle()
         assertTrue(viewModel.uiState.value is PodcastsUiState.Content)
@@ -182,7 +186,8 @@ class PodcastsViewModelTest {
             ),
             markPodcastEpisodesPlayed = noopMarkPodcastEpisodesPlayed(),
             podcastPlaylistSync = noopPodcastPlaylistSync(),
-            podcastPlayerDriver = FakePodcastPlayerDriver()
+            podcastPlayerDriver = FakePodcastPlayerDriver(),
+            syncPodcastVaultRefresh = noopSyncPodcastVaultRefresh()
         )
         advanceUntilIdle()
 
@@ -209,7 +214,8 @@ class PodcastsViewModelTest {
             ),
             markPodcastEpisodesPlayed = noopMarkPodcastEpisodesPlayed(),
             podcastPlaylistSync = noopPodcastPlaylistSync(),
-            podcastPlayerDriver = playerDriver
+            podcastPlayerDriver = playerDriver,
+            syncPodcastVaultRefresh = noopSyncPodcastVaultRefresh()
         )
         advanceUntilIdle()
 
@@ -245,7 +251,8 @@ class PodcastsViewModelTest {
                 syncPodcastChange = { _, _ -> Result.success(PodcastSyncResult.NOTHING_TO_COMMIT) }
             ),
             podcastPlaylistSync = noopPodcastPlaylistSync(),
-            podcastPlayerDriver = playerDriver
+            podcastPlayerDriver = playerDriver,
+            syncPodcastVaultRefresh = noopSyncPodcastVaultRefresh()
         )
         advanceUntilIdle()
 
@@ -305,7 +312,8 @@ class PodcastsViewModelTest {
                 readEntry = playlistEntry,
                 r2Configured = true
             ),
-            podcastPlayerDriver = playerDriver
+            podcastPlayerDriver = playerDriver,
+            syncPodcastVaultRefresh = noopSyncPodcastVaultRefresh()
         )
 
         advanceUntilIdle()

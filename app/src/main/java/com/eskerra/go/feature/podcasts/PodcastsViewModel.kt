@@ -18,6 +18,7 @@ import com.eskerra.go.core.repository.PodcastPlayerDriver
 import com.eskerra.go.core.usecase.LoadPodcastCatalog
 import com.eskerra.go.core.usecase.MarkPodcastEpisodesPlayed
 import com.eskerra.go.core.usecase.PodcastPlaylistSync
+import com.eskerra.go.core.usecase.SyncPodcastVaultRefresh
 import com.eskerra.go.data.workspace.WorkspacePaths
 import java.io.File
 import kotlinx.coroutines.Job
@@ -33,11 +34,15 @@ class PodcastsViewModel(
     private val loadPodcastCatalog: LoadPodcastCatalog,
     private val markPodcastEpisodesPlayed: MarkPodcastEpisodesPlayed,
     private val podcastPlaylistSync: PodcastPlaylistSync,
-    private val podcastPlayerDriver: PodcastPlayerDriver
+    private val podcastPlayerDriver: PodcastPlayerDriver,
+    private val syncPodcastVaultRefresh: SyncPodcastVaultRefresh
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<PodcastsUiState>(PodcastsUiState.Loading)
     val uiState: StateFlow<PodcastsUiState> = _uiState.asStateFlow()
+
+    private val _refreshState = MutableStateFlow(PodcastRefreshState())
+    val refreshState: StateFlow<PodcastRefreshState> = _refreshState.asStateFlow()
 
     private val workspaceRoot: File? =
         WorkspacePaths.resolve(filesDir, config.relativePath).getOrNull()
@@ -66,33 +71,50 @@ class PodcastsViewModel(
 
     fun refresh() {
         refreshJob?.cancel()
-        refreshJob = viewModelScope.launch {
-            if (_uiState.value !is PodcastsUiState.Content) {
-                _uiState.value = PodcastsUiState.Loading
+        refreshJob = viewModelScope.launch { reloadCatalog() }
+    }
+
+    /** Serialized RSS vault refresh (fetch + merge + commit), then catalog reload. */
+    fun runVaultRefresh() {
+        if (_refreshState.value.active) return
+        viewModelScope.launch {
+            _refreshState.value = PodcastRefreshState(active = true)
+            val result = syncPodcastVaultRefresh(config, filesDir) { progress ->
+                _refreshState.value = _refreshState.value.copy(percent = progress.percent)
             }
-            loadPodcastCatalog(config, filesDir)
-                .onSuccess { catalog ->
-                    lastCatalog = catalog
-                    runPlaylistHousekeeping(catalog)
-                    validateActiveEpisodeStillInCatalog(catalog)
-                    restorePlaylistOnceIfNeeded(catalog)
-                    val playerState = podcastPlayerDriver.state.value
-                    val shouldShowEmpty =
-                        catalog.sections.isEmpty() &&
-                            !playerState.hasActiveEpisode
-                    _uiState.value = if (shouldShowEmpty) {
-                        PodcastsUiState.Empty
-                    } else {
-                        PodcastsUiState.Content(
-                            sections = catalog.sections,
-                            playerState = playerState
-                        )
-                    }
-                }
-                .onFailure { error ->
-                    _uiState.value = PodcastsUiState.Error(mapFailure(error))
-                }
+            reloadCatalog()
+            _refreshState.value = if (result.isSuccess) {
+                PodcastRefreshState()
+            } else {
+                PodcastRefreshState(error = REFRESH_ERROR_MESSAGE)
+            }
         }
+    }
+
+    private suspend fun reloadCatalog() {
+        if (_uiState.value !is PodcastsUiState.Content) {
+            _uiState.value = PodcastsUiState.Loading
+        }
+        loadPodcastCatalog(config, filesDir)
+            .onSuccess { catalog ->
+                lastCatalog = catalog
+                runPlaylistHousekeeping(catalog)
+                validateActiveEpisodeStillInCatalog(catalog)
+                restorePlaylistOnceIfNeeded(catalog)
+                val playerState = podcastPlayerDriver.state.value
+                val shouldShowEmpty = catalog.sections.isEmpty() && !playerState.hasActiveEpisode
+                _uiState.value = if (shouldShowEmpty) {
+                    PodcastsUiState.Empty
+                } else {
+                    PodcastsUiState.Content(
+                        sections = catalog.sections,
+                        playerState = playerState
+                    )
+                }
+            }
+            .onFailure { error ->
+                _uiState.value = PodcastsUiState.Error(mapFailure(error))
+            }
     }
 
     fun onPlaylistSyncGenerationChanged(generation: Int) {
@@ -105,66 +127,46 @@ class PodcastsViewModel(
     fun onEpisodeClick(episode: PodcastEpisode) {
         val current = podcastPlayerDriver.state.value
         if (current.isPlaying && current.isActiveEpisode(episode)) return
-
-        userActionInFlight = true
-        viewModelScope.launch {
-            try {
-                val startPositionMs = startPositionForEpisode(episode)
-                podcastPlayerDriver.play(episode, startPositionMs)
-                queuePersist(podcastPlayerDriver.state.value)
-            } finally {
-                userActionInFlight = false
-            }
+        launchUserAction {
+            podcastPlayerDriver.play(episode, startPositionForEpisode(episode))
+            queuePersist(podcastPlayerDriver.state.value)
         }
     }
 
-    fun pausePlayback() {
-        userActionInFlight = true
-        viewModelScope.launch {
-            try {
-                podcastPlayerDriver.pause()
-                val state = podcastPlayerDriver.state.value
-                if (state.positionMs < MIN_PROGRESS_MS) {
-                    clearRemotePlaylist()
-                } else {
-                    queuePersist(state)
-                }
-            } finally {
-                userActionInFlight = false
-            }
-        }
+    fun pausePlayback() = launchUserAction {
+        podcastPlayerDriver.pause()
+        val state = podcastPlayerDriver.state.value
+        if (state.positionMs < MIN_PROGRESS_MS) clearRemotePlaylist() else queuePersist(state)
     }
 
     fun resumePlayback() {
         val state = podcastPlayerDriver.state.value
         val episode = state.activeEpisode ?: return
         if (state.isPlaying) return
+        launchUserAction {
+            when (state.phase) {
+                PodcastPlaybackPhase.PRIMED,
+                PodcastPlaybackPhase.PAUSED,
+                PodcastPlaybackPhase.NEAR_END_PAUSED,
+                PodcastPlaybackPhase.STOPPED ->
+                    podcastPlayerDriver.play(episode, state.positionMs)
 
-        userActionInFlight = true
-        viewModelScope.launch {
-            try {
-                when (state.phase) {
-                    PodcastPlaybackPhase.PRIMED,
-                    PodcastPlaybackPhase.PAUSED,
-                    PodcastPlaybackPhase.NEAR_END_PAUSED,
-                    PodcastPlaybackPhase.STOPPED ->
-                        podcastPlayerDriver.play(episode, state.positionMs)
-
-                    else -> podcastPlayerDriver.resume()
-                }
-                queuePersist(podcastPlayerDriver.state.value)
-            } finally {
-                userActionInFlight = false
+                else -> podcastPlayerDriver.resume()
             }
+            queuePersist(podcastPlayerDriver.state.value)
         }
     }
 
-    fun stopPlayback() {
+    fun stopPlayback() = launchUserAction {
+        podcastPlayerDriver.stop()
+        clearRemotePlaylist()
+    }
+
+    private fun launchUserAction(block: suspend () -> Unit) {
         userActionInFlight = true
         viewModelScope.launch {
             try {
-                podcastPlayerDriver.stop()
-                clearRemotePlaylist()
+                block()
             } finally {
                 userActionInFlight = false
             }
@@ -359,6 +361,7 @@ class PodcastsViewModel(
         const val WORKSPACE_UNAVAILABLE_MESSAGE = "Workspace is not available."
         const val WORKSPACE_MISSING_MESSAGE = "Workspace files are missing."
         const val LOAD_ERROR_MESSAGE = "Could not load podcast episodes."
+        const val REFRESH_ERROR_MESSAGE = "Could not refresh podcast episodes."
 
         fun factory(
             config: WorkspaceConfig,
@@ -366,7 +369,8 @@ class PodcastsViewModel(
             loadPodcastCatalog: LoadPodcastCatalog,
             markPodcastEpisodesPlayed: MarkPodcastEpisodesPlayed,
             podcastPlaylistSync: PodcastPlaylistSync,
-            podcastPlayerDriver: PodcastPlayerDriver
+            podcastPlayerDriver: PodcastPlayerDriver,
+            syncPodcastVaultRefresh: SyncPodcastVaultRefresh
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T = PodcastsViewModel(
@@ -375,7 +379,8 @@ class PodcastsViewModel(
                 loadPodcastCatalog,
                 markPodcastEpisodesPlayed,
                 podcastPlaylistSync,
-                podcastPlayerDriver
+                podcastPlayerDriver,
+                syncPodcastVaultRefresh
             ) as T
         }
     }

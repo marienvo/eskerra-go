@@ -10,6 +10,7 @@ import com.eskerra.go.core.repository.PodcastPlayerDriver
 import com.eskerra.go.core.usecase.LoadPodcastCatalog
 import com.eskerra.go.core.usecase.MarkPodcastEpisodesPlayed
 import com.eskerra.go.core.usecase.PodcastPlaylistSync
+import com.eskerra.go.core.usecase.SyncPodcastVaultRefresh
 import com.eskerra.go.feature.podcasts.PlaylistR2PollingHost
 import com.eskerra.go.feature.podcasts.PodcastsScreen
 import com.eskerra.go.feature.podcasts.PodcastsViewModel
@@ -23,6 +24,7 @@ internal fun AppPodcastsRoute(
     markPodcastEpisodesPlayed: MarkPodcastEpisodesPlayed,
     podcastPlaylistSync: PodcastPlaylistSync,
     podcastPlayerDriver: PodcastPlayerDriver,
+    syncPodcastVaultRefresh: SyncPodcastVaultRefresh,
     playlistPollingHost: PlaylistR2PollingHost?
 ) {
     val podcastsViewModel: PodcastsViewModel = viewModel(
@@ -33,10 +35,12 @@ internal fun AppPodcastsRoute(
             loadPodcastCatalog = loadPodcastCatalog,
             markPodcastEpisodesPlayed = markPodcastEpisodesPlayed,
             podcastPlaylistSync = podcastPlaylistSync,
-            podcastPlayerDriver = podcastPlayerDriver
+            podcastPlayerDriver = podcastPlayerDriver,
+            syncPodcastVaultRefresh = syncPodcastVaultRefresh
         )
     )
     val podcastsState by podcastsViewModel.uiState.collectAsState()
+    val refreshState by podcastsViewModel.refreshState.collectAsState()
     val playlistGeneration = playlistPollingHost?.playlistSyncGeneration
     if (playlistGeneration != null) {
         val generation by playlistGeneration.collectAsState()
@@ -46,7 +50,9 @@ internal fun AppPodcastsRoute(
     }
     PodcastsScreen(
         state = podcastsState,
+        refreshState = refreshState,
         onRetry = podcastsViewModel::refresh,
+        onRefresh = podcastsViewModel::runVaultRefresh,
         onEpisodeClick = podcastsViewModel::onEpisodeClick,
         onPausePlayback = podcastsViewModel::pausePlayback,
         onResumePlayback = podcastsViewModel::resumePlayback,

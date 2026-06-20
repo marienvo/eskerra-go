@@ -15,3 +15,14 @@ sealed interface PodcastsUiState {
 
     data class Error(val message: String) : PodcastsUiState
 }
+
+/**
+ * Vault-refresh feedback rendered as the 3px header strip (spec §7.4). [active]
+ * spans the whole serialized run; [percent] drives a determinate fill when the
+ * native RSS sync reports progress, otherwise the strip sweeps indeterminately.
+ */
+data class PodcastRefreshState(
+    val active: Boolean = false,
+    val percent: Int? = null,
+    val error: String? = null
+)

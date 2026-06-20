@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -21,10 +22,13 @@ import androidx.compose.material.icons.outlined.Replay10
 import androidx.compose.material.icons.outlined.Stop
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,13 +57,19 @@ private object PodcastUiTokens {
     val ArtworkPlaceholder = Color(0xFF3A3A3A)
     val ArtworkIcon = Color(0xFF8F8F8F)
     val Accent = Color(0xFF4FAFE6)
+    val StripTrack = Color(0x1F4FAFE6)
 }
 
+private val RefreshStripHeight = 3.dp
+
 /** Stateless Episodes list from vault catalog data. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PodcastsScreen(
     state: PodcastsUiState,
+    refreshState: PodcastRefreshState,
     onRetry: () -> Unit,
+    onRefresh: () -> Unit,
     onEpisodeClick: (PodcastEpisode) -> Unit,
     onPausePlayback: () -> Unit,
     onResumePlayback: () -> Unit,
@@ -67,23 +77,68 @@ fun PodcastsScreen(
     onSeekBy: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Box(
+    Column(
         modifier = modifier
             .fillMaxSize()
             .background(PodcastUiTokens.ListBackground)
     ) {
-        when (state) {
-            PodcastsUiState.Loading -> LoadingContent()
-            PodcastsUiState.Empty -> EmptyContent()
-            is PodcastsUiState.Error -> ErrorContent(message = state.message, onRetry = onRetry)
-            is PodcastsUiState.Content -> CatalogContent(
-                sections = state.sections,
-                playerState = state.playerState,
-                onEpisodeClick = onEpisodeClick,
-                onPausePlayback = onPausePlayback,
-                onResumePlayback = onResumePlayback,
-                onStopPlayback = onStopPlayback,
-                onSeekBy = onSeekBy
+        RefreshStrip(refreshState)
+        // `isRefreshing` is always false so no list-attached spinner shows; the
+        // header strip is the sole refresh affordance (spec §7.4).
+        PullToRefreshBox(
+            isRefreshing = false,
+            onRefresh = onRefresh,
+            indicator = {},
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+        ) {
+            when (state) {
+                PodcastsUiState.Loading -> LoadingContent()
+                PodcastsUiState.Empty -> EmptyContent()
+                is PodcastsUiState.Error ->
+                    ErrorContent(message = state.message, onRetry = onRetry)
+                is PodcastsUiState.Content -> CatalogContent(
+                    sections = state.sections,
+                    playerState = state.playerState,
+                    refreshError = refreshState.error,
+                    onEpisodeClick = onEpisodeClick,
+                    onPausePlayback = onPausePlayback,
+                    onResumePlayback = onResumePlayback,
+                    onStopPlayback = onStopPlayback,
+                    onSeekBy = onSeekBy
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RefreshStrip(refreshState: PodcastRefreshState) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(RefreshStripHeight)
+            .background(if (refreshState.active) PodcastUiTokens.StripTrack else Color.Transparent)
+    ) {
+        if (!refreshState.active) return@Box
+        val percent = refreshState.percent
+        if (percent != null) {
+            LinearProgressIndicator(
+                progress = { (percent.coerceIn(0, 100)) / 100f },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(RefreshStripHeight),
+                color = PodcastUiTokens.Accent,
+                trackColor = PodcastUiTokens.StripTrack
+            )
+        } else {
+            LinearProgressIndicator(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(RefreshStripHeight),
+                color = PodcastUiTokens.Accent,
+                trackColor = PodcastUiTokens.StripTrack
             )
         }
     }
@@ -132,6 +187,7 @@ private fun ErrorContent(message: String, onRetry: () -> Unit) {
 private fun CatalogContent(
     sections: List<PodcastSection>,
     playerState: PodcastPlaybackState,
+    refreshError: String?,
     onEpisodeClick: (PodcastEpisode) -> Unit,
     onPausePlayback: () -> Unit,
     onResumePlayback: () -> Unit,
@@ -142,6 +198,19 @@ private fun CatalogContent(
         modifier = Modifier.fillMaxSize(),
         contentPadding = shellScrollContentPadding()
     ) {
+        if (refreshError != null) {
+            item(key = "refresh-error") {
+                Text(
+                    text = refreshError,
+                    color = PodcastUiTokens.StatusMuted,
+                    fontSize = 13.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp)
+                )
+            }
+        }
         if (playerState.hasActiveEpisode) {
             item(key = "now-playing") {
                 NowPlayingCard(

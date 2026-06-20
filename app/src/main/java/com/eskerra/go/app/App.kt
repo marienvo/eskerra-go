@@ -57,6 +57,7 @@ import com.eskerra.go.core.usecase.SaveNote
 import com.eskerra.go.core.usecase.SaveRemoteSyncSettings
 import com.eskerra.go.core.usecase.SaveVaultSettings
 import com.eskerra.go.core.usecase.SearchVault
+import com.eskerra.go.core.usecase.SyncPodcastVaultRefresh
 import com.eskerra.go.core.usecase.TestRemoteConnection
 import com.eskerra.go.core.usecase.TouchVaultSearchPaths
 import com.eskerra.go.core.usecase.UpdateSyncToken
@@ -119,6 +120,7 @@ fun App(
     markPodcastEpisodesPlayed: MarkPodcastEpisodesPlayed,
     podcastPlaylistWiring: PodcastPlaylistWiring,
     podcastPlayerDriver: PodcastPlayerDriver,
+    syncPodcastVaultRefresh: SyncPodcastVaultRefresh,
     onConfigUpdated: (WorkspaceConfig) -> Unit,
     onInboxUiStateChanged: (InboxUiState) -> Unit = {},
     onTodayHubUiStateChanged: (TodayHubUiState) -> Unit = {}
@@ -287,6 +289,7 @@ fun App(
                     markPodcastEpisodesPlayed = markPodcastEpisodesPlayed,
                     podcastPlaylistSync = podcastPlaylistWiring.sync,
                     podcastPlayerDriver = podcastPlayerDriver,
+                    syncPodcastVaultRefresh = syncPodcastVaultRefresh,
                     playlistPollingHost = playlistPollingHost
                 )
             }

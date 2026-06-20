@@ -51,6 +51,7 @@ import com.eskerra.go.core.usecase.SaveNote
 import com.eskerra.go.core.usecase.SaveRemoteSyncSettings
 import com.eskerra.go.core.usecase.SaveVaultSettings
 import com.eskerra.go.core.usecase.SearchVault
+import com.eskerra.go.core.usecase.SyncPodcastVaultRefresh
 import com.eskerra.go.core.usecase.TestRemoteConnection
 import com.eskerra.go.core.usecase.TouchVaultSearchPaths
 import com.eskerra.go.core.usecase.UpdateSyncToken
@@ -112,6 +113,7 @@ fun AppRoot(
     markPodcastEpisodesPlayed: MarkPodcastEpisodesPlayed,
     podcastPlaylistWiring: PodcastPlaylistWiring,
     podcastPlayerDriver: PodcastPlayerDriver,
+    syncPodcastVaultRefresh: SyncPodcastVaultRefresh,
     onLaunchSettled: () -> Unit = {}
 ) {
     EskerraGoTheme(darkTheme = true) {
@@ -217,6 +219,7 @@ fun AppRoot(
                         markPodcastEpisodesPlayed = markPodcastEpisodesPlayed,
                         podcastPlaylistWiring = podcastPlaylistWiring,
                         podcastPlayerDriver = podcastPlayerDriver,
+                        syncPodcastVaultRefresh = syncPodcastVaultRefresh,
                         onConfigUpdated = gateViewModel::updateReadyConfig,
                         onInboxUiStateChanged = { inboxUiState = it },
                         onTodayHubUiStateChanged = { todayHubUiState = it }

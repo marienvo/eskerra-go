@@ -48,6 +48,7 @@ import com.eskerra.go.core.usecase.SaveRemoteSyncSettings
 import com.eskerra.go.core.usecase.SaveVaultSettings
 import com.eskerra.go.core.usecase.SearchVault
 import com.eskerra.go.core.usecase.SyncPodcastChange
+import com.eskerra.go.core.usecase.SyncPodcastVaultRefresh
 import com.eskerra.go.core.usecase.TestRemoteConnection
 import com.eskerra.go.core.usecase.TouchVaultSearchPaths
 import com.eskerra.go.core.usecase.UpdateSyncToken
@@ -69,6 +70,8 @@ import com.eskerra.go.data.notes.ParsedMarkdownCache
 import com.eskerra.go.data.player.Media3PodcastPlayerDriver
 import com.eskerra.go.data.podcast.FilePodcastCatalogRepository
 import com.eskerra.go.data.podcast.FilePodcastFileRepository
+import com.eskerra.go.data.podcast.rss.FilePodcastRssVaultSync
+import com.eskerra.go.data.podcast.rss.OkHttpRssFeedFetcher
 import com.eskerra.go.data.r2.PlaylistR2ConditionalFetch
 import com.eskerra.go.data.r2.R2PlaylistConditionalClient
 import com.eskerra.go.data.r2.R2PlaylistObjectClient
@@ -235,6 +238,16 @@ class MainActivity : ComponentActivity() {
             podcastFileRepository = FilePodcastFileRepository(),
             syncPodcastChange = syncMarkPlayedChange::invoke
         )
+        val syncRefreshChange = SyncPodcastChange(
+            remoteSyncRepository = remoteSyncRepository,
+            credentialStore = credentialStore,
+            gitSyncMutex = gitSyncMutex,
+            commitMessage = "Refresh podcast episodes"
+        )
+        val syncPodcastVaultRefresh = SyncPodcastVaultRefresh(
+            vaultSync = FilePodcastRssVaultSync(fetcher = OkHttpRssFeedFetcher()),
+            syncPodcastChange = syncRefreshChange::invoke
+        )
         val podcastPlayerDriver = Media3PodcastPlayerDriver(applicationContext)
             .also { this.podcastPlayerDriver = it }
 
@@ -310,6 +323,7 @@ class MainActivity : ComponentActivity() {
                 markPodcastEpisodesPlayed = markPodcastEpisodesPlayed,
                 podcastPlaylistWiring = podcastPlaylistWiring,
                 podcastPlayerDriver = podcastPlayerDriver,
+                syncPodcastVaultRefresh = syncPodcastVaultRefresh,
                 onLaunchSettled = {
                     if (keepSplashOnScreen) {
                         keepSplashOnScreen = false
