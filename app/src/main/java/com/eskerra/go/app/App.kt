@@ -18,7 +18,6 @@ import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
@@ -193,7 +192,7 @@ fun App(
             popEnterTransition = { EnterTransition.None },
             popExitTransition = { ExitTransition.None }
         ) {
-            composable(AppRoute.INBOX) { entry ->
+            opaqueComposable(AppRoute.INBOX) { entry ->
                 AppInboxRoute(
                     currentConfig = currentConfig,
                     filesDir = filesDir,
@@ -214,7 +213,7 @@ fun App(
                 )
             }
 
-            composable(AppRoute.CREATE_INBOX) {
+            opaqueComposable(AppRoute.CREATE_INBOX) {
                 val createViewModel: CreateInboxNoteViewModel = viewModel(
                     factory = CreateInboxNoteViewModel.factory(
                         config = currentConfig,
@@ -250,7 +249,7 @@ fun App(
                 )
             }
 
-            composable(AppRoute.SEARCH) {
+            opaqueComposable(AppRoute.SEARCH) {
                 AppSearchRoute(
                     currentConfig = currentConfig,
                     filesDir = filesDir,
@@ -261,11 +260,11 @@ fun App(
                 )
             }
 
-            composable(AppRoute.PODCASTS) {
+            opaqueComposable(AppRoute.PODCASTS) {
                 PodcastsScreen(podcasts = fakePodcasts)
             }
 
-            composable(AppRoute.MENU) {
+            opaqueComposable(AppRoute.MENU) {
                 MenuScreen(
                     items = menuItems,
                     onItemClick = { item ->
@@ -278,7 +277,7 @@ fun App(
                 )
             }
 
-            composable(AppRoute.SYNC) {
+            opaqueComposable(AppRoute.SYNC) {
                 SyncScreen(
                     state = syncState,
                     onSyncNow = appSyncViewModel::syncNow,
@@ -287,7 +286,7 @@ fun App(
                 )
             }
 
-            composable(AppRoute.SETTINGS) {
+            opaqueComposable(AppRoute.SETTINGS) {
                 val vaultSettingsViewModel: VaultSettingsViewModel = viewModel(
                     factory = VaultSettingsViewModel.factory(
                         config = currentConfig,
@@ -313,7 +312,7 @@ fun App(
                 )
             }
 
-            composable(AppRoute.SYNC_SETTINGS) {
+            opaqueComposable(AppRoute.SYNC_SETTINGS) {
                 val settingsViewModel: SyncSettingsViewModel = viewModel(
                     key = currentConfig.syncViewModelKey(),
                     factory = SyncSettingsViewModel.factory(
@@ -342,7 +341,7 @@ fun App(
                 )
             }
 
-            composable(
+            opaqueComposable(
                 route = AppRoute.NOTE_PATTERN,
                 arguments = listOf(
                     navArgument(AppRoute.NOTE_ARG) { type = NavType.StringType }
@@ -404,7 +403,7 @@ fun App(
                 }
             }
 
-            composable(
+            opaqueComposable(
                 route = AppRoute.EDITOR_PATTERN,
                 arguments = listOf(
                     navArgument(AppRoute.EDITOR_ARG) { type = NavType.StringType }

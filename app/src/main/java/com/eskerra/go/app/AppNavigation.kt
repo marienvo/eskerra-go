@@ -1,6 +1,15 @@
 package com.eskerra.go.app
 
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.navigation.NamedNavArgument
+import androidx.navigation.NavBackStackEntry
+import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
+import androidx.navigation.compose.composable
 import com.eskerra.go.core.model.hasSyncWork
 import com.eskerra.go.feature.sync.SyncUiState
 
@@ -97,4 +106,26 @@ internal fun onShellSyncClick(
 
 private fun NavHostController.openSyncScreen() {
     navigate(AppRoute.SYNC) { launchSingleTop = true }
+}
+
+/**
+ * Registers a NavHost destination whose content paints on an opaque [Surface].
+ *
+ * Transitions are instant (no animation), but the NavHost still briefly composes the outgoing and
+ * incoming destinations stacked during the swap. With transparent screens you see the previous
+ * screen's content through the new one for a frame ("content over elkaar"). An opaque background
+ * makes the incoming screen fully occlude the outgoing one, so every swap looks atomic. The colour
+ * matches the root [Surface] in `AppRoot`, and the shell edge scrims still draw on top.
+ */
+internal fun NavGraphBuilder.opaqueComposable(
+    route: String,
+    arguments: List<NamedNavArgument> = emptyList(),
+    content: @Composable (NavBackStackEntry) -> Unit
+) = composable(route = route, arguments = arguments) { entry ->
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
+    ) {
+        content(entry)
+    }
 }
