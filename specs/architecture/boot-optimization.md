@@ -86,8 +86,6 @@ Implementation:
 - Shell sync FAB maps `SyncUiState.Loading` to no indicator (quiet shell refresh per [sync-hardening-and-recovery.md](sync-hardening-and-recovery.md)).
 - Inbox background rescan uses debounced `showRefreshIndicator` (~300ms) so fast cache-hit refreshes stay silent.
 
-See also [snappy-boot-and-navigation-plan.md](../plans/snappy-boot-and-navigation-plan.md) for the full performance plan and test map.
-
 ## Out of scope
 
 - Background sync
