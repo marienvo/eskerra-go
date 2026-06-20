@@ -10,7 +10,7 @@ Product behavior and boundaries for the native Android app. Non-obvious rules th
 - Markdown reader with clickable wiki links (title or filename stem, case-insensitive; path-like targets stay case-sensitive).
 - Full-text vault search (SQLite FTS5).
 - Manual HTTPS remote sync (explicit user action): inbox-only commits, fast-forward integration.
-- Podcast episodes tab (see [`android-podcasts-rebuild-spec.md`](../plans/android-podcasts-rebuild-spec.md)): catalog, playback, R2 playlist handoff, RSS refresh, mark-as-played.
+- Podcast episodes tab: catalog, playback, R2 playlist handoff, RSS refresh, mark-as-played.
 - Floating shell navigation with tab state preservation.
 
 ## Shell bottom navigation

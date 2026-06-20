@@ -60,7 +60,7 @@ Use these to decide where new code goes:
 | Capability | Placement | Rationale |
 | --- | --- | --- |
 | Notes browsing (git) | Existing `core` + `data/notes` + `data/git` | Shared vault model. |
-| R2 transport (S3 HTTP, ETag poller) | `core` interface + `data/r2` | Both vault settings and podcast playback state use the same transport, credentials, and merge/poll contract (see [`android-r2-vault-settings.md`](../plans/android-r2-vault-settings.md)). One client, one credential path. |
+| R2 transport (S3 HTTP, ETag poller) | `core` interface + `data/r2` | Both vault settings and podcast playback state use the same transport, credentials, and merge/poll contract. One client, one credential path. |
 | Vault settings (`.eskerra/settings-*.json`) | `core` + `data` | Read by multiple features (setup, sync, podcasts). On-disk contract is vault-wide. |
 | Podcast listening (playback, playlist UI) | `feature/podcasts/` | No other slice reads playback state. The slice *consumes* the shared R2 transport and settings; it does not implement them. |
 | Audio recording (future) | Own slice for recording state; recorded files enter the vault through the existing write repositories | Recording state is slice-owned; the produced artifact lands in shared vault territory, so the write path is shared. |

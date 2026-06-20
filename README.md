@@ -11,7 +11,7 @@ repo; Android work belongs here.
 
 ## Status
 
-Native Android app for the Eskerra Markdown vault. Core note workflows are implemented; the Episodes (podcasts) tab is the active rebuild target (see [`specs/plans/android-podcasts-rebuild-spec.md`](specs/plans/android-podcasts-rebuild-spec.md)).
+Native Android app for the Eskerra Markdown vault. Core note workflows and the Episodes (podcasts) tab are implemented.
 
 **Implemented:**
 
@@ -21,10 +21,7 @@ Native Android app for the Eskerra Markdown vault. Core note workflows are imple
 - Manual HTTPS remote sync (inbox-only commits, fast-forward integration)
 - Vault settings UI including Cloudflare R2 credentials
 - Restart/offline reliability, boot optimization, stale-while-revalidate caches
-
-**In progress:**
-
-- Episodes/podcasts: catalog, playback, R2 playlist handoff, RSS refresh, mark-as-played, auto git commit+push per podcast operation
+- Episodes/podcasts: catalog, Media3 playback, mini player, R2 playlist handoff, pure-Kotlin RSS refresh, mark-as-played, and auto git commit+push per podcast operation
 
 Specs and product boundaries live in [`specs/`](specs/). Agent and project rules live in
 [`AGENTS.md`](AGENTS.md).
@@ -37,7 +34,7 @@ Specs and product boundaries live in [`specs/`](specs/). Agent and project rules
 - Clone from `file://` or sanitized `https://` remotes; manual inbox sync for HTTPS.
 - Read, write (inbox only), commit, fetch, fast-forward, and push path.
 - Inbox list from markdown files; Today Hub; vault search.
-- Podcast episodes: catalog, playback, R2 playlist sync, RSS refresh (see podcasts rebuild spec).
+- Podcast episodes: catalog, playback, R2 playlist sync, RSS refresh.
 - Non-inbox notes are read-only except podcast checkbox writes under `General/`.
 - Floating shell navigation.
 
