@@ -9,7 +9,7 @@ import com.eskerra.go.core.model.NotePath
 import com.eskerra.go.core.model.NoteReaderDocument
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.NoteContentRepository
-import com.eskerra.go.data.notes.NoteRegistryCache
+import com.eskerra.go.core.repository.NoteRegistryCachePort
 import java.io.File
 
 /**
@@ -18,7 +18,7 @@ import java.io.File
  * ([com.eskerra.go.core.markdown.VaultReadonlyLink]); this use case no longer pre-computes segments.
  */
 class LoadNoteForReading(
-    private val registryCache: NoteRegistryCache,
+    private val registryCache: NoteRegistryCachePort,
     private val contentRepository: NoteContentRepository
 ) {
 

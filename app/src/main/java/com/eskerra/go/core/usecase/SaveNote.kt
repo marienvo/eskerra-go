@@ -9,17 +9,17 @@ import com.eskerra.go.core.model.SaveNoteError
 import com.eskerra.go.core.model.SaveNoteException
 import com.eskerra.go.core.model.SaveNoteResult
 import com.eskerra.go.core.model.WorkspaceConfig
+import com.eskerra.go.core.repository.NoteContentCachePort
+import com.eskerra.go.core.repository.NoteRegistryCachePort
 import com.eskerra.go.core.repository.NoteWriteRepository
-import com.eskerra.go.data.notes.NoteContentCache
-import com.eskerra.go.data.notes.NoteRegistryCache
 import java.io.File
 
 /** Validates editability, writes markdown, and refreshes registry and Git status. */
 class SaveNote(
     private val writeRepository: NoteWriteRepository,
-    private val registryCache: NoteRegistryCache,
+    private val registryCache: NoteRegistryCachePort,
     private val loadGitStatusSummary: LoadGitStatusSummary,
-    private val contentCache: NoteContentCache? = null
+    private val contentCache: NoteContentCachePort? = null
 ) {
 
     suspend operator fun invoke(

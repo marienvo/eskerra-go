@@ -4,6 +4,7 @@ import com.eskerra.go.core.model.GateFingerprint
 import com.eskerra.go.core.model.NoteContent
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.WorkspaceConfig
+import com.eskerra.go.core.repository.NoteContentCachePort
 import com.eskerra.go.core.repository.NoteContentRepository
 import com.eskerra.go.data.workspace.GateFingerprintComputer
 import java.io.File
@@ -26,7 +27,7 @@ import kotlinx.coroutines.sync.withLock
 class NoteContentCache(
     private val delegate: NoteContentRepository,
     private val maxSize: Int = DEFAULT_SIZE
-) : NoteContentRepository {
+) : NoteContentCachePort {
 
     private val mutex = Mutex()
     private val lru = LinkedHashMap<NoteId, NoteContent>(maxSize * 2, 0.75f, true)
@@ -61,14 +62,14 @@ class NoteContentCache(
         }
     }
 
-    suspend fun evict(noteId: NoteId) {
+    override suspend fun evict(noteId: NoteId) {
         mutex.withLock {
             lru.remove(noteId)
             generation++
         }
     }
 
-    suspend fun evictAll() {
+    override suspend fun evictAll() {
         mutex.withLock {
             lru.clear()
             generation++

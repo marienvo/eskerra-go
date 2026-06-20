@@ -2,6 +2,7 @@ package com.eskerra.go.data.notes
 
 import com.eskerra.go.core.model.NoteRegistry
 import com.eskerra.go.core.model.WorkspaceConfig
+import com.eskerra.go.core.repository.NoteRegistryCachePort
 import com.eskerra.go.core.repository.NoteRegistryRepository
 import com.eskerra.go.core.repository.NoteRegistrySnapshotStore
 import java.io.File
@@ -30,7 +31,7 @@ import kotlinx.coroutines.sync.withLock
 class NoteRegistryCache(
     private val repository: NoteRegistryRepository,
     private val snapshotStore: NoteRegistrySnapshotStore? = null
-) {
+) : NoteRegistryCachePort {
 
     private val mutex = Mutex()
     private val _registry = MutableStateFlow<NoteRegistry?>(null)
@@ -42,7 +43,7 @@ class NoteRegistryCache(
      * Returns the cached registry without scanning: in-memory → persisted snapshot → `null`.
      * A persisted snapshot is promoted into memory so later reads hit the lock-free fast path.
      */
-    suspend fun current(config: WorkspaceConfig, filesDir: File): NoteRegistry? {
+    override suspend fun current(config: WorkspaceConfig, filesDir: File): NoteRegistry? {
         _registry.value?.let { return it }
         return mutex.withLock {
             _registry.value ?: snapshotStore?.read(config, filesDir)?.also { snapshot ->
@@ -57,7 +58,7 @@ class NoteRegistryCache(
      * revalidate). Concurrent calls are serialized; the later one rescans against the now-fresh
      * registry, so it remains an incremental (cheap) pass.
      */
-    suspend fun refresh(config: WorkspaceConfig, filesDir: File): Result<NoteRegistry> =
+    override suspend fun refresh(config: WorkspaceConfig, filesDir: File): Result<NoteRegistry> =
         mutex.withLock {
             repository.refresh(config, filesDir, _registry.value).onSuccess { fresh ->
                 _registry.value = fresh
@@ -70,7 +71,7 @@ class NoteRegistryCache(
      * the next [refresh] does a full read) and the persisted snapshot. Callers should [refresh]
      * afterwards to repopulate.
      */
-    suspend fun invalidate(config: WorkspaceConfig, filesDir: File) {
+    override suspend fun invalidate(config: WorkspaceConfig, filesDir: File) {
         mutex.withLock {
             _registry.value = null
             snapshotStore?.clear(config, filesDir)

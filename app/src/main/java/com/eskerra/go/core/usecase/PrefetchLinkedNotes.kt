@@ -3,7 +3,7 @@ package com.eskerra.go.core.usecase
 import com.eskerra.go.core.markdown.PrefetchLinkTargets
 import com.eskerra.go.core.model.NoteReaderDocument
 import com.eskerra.go.core.model.WorkspaceConfig
-import com.eskerra.go.data.notes.NoteContentCache
+import com.eskerra.go.core.repository.NoteContentCachePort
 import java.io.File
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -15,7 +15,7 @@ import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 
 /**
- * Warms the [NoteContentCache] with the notes linked from the open note, so a wiki-link tap reads
+ * Warms the content cache with the notes linked from the open note, so a wiki-link tap reads
  * from memory instead of disk. The registry is already cached, so resolution is in-memory; only the
  * link targets' content is read.
  *
@@ -29,7 +29,7 @@ import kotlinx.coroutines.withContext
  *   locked file must never surface in the reader.
  */
 class PrefetchLinkedNotes(
-    private val contentCache: NoteContentCache,
+    private val contentCache: NoteContentCachePort,
     private val maxConcurrency: Int = DEFAULT_CONCURRENCY,
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO
 ) {

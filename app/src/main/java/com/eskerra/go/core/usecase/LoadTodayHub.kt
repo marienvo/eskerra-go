@@ -9,11 +9,11 @@ import com.eskerra.go.core.model.NoteIndexException
 import com.eskerra.go.core.model.NoteRegistry
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.NoteContentRepository
+import com.eskerra.go.core.repository.NoteRegistryCachePort
 import com.eskerra.go.core.todayhub.TodayHubData
 import com.eskerra.go.core.todayhub.TodayHubDiscovery
 import com.eskerra.go.core.todayhub.TodayHubFrontmatter
 import com.eskerra.go.core.todayhub.TodayHubRef
-import com.eskerra.go.data.notes.NoteRegistryCache
 import java.io.File
 
 /**
@@ -22,7 +22,7 @@ import java.io.File
  * fetched separately via [LoadTodayHubRow] (spec §11.4).
  */
 class LoadTodayHub(
-    private val registryCache: NoteRegistryCache,
+    private val registryCache: NoteRegistryCachePort,
     private val contentRepository: NoteContentRepository
 ) {
 
