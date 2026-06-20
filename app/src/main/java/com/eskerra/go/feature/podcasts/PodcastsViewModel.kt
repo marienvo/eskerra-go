@@ -26,6 +26,7 @@ import com.eskerra.go.core.usecase.PodcastPlaylistSync
 import com.eskerra.go.core.usecase.SyncPodcastVaultRefresh
 import com.eskerra.go.data.workspace.WorkspacePaths
 import java.io.File
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -128,14 +129,21 @@ class PodcastsViewModel(
         if (_refreshState.value.active) return
         viewModelScope.launch {
             _refreshState.value = PodcastRefreshState(active = true)
-            val result = syncPodcastVaultRefresh(config, filesDir) { progress ->
-                _refreshState.value = _refreshState.value.copy(percent = progress.percent)
-            }
-            reloadCatalog()
-            _refreshState.value = if (result.isSuccess) {
-                PodcastRefreshState()
-            } else {
-                PodcastRefreshState(error = REFRESH_ERROR_MESSAGE)
+            try {
+                val result = syncPodcastVaultRefresh(config, filesDir) { progress ->
+                    _refreshState.value = _refreshState.value.copy(percent = progress.percent)
+                }
+                reloadCatalog()
+                _refreshState.value = if (result.isSuccess) {
+                    PodcastRefreshState()
+                } else {
+                    PodcastRefreshState(error = REFRESH_ERROR_MESSAGE)
+                }
+            } catch (e: CancellationException) {
+                _refreshState.value = PodcastRefreshState()
+                throw e
+            } catch (_: Exception) {
+                _refreshState.value = PodcastRefreshState(error = REFRESH_ERROR_MESSAGE)
             }
         }
     }

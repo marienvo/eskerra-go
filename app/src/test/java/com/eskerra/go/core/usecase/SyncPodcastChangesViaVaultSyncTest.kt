@@ -45,9 +45,8 @@ class SyncPodcastChangesViaVaultSyncTest {
 
     @Test
     fun committedAndPushed_mapsToPushedResult() = runTest {
-        val result = adapter(Result.success(syncResult(committed = true, pushed = true)))(
-            config, filesDir
-        ).getOrThrow()
+        val sync = Result.success(syncResult(committed = true, pushed = true))
+        val result = adapter(sync)(config, filesDir).getOrThrow()
 
         assertTrue(result.committed)
         assertTrue(result.pushed)
@@ -57,9 +56,8 @@ class SyncPodcastChangesViaVaultSyncTest {
 
     @Test
     fun committedButNotPushed_marksPendingPush() = runTest {
-        val result = adapter(Result.success(syncResult(committed = true, pushed = false)))(
-            config, filesDir
-        ).getOrThrow()
+        val sync = Result.success(syncResult(committed = true, pushed = false))
+        val result = adapter(sync)(config, filesDir).getOrThrow()
 
         assertTrue(result.committed)
         assertFalse(result.pushed)

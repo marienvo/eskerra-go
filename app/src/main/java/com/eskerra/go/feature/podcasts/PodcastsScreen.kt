@@ -3,15 +3,18 @@ package com.eskerra.go.feature.podcasts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -31,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -85,34 +89,51 @@ fun PodcastsScreen(
             .background(PodcastUiTokens.ListBackground)
     ) {
         RefreshStrip(refreshState)
+        val fillItemModifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = LocalConfiguration.current.screenHeightDp.dp)
         PullToRefreshBox(
-            isRefreshing = false,
+            isRefreshing = refreshState.active,
             onRefresh = onRefresh,
             indicator = {},
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
         ) {
-            when (state) {
-                PodcastsUiState.Loading -> LoadingContent()
-                PodcastsUiState.Empty -> EmptyContent()
-                is PodcastsUiState.Error ->
-                    ErrorContent(message = state.message, onRetry = onRetry)
-                is PodcastsUiState.Content -> CatalogContent(
-                    sections = state.sections,
-                    playerState = state.playerState,
-                    selectedEpisodeIds = state.selectedEpisodeIds,
-                    markInFlight = state.markInFlight,
-                    markError = state.markError,
-                    refreshError = refreshState.error,
-                    config = config,
-                    filesDir = filesDir,
-                    loadPodcastArtwork = loadPodcastArtwork,
-                    onEpisodeClick = onEpisodeClick,
-                    onEpisodeArtworkClick = onEpisodeArtworkClick,
-                    onClearSelection = onClearSelection,
-                    onMarkSelected = onMarkSelected
-                )
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = shellScrollContentPadding()
+            ) {
+                when (state) {
+                    PodcastsUiState.Loading -> item(key = "loading") {
+                        LoadingContent(modifier = fillItemModifier)
+                    }
+                    PodcastsUiState.Empty -> item(key = "empty") {
+                        EmptyContent(modifier = fillItemModifier)
+                    }
+                    is PodcastsUiState.Error -> item(key = "error") {
+                        ErrorContent(
+                            message = state.message,
+                            onRetry = onRetry,
+                            modifier = fillItemModifier
+                        )
+                    }
+                    is PodcastsUiState.Content -> podcastCatalogItems(
+                        sections = state.sections,
+                        playerState = state.playerState,
+                        selectedEpisodeIds = state.selectedEpisodeIds,
+                        markInFlight = state.markInFlight,
+                        markError = state.markError,
+                        refreshError = refreshState.error,
+                        config = config,
+                        filesDir = filesDir,
+                        loadPodcastArtwork = loadPodcastArtwork,
+                        onEpisodeClick = onEpisodeClick,
+                        onEpisodeArtworkClick = onEpisodeArtworkClick,
+                        onClearSelection = onClearSelection,
+                        onMarkSelected = onMarkSelected
+                    )
+                }
             }
         }
     }
@@ -150,18 +171,16 @@ private fun RefreshStrip(refreshState: PodcastRefreshState) {
 }
 
 @Composable
-private fun LoadingContent() {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+private fun LoadingContent(modifier: Modifier = Modifier) {
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
         CircularProgressIndicator()
     }
 }
 
 @Composable
-private fun EmptyContent() {
+private fun EmptyContent(modifier: Modifier = Modifier) {
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(shellScrollContentPadding()),
+        modifier = modifier,
         contentAlignment = Alignment.Center
     ) {
         Text(
@@ -173,13 +192,11 @@ private fun EmptyContent() {
 }
 
 @Composable
-private fun ErrorContent(message: String, onRetry: () -> Unit) {
+private fun ErrorContent(message: String, onRetry: () -> Unit, modifier: Modifier = Modifier) {
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(shellScrollContentPadding()),
+        modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center
+        verticalArrangement = Arrangement.Center
     ) {
         Text(text = message, color = PodcastUiTokens.MutedMeta, textAlign = TextAlign.Center)
         Button(onClick = onRetry, modifier = Modifier.padding(top = 16.dp)) {
@@ -188,8 +205,7 @@ private fun ErrorContent(message: String, onRetry: () -> Unit) {
     }
 }
 
-@Composable
-private fun CatalogContent(
+private fun LazyListScope.podcastCatalogItems(
     sections: List<PodcastSection>,
     playerState: PodcastPlaybackState,
     selectedEpisodeIds: Set<String>,
@@ -205,70 +221,65 @@ private fun CatalogContent(
     onMarkSelected: () -> Unit
 ) {
     val hasSelection = selectedEpisodeIds.isNotEmpty()
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = shellScrollContentPadding()
-    ) {
-        item(key = "header-bar") {
-            PodcastsHeaderBar(
-                hasSelection = hasSelection,
-                selectedCount = selectedEpisodeIds.size,
-                markInFlight = markInFlight,
-                onClearSelection = onClearSelection,
-                onMarkSelected = onMarkSelected
+    item(key = "header-bar") {
+        PodcastsHeaderBar(
+            hasSelection = hasSelection,
+            selectedCount = selectedEpisodeIds.size,
+            markInFlight = markInFlight,
+            onClearSelection = onClearSelection,
+            onMarkSelected = onMarkSelected
+        )
+    }
+    markError?.let { error ->
+        item(key = "mark-error") {
+            Text(
+                text = error,
+                color = PodcastUiTokens.StatusMuted,
+                fontSize = 13.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp)
             )
         }
-        markError?.let { error ->
-            item(key = "mark-error") {
-                Text(
-                    text = error,
-                    color = PodcastUiTokens.StatusMuted,
-                    fontSize = 13.sp,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp)
-                )
-            }
+    }
+    if (refreshError != null) {
+        item(key = "refresh-error") {
+            Text(
+                text = refreshError,
+                color = PodcastUiTokens.StatusMuted,
+                fontSize = 13.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp)
+            )
         }
-        if (refreshError != null) {
-            item(key = "refresh-error") {
-                Text(
-                    text = refreshError,
-                    color = PodcastUiTokens.StatusMuted,
-                    fontSize = 13.sp,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp)
-                )
-            }
+    }
+    sections.forEachIndexed { sectionIndex, section ->
+        item(key = "header-${section.title}") {
+            SectionHeader(title = section.title)
         }
-        sections.forEachIndexed { sectionIndex, section ->
-            item(key = "header-${section.title}") {
-                SectionHeader(title = section.title)
-            }
-            items(
-                items = section.episodes,
-                key = { episode -> episode.id }
-            ) { episode ->
-                val isLastRow = sectionIndex == sections.lastIndex &&
-                    episode == section.episodes.lastOrNull()
-                EpisodeRow(
-                    episode = episode,
-                    sectionRssFeedUrl = section.rssFeedUrl,
-                    config = config,
-                    filesDir = filesDir,
-                    loadPodcastArtwork = loadPodcastArtwork,
-                    playerState = playerState,
-                    isSelected = episode.id in selectedEpisodeIds,
-                    selectionActive = hasSelection,
-                    markInFlight = markInFlight,
-                    showBottomDivider = !isLastRow,
-                    onArtworkClick = { onEpisodeArtworkClick(episode) },
-                    onRowClick = { onEpisodeClick(episode) }
-                )
-            }
+        items(
+            items = section.episodes,
+            key = { episode -> episode.id }
+        ) { episode ->
+            val isLastRow = sectionIndex == sections.lastIndex &&
+                episode == section.episodes.lastOrNull()
+            EpisodeRow(
+                episode = episode,
+                sectionRssFeedUrl = section.rssFeedUrl,
+                config = config,
+                filesDir = filesDir,
+                loadPodcastArtwork = loadPodcastArtwork,
+                playerState = playerState,
+                isSelected = episode.id in selectedEpisodeIds,
+                selectionActive = hasSelection,
+                markInFlight = markInFlight,
+                showBottomDivider = !isLastRow,
+                onArtworkClick = { onEpisodeArtworkClick(episode) },
+                onRowClick = { onEpisodeClick(episode) }
+            )
         }
     }
 }

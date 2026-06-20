@@ -9,10 +9,16 @@ import com.eskerra.go.core.model.PodcastPlaybackState
 import com.eskerra.go.core.model.PodcastSection
 import com.eskerra.go.core.model.PodcastSyncResult
 import com.eskerra.go.core.model.WorkspaceConfig
+import com.eskerra.go.core.repository.PodcastRefreshProgress
+import com.eskerra.go.core.repository.PodcastRssVaultSync
+import com.eskerra.go.core.repository.PodcastRssVaultSyncSummary
 import com.eskerra.go.core.usecase.LoadPodcastCatalog
 import com.eskerra.go.core.usecase.MarkPodcastEpisodesPlayed
+import com.eskerra.go.core.usecase.SyncPodcastVaultRefresh
 import com.eskerra.go.data.workspace.WorkspacePaths
 import java.io.File
+import java.util.concurrent.atomic.AtomicInteger
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -20,6 +26,8 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -356,5 +364,117 @@ class PodcastsViewModelTest {
         assertEquals(PodcastPlaybackPhase.PRIMED, content.playerState.phase)
         assertEquals(12_000L, content.playerState.positionMs)
         assertEquals(episode.id, content.playerState.activeEpisode?.id)
+    }
+
+    @Test
+    fun runVaultRefresh_invokesVaultSyncAndSetsActiveState() = runTest {
+        val episode = samplePodcastEpisode()
+        val section = PodcastSection(episodes = listOf(episode), rssFeedUrl = null, title = "News")
+        val refreshCount = AtomicInteger(0)
+        val gate = CompletableDeferred<Unit>()
+        val syncPodcastVaultRefresh = SyncPodcastVaultRefresh(
+            vaultSync = object : PodcastRssVaultSync {
+                override suspend fun refresh(
+                    config: WorkspaceConfig,
+                    filesDir: File,
+                    onProgress: (PodcastRefreshProgress) -> Unit
+                ): Result<PodcastRssVaultSyncSummary> {
+                    refreshCount.incrementAndGet()
+                    onProgress(PodcastRefreshProgress(50, PodcastRefreshProgress.PHASE_RSS))
+                    gate.await()
+                    return Result.success(PodcastRssVaultSyncSummary(1, 0, 0))
+                }
+            },
+            syncPodcastChange = { _, _ -> Result.success(PodcastSyncResult.NOTHING_TO_COMMIT) },
+            dispatcher = dispatcher
+        )
+        val viewModel = PodcastsViewModel(
+            config = config,
+            filesDir = temp.newFolder("files"),
+            loadPodcastCatalog = LoadPodcastCatalog(
+                FakePodcastCatalogRepository(
+                    Result.success(
+                        PodcastCatalog(allEpisodes = listOf(episode), sections = listOf(section))
+                    )
+                )
+            ),
+            markPodcastEpisodesPlayed = noopMarkPodcastEpisodesPlayed(),
+            podcastPlaylistSync = noopPodcastPlaylistSync(),
+            podcastPlayerDriver = FakePodcastPlayerDriver(),
+            syncPodcastVaultRefresh = syncPodcastVaultRefresh,
+            loadPodcastArtwork = noopLoadPodcastArtwork(),
+            persistPodcastPlaybackSnapshot = persistence().persistPodcastPlaybackSnapshot,
+            clearPodcastPlaybackSnapshot = persistence().clearPodcastPlaybackSnapshot,
+            loadLocalSettings = persistence().loadLocalSettings
+        )
+        advanceUntilIdle()
+
+        viewModel.runVaultRefresh()
+        advanceUntilIdle()
+
+        assertTrue(viewModel.refreshState.value.active)
+        assertEquals(50, viewModel.refreshState.value.percent)
+
+        gate.complete(Unit)
+        advanceUntilIdle()
+
+        assertFalse(viewModel.refreshState.value.active)
+        assertNull(viewModel.refreshState.value.error)
+        assertEquals(1, refreshCount.get())
+    }
+
+    @Test
+    fun runVaultRefresh_whileActive_isIgnored() = runTest {
+        val episode = samplePodcastEpisode()
+        val section = PodcastSection(episodes = listOf(episode), rssFeedUrl = null, title = "News")
+        val refreshCount = AtomicInteger(0)
+        val gate = CompletableDeferred<Unit>()
+        val syncPodcastVaultRefresh = SyncPodcastVaultRefresh(
+            vaultSync = object : PodcastRssVaultSync {
+                override suspend fun refresh(
+                    config: WorkspaceConfig,
+                    filesDir: File,
+                    onProgress: (PodcastRefreshProgress) -> Unit
+                ): Result<PodcastRssVaultSyncSummary> {
+                    refreshCount.incrementAndGet()
+                    gate.await()
+                    return Result.success(PodcastRssVaultSyncSummary.EMPTY)
+                }
+            },
+            syncPodcastChange = { _, _ -> Result.success(PodcastSyncResult.NOTHING_TO_COMMIT) },
+            dispatcher = dispatcher
+        )
+        val viewModel = PodcastsViewModel(
+            config = config,
+            filesDir = temp.newFolder("files"),
+            loadPodcastCatalog = LoadPodcastCatalog(
+                FakePodcastCatalogRepository(
+                    Result.success(
+                        PodcastCatalog(allEpisodes = listOf(episode), sections = listOf(section))
+                    )
+                )
+            ),
+            markPodcastEpisodesPlayed = noopMarkPodcastEpisodesPlayed(),
+            podcastPlaylistSync = noopPodcastPlaylistSync(),
+            podcastPlayerDriver = FakePodcastPlayerDriver(),
+            syncPodcastVaultRefresh = syncPodcastVaultRefresh,
+            loadPodcastArtwork = noopLoadPodcastArtwork(),
+            persistPodcastPlaybackSnapshot = persistence().persistPodcastPlaybackSnapshot,
+            clearPodcastPlaybackSnapshot = persistence().clearPodcastPlaybackSnapshot,
+            loadLocalSettings = persistence().loadLocalSettings
+        )
+        advanceUntilIdle()
+
+        viewModel.runVaultRefresh()
+        advanceUntilIdle()
+        assertTrue(viewModel.refreshState.value.active)
+
+        viewModel.runVaultRefresh()
+        advanceUntilIdle()
+        assertEquals(1, refreshCount.get())
+
+        gate.complete(Unit)
+        advanceUntilIdle()
+        assertFalse(viewModel.refreshState.value.active)
     }
 }
