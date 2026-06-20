@@ -4,7 +4,7 @@ import java.io.File
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Static manifest checks for PoC security defaults. */
+/** Static manifest checks for security defaults. */
 class AndroidManifestSecurityTest {
 
     @Test
@@ -24,7 +24,7 @@ class AndroidManifestSecurityTest {
         assertTrue("Expected manifest at ${manifest.absolutePath}", manifest.isFile)
         val text = manifest.readText()
         assertTrue(
-            "Android backup must be disabled for PoC credential safety",
+            "Android backup must be disabled for credential safety",
             """android:allowBackup="false"""" in text ||
                 """android:allowBackup='false'""" in text
         )

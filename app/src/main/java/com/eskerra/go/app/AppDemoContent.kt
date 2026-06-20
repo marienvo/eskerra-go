@@ -2,7 +2,7 @@ package com.eskerra.go.app
 
 import com.eskerra.go.feature.podcasts.PodcastItem
 
-/** Placeholder content for PoC-only surfaces (podcasts list, overflow menu). Not vault data. */
+/** Placeholder content for stub surfaces (podcasts list, overflow menu). Not vault data. */
 
 internal val fakePodcasts: List<PodcastItem> = listOf(
     PodcastItem(title = "Note-taking, deeply", author = "Eskerra FM"),

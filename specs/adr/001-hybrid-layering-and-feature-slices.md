@@ -70,4 +70,4 @@ Use these to decide where new code goes:
 ## Related
 
 - Enforced rules: [`AGENTS.md`](../../AGENTS.md) (project-specific rules section).
-- PoC scope: [`poc-contract.md`](../architecture/poc-contract.md).
+- App contract: [`app-contract.md`](../architecture/app-contract.md).

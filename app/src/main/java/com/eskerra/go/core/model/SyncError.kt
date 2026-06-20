@@ -56,12 +56,12 @@ sealed interface SyncError {
 
     data object Diverged : SyncError {
         override fun message() =
-            "Sync stopped because local and remote histories have diverged. Manual Git repair is required for this PoC."
+            "Sync stopped because local and remote histories have diverged. Manual Git repair is required."
     }
 
     data object ConflictRisk : SyncError {
         override fun message() =
-            "Sync stopped because local and remote changes conflict. Manual Git repair is required for this PoC."
+            "Sync stopped because local and remote changes conflict. Manual Git repair is required."
     }
 
     data object PushRejected : SyncError {
