@@ -31,6 +31,8 @@ class PodcastsViewModelTest {
     @get:Rule
     val temp = TemporaryFolder()
 
+    private fun persistence() = podcastsViewModelPersistenceDefaults()
+
     private val config = WorkspaceConfig(
         name = "Vault",
         relativePath = WorkspacePaths.DEFAULT_RELATIVE_PATH,
@@ -69,7 +71,10 @@ class PodcastsViewModelTest {
             podcastPlaylistSync = noopPodcastPlaylistSync(),
             podcastPlayerDriver = FakePodcastPlayerDriver(),
             syncPodcastVaultRefresh = noopSyncPodcastVaultRefresh(),
-            loadPodcastArtwork = noopLoadPodcastArtwork()
+            loadPodcastArtwork = noopLoadPodcastArtwork(),
+            persistPodcastPlaybackSnapshot = persistence().persistPodcastPlaybackSnapshot,
+            clearPodcastPlaybackSnapshot = persistence().clearPodcastPlaybackSnapshot,
+            loadLocalSettings = persistence().loadLocalSettings
         )
 
         advanceUntilIdle()
@@ -90,7 +95,10 @@ class PodcastsViewModelTest {
             podcastPlaylistSync = noopPodcastPlaylistSync(),
             podcastPlayerDriver = FakePodcastPlayerDriver(),
             syncPodcastVaultRefresh = noopSyncPodcastVaultRefresh(),
-            loadPodcastArtwork = noopLoadPodcastArtwork()
+            loadPodcastArtwork = noopLoadPodcastArtwork(),
+            persistPodcastPlaybackSnapshot = persistence().persistPodcastPlaybackSnapshot,
+            clearPodcastPlaybackSnapshot = persistence().clearPodcastPlaybackSnapshot,
+            loadLocalSettings = persistence().loadLocalSettings
         )
 
         advanceUntilIdle()
@@ -112,7 +120,10 @@ class PodcastsViewModelTest {
             podcastPlaylistSync = noopPodcastPlaylistSync(),
             podcastPlayerDriver = FakePodcastPlayerDriver(),
             syncPodcastVaultRefresh = noopSyncPodcastVaultRefresh(),
-            loadPodcastArtwork = noopLoadPodcastArtwork()
+            loadPodcastArtwork = noopLoadPodcastArtwork(),
+            persistPodcastPlaybackSnapshot = persistence().persistPodcastPlaybackSnapshot,
+            clearPodcastPlaybackSnapshot = persistence().clearPodcastPlaybackSnapshot,
+            loadLocalSettings = persistence().loadLocalSettings
         )
 
         advanceUntilIdle()
@@ -159,7 +170,10 @@ class PodcastsViewModelTest {
             podcastPlaylistSync = noopPodcastPlaylistSync(),
             podcastPlayerDriver = FakePodcastPlayerDriver(),
             syncPodcastVaultRefresh = noopSyncPodcastVaultRefresh(),
-            loadPodcastArtwork = noopLoadPodcastArtwork()
+            loadPodcastArtwork = noopLoadPodcastArtwork(),
+            persistPodcastPlaybackSnapshot = persistence().persistPodcastPlaybackSnapshot,
+            clearPodcastPlaybackSnapshot = persistence().clearPodcastPlaybackSnapshot,
+            loadLocalSettings = persistence().loadLocalSettings
         )
         advanceUntilIdle()
         assertTrue(viewModel.uiState.value is PodcastsUiState.Content)
@@ -192,7 +206,10 @@ class PodcastsViewModelTest {
             podcastPlaylistSync = noopPodcastPlaylistSync(),
             podcastPlayerDriver = FakePodcastPlayerDriver(),
             syncPodcastVaultRefresh = noopSyncPodcastVaultRefresh(),
-            loadPodcastArtwork = noopLoadPodcastArtwork()
+            loadPodcastArtwork = noopLoadPodcastArtwork(),
+            persistPodcastPlaybackSnapshot = persistence().persistPodcastPlaybackSnapshot,
+            clearPodcastPlaybackSnapshot = persistence().clearPodcastPlaybackSnapshot,
+            loadLocalSettings = persistence().loadLocalSettings
         )
         advanceUntilIdle()
 
@@ -221,7 +238,10 @@ class PodcastsViewModelTest {
             podcastPlaylistSync = noopPodcastPlaylistSync(),
             podcastPlayerDriver = playerDriver,
             syncPodcastVaultRefresh = noopSyncPodcastVaultRefresh(),
-            loadPodcastArtwork = noopLoadPodcastArtwork()
+            loadPodcastArtwork = noopLoadPodcastArtwork(),
+            persistPodcastPlaybackSnapshot = persistence().persistPodcastPlaybackSnapshot,
+            clearPodcastPlaybackSnapshot = persistence().clearPodcastPlaybackSnapshot,
+            loadLocalSettings = persistence().loadLocalSettings
         )
         advanceUntilIdle()
 
@@ -259,7 +279,10 @@ class PodcastsViewModelTest {
             podcastPlaylistSync = noopPodcastPlaylistSync(),
             podcastPlayerDriver = playerDriver,
             syncPodcastVaultRefresh = noopSyncPodcastVaultRefresh(),
-            loadPodcastArtwork = noopLoadPodcastArtwork()
+            loadPodcastArtwork = noopLoadPodcastArtwork(),
+            persistPodcastPlaybackSnapshot = persistence().persistPodcastPlaybackSnapshot,
+            clearPodcastPlaybackSnapshot = persistence().clearPodcastPlaybackSnapshot,
+            loadLocalSettings = persistence().loadLocalSettings
         )
         advanceUntilIdle()
 
@@ -321,7 +344,10 @@ class PodcastsViewModelTest {
             ),
             podcastPlayerDriver = playerDriver,
             syncPodcastVaultRefresh = noopSyncPodcastVaultRefresh(),
-            loadPodcastArtwork = noopLoadPodcastArtwork()
+            loadPodcastArtwork = noopLoadPodcastArtwork(),
+            persistPodcastPlaybackSnapshot = persistence().persistPodcastPlaybackSnapshot,
+            clearPodcastPlaybackSnapshot = persistence().clearPodcastPlaybackSnapshot,
+            loadLocalSettings = persistence().loadLocalSettings
         )
 
         advanceUntilIdle()

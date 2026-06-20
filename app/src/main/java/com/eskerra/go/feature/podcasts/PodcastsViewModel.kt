@@ -4,7 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.eskerra.go.core.model.PlaylistEntry
-import com.eskerra.go.core.model.PlaylistWriteResult
 import com.eskerra.go.core.model.PodcastCatalog
 import com.eskerra.go.core.model.PodcastCatalogError
 import com.eskerra.go.core.model.PodcastCatalogException
@@ -12,19 +11,22 @@ import com.eskerra.go.core.model.PodcastEpisode
 import com.eskerra.go.core.model.PodcastPlaybackPhase
 import com.eskerra.go.core.model.PodcastPlaybackState
 import com.eskerra.go.core.model.WorkspaceConfig
-import com.eskerra.go.core.playlist.resolvePodcastPlaylistHydration
+import com.eskerra.go.core.playlist.playbackSnapshot
+import com.eskerra.go.core.playlist.reconcilePodcastPlaybackSources
 import com.eskerra.go.core.playlist.shouldClearPlaylistForCatalog
 import com.eskerra.go.core.repository.PodcastCatalogSnapshotStore
 import com.eskerra.go.core.repository.PodcastPlayerDriver
+import com.eskerra.go.core.usecase.ClearPodcastPlaybackSnapshot
+import com.eskerra.go.core.usecase.LoadLocalSettings
 import com.eskerra.go.core.usecase.LoadPodcastArtwork
 import com.eskerra.go.core.usecase.LoadPodcastCatalog
 import com.eskerra.go.core.usecase.MarkPodcastEpisodesPlayed
+import com.eskerra.go.core.usecase.PersistPodcastPlaybackSnapshot
 import com.eskerra.go.core.usecase.PodcastPlaylistSync
 import com.eskerra.go.core.usecase.SyncPodcastVaultRefresh
 import com.eskerra.go.data.workspace.WorkspacePaths
 import java.io.File
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -40,6 +42,9 @@ class PodcastsViewModel(
     private val syncPodcastVaultRefresh: SyncPodcastVaultRefresh,
     private val loadPodcastArtwork: LoadPodcastArtwork,
     private val catalogSnapshotStore: PodcastCatalogSnapshotStore? = null,
+    private val persistPodcastPlaybackSnapshot: PersistPodcastPlaybackSnapshot,
+    private val clearPodcastPlaybackSnapshot: ClearPodcastPlaybackSnapshot,
+    private val loadLocalSettings: LoadLocalSettings,
     private val onExitMiniPlayerArtworkMode: () -> Unit = {}
 ) : ViewModel() {
 
@@ -53,12 +58,17 @@ class PodcastsViewModel(
         WorkspacePaths.resolve(filesDir, config.relativePath).getOrNull()
 
     private var refreshJob: Job? = null
-    private var persistJob: Job? = null
     private val autoMarkedEpisodeIds = mutableSetOf<String>()
     private val nearEndPlaylistClearedEpisodeIds = mutableSetOf<String>()
 
     private var lastCatalog: PodcastCatalog? = null
-    private var knownPlaylistEntry: PlaylistEntry? = null
+    private val playlistPersistence = PodcastPlaylistPersistence(
+        scope = viewModelScope,
+        workspaceRoot = workspaceRoot,
+        podcastPlaylistSync = podcastPlaylistSync,
+        persistPodcastPlaybackSnapshot = persistPodcastPlaybackSnapshot,
+        clearPodcastPlaybackSnapshot = clearPodcastPlaybackSnapshot
+    )
     private var playlistRestoredForVault = false
     private var userActionInFlight = false
     private var lastObservedPlaylistGeneration = 0
@@ -70,7 +80,7 @@ class PodcastsViewModel(
         onExitMiniPlayerArtworkMode = onExitMiniPlayerArtworkMode,
         markEpisodes = { episodes -> markPodcastEpisodesPlayed(config, filesDir, episodes) },
         onMarkedUpdated = {
-            clearRemotePlaylist()
+            viewModelScope.launch { playlistPersistence.clearRemotePlaylist() }
             reloadCatalog()
         }
     )
@@ -197,7 +207,11 @@ class PodcastsViewModel(
     fun pausePlayback() = launchUserAction {
         podcastPlayerDriver.pause()
         val state = podcastPlayerDriver.state.value
-        if (state.positionMs < MIN_PROGRESS_MS) clearRemotePlaylist() else queuePersist(state)
+        if (state.positionMs < MIN_PROGRESS_MS) {
+            launchUserAction { playlistPersistence.clearRemotePlaylist() }
+        } else {
+            queuePersist(state)
+        }
     }
 
     fun resumePlayback() {
@@ -220,7 +234,7 @@ class PodcastsViewModel(
 
     fun stopPlayback() = launchUserAction {
         podcastPlayerDriver.stop()
-        clearRemotePlaylist()
+        playlistPersistence.clearRemotePlaylist()
     }
 
     private fun launchUserAction(block: suspend () -> Unit) {
@@ -250,7 +264,7 @@ class PodcastsViewModel(
             markPodcastEpisodesPlayed(config, filesDir, episodes)
                 .onSuccess { result ->
                     if (result.updated) {
-                        clearRemotePlaylist()
+                        playlistPersistence.clearRemotePlaylist()
                         refresh()
                     }
                 }
@@ -261,7 +275,9 @@ class PodcastsViewModel(
         if (playlistRestoredForVault) return
         playlistRestoredForVault = true
         val root = workspaceRoot ?: return
-        val entry = podcastPlaylistSync.read(root)?.also { knownPlaylistEntry = it } ?: return
+        val entry =
+            podcastPlaylistSync.read(root)?.also { playlistPersistence.knownPlaylistEntry = it }
+                ?: return
         hydrateOrReset(catalog, entry)
     }
 
@@ -271,7 +287,7 @@ class PodcastsViewModel(
         if (userActionInFlight) return
         val catalog = lastCatalog ?: return
         val entry = podcastPlaylistSync.read(root)
-        knownPlaylistEntry = entry
+        playlistPersistence.knownPlaylistEntry = entry
         if (entry == null) {
             resetPlaybackIfIdle()
             return
@@ -281,10 +297,17 @@ class PodcastsViewModel(
 
     private suspend fun hydrateOrReset(catalog: PodcastCatalog, entry: PlaylistEntry) {
         val root = workspaceRoot ?: return
-        val hydration = resolvePodcastPlaylistHydration(catalog, entry)
+        val localSnapshot = loadLocalSettings().playbackSnapshot()
+        val hydration = reconcilePodcastPlaybackSources(
+            catalog = catalog,
+            localSnapshot = localSnapshot,
+            remoteEntry = entry,
+            nativeSession = podcastPlayerDriver.currentNativeSession()
+        )
         if (hydration == null) {
             podcastPlaylistSync.clear(root)
-            knownPlaylistEntry = null
+            playlistPersistence.knownPlaylistEntry = null
+            clearPodcastPlaybackSnapshot()
             resetPlaybackIfIdle()
             return
         }
@@ -299,19 +322,19 @@ class PodcastsViewModel(
         podcastPlayerDriver.hydrate(
             episode = hydration.episode,
             positionMs = hydration.positionMs,
-            durationMs = entry.durationMs
+            durationMs = entry.durationMs ?: localSnapshot?.durationMs
         )
     }
 
     private suspend fun runPlaylistHousekeeping(catalog: PodcastCatalog) {
         val root = workspaceRoot ?: return
-        val entry = knownPlaylistEntry ?: podcastPlaylistSync.read(root)?.also {
-            knownPlaylistEntry = it
+        val entry = playlistPersistence.knownPlaylistEntry ?: podcastPlaylistSync.read(root)?.also {
+            playlistPersistence.knownPlaylistEntry = it
         }
         if (entry == null) return
         if (shouldClearPlaylistForCatalog(catalog, entry)) {
             podcastPlaylistSync.clear(root)
-            knownPlaylistEntry = null
+            playlistPersistence.knownPlaylistEntry = null
             if (!podcastPlayerDriver.state.value.isPlaying) {
                 resetPlaybackIfIdle()
             }
@@ -322,52 +345,22 @@ class PodcastsViewModel(
         val active = podcastPlayerDriver.state.value.activeEpisode ?: return
         if (catalog.allEpisodes.none { it.id == active.id }) {
             podcastPlayerDriver.stop()
-            knownPlaylistEntry = null
+            playlistPersistence.knownPlaylistEntry = null
         }
     }
 
     private fun handlePlaylistSideEffects(playerState: PodcastPlaybackState) {
         val episode = playerState.activeEpisode ?: return
         if (playerState.isNearEnd && nearEndPlaylistClearedEpisodeIds.add(episode.id)) {
-            viewModelScope.launch { clearRemotePlaylist() }
+            viewModelScope.launch { playlistPersistence.clearRemotePlaylist() }
         }
         if (playerState.isPlaying || playerState.isPaused) {
-            queuePersist(playerState)
+            playlistPersistence.queuePersist(playerState)
         }
     }
 
     private fun queuePersist(playerState: PodcastPlaybackState) {
-        val episode = playerState.activeEpisode ?: return
-        val root = workspaceRoot ?: return
-        if (
-            playerState.phase == PodcastPlaybackPhase.LOADING &&
-            playerState.positionMs < MIN_PROGRESS_MS
-        ) {
-            return
-        }
-        persistJob?.cancel()
-        persistJob = viewModelScope.launch {
-            delay(PERSIST_DEBOUNCE_MS)
-            if (!podcastPlaylistSync.isR2Configured(root)) return@launch
-            val result = podcastPlaylistSync.persist(
-                workspaceRoot = root,
-                episode = episode,
-                positionMs = playerState.positionMs,
-                durationMs = playerState.durationMs,
-                knownEntry = knownPlaylistEntry
-            )
-            knownPlaylistEntry = when (result) {
-                is PlaylistWriteResult.Saved -> result.entry
-                is PlaylistWriteResult.Superseded -> result.entry
-                PlaylistWriteResult.Skipped -> knownPlaylistEntry
-            }
-        }
-    }
-
-    private suspend fun clearRemotePlaylist() {
-        val root = workspaceRoot ?: return
-        podcastPlaylistSync.clear(root)
-        knownPlaylistEntry = null
+        playlistPersistence.queuePersist(playerState)
     }
 
     private fun resetPlaybackIfIdle() {
@@ -378,7 +371,7 @@ class PodcastsViewModel(
     }
 
     private fun startPositionForEpisode(episode: PodcastEpisode): Long {
-        val entry = knownPlaylistEntry ?: return 0L
+        val entry = playlistPersistence.knownPlaylistEntry ?: return 0L
         return if (entry.episodeId == episode.id) entry.positionMs.coerceAtLeast(0L) else 0L
     }
 
@@ -407,7 +400,7 @@ class PodcastsViewModel(
             markPodcastEpisodesPlayed(config, filesDir, listOf(episode))
                 .onSuccess { result ->
                     if (result.updated) {
-                        clearRemotePlaylist()
+                        playlistPersistence.clearRemotePlaylist()
                         refresh()
                     }
                     if (playerState.phase == PodcastPlaybackPhase.ENDED) {
@@ -429,7 +422,6 @@ class PodcastsViewModel(
 
     companion object {
         const val MIN_PROGRESS_MS = 10_000L
-        private const val PERSIST_DEBOUNCE_MS = 500L
 
         const val WORKSPACE_UNAVAILABLE_MESSAGE = "Workspace is not available."
         const val WORKSPACE_MISSING_MESSAGE = "Workspace files are missing."
@@ -447,6 +439,9 @@ class PodcastsViewModel(
             syncPodcastVaultRefresh: SyncPodcastVaultRefresh,
             loadPodcastArtwork: LoadPodcastArtwork,
             catalogSnapshotStore: PodcastCatalogSnapshotStore? = null,
+            persistPodcastPlaybackSnapshot: PersistPodcastPlaybackSnapshot,
+            clearPodcastPlaybackSnapshot: ClearPodcastPlaybackSnapshot,
+            loadLocalSettings: LoadLocalSettings,
             onExitMiniPlayerArtworkMode: () -> Unit = {}
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
@@ -460,6 +455,9 @@ class PodcastsViewModel(
                 syncPodcastVaultRefresh,
                 loadPodcastArtwork,
                 catalogSnapshotStore,
+                persistPodcastPlaybackSnapshot,
+                clearPodcastPlaybackSnapshot,
+                loadLocalSettings,
                 onExitMiniPlayerArtworkMode
             ) as T
         }

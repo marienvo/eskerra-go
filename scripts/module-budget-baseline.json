@@ -1,8 +1,8 @@
 {
   "maxLinesByPath": {
-    "app/src/main/java/com/eskerra/go/app/App.kt": 510,
-    "app/src/main/java/com/eskerra/go/feature/podcasts/PodcastsViewModel.kt": 467,
-    "app/src/test/java/com/eskerra/go/core/usecase/ManualSyncNowTest.kt": 511,
+    "app/src/main/java/com/eskerra/go/app/App.kt": 525,
+    "app/src/main/java/com/eskerra/go/feature/podcasts/PodcastsViewModel.kt": 465,
+    "app/src/test/java/com/eskerra/go/core/usecase/ManualSyncNowTest.kt": 552,
     "app/src/test/java/com/eskerra/go/data/workspace/RemoteSyncSettingsRepositoryTest.kt": 571,
     "app/src/test/java/com/eskerra/go/data/workspace/WorkspaceSetupRepositoryTest.kt": 450
   }

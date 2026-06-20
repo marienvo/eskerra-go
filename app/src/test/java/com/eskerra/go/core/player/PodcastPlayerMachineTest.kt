@@ -108,6 +108,29 @@ class PodcastPlayerMachineTest {
         assertEquals(sampleEpisode().id, next.activeEpisode?.id)
     }
 
+    @Test
+    fun nativeIdle_doesNotDemotePrimedHydration() {
+        val state = PodcastPlaybackState(
+            activeEpisode = sampleEpisode(),
+            phase = PodcastPlaybackPhase.PRIMED,
+            positionMs = 15_000L,
+            durationMs = 60_000L
+        )
+
+        val next = PodcastPlayerMachine.reduce(
+            state,
+            PodcastPlayerEvent.NativeStateChanged(
+                nativeState = PodcastNativePlaybackState.IDLE,
+                playWhenReady = false,
+                positionMs = 0L,
+                durationMs = null
+            )
+        )
+
+        assertEquals(PodcastPlaybackPhase.PRIMED, next.phase)
+        assertEquals(15_000L, next.positionMs)
+    }
+
     private fun primedState(): PodcastPlaybackState =
         PodcastPlaybackState(activeEpisode = sampleEpisode())
 

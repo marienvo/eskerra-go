@@ -11,6 +11,7 @@ import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.eskerra.go.core.model.PodcastEpisode
+import com.eskerra.go.core.model.PodcastNativeSessionSnapshot
 import com.eskerra.go.core.model.PodcastPlaybackState
 import com.eskerra.go.core.player.PodcastNativePlaybackState
 import com.eskerra.go.core.player.PodcastPlayerEvent
@@ -128,6 +129,18 @@ class Media3PodcastPlayerDriver(context: Context) : PodcastPlayerDriver {
             mediaController.seekTo(positionMs.coerceAtLeast(0L))
             publishProgress(mediaController)
         }
+    }
+
+    override fun currentNativeSession(): PodcastNativeSessionSnapshot? {
+        val mediaController = controller ?: return null
+        val mediaId = mediaController.currentMediaItem?.mediaId?.takeIf { it.isNotBlank() }
+            ?: return null
+        return PodcastNativeSessionSnapshot(
+            episodeId = mediaId,
+            positionMs = mediaController.currentPosition.coerceAtLeast(0L),
+            durationMs = mediaController.duration.takeIf { it != C.TIME_UNSET && it > 0L },
+            isPlaying = mediaController.isPlaying
+        )
     }
 
     override fun release() {

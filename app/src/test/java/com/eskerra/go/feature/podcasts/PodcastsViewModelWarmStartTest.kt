@@ -97,17 +97,22 @@ class PodcastsViewModelWarmStartTest {
     }
 
     private fun buildViewModel(loadPodcastCatalog: LoadPodcastCatalog, snapshot: PodcastCatalog?) =
-        PodcastsViewModel(
-            config = config,
-            filesDir = temp.newFolder("files"),
-            loadPodcastCatalog = loadPodcastCatalog,
-            markPodcastEpisodesPlayed = noopMarkPodcastEpisodesPlayed(),
-            podcastPlaylistSync = noopPodcastPlaylistSync(),
-            podcastPlayerDriver = FakePodcastPlayerDriver(),
-            syncPodcastVaultRefresh = noopSyncPodcastVaultRefresh(),
-            loadPodcastArtwork = noopLoadPodcastArtwork(),
-            catalogSnapshotStore = FakeSnapshotStore(snapshot)
-        )
+        podcastsViewModelPersistenceDefaults().let { persistence ->
+            PodcastsViewModel(
+                config = config,
+                filesDir = temp.newFolder("files"),
+                loadPodcastCatalog = loadPodcastCatalog,
+                markPodcastEpisodesPlayed = noopMarkPodcastEpisodesPlayed(),
+                podcastPlaylistSync = noopPodcastPlaylistSync(),
+                podcastPlayerDriver = FakePodcastPlayerDriver(),
+                syncPodcastVaultRefresh = noopSyncPodcastVaultRefresh(),
+                loadPodcastArtwork = noopLoadPodcastArtwork(),
+                catalogSnapshotStore = FakeSnapshotStore(snapshot),
+                persistPodcastPlaybackSnapshot = persistence.persistPodcastPlaybackSnapshot,
+                clearPodcastPlaybackSnapshot = persistence.clearPodcastPlaybackSnapshot,
+                loadLocalSettings = persistence.loadLocalSettings
+            )
+        }
 
     private class GatedCatalogRepository(
         private val gate: CompletableDeferred<Result<PodcastCatalog>>

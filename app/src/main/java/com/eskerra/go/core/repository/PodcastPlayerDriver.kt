@@ -1,6 +1,7 @@
 package com.eskerra.go.core.repository
 
 import com.eskerra.go.core.model.PodcastEpisode
+import com.eskerra.go.core.model.PodcastNativeSessionSnapshot
 import com.eskerra.go.core.model.PodcastPlaybackState
 import kotlinx.coroutines.flow.StateFlow
 
@@ -20,6 +21,8 @@ interface PodcastPlayerDriver {
     fun seekBy(deltaMs: Long)
 
     fun seekTo(positionMs: Long)
+
+    fun currentNativeSession(): PodcastNativeSessionSnapshot?
 
     fun release()
 }

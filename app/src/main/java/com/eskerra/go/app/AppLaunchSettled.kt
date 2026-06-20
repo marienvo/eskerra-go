@@ -25,15 +25,20 @@ internal const val MIN_SPLASH_HOLD_MS = 150L
 internal fun isLaunchSettled(
     gateState: AppGateState,
     inboxUiState: InboxUiState?,
-    todayHubUiState: TodayHubUiState?
+    todayHubUiState: TodayHubUiState?,
+    podcastFirstLaunch: Boolean = false
 ): Boolean = when (gateState) {
     AppGateState.Loading -> false
     is AppGateState.NeedsSetup -> true
     is AppGateState.Ready ->
-        inboxUiState != null &&
-            inboxUiState !is InboxUiState.Loading &&
-            todayHubUiState != null &&
-            todayHubUiState !is TodayHubUiState.Loading
+        if (podcastFirstLaunch) {
+            true
+        } else {
+            inboxUiState != null &&
+                inboxUiState !is InboxUiState.Loading &&
+                todayHubUiState != null &&
+                todayHubUiState !is TodayHubUiState.Loading
+        }
 }
 
 /**
@@ -47,9 +52,15 @@ internal fun AppLaunchSettledEffect(
     inboxUiState: InboxUiState?,
     todayHubUiState: TodayHubUiState?,
     onLaunchSettled: () -> Unit,
+    podcastFirstLaunch: Boolean = false,
     minSplashHoldMs: Long = MIN_SPLASH_HOLD_MS
 ) {
-    val launchSettled = isLaunchSettled(gateState, inboxUiState, todayHubUiState)
+    val launchSettled = isLaunchSettled(
+        gateState,
+        inboxUiState,
+        todayHubUiState,
+        podcastFirstLaunch
+    )
     LaunchedEffect(gateState, launchSettled) {
         if (!launchSettled) {
             return@LaunchedEffect

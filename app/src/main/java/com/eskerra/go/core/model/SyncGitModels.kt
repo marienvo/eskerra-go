@@ -15,10 +15,7 @@ data class SyncChangePartition(
  * the local ("ours") version of each conflicting file before the remote version
  * was taken as canonical (remote-wins policy).
  */
-data class MergeOutcome(
-    val merged: Boolean,
-    val conflictCopies: List<String> = emptyList()
-)
+data class MergeOutcome(val merged: Boolean, val conflictCopies: List<String> = emptyList())
 
 /** Comparison between local HEAD and `origin/<branch>` after fetch. */
 data class RemoteBranchComparison(

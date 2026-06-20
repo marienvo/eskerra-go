@@ -25,6 +25,8 @@ class PodcastsViewModelSelectionTest {
     @get:Rule
     val temp = TemporaryFolder()
 
+    private fun persistence() = podcastsViewModelPersistenceDefaults()
+
     private val config = WorkspaceConfig(
         name = "Vault",
         relativePath = WorkspacePaths.DEFAULT_RELATIVE_PATH,
@@ -73,6 +75,9 @@ class PodcastsViewModelSelectionTest {
             podcastPlayerDriver = FakePodcastPlayerDriver(),
             syncPodcastVaultRefresh = noopSyncPodcastVaultRefresh(),
             loadPodcastArtwork = noopLoadPodcastArtwork(),
+            persistPodcastPlaybackSnapshot = persistence().persistPodcastPlaybackSnapshot,
+            clearPodcastPlaybackSnapshot = persistence().clearPodcastPlaybackSnapshot,
+            loadLocalSettings = persistence().loadLocalSettings,
             onExitMiniPlayerArtworkMode = { miniPlayerExitCount++ }
         )
         advanceUntilIdle()
@@ -121,7 +126,10 @@ class PodcastsViewModelSelectionTest {
             podcastPlaylistSync = noopPodcastPlaylistSync(),
             podcastPlayerDriver = FakePodcastPlayerDriver(),
             syncPodcastVaultRefresh = noopSyncPodcastVaultRefresh(),
-            loadPodcastArtwork = noopLoadPodcastArtwork()
+            loadPodcastArtwork = noopLoadPodcastArtwork(),
+            persistPodcastPlaybackSnapshot = persistence().persistPodcastPlaybackSnapshot,
+            clearPodcastPlaybackSnapshot = persistence().clearPodcastPlaybackSnapshot,
+            loadLocalSettings = persistence().loadLocalSettings
         )
         advanceUntilIdle()
         viewModel.onEpisodeArtworkClick(episode)

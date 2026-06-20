@@ -12,10 +12,12 @@ import androidx.compose.runtime.setValue
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.eskerra.go.app.AppRoot
 import com.eskerra.go.app.PodcastPlaylistWiring
+import com.eskerra.go.app.PodcastShellStateWiring
 import com.eskerra.go.core.repository.PodcastPlayerDriver
 import com.eskerra.go.core.usecase.BuildSafeSyncDiagnostic
 import com.eskerra.go.core.usecase.BuildSyncPreflight
 import com.eskerra.go.core.usecase.ClearPlaylist
+import com.eskerra.go.core.usecase.ClearPodcastPlaybackSnapshot
 import com.eskerra.go.core.usecase.ClearRemoteSyncSettings
 import com.eskerra.go.core.usecase.CreateInboxNote
 import com.eskerra.go.core.usecase.DeleteInboxNotes
@@ -36,6 +38,8 @@ import com.eskerra.go.core.usecase.LoadVaultSettings
 import com.eskerra.go.core.usecase.MaintainVaultSearchIndex
 import com.eskerra.go.core.usecase.ManualSyncNow
 import com.eskerra.go.core.usecase.MarkPodcastEpisodesPlayed
+import com.eskerra.go.core.usecase.PersistAppShellMode
+import com.eskerra.go.core.usecase.PersistPodcastPlaybackSnapshot
 import com.eskerra.go.core.usecase.PodcastPlaylistSync
 import com.eskerra.go.core.usecase.PrefetchLinkedNotes
 import com.eskerra.go.core.usecase.ReadPlaylist
@@ -43,6 +47,7 @@ import com.eskerra.go.core.usecase.ReconcileWorkspaceSyncBranch
 import com.eskerra.go.core.usecase.RecordLastSyncAttempt
 import com.eskerra.go.core.usecase.RefreshRemoteSyncStatus
 import com.eskerra.go.core.usecase.RepairVaultSearchIndex
+import com.eskerra.go.core.usecase.RestorePodcastPlayback
 import com.eskerra.go.core.usecase.SaveLocalSettings
 import com.eskerra.go.core.usecase.SaveNote
 import com.eskerra.go.core.usecase.SaveRemoteSyncSettings
@@ -294,6 +299,22 @@ class MainActivity : ComponentActivity() {
             repository = playlistSyncRepository,
             conditionalFetch = playlistR2ConditionalFetch
         )
+        val restorePodcastPlayback = RestorePodcastPlayback(
+            loadPodcastCatalog = loadPodcastCatalog,
+            podcastPlaylistSync = podcastPlaylistSync,
+            localSettingsStore = localSettingsStore,
+            podcastPlayerDriver = podcastPlayerDriver
+        )
+        val persistAppShellMode = PersistAppShellMode(localSettingsStore)
+        val persistPodcastPlaybackSnapshot = PersistPodcastPlaybackSnapshot(localSettingsStore)
+        val clearPodcastPlaybackSnapshot = ClearPodcastPlaybackSnapshot(localSettingsStore)
+
+        val podcastShellStateWiring = PodcastShellStateWiring(
+            restorePodcastPlayback = restorePodcastPlayback,
+            persistAppShellMode = persistAppShellMode,
+            persistPodcastPlaybackSnapshot = persistPodcastPlaybackSnapshot,
+            clearPodcastPlaybackSnapshot = clearPodcastPlaybackSnapshot
+        )
 
         setContent {
             AppRoot(
@@ -342,6 +363,7 @@ class MainActivity : ComponentActivity() {
                 podcastPlayerDriver = podcastPlayerDriver,
                 syncPodcastVaultRefresh = syncPodcastVaultRefresh,
                 catalogSnapshotStore = catalogSnapshotStore,
+                podcastShellStateWiring = podcastShellStateWiring,
                 onLaunchSettled = {
                     if (keepSplashOnScreen) {
                         keepSplashOnScreen = false

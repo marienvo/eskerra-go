@@ -118,6 +118,7 @@ fun AppRoot(
     podcastPlayerDriver: PodcastPlayerDriver,
     syncPodcastVaultRefresh: SyncPodcastVaultRefresh,
     catalogSnapshotStore: PodcastCatalogSnapshotStore,
+    podcastShellStateWiring: PodcastShellStateWiring,
     onLaunchSettled: () -> Unit = {}
 ) {
     EskerraGoTheme(darkTheme = true) {
@@ -136,11 +137,13 @@ fun AppRoot(
                 val gateState by gateViewModel.gateState.collectAsState()
                 var inboxUiState by remember { mutableStateOf<InboxUiState?>(null) }
                 var todayHubUiState by remember { mutableStateOf<TodayHubUiState?>(null) }
+                var podcastFirstLaunch by remember { mutableStateOf(false) }
 
                 AppLaunchSettledEffect(
                     gateState = gateState,
                     inboxUiState = inboxUiState,
                     todayHubUiState = todayHubUiState,
+                    podcastFirstLaunch = podcastFirstLaunch,
                     onLaunchSettled = onLaunchSettled
                 )
 
@@ -226,9 +229,11 @@ fun AppRoot(
                         podcastPlayerDriver = podcastPlayerDriver,
                         syncPodcastVaultRefresh = syncPodcastVaultRefresh,
                         catalogSnapshotStore = catalogSnapshotStore,
+                        podcastShellStateWiring = podcastShellStateWiring,
                         onConfigUpdated = gateViewModel::updateReadyConfig,
                         onInboxUiStateChanged = { inboxUiState = it },
-                        onTodayHubUiStateChanged = { todayHubUiState = it }
+                        onTodayHubUiStateChanged = { todayHubUiState = it },
+                        onPodcastFirstLaunchChanged = { podcastFirstLaunch = it }
                     )
                 }
             }

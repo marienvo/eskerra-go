@@ -39,11 +39,8 @@ interface RemoteSyncRepository {
      * ("ours") version is saved to a sidecar copy named with [conflictLabel] and the
      * remote ("theirs") version becomes canonical (remote-wins).
      */
-    fun mergeRemote(
-        workingDir: File,
-        branch: String,
-        conflictLabel: String
-    ): Result<MergeOutcome> = Result.success(MergeOutcome(merged = false))
+    fun mergeRemote(workingDir: File, branch: String, conflictLabel: String): Result<MergeOutcome> =
+        Result.success(MergeOutcome(merged = false))
 
     /** Stages the given repo-relative [relativePaths] (additions, edits, and deletions). */
     fun stagePaths(workingDir: File, relativePaths: Set<String>): Result<Unit>

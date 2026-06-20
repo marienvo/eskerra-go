@@ -81,23 +81,45 @@ object PodcastPlayerMachine {
                 errorMessage = null
             )
 
-            is PodcastPlayerEvent.NativeStateChanged -> state.copy(
-                phase = phaseFromNative(
-                    nativeState = event.nativeState,
-                    playWhenReady = event.playWhenReady,
-                    positionMs = event.positionMs,
-                    durationMs = event.durationMs,
-                    hasActiveEpisode = state.activeEpisode != null
-                ),
-                positionMs = sanitizedPosition(event.positionMs),
-                durationMs = event.durationMs?.takeIf { it > 0L },
-                transportBusy = event.nativeState == PodcastNativePlaybackState.BUFFERING,
-                errorMessage = if (event.nativeState == PodcastNativePlaybackState.ERROR) {
-                    state.errorMessage
+            is PodcastPlayerEvent.NativeStateChanged -> {
+                val nativeIdleWithoutLoadedMedia =
+                    event.nativeState == PodcastNativePlaybackState.IDLE &&
+                        event.positionMs == 0L &&
+                        state.hasActiveEpisode &&
+                        state.positionMs > 0L
+                if (
+                    nativeIdleWithoutLoadedMedia &&
+                    (
+                        state.phase == PodcastPlaybackPhase.PRIMED ||
+                            state.phase == PodcastPlaybackPhase.PAUSED ||
+                            state.phase == PodcastPlaybackPhase.NEAR_END_PAUSED
+                        )
+                ) {
+                    state
                 } else {
-                    null
+                    state.copy(
+                        phase = phaseFromNative(
+                            nativeState = event.nativeState,
+                            playWhenReady = event.playWhenReady,
+                            positionMs = event.positionMs,
+                            durationMs = event.durationMs,
+                            hasActiveEpisode = state.activeEpisode != null
+                        ),
+                        positionMs = if (nativeIdleWithoutLoadedMedia) {
+                            state.positionMs
+                        } else {
+                            sanitizedPosition(event.positionMs)
+                        },
+                        durationMs = event.durationMs?.takeIf { it > 0L } ?: state.durationMs,
+                        transportBusy = event.nativeState == PodcastNativePlaybackState.BUFFERING,
+                        errorMessage = if (event.nativeState == PodcastNativePlaybackState.ERROR) {
+                            state.errorMessage
+                        } else {
+                            null
+                        }
+                    )
                 }
-            )
+            }
 
             is PodcastPlayerEvent.ProgressChanged -> {
                 val positionMs = sanitizedPosition(event.positionMs)

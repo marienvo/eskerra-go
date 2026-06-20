@@ -6,6 +6,7 @@ import com.eskerra.go.core.model.PlaylistEntry
 import com.eskerra.go.core.model.PlaylistWriteResult
 import com.eskerra.go.core.model.PodcastCatalog
 import com.eskerra.go.core.model.PodcastEpisode
+import com.eskerra.go.core.model.PodcastNativeSessionSnapshot
 import com.eskerra.go.core.model.PodcastPlaybackPhase
 import com.eskerra.go.core.model.PodcastPlaybackState
 import com.eskerra.go.core.model.PodcastSyncResult
@@ -22,10 +23,13 @@ import com.eskerra.go.core.repository.PodcastRssVaultSync
 import com.eskerra.go.core.repository.PodcastRssVaultSyncSummary
 import com.eskerra.go.core.repository.VaultSettingsRepository
 import com.eskerra.go.core.usecase.ClearPlaylist
+import com.eskerra.go.core.usecase.ClearPodcastPlaybackSnapshot
 import com.eskerra.go.core.usecase.EnsureDeviceInstanceId
+import com.eskerra.go.core.usecase.LoadLocalSettings
 import com.eskerra.go.core.usecase.LoadPodcastArtwork
 import com.eskerra.go.core.usecase.LoadVaultSettings
 import com.eskerra.go.core.usecase.MarkPodcastEpisodesPlayed
+import com.eskerra.go.core.usecase.PersistPodcastPlaybackSnapshot
 import com.eskerra.go.core.usecase.PodcastPlaylistSync
 import com.eskerra.go.core.usecase.ReadPlaylist
 import com.eskerra.go.core.usecase.SyncPodcastVaultRefresh
@@ -215,7 +219,33 @@ internal class FakePodcastPlayerDriver : PodcastPlayerDriver {
 
     override fun release() = Unit
 
+    override fun currentNativeSession(): PodcastNativeSessionSnapshot? = null
+
     fun emit(state: PodcastPlaybackState) {
         mutableState.value = state
     }
 }
+
+internal class RecordingLocalSettingsStore : LocalSettingsStore {
+    var settings = EskerraLocalSettings()
+    override suspend fun load(): EskerraLocalSettings = settings
+    override suspend fun save(settings: EskerraLocalSettings) {
+        this.settings = settings
+    }
+}
+
+internal fun podcastsViewModelPersistenceDefaults(
+    store: RecordingLocalSettingsStore = RecordingLocalSettingsStore()
+): PodcastsViewModelPersistence = PodcastsViewModelPersistence(
+    persistPodcastPlaybackSnapshot = PersistPodcastPlaybackSnapshot(store),
+    clearPodcastPlaybackSnapshot = ClearPodcastPlaybackSnapshot(store),
+    loadLocalSettings = LoadLocalSettings(store),
+    store = store
+)
+
+internal data class PodcastsViewModelPersistence(
+    val persistPodcastPlaybackSnapshot: PersistPodcastPlaybackSnapshot,
+    val clearPodcastPlaybackSnapshot: ClearPodcastPlaybackSnapshot,
+    val loadLocalSettings: LoadLocalSettings,
+    val store: RecordingLocalSettingsStore
+)

@@ -125,9 +125,11 @@ fun App(
     podcastPlayerDriver: PodcastPlayerDriver,
     syncPodcastVaultRefresh: SyncPodcastVaultRefresh,
     catalogSnapshotStore: PodcastCatalogSnapshotStore,
+    podcastShellStateWiring: PodcastShellStateWiring,
     onConfigUpdated: (WorkspaceConfig) -> Unit,
     onInboxUiStateChanged: (InboxUiState) -> Unit = {},
-    onTodayHubUiStateChanged: (TodayHubUiState) -> Unit = {}
+    onTodayHubUiStateChanged: (TodayHubUiState) -> Unit = {},
+    onPodcastFirstLaunchChanged: (Boolean) -> Unit = {}
 ) {
     var currentConfig by remember(config) { mutableStateOf(config) }
     val workspaceRoot = remember(currentConfig, filesDir) {
@@ -207,6 +209,19 @@ fun App(
         markPodcastEpisodesPlayed = markPodcastEpisodesPlayed,
         podcastPlayerDriver = podcastPlayerDriver,
         bridge = podcastShellBridge
+    )
+    AppPodcastBootstrap(
+        currentConfig = currentConfig,
+        filesDir = filesDir,
+        workspaceRoot = workspaceRoot,
+        currentRoute = currentRoute,
+        navController = navController,
+        podcastPlayerDriver = podcastPlayerDriver,
+        podcastShellStateWiring = podcastShellStateWiring,
+        podcastPlaylistSync = podcastPlaylistWiring.sync,
+        playlistPollingHost = playlistPollingHost,
+        bridge = podcastShellBridge,
+        onPodcastFirstLaunchChanged = onPodcastFirstLaunchChanged
     )
     AppShell(
         currentRoute = currentRoute,
@@ -307,6 +322,11 @@ fun App(
                     podcastPlayerDriver = podcastPlayerDriver,
                     syncPodcastVaultRefresh = syncPodcastVaultRefresh,
                     catalogSnapshotStore = catalogSnapshotStore,
+                    persistPodcastPlaybackSnapshot =
+                    podcastShellStateWiring.persistPodcastPlaybackSnapshot,
+                    clearPodcastPlaybackSnapshot =
+                    podcastShellStateWiring.clearPodcastPlaybackSnapshot,
+                    loadLocalSettings = loadLocalSettings,
                     podcastShellBridge = podcastShellBridge,
                     playlistPollingHost = playlistPollingHost
                 )

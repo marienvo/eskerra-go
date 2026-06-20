@@ -9,9 +9,12 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.PodcastCatalogSnapshotStore
 import com.eskerra.go.core.repository.PodcastPlayerDriver
+import com.eskerra.go.core.usecase.ClearPodcastPlaybackSnapshot
+import com.eskerra.go.core.usecase.LoadLocalSettings
 import com.eskerra.go.core.usecase.LoadPodcastArtwork
 import com.eskerra.go.core.usecase.LoadPodcastCatalog
 import com.eskerra.go.core.usecase.MarkPodcastEpisodesPlayed
+import com.eskerra.go.core.usecase.PersistPodcastPlaybackSnapshot
 import com.eskerra.go.core.usecase.PodcastPlaylistSync
 import com.eskerra.go.core.usecase.SyncPodcastVaultRefresh
 import com.eskerra.go.feature.podcasts.PlaylistR2PollingHost
@@ -30,6 +33,9 @@ internal fun AppPodcastsRoute(
     syncPodcastVaultRefresh: SyncPodcastVaultRefresh,
     loadPodcastArtwork: LoadPodcastArtwork,
     catalogSnapshotStore: PodcastCatalogSnapshotStore?,
+    persistPodcastPlaybackSnapshot: PersistPodcastPlaybackSnapshot,
+    clearPodcastPlaybackSnapshot: ClearPodcastPlaybackSnapshot,
+    loadLocalSettings: LoadLocalSettings,
     podcastShellBridge: PodcastShellBridge,
     playlistPollingHost: PlaylistR2PollingHost?
 ) {
@@ -45,6 +51,9 @@ internal fun AppPodcastsRoute(
             syncPodcastVaultRefresh = syncPodcastVaultRefresh,
             loadPodcastArtwork = loadPodcastArtwork,
             catalogSnapshotStore = catalogSnapshotStore,
+            persistPodcastPlaybackSnapshot = persistPodcastPlaybackSnapshot,
+            clearPodcastPlaybackSnapshot = clearPodcastPlaybackSnapshot,
+            loadLocalSettings = loadLocalSettings,
             onExitMiniPlayerArtworkMode = {
                 podcastShellBridge.onExitMiniPlayerArtworkMode?.invoke()
             }
@@ -53,19 +62,9 @@ internal fun AppPodcastsRoute(
     DisposableEffect(podcastsViewModel) {
         podcastShellBridge.clearRowSelection = podcastsViewModel::clearSelection
         podcastShellBridge.refreshCatalog = podcastsViewModel::refresh
-        podcastShellBridge.pausePlayback = podcastsViewModel::pausePlayback
-        podcastShellBridge.resumePlayback = podcastsViewModel::resumePlayback
-        podcastShellBridge.seekBy = podcastsViewModel::seekBy
-        podcastShellBridge.seekTo = podcastsViewModel::seekTo
-        podcastShellBridge.stopPlayback = podcastsViewModel::stopPlayback
         onDispose {
             podcastShellBridge.clearRowSelection = null
             podcastShellBridge.refreshCatalog = null
-            podcastShellBridge.pausePlayback = null
-            podcastShellBridge.resumePlayback = null
-            podcastShellBridge.seekBy = null
-            podcastShellBridge.seekTo = null
-            podcastShellBridge.stopPlayback = null
         }
     }
     val podcastsState by podcastsViewModel.uiState.collectAsState()
