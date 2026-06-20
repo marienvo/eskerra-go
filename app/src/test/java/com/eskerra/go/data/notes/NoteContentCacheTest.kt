@@ -8,7 +8,11 @@ import com.eskerra.go.core.model.NotePath
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.NoteContentRepository
 import java.io.File
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -157,6 +161,29 @@ class NoteContentCacheTest {
         assertEquals(2, repo.callCount)
     }
 
+    @Test
+    fun load_evictWhileInflight_doesNotRepopulate() = runTest {
+        val id = noteId("A")
+        val gate = CompletableDeferred<Unit>()
+        val gatedRepo = GatedRepository(mapOf(id to "# A"), gate)
+        val cache = NoteContentCache(gatedRepo)
+
+        // Starts loading; suspends inside delegate waiting for gate
+        val inflightLoad = launch { cache.load(config, filesDir, id) }
+        yield() // advance inflightLoad until it suspends at gate.await()
+
+        // Evict mid-flight — increments generation
+        cache.evict(id)
+
+        // Unblock the delegate; inflightLoad sees generation mismatch and skips insert
+        gate.complete(Unit)
+        inflightLoad.join()
+
+        // Cache was not repopulated; this load must delegate again
+        cache.load(config, filesDir, id)
+        assertEquals(2, gatedRepo.callCount)
+    }
+
     private class MultiNoteRepository(private val notes: Map<NoteId, String>) :
         NoteContentRepository {
 
@@ -169,6 +196,28 @@ class NoteContentCacheTest {
             noteId: NoteId
         ): Result<NoteContent> {
             callCount++
+            val markdown = notes[noteId]
+                ?: return Result.failure(NoteContentException(NoteContentError.NotFound))
+            val path = NotePath.fromRelativePath(noteId.value).getOrThrow()
+            return Result.success(NoteContent(noteId, path, markdown))
+        }
+    }
+
+    private class GatedRepository(
+        private val notes: Map<NoteId, String>,
+        private val gate: Deferred<Unit>
+    ) : NoteContentRepository {
+
+        var callCount = 0
+            private set
+
+        override suspend fun load(
+            config: WorkspaceConfig,
+            filesDir: File,
+            noteId: NoteId
+        ): Result<NoteContent> {
+            callCount++
+            gate.await()
             val markdown = notes[noteId]
                 ?: return Result.failure(NoteContentException(NoteContentError.NotFound))
             val path = NotePath.fromRelativePath(noteId.value).getOrThrow()

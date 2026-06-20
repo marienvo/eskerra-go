@@ -31,6 +31,7 @@ class NoteContentCache(
     private val mutex = Mutex()
     private val lru = LinkedHashMap<NoteId, NoteContent>(maxSize * 2, 0.75f, true)
     private var lastFingerprint: GateFingerprint? = null
+    private var generation: Long = 0
 
     override suspend fun load(
         config: WorkspaceConfig,
@@ -38,29 +39,40 @@ class NoteContentCache(
         noteId: NoteId
     ): Result<NoteContent> {
         val fp = GateFingerprintComputer.compute(config, filesDir)
+        var gen = 0L
         mutex.withLock {
             if (fp != lastFingerprint) {
                 lru.clear()
                 lastFingerprint = fp
+                generation++
             }
             lru[noteId]?.let { return Result.success(it) }
+            gen = generation
         }
         return delegate.load(config, filesDir, noteId).onSuccess { content ->
             mutex.withLock {
-                lru[noteId] = content
-                while (lru.size > maxSize) {
-                    lru.remove(lru.keys.first())
+                if (generation == gen) {
+                    lru[noteId] = content
+                    while (lru.size > maxSize) {
+                        lru.remove(lru.keys.first())
+                    }
                 }
             }
         }
     }
 
     suspend fun evict(noteId: NoteId) {
-        mutex.withLock { lru.remove(noteId) }
+        mutex.withLock {
+            lru.remove(noteId)
+            generation++
+        }
     }
 
     suspend fun evictAll() {
-        mutex.withLock { lru.clear() }
+        mutex.withLock {
+            lru.clear()
+            generation++
+        }
     }
 
     companion object {
