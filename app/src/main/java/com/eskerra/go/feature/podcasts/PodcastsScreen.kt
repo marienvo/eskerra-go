@@ -12,10 +12,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Forward10
-import androidx.compose.material.icons.outlined.MusicNote
 import androidx.compose.material.icons.outlined.Pause
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Replay10
@@ -32,7 +30,6 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -45,7 +42,10 @@ import com.eskerra.go.core.model.PodcastEpisode
 import com.eskerra.go.core.model.PodcastPlaybackPhase
 import com.eskerra.go.core.model.PodcastPlaybackState
 import com.eskerra.go.core.model.PodcastSection
+import com.eskerra.go.core.model.WorkspaceConfig
+import com.eskerra.go.core.usecase.LoadPodcastArtwork
 import com.eskerra.go.ui.theme.DarkBackground
+import java.io.File
 
 private object PodcastUiTokens {
     val ListBackground = DarkBackground
@@ -68,6 +68,9 @@ private val RefreshStripHeight = 3.dp
 fun PodcastsScreen(
     state: PodcastsUiState,
     refreshState: PodcastRefreshState,
+    config: WorkspaceConfig,
+    filesDir: File,
+    loadPodcastArtwork: LoadPodcastArtwork,
     onRetry: () -> Unit,
     onRefresh: () -> Unit,
     onEpisodeClick: (PodcastEpisode) -> Unit,
@@ -102,6 +105,9 @@ fun PodcastsScreen(
                     sections = state.sections,
                     playerState = state.playerState,
                     refreshError = refreshState.error,
+                    config = config,
+                    filesDir = filesDir,
+                    loadPodcastArtwork = loadPodcastArtwork,
                     onEpisodeClick = onEpisodeClick,
                     onPausePlayback = onPausePlayback,
                     onResumePlayback = onResumePlayback,
@@ -188,6 +194,9 @@ private fun CatalogContent(
     sections: List<PodcastSection>,
     playerState: PodcastPlaybackState,
     refreshError: String?,
+    config: WorkspaceConfig,
+    filesDir: File,
+    loadPodcastArtwork: LoadPodcastArtwork,
     onEpisodeClick: (PodcastEpisode) -> Unit,
     onPausePlayback: () -> Unit,
     onResumePlayback: () -> Unit,
@@ -234,6 +243,10 @@ private fun CatalogContent(
                     episode == section.episodes.lastOrNull()
                 EpisodeRow(
                     episode = episode,
+                    sectionRssFeedUrl = section.rssFeedUrl,
+                    config = config,
+                    filesDir = filesDir,
+                    loadPodcastArtwork = loadPodcastArtwork,
                     playerState = playerState,
                     showBottomDivider = !isLastRow,
                     onClick = { onEpisodeClick(episode) }
@@ -334,11 +347,16 @@ private fun SectionHeader(title: String) {
 @Composable
 private fun EpisodeRow(
     episode: PodcastEpisode,
+    sectionRssFeedUrl: String?,
+    config: WorkspaceConfig,
+    filesDir: File,
+    loadPodcastArtwork: LoadPodcastArtwork,
     playerState: PodcastPlaybackState,
     showBottomDivider: Boolean,
     onClick: () -> Unit
 ) {
     val dateLabel = RelativeCalendarLabel.formatFromIsoDate(episode.date)
+    val artworkFeedUrl = episode.rssFeedUrl ?: sectionRssFeedUrl
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -350,20 +368,14 @@ private fun EpisodeRow(
                 .padding(vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(PodcastUiTokens.ArtworkPlaceholder),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.MusicNote,
-                    contentDescription = null,
-                    tint = PodcastUiTokens.ArtworkIcon,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
+            PodcastArtworkImage(
+                rssFeedUrl = artworkFeedUrl,
+                config = config,
+                filesDir = filesDir,
+                loadPodcastArtwork = loadPodcastArtwork,
+                modifier = Modifier.size(40.dp),
+                cornerRadius = 8.dp
+            )
             Column(
                 modifier = Modifier
                     .weight(1f)

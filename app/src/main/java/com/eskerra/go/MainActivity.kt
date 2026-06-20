@@ -26,6 +26,7 @@ import com.eskerra.go.core.usecase.LoadInboxSummaries
 import com.eskerra.go.core.usecase.LoadInboxSummariesCached
 import com.eskerra.go.core.usecase.LoadLocalSettings
 import com.eskerra.go.core.usecase.LoadNoteForReading
+import com.eskerra.go.core.usecase.LoadPodcastArtwork
 import com.eskerra.go.core.usecase.LoadPodcastCatalog
 import com.eskerra.go.core.usecase.LoadRemoteSyncSettings
 import com.eskerra.go.core.usecase.LoadSyncStatus
@@ -70,6 +71,7 @@ import com.eskerra.go.data.notes.ParsedMarkdownCache
 import com.eskerra.go.data.player.Media3PodcastPlayerDriver
 import com.eskerra.go.data.podcast.FilePodcastCatalogRepository
 import com.eskerra.go.data.podcast.FilePodcastFileRepository
+import com.eskerra.go.data.podcast.artwork.FilePodcastArtworkRepository
 import com.eskerra.go.data.podcast.rss.FilePodcastRssVaultSync
 import com.eskerra.go.data.podcast.rss.OkHttpRssFeedFetcher
 import com.eskerra.go.data.r2.PlaylistR2ConditionalFetch
@@ -85,6 +87,7 @@ import com.eskerra.go.data.workspace.DataStoreWorkspaceStore
 import com.eskerra.go.data.workspace.DefaultRemoteSyncSettingsRepository
 import com.eskerra.go.data.workspace.DefaultWorkspaceSetupCompletion
 import com.eskerra.go.data.workspace.DefaultWorkspaceSetupRepository
+import com.eskerra.go.data.workspace.GateFingerprintComputer
 import okhttp3.OkHttpClient
 
 /** Single entry point. Hosts the Compose UI and nothing else. */
@@ -244,14 +247,25 @@ class MainActivity : ComponentActivity() {
             gitSyncMutex = gitSyncMutex,
             commitMessage = "Refresh podcast episodes"
         )
+        val okHttpClient = OkHttpClient()
+        val rssFeedFetcher = OkHttpRssFeedFetcher(okHttpClient)
         val syncPodcastVaultRefresh = SyncPodcastVaultRefresh(
-            vaultSync = FilePodcastRssVaultSync(fetcher = OkHttpRssFeedFetcher()),
+            vaultSync = FilePodcastRssVaultSync(fetcher = rssFeedFetcher),
             syncPodcastChange = syncRefreshChange::invoke
+        )
+        val loadPodcastArtwork = LoadPodcastArtwork(
+            repository = FilePodcastArtworkRepository(filesDir, okHttpClient),
+            fetchRssXml = { url ->
+                rssFeedFetcher.fetch(url, FilePodcastArtworkRepository.DOWNLOAD_TIMEOUT_MS)
+            },
+            workspaceKeyFor = { config, dir ->
+                GateFingerprintComputer.compute(config, dir).value
+            }
         )
         val podcastPlayerDriver = Media3PodcastPlayerDriver(applicationContext)
             .also { this.podcastPlayerDriver = it }
 
-        val r2HttpClient = OkHttpClient()
+        val r2HttpClient = okHttpClient
         val r2PlaylistObjectClient = R2PlaylistObjectClient(r2HttpClient)
         val playlistSyncRepository = R2PlaylistSyncRepository(
             settingsRepository = vaultSettingsRepository,
@@ -322,6 +336,7 @@ class MainActivity : ComponentActivity() {
                 loadPodcastCatalog = loadPodcastCatalog,
                 markPodcastEpisodesPlayed = markPodcastEpisodesPlayed,
                 podcastPlaylistWiring = podcastPlaylistWiring,
+                loadPodcastArtwork = loadPodcastArtwork,
                 podcastPlayerDriver = podcastPlayerDriver,
                 syncPodcastVaultRefresh = syncPodcastVaultRefresh,
                 onLaunchSettled = {

@@ -15,6 +15,7 @@ import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.playlist.resolvePodcastPlaylistHydration
 import com.eskerra.go.core.playlist.shouldClearPlaylistForCatalog
 import com.eskerra.go.core.repository.PodcastPlayerDriver
+import com.eskerra.go.core.usecase.LoadPodcastArtwork
 import com.eskerra.go.core.usecase.LoadPodcastCatalog
 import com.eskerra.go.core.usecase.MarkPodcastEpisodesPlayed
 import com.eskerra.go.core.usecase.PodcastPlaylistSync
@@ -35,7 +36,8 @@ class PodcastsViewModel(
     private val markPodcastEpisodesPlayed: MarkPodcastEpisodesPlayed,
     private val podcastPlaylistSync: PodcastPlaylistSync,
     private val podcastPlayerDriver: PodcastPlayerDriver,
-    private val syncPodcastVaultRefresh: SyncPodcastVaultRefresh
+    private val syncPodcastVaultRefresh: SyncPodcastVaultRefresh,
+    private val loadPodcastArtwork: LoadPodcastArtwork
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<PodcastsUiState>(PodcastsUiState.Loading)
@@ -110,6 +112,9 @@ class PodcastsViewModel(
                         sections = catalog.sections,
                         playerState = playerState
                     )
+                }
+                viewModelScope.launch {
+                    loadPodcastArtwork.primeForCatalog(config, filesDir, catalog)
                 }
             }
             .onFailure { error ->
@@ -370,7 +375,8 @@ class PodcastsViewModel(
             markPodcastEpisodesPlayed: MarkPodcastEpisodesPlayed,
             podcastPlaylistSync: PodcastPlaylistSync,
             podcastPlayerDriver: PodcastPlayerDriver,
-            syncPodcastVaultRefresh: SyncPodcastVaultRefresh
+            syncPodcastVaultRefresh: SyncPodcastVaultRefresh,
+            loadPodcastArtwork: LoadPodcastArtwork
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T = PodcastsViewModel(
@@ -380,7 +386,8 @@ class PodcastsViewModel(
                 markPodcastEpisodesPlayed,
                 podcastPlaylistSync,
                 podcastPlayerDriver,
-                syncPodcastVaultRefresh
+                syncPodcastVaultRefresh,
+                loadPodcastArtwork
             ) as T
         }
     }

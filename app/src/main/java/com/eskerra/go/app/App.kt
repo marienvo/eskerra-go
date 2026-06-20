@@ -38,6 +38,7 @@ import com.eskerra.go.core.usecase.LoadGitStatusSummary
 import com.eskerra.go.core.usecase.LoadInboxSummariesCached
 import com.eskerra.go.core.usecase.LoadLocalSettings
 import com.eskerra.go.core.usecase.LoadNoteForReading
+import com.eskerra.go.core.usecase.LoadPodcastArtwork
 import com.eskerra.go.core.usecase.LoadPodcastCatalog
 import com.eskerra.go.core.usecase.LoadRemoteSyncSettings
 import com.eskerra.go.core.usecase.LoadSyncStatus
@@ -119,6 +120,7 @@ fun App(
     loadPodcastCatalog: LoadPodcastCatalog,
     markPodcastEpisodesPlayed: MarkPodcastEpisodesPlayed,
     podcastPlaylistWiring: PodcastPlaylistWiring,
+    loadPodcastArtwork: LoadPodcastArtwork,
     podcastPlayerDriver: PodcastPlayerDriver,
     syncPodcastVaultRefresh: SyncPodcastVaultRefresh,
     onConfigUpdated: (WorkspaceConfig) -> Unit,
@@ -288,6 +290,7 @@ fun App(
                     loadPodcastCatalog = loadPodcastCatalog,
                     markPodcastEpisodesPlayed = markPodcastEpisodesPlayed,
                     podcastPlaylistSync = podcastPlaylistWiring.sync,
+                    loadPodcastArtwork = loadPodcastArtwork,
                     podcastPlayerDriver = podcastPlayerDriver,
                     syncPodcastVaultRefresh = syncPodcastVaultRefresh,
                     playlistPollingHost = playlistPollingHost

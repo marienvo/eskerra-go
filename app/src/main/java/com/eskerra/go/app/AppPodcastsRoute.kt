@@ -7,6 +7,7 @@ import androidx.compose.runtime.getValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.PodcastPlayerDriver
+import com.eskerra.go.core.usecase.LoadPodcastArtwork
 import com.eskerra.go.core.usecase.LoadPodcastCatalog
 import com.eskerra.go.core.usecase.MarkPodcastEpisodesPlayed
 import com.eskerra.go.core.usecase.PodcastPlaylistSync
@@ -25,6 +26,7 @@ internal fun AppPodcastsRoute(
     podcastPlaylistSync: PodcastPlaylistSync,
     podcastPlayerDriver: PodcastPlayerDriver,
     syncPodcastVaultRefresh: SyncPodcastVaultRefresh,
+    loadPodcastArtwork: LoadPodcastArtwork,
     playlistPollingHost: PlaylistR2PollingHost?
 ) {
     val podcastsViewModel: PodcastsViewModel = viewModel(
@@ -36,7 +38,8 @@ internal fun AppPodcastsRoute(
             markPodcastEpisodesPlayed = markPodcastEpisodesPlayed,
             podcastPlaylistSync = podcastPlaylistSync,
             podcastPlayerDriver = podcastPlayerDriver,
-            syncPodcastVaultRefresh = syncPodcastVaultRefresh
+            syncPodcastVaultRefresh = syncPodcastVaultRefresh,
+            loadPodcastArtwork = loadPodcastArtwork
         )
     )
     val podcastsState by podcastsViewModel.uiState.collectAsState()
@@ -51,6 +54,9 @@ internal fun AppPodcastsRoute(
     PodcastsScreen(
         state = podcastsState,
         refreshState = refreshState,
+        config = currentConfig,
+        filesDir = filesDir,
+        loadPodcastArtwork = loadPodcastArtwork,
         onRetry = podcastsViewModel::refresh,
         onRefresh = podcastsViewModel::runVaultRefresh,
         onEpisodeClick = podcastsViewModel::onEpisodeClick,

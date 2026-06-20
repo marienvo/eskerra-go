@@ -32,6 +32,7 @@ import com.eskerra.go.core.usecase.LoadGitStatusSummary
 import com.eskerra.go.core.usecase.LoadInboxSummariesCached
 import com.eskerra.go.core.usecase.LoadLocalSettings
 import com.eskerra.go.core.usecase.LoadNoteForReading
+import com.eskerra.go.core.usecase.LoadPodcastArtwork
 import com.eskerra.go.core.usecase.LoadPodcastCatalog
 import com.eskerra.go.core.usecase.LoadRemoteSyncSettings
 import com.eskerra.go.core.usecase.LoadSyncStatus
@@ -112,6 +113,7 @@ fun AppRoot(
     loadPodcastCatalog: LoadPodcastCatalog,
     markPodcastEpisodesPlayed: MarkPodcastEpisodesPlayed,
     podcastPlaylistWiring: PodcastPlaylistWiring,
+    loadPodcastArtwork: LoadPodcastArtwork,
     podcastPlayerDriver: PodcastPlayerDriver,
     syncPodcastVaultRefresh: SyncPodcastVaultRefresh,
     onLaunchSettled: () -> Unit = {}
@@ -218,6 +220,7 @@ fun AppRoot(
                         loadPodcastCatalog = loadPodcastCatalog,
                         markPodcastEpisodesPlayed = markPodcastEpisodesPlayed,
                         podcastPlaylistWiring = podcastPlaylistWiring,
+                        loadPodcastArtwork = loadPodcastArtwork,
                         podcastPlayerDriver = podcastPlayerDriver,
                         syncPodcastVaultRefresh = syncPodcastVaultRefresh,
                         onConfigUpdated = gateViewModel::updateReadyConfig,

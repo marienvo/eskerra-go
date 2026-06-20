@@ -13,6 +13,7 @@ import com.eskerra.go.core.model.R2Config
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.LocalSettingsStore
 import com.eskerra.go.core.repository.PlaylistSyncRepository
+import com.eskerra.go.core.repository.PodcastArtworkRepository
 import com.eskerra.go.core.repository.PodcastCatalogRepository
 import com.eskerra.go.core.repository.PodcastFileRepository
 import com.eskerra.go.core.repository.PodcastPlayerDriver
@@ -22,6 +23,7 @@ import com.eskerra.go.core.repository.PodcastRssVaultSyncSummary
 import com.eskerra.go.core.repository.VaultSettingsRepository
 import com.eskerra.go.core.usecase.ClearPlaylist
 import com.eskerra.go.core.usecase.EnsureDeviceInstanceId
+import com.eskerra.go.core.usecase.LoadPodcastArtwork
 import com.eskerra.go.core.usecase.LoadVaultSettings
 import com.eskerra.go.core.usecase.MarkPodcastEpisodesPlayed
 import com.eskerra.go.core.usecase.PodcastPlaylistSync
@@ -62,6 +64,21 @@ internal fun noopSyncPodcastVaultRefresh() = SyncPodcastVaultRefresh(
 )
 
 internal fun noopPodcastPlaylistSync() = podcastPlaylistSyncForTest()
+
+internal fun noopLoadPodcastArtwork() = LoadPodcastArtwork(
+    repository = object : PodcastArtworkRepository {
+        override fun peekMemoryUri(workspaceKey: String, rssFeedUrl: String): String? = null
+        override suspend fun loadMetadataFromDisk(workspaceKey: String) = Unit
+        override suspend fun resolveUri(
+            workspaceKey: String,
+            rssFeedUrl: String,
+            fetchRssXml: suspend (String) -> String?,
+            allowNetwork: Boolean
+        ): String? = null
+    },
+    fetchRssXml = { null },
+    workspaceKeyFor = { _, _ -> "test-vault" }
+)
 
 internal fun podcastPlaylistSyncForTest(
     readEntry: PlaylistEntry? = null,
