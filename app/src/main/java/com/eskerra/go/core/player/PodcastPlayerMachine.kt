@@ -68,12 +68,9 @@ object PodcastPlayerMachine {
                 errorMessage = null
             )
 
-            PodcastPlayerEvent.StopRequested -> state.copy(
-                phase = PodcastPlaybackPhase.STOPPED,
-                transportBusy = false,
-                positionMs = 0L,
-                errorMessage = null
-            )
+            // Explicit stop/dismiss tears the session down completely so the global mini player
+            // unmounts (hasActiveEpisode == false). AppClosed below keeps the episode for restore.
+            PodcastPlayerEvent.StopRequested -> PodcastPlaybackState()
 
             PodcastPlayerEvent.AppClosed -> state.copy(
                 phase = PodcastPlaybackPhase.STOPPED,

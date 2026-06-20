@@ -31,7 +31,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
-import androidx.compose.material3.pulltorefresh.pullToRefresh
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -99,53 +100,67 @@ fun PodcastsScreen(
         val fillItemModifier = Modifier
             .fillMaxWidth()
             .heightIn(min = LocalConfiguration.current.screenHeightDp.dp)
-        LazyColumn(
-            state = listState,
+        PullToRefreshBox(
+            isRefreshing = refreshState.active,
+            onRefresh = onRefresh,
+            state = pullRefreshState,
             modifier = Modifier
                 .weight(1f)
-                .fillMaxWidth()
-                .pullToRefresh(
-                    isRefreshing = refreshState.active,
+                .fillMaxWidth(),
+            indicator = {
+                // Visible pull/refresh affordance dropped below the floating top chrome so the
+                // gesture has feedback (the prior strip-only versions showed nothing while pulling).
+                PullToRefreshDefaults.Indicator(
                     state = pullRefreshState,
-                    onRefresh = onRefresh
-                ),
-            contentPadding = PaddingValues(horizontal = 16.dp)
-        ) {
-            item(key = "top-chrome") {
-                Spacer(Modifier.height(chrome.top))
-            }
-            when (state) {
-                PodcastsUiState.Loading -> item(key = "loading") {
-                    LoadingContent(modifier = fillItemModifier)
-                }
-                PodcastsUiState.Empty -> item(key = "empty") {
-                    EmptyContent(modifier = fillItemModifier)
-                }
-                is PodcastsUiState.Error -> item(key = "error") {
-                    ErrorContent(
-                        message = state.message,
-                        onRetry = onRetry,
-                        modifier = fillItemModifier
-                    )
-                }
-                is PodcastsUiState.Content -> podcastCatalogItems(
-                    sections = state.sections,
-                    playerState = state.playerState,
-                    selectedEpisodeIds = state.selectedEpisodeIds,
-                    markInFlight = state.markInFlight,
-                    markError = state.markError,
-                    refreshError = refreshState.error,
-                    config = config,
-                    filesDir = filesDir,
-                    loadPodcastArtwork = loadPodcastArtwork,
-                    onEpisodeClick = onEpisodeClick,
-                    onEpisodeArtworkClick = onEpisodeArtworkClick,
-                    onClearSelection = onClearSelection,
-                    onMarkSelected = onMarkSelected
+                    isRefreshing = refreshState.active,
+                    color = PodcastUiTokens.Accent,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = chrome.top)
                 )
             }
-            item(key = "bottom-chrome") {
-                Spacer(Modifier.height(chrome.bottom))
+        ) {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(horizontal = 16.dp)
+            ) {
+                item(key = "top-chrome") {
+                    Spacer(Modifier.height(chrome.top))
+                }
+                when (state) {
+                    PodcastsUiState.Loading -> item(key = "loading") {
+                        LoadingContent(modifier = fillItemModifier)
+                    }
+                    PodcastsUiState.Empty -> item(key = "empty") {
+                        EmptyContent(modifier = fillItemModifier)
+                    }
+                    is PodcastsUiState.Error -> item(key = "error") {
+                        ErrorContent(
+                            message = state.message,
+                            onRetry = onRetry,
+                            modifier = fillItemModifier
+                        )
+                    }
+                    is PodcastsUiState.Content -> podcastCatalogItems(
+                        sections = state.sections,
+                        playerState = state.playerState,
+                        selectedEpisodeIds = state.selectedEpisodeIds,
+                        markInFlight = state.markInFlight,
+                        markError = state.markError,
+                        refreshError = refreshState.error,
+                        config = config,
+                        filesDir = filesDir,
+                        loadPodcastArtwork = loadPodcastArtwork,
+                        onEpisodeClick = onEpisodeClick,
+                        onEpisodeArtworkClick = onEpisodeArtworkClick,
+                        onClearSelection = onClearSelection,
+                        onMarkSelected = onMarkSelected
+                    )
+                }
+                item(key = "bottom-chrome") {
+                    Spacer(Modifier.height(chrome.bottom))
+                }
             }
         }
     }

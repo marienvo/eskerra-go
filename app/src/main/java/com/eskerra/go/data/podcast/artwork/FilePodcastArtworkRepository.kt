@@ -62,13 +62,17 @@ class FilePodcastArtworkRepository(
 
         if (!allowNetwork) return null
 
-        val rssXml = fetchRssXml(trimmed) ?: return storeRemoteFallback(
-            workspaceKey,
-            cacheKey,
-            memoryKey,
-            metaMap,
-            existing?.remoteUrl
-        )
+        // fetchRssXml is backed by a blocking OkHttp call; callers resolve artwork from the main
+        // thread (composition + viewModelScope), so force it onto IO or it throws
+        // NetworkOnMainThreadException (swallowed downstream) and artwork never resolves.
+        val rssXml = withContext(Dispatchers.IO) { fetchRssXml(trimmed) }
+            ?: return storeRemoteFallback(
+                workspaceKey,
+                cacheKey,
+                memoryKey,
+                metaMap,
+                existing?.remoteUrl
+            )
         val remoteArtworkUrl = RssChannelArtworkParser.parseArtworkUrl(rssXml)
             ?: return storeRemoteFallback(
                 workspaceKey,

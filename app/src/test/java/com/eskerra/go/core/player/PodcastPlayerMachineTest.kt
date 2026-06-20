@@ -99,6 +99,21 @@ class PodcastPlayerMachineTest {
     }
 
     @Test
+    fun stopRequested_clearsSessionSoMiniPlayerUnmounts() {
+        val state = primedState().copy(
+            phase = PodcastPlaybackPhase.PLAYING,
+            positionMs = 30_000L,
+            durationMs = 60_000L
+        )
+
+        val next = PodcastPlayerMachine.reduce(state, PodcastPlayerEvent.StopRequested)
+
+        assertEquals(PodcastPlaybackPhase.IDLE, next.phase)
+        assertEquals(null, next.activeEpisode)
+        assertEquals(false, next.hasActiveEpisode)
+    }
+
+    @Test
     fun appClosed_mapsToStoppedWithoutLosingEpisode() {
         val state = primedState().copy(phase = PodcastPlaybackPhase.PAUSED)
 
