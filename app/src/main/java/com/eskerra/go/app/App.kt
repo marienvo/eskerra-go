@@ -37,6 +37,7 @@ import com.eskerra.go.core.usecase.LoadGitStatusSummary
 import com.eskerra.go.core.usecase.LoadInboxSummariesCached
 import com.eskerra.go.core.usecase.LoadLocalSettings
 import com.eskerra.go.core.usecase.LoadNoteForReading
+import com.eskerra.go.core.usecase.LoadPodcastCatalog
 import com.eskerra.go.core.usecase.LoadRemoteSyncSettings
 import com.eskerra.go.core.usecase.LoadSyncStatus
 import com.eskerra.go.core.usecase.LoadTodayHub
@@ -64,7 +65,6 @@ import com.eskerra.go.feature.inbox.InboxUiState
 import com.eskerra.go.feature.menu.MenuScreen
 import com.eskerra.go.feature.note.NoteReaderUiState
 import com.eskerra.go.feature.note.NoteScreen
-import com.eskerra.go.feature.podcasts.PodcastsScreen
 import com.eskerra.go.feature.settings.VaultSettingsScreen
 import com.eskerra.go.feature.sync.SyncScreen
 import com.eskerra.go.feature.sync.SyncSettingsScreen
@@ -113,6 +113,7 @@ fun App(
     maintainVaultSearchIndex: MaintainVaultSearchIndex,
     repairVaultSearchIndex: RepairVaultSearchIndex,
     touchVaultSearchPaths: TouchVaultSearchPaths,
+    loadPodcastCatalog: LoadPodcastCatalog,
     onConfigUpdated: (WorkspaceConfig) -> Unit,
     onInboxUiStateChanged: (InboxUiState) -> Unit = {},
     onTodayHubUiStateChanged: (TodayHubUiState) -> Unit = {}
@@ -267,7 +268,11 @@ fun App(
             }
 
             opaqueComposable(AppRoute.PODCASTS) {
-                PodcastsScreen(podcasts = fakePodcasts)
+                AppPodcastsRoute(
+                    currentConfig = currentConfig,
+                    filesDir = filesDir,
+                    loadPodcastCatalog = loadPodcastCatalog
+                )
             }
 
             opaqueComposable(AppRoute.MENU) {

@@ -23,6 +23,7 @@ import com.eskerra.go.core.usecase.LoadInboxSummaries
 import com.eskerra.go.core.usecase.LoadInboxSummariesCached
 import com.eskerra.go.core.usecase.LoadLocalSettings
 import com.eskerra.go.core.usecase.LoadNoteForReading
+import com.eskerra.go.core.usecase.LoadPodcastCatalog
 import com.eskerra.go.core.usecase.LoadRemoteSyncSettings
 import com.eskerra.go.core.usecase.LoadSyncStatus
 import com.eskerra.go.core.usecase.LoadTodayHub
@@ -56,6 +57,7 @@ import com.eskerra.go.data.notes.FileNoteWriteRepository
 import com.eskerra.go.data.notes.NoteContentCache
 import com.eskerra.go.data.notes.NoteRegistryCache
 import com.eskerra.go.data.notes.ParsedMarkdownCache
+import com.eskerra.go.data.podcast.FilePodcastCatalogRepository
 import com.eskerra.go.data.search.SqliteVaultSearchRepository
 import com.eskerra.go.data.todayhub.DataStoreActiveTodayHubStore
 import com.eskerra.go.data.todayhub.FileTodayHubSnapshotStore
@@ -202,6 +204,8 @@ class MainActivity : ComponentActivity() {
         val repairVaultSearchIndex = RepairVaultSearchIndex(vaultSearchRepository)
         val touchVaultSearchPaths = TouchVaultSearchPaths(vaultSearchRepository)
 
+        val loadPodcastCatalog = LoadPodcastCatalog(FilePodcastCatalogRepository())
+
         setContent {
             AppRoot(
                 workspaceStore = workspaceStore,
@@ -242,6 +246,7 @@ class MainActivity : ComponentActivity() {
                 maintainVaultSearchIndex = maintainVaultSearchIndex,
                 repairVaultSearchIndex = repairVaultSearchIndex,
                 touchVaultSearchPaths = touchVaultSearchPaths,
+                loadPodcastCatalog = loadPodcastCatalog,
                 onLaunchSettled = {
                     if (keepSplashOnScreen) {
                         keepSplashOnScreen = false

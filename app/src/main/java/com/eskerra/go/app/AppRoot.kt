@@ -31,6 +31,7 @@ import com.eskerra.go.core.usecase.LoadGitStatusSummary
 import com.eskerra.go.core.usecase.LoadInboxSummariesCached
 import com.eskerra.go.core.usecase.LoadLocalSettings
 import com.eskerra.go.core.usecase.LoadNoteForReading
+import com.eskerra.go.core.usecase.LoadPodcastCatalog
 import com.eskerra.go.core.usecase.LoadRemoteSyncSettings
 import com.eskerra.go.core.usecase.LoadSyncStatus
 import com.eskerra.go.core.usecase.LoadTodayHub
@@ -105,6 +106,7 @@ fun AppRoot(
     maintainVaultSearchIndex: MaintainVaultSearchIndex,
     repairVaultSearchIndex: RepairVaultSearchIndex,
     touchVaultSearchPaths: TouchVaultSearchPaths,
+    loadPodcastCatalog: LoadPodcastCatalog,
     onLaunchSettled: () -> Unit = {}
 ) {
     EskerraGoTheme(darkTheme = true) {
@@ -206,6 +208,7 @@ fun AppRoot(
                         maintainVaultSearchIndex = maintainVaultSearchIndex,
                         repairVaultSearchIndex = repairVaultSearchIndex,
                         touchVaultSearchPaths = touchVaultSearchPaths,
+                        loadPodcastCatalog = loadPodcastCatalog,
                         onConfigUpdated = gateViewModel::updateReadyConfig,
                         onInboxUiStateChanged = { inboxUiState = it },
                         onTodayHubUiStateChanged = { todayHubUiState = it }
