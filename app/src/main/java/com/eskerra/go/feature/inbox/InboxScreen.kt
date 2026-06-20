@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -25,6 +26,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -66,6 +68,7 @@ fun InboxScreen(
     onNoteNotFound: (String) -> Unit = {},
     onOpenSearch: () -> Unit = {},
     workspaceRoot: File? = null,
+    scrollToTopSignal: Int = 0,
     modifier: Modifier = Modifier
 ) {
     InboxScrollBody(
@@ -89,6 +92,7 @@ fun InboxScreen(
         onNoteNotFound = onNoteNotFound,
         onOpenSearch = onOpenSearch,
         workspaceRoot = workspaceRoot,
+        scrollToTopSignal = scrollToTopSignal,
         modifier = modifier
     )
 }
@@ -115,11 +119,21 @@ private fun InboxScrollBody(
     onNoteNotFound: (String) -> Unit,
     onOpenSearch: () -> Unit,
     workspaceRoot: File?,
+    scrollToTopSignal: Int = 0,
     modifier: Modifier = Modifier
 ) {
     val hasSelection = selectedNoteIds.isNotEmpty()
+    val listState = rememberLazyListState()
+
+    // Home re-selection from a drill-down bumps the signal; jump the list back to the top.
+    LaunchedEffect(scrollToTopSignal) {
+        if (scrollToTopSignal > 0) {
+            listState.animateScrollToItem(0)
+        }
+    }
 
     LazyColumn(
+        state = listState,
         modifier = modifier.fillMaxSize(),
         contentPadding = shellScrollContentPadding()
     ) {

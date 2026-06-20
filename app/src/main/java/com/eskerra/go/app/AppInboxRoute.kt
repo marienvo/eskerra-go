@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -49,6 +50,7 @@ internal fun AppInboxRoute(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     var ambiguousCandidates by remember { mutableStateOf<List<NoteId>?>(null) }
+    var scrollResetSignal by remember { mutableIntStateOf(0) }
 
     val inboxViewModel: InboxViewModel = viewModel(
         key = inboxViewModelKey(currentConfig.remoteUri),
@@ -101,6 +103,10 @@ internal fun AppInboxRoute(
             todayHubViewModel.retry()
             appSyncViewModel.refreshLocalStatusQuietly()
         }
+        if (consumeHomeReset(currentRoute, entry.savedStateHandle)) {
+            todayHubViewModel.resetToCurrentWeek()
+            scrollResetSignal++
+        }
     }
 
     InboxScreen(
@@ -125,7 +131,8 @@ internal fun AppInboxRoute(
         onAmbiguousWikiLink = { candidates, _ -> ambiguousCandidates = candidates },
         onNoteNotFound = { message -> showNoteNotFoundToast(context, message) },
         onOpenSearch = { navController.navigate(AppRoute.SEARCH) },
-        workspaceRoot = workspaceRoot
+        workspaceRoot = workspaceRoot,
+        scrollToTopSignal = scrollResetSignal
     )
 
     val registry = (todayHubState as? TodayHubUiState.Content)?.registry

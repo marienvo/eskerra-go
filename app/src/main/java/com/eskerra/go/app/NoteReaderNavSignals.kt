@@ -15,6 +15,7 @@ import com.eskerra.go.core.model.NoteId
 
 internal const val NOTES_CHANGED_KEY = "notesChanged"
 internal const val NOTE_CONTENT_CHANGED_KEY = "noteContentChanged"
+internal const val HOME_RESET_KEY = "homeReset"
 
 internal fun consumeNoteReaderChanged(
     currentRoute: String?,
@@ -29,6 +30,19 @@ internal fun NavHostController.markInboxNotesChanged() {
     runCatching {
         getBackStackEntry(AppRoute.INBOX).savedStateHandle[NOTES_CHANGED_KEY] = true
     }
+}
+
+/** Flags that the next entry to the inbox should reset home (Today Hub → current week, scroll top). */
+internal fun NavHostController.markHomeReset() {
+    runCatching {
+        getBackStackEntry(AppRoute.INBOX).savedStateHandle[HOME_RESET_KEY] = true
+    }
+}
+
+/** Consumes a pending home-reset flag once the inbox is the current destination. */
+internal fun consumeHomeReset(currentRoute: String?, savedStateHandle: SavedStateHandle): Boolean {
+    if (currentRoute != AppRoute.INBOX) return false
+    return savedStateHandle.remove<Boolean>(HOME_RESET_KEY) == true
 }
 
 internal fun NavHostController.markNoteReaderChanged(noteId: NoteId) {

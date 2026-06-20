@@ -268,6 +268,33 @@ class TodayHubViewModelTest {
     }
 
     @Test
+    fun resetToCurrentWeekReturnsFromEarlierStem() = runTest {
+        val registry = FakeNoteRegistryRepository.withInboxNotes(
+            note("Daily/Today.md"),
+            note("Daily/2026-03-30.md"),
+            note("Daily/2026-04-06.md")
+        )
+        val content = MapContentRepository(NoteId("Daily/Today.md") to hubMarkdown)
+        val vm = viewModel(content, registry)
+        advanceUntilIdle()
+
+        vm.previousWeek()
+        advanceUntilIdle()
+        assertEquals(
+            "2026-03-30",
+            (vm.uiState.value as TodayHubUiState.Content).selectedWeekStem
+        )
+
+        vm.resetToCurrentWeek()
+        advanceUntilIdle()
+
+        val state = vm.uiState.value as TodayHubUiState.Content
+        assertEquals("2026-04-06", state.selectedWeekStem)
+        assertTrue(state.canGoPrev)
+        assertFalse(state.canGoNext)
+    }
+
+    @Test
     fun persistsActiveHubId() = runTest {
         val registry = FakeNoteRegistryRepository.withInboxNotes(note("Daily/Today.md"))
         val store = FakeActiveTodayHubStore()

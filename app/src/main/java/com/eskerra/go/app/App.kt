@@ -24,7 +24,6 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.WorkspaceConfig
-import com.eskerra.go.core.model.hasSyncWork
 import com.eskerra.go.core.repository.ActiveTodayHubStore
 import com.eskerra.go.core.repository.TodayHubSnapshotStore
 import com.eskerra.go.core.usecase.BuildSafeSyncDiagnostic
@@ -69,7 +68,6 @@ import com.eskerra.go.feature.podcasts.PodcastsScreen
 import com.eskerra.go.feature.settings.VaultSettingsScreen
 import com.eskerra.go.feature.sync.SyncScreen
 import com.eskerra.go.feature.sync.SyncSettingsScreen
-import com.eskerra.go.feature.sync.SyncUiState
 import com.eskerra.go.feature.todayhub.TodayHubUiState
 import com.eskerra.go.ui.markdown.AmbiguousWikiLinkSheet
 import java.io.File
@@ -181,28 +179,9 @@ fun App(
     AppShell(
         currentRoute = currentRoute,
         syncIndicator = syncIndicator,
-        onSyncClick = {
-            when (val state = syncState) {
-                is SyncUiState.Ready -> when {
-                    !state.status.hasSyncWork -> Unit
-                    state.preflight.canSync -> appSyncViewModel.syncNow()
-                    else -> navController.navigate(AppRoute.SYNC) {
-                        launchSingleTop = true
-                    }
-                }
-                SyncUiState.Loading,
-                is SyncUiState.Syncing,
-                is SyncUiState.Success -> Unit
-                is SyncUiState.Error -> navController.navigate(AppRoute.SYNC) {
-                    launchSingleTop = true
-                }
-            }
-        },
+        onSyncClick = { onShellSyncClick(syncState, appSyncViewModel, navController) },
         onNavigate = { route ->
-            navController.navigate(route) {
-                launchSingleTop = true
-                restoreState = true
-            }
+            navController.navigateTab(currentRoute, route) { navController.markHomeReset() }
         }
     ) { contentModifier ->
         NavHost(
