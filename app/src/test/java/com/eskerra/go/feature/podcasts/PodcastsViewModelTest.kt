@@ -4,15 +4,20 @@ import com.eskerra.go.core.model.PodcastCatalog
 import com.eskerra.go.core.model.PodcastCatalogError
 import com.eskerra.go.core.model.PodcastCatalogException
 import com.eskerra.go.core.model.PodcastEpisode
+import com.eskerra.go.core.model.PodcastPlaybackPhase
+import com.eskerra.go.core.model.PodcastPlaybackState
 import com.eskerra.go.core.model.PodcastSection
 import com.eskerra.go.core.model.PodcastSyncResult
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.PodcastCatalogRepository
 import com.eskerra.go.core.repository.PodcastFileRepository
+import com.eskerra.go.core.repository.PodcastPlayerDriver
 import com.eskerra.go.core.usecase.LoadPodcastCatalog
 import com.eskerra.go.core.usecase.MarkPodcastEpisodesPlayed
 import com.eskerra.go.data.workspace.WorkspacePaths
 import java.io.File
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -65,7 +70,8 @@ class PodcastsViewModelTest {
                     )
                 )
             ),
-            markPodcastEpisodesPlayed = noopMark()
+            markPodcastEpisodesPlayed = noopMark(),
+            podcastPlayerDriver = FakePodcastPlayerDriver()
         )
 
         advanceUntilIdle()
@@ -82,7 +88,8 @@ class PodcastsViewModelTest {
             loadPodcastCatalog = LoadPodcastCatalog(
                 FakePodcastCatalogRepository(Result.success(emptyCatalog))
             ),
-            markPodcastEpisodesPlayed = noopMark()
+            markPodcastEpisodesPlayed = noopMark(),
+            podcastPlayerDriver = FakePodcastPlayerDriver()
         )
 
         advanceUntilIdle()
@@ -100,7 +107,8 @@ class PodcastsViewModelTest {
                     Result.failure(PodcastCatalogException(PodcastCatalogError.WorkspaceMissing))
                 )
             ),
-            markPodcastEpisodesPlayed = noopMark()
+            markPodcastEpisodesPlayed = noopMark(),
+            podcastPlayerDriver = FakePodcastPlayerDriver()
         )
 
         advanceUntilIdle()
@@ -143,7 +151,8 @@ class PodcastsViewModelTest {
                         )
                     )
                 }
-            )
+            ),
+            podcastPlayerDriver = FakePodcastPlayerDriver()
         )
         advanceUntilIdle()
         assertTrue(viewModel.uiState.value is PodcastsUiState.Content)
@@ -172,7 +181,8 @@ class PodcastsViewModelTest {
                     )
                 )
             ),
-            markPodcastEpisodesPlayed = noopMark()
+            markPodcastEpisodesPlayed = noopMark(),
+            podcastPlayerDriver = FakePodcastPlayerDriver()
         )
         advanceUntilIdle()
 
@@ -180,6 +190,89 @@ class PodcastsViewModelTest {
         advanceUntilIdle()
 
         assertEquals(PodcastsUiState.Content(sections = listOf(section)), viewModel.uiState.value)
+    }
+
+    @Test
+    fun onEpisodeClick_startsDriverPlayback() = runTest {
+        val episode = sampleEpisode()
+        val section = PodcastSection(episodes = listOf(episode), rssFeedUrl = null, title = "News")
+        val playerDriver = FakePodcastPlayerDriver()
+        val viewModel = PodcastsViewModel(
+            config = config,
+            filesDir = temp.newFolder("files"),
+            loadPodcastCatalog = LoadPodcastCatalog(
+                FakePodcastCatalogRepository(
+                    Result.success(
+                        PodcastCatalog(allEpisodes = listOf(episode), sections = listOf(section))
+                    )
+                )
+            ),
+            markPodcastEpisodesPlayed = noopMark(),
+            podcastPlayerDriver = playerDriver
+        )
+        advanceUntilIdle()
+
+        viewModel.onEpisodeClick(episode)
+        advanceUntilIdle()
+
+        assertEquals(episode.id, playerDriver.playedEpisode?.id)
+        val content = viewModel.uiState.value as PodcastsUiState.Content
+        assertEquals(PodcastPlaybackPhase.LOADING, content.playerState.phase)
+    }
+
+    @Test
+    fun nearEndPlayerState_marksEpisodePlayedOnceAndKeepsPlayerVisible() = runTest {
+        val episode = sampleEpisode()
+        val section = PodcastSection(episodes = listOf(episode), rssFeedUrl = null, title = "News")
+        val catalogRepository = SwitchingCatalogRepository(
+            first = PodcastCatalog(allEpisodes = listOf(episode), sections = listOf(section)),
+            second = PodcastCatalog(allEpisodes = emptyList(), sections = emptyList())
+        )
+        val fileRepository = InMemoryPodcastFileRepository(
+            mutableMapOf(
+                "General/2026 News - podcasts.md" to
+                    "- [ ] 2026-03-15; Episode title [\u25B6](https://cdn/episode.mp3) (Daily)\n"
+            )
+        )
+        val playerDriver = FakePodcastPlayerDriver()
+        val viewModel = PodcastsViewModel(
+            config = config,
+            filesDir = temp.newFolder("files"),
+            loadPodcastCatalog = LoadPodcastCatalog(catalogRepository),
+            markPodcastEpisodesPlayed = MarkPodcastEpisodesPlayed(
+                podcastFileRepository = fileRepository,
+                syncPodcastChange = { _, _ -> Result.success(PodcastSyncResult.NOTHING_TO_COMMIT) }
+            ),
+            podcastPlayerDriver = playerDriver
+        )
+        advanceUntilIdle()
+
+        playerDriver.emit(
+            PodcastPlaybackState(
+                activeEpisode = episode,
+                phase = PodcastPlaybackPhase.NEAR_END_PLAYING,
+                positionMs = 51_000L,
+                durationMs = 60_000L
+            )
+        )
+        advanceUntilIdle()
+        playerDriver.emit(
+            PodcastPlaybackState(
+                activeEpisode = episode,
+                phase = PodcastPlaybackPhase.NEAR_END_PAUSED,
+                positionMs = 52_000L,
+                durationMs = 60_000L
+            )
+        )
+        advanceUntilIdle()
+
+        val content = viewModel.uiState.value as PodcastsUiState.Content
+        assertTrue(content.sections.isEmpty())
+        assertEquals(episode.id, content.playerState.activeEpisode?.id)
+        assertTrue(
+            fileRepository.files["General/2026 News - podcasts.md"]
+                ?.contains("- [x] 2026-03-15") == true
+        )
     }
 
     private fun sampleEpisode() = PodcastEpisode(
@@ -233,6 +326,48 @@ class PodcastsViewModelTest {
         ): Result<Unit> {
             files[relativePath] = content
             return Result.success(Unit)
+        }
+    }
+
+    private class FakePodcastPlayerDriver : PodcastPlayerDriver {
+        private val mutableState = MutableStateFlow(PodcastPlaybackState())
+        override val state: StateFlow<PodcastPlaybackState> = mutableState
+        var playedEpisode: PodcastEpisode? = null
+            private set
+
+        override fun play(episode: PodcastEpisode) {
+            playedEpisode = episode
+            emit(
+                PodcastPlaybackState(
+                    activeEpisode = episode,
+                    phase = PodcastPlaybackPhase.LOADING,
+                    transportBusy = true
+                )
+            )
+        }
+
+        override fun pause() {
+            mutableState.value = mutableState.value.copy(phase = PodcastPlaybackPhase.PAUSED)
+        }
+
+        override fun resume() {
+            mutableState.value = mutableState.value.copy(phase = PodcastPlaybackPhase.PLAYING)
+        }
+
+        override fun stop() {
+            mutableState.value = mutableState.value.copy(phase = PodcastPlaybackPhase.STOPPED)
+        }
+
+        override fun seekBy(deltaMs: Long) {
+            mutableState.value = mutableState.value.copy(
+                positionMs = (mutableState.value.positionMs + deltaMs).coerceAtLeast(0L)
+            )
+        }
+
+        override fun release() = Unit
+
+        fun emit(state: PodcastPlaybackState) {
+            mutableState.value = state
         }
     }
 }

@@ -11,6 +11,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.eskerra.go.app.AppRoot
+import com.eskerra.go.core.repository.PodcastPlayerDriver
 import com.eskerra.go.core.usecase.BuildSafeSyncDiagnostic
 import com.eskerra.go.core.usecase.BuildSyncPreflight
 import com.eskerra.go.core.usecase.ClearRemoteSyncSettings
@@ -60,6 +61,7 @@ import com.eskerra.go.data.notes.FileNoteWriteRepository
 import com.eskerra.go.data.notes.NoteContentCache
 import com.eskerra.go.data.notes.NoteRegistryCache
 import com.eskerra.go.data.notes.ParsedMarkdownCache
+import com.eskerra.go.data.player.Media3PodcastPlayerDriver
 import com.eskerra.go.data.podcast.FilePodcastCatalogRepository
 import com.eskerra.go.data.podcast.FilePodcastFileRepository
 import com.eskerra.go.data.search.SqliteVaultSearchRepository
@@ -74,6 +76,8 @@ import com.eskerra.go.data.workspace.DefaultWorkspaceSetupRepository
 
 /** Single entry point. Hosts the Compose UI and nothing else. */
 class MainActivity : ComponentActivity() {
+    private var podcastPlayerDriver: PodcastPlayerDriver? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
@@ -221,6 +225,8 @@ class MainActivity : ComponentActivity() {
             podcastFileRepository = FilePodcastFileRepository(),
             syncPodcastChange = syncMarkPlayedChange::invoke
         )
+        val podcastPlayerDriver = Media3PodcastPlayerDriver(applicationContext)
+            .also { this.podcastPlayerDriver = it }
 
         setContent {
             AppRoot(
@@ -264,6 +270,7 @@ class MainActivity : ComponentActivity() {
                 touchVaultSearchPaths = touchVaultSearchPaths,
                 loadPodcastCatalog = loadPodcastCatalog,
                 markPodcastEpisodesPlayed = markPodcastEpisodesPlayed,
+                podcastPlayerDriver = podcastPlayerDriver,
                 onLaunchSettled = {
                     if (keepSplashOnScreen) {
                         keepSplashOnScreen = false
@@ -271,5 +278,11 @@ class MainActivity : ComponentActivity() {
                 }
             )
         }
+    }
+
+    override fun onDestroy() {
+        podcastPlayerDriver?.release()
+        podcastPlayerDriver = null
+        super.onDestroy()
     }
 }

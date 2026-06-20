@@ -99,6 +99,9 @@ dependencies {
     implementation(libs.markdown.renderer.core)
     implementation(libs.markdown.renderer.m3)
 
+    implementation(libs.androidx.media3.exoplayer)
+    implementation(libs.androidx.media3.session)
+
     // Image loading for vault attachments (Phase 5+)
     implementation(libs.coil.compose)
 

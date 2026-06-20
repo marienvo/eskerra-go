@@ -29,4 +29,14 @@ class AndroidManifestSecurityTest {
                 """android:allowBackup='false'""" in text
         )
     }
+
+    @Test
+    fun mediaSessionService_isDeclaredWithPlaybackType() {
+        val manifest = File("src/main/AndroidManifest.xml")
+        assertTrue("Expected manifest at ${manifest.absolutePath}", manifest.isFile)
+        val text = manifest.readText()
+        assertTrue(text.contains(".data.player.PodcastPlaybackService"))
+        assertTrue(text.contains("""android:foregroundServiceType="mediaPlayback""""))
+        assertTrue(text.contains("androidx.media3.session.MediaSessionService"))
+    }
 }

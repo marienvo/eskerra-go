@@ -19,6 +19,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.eskerra.go.core.repository.ActiveTodayHubStore
 import com.eskerra.go.core.repository.BootCacheStore
+import com.eskerra.go.core.repository.PodcastPlayerDriver
 import com.eskerra.go.core.repository.TodayHubSnapshotStore
 import com.eskerra.go.core.usecase.BuildSafeSyncDiagnostic
 import com.eskerra.go.core.usecase.BuildSyncPreflight
@@ -109,6 +110,7 @@ fun AppRoot(
     touchVaultSearchPaths: TouchVaultSearchPaths,
     loadPodcastCatalog: LoadPodcastCatalog,
     markPodcastEpisodesPlayed: MarkPodcastEpisodesPlayed,
+    podcastPlayerDriver: PodcastPlayerDriver,
     onLaunchSettled: () -> Unit = {}
 ) {
     EskerraGoTheme(darkTheme = true) {
@@ -212,6 +214,7 @@ fun AppRoot(
                         touchVaultSearchPaths = touchVaultSearchPaths,
                         loadPodcastCatalog = loadPodcastCatalog,
                         markPodcastEpisodesPlayed = markPodcastEpisodesPlayed,
+                        podcastPlayerDriver = podcastPlayerDriver,
                         onConfigUpdated = gateViewModel::updateReadyConfig,
                         onInboxUiStateChanged = { inboxUiState = it },
                         onTodayHubUiStateChanged = { todayHubUiState = it }

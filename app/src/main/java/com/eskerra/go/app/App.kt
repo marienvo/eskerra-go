@@ -25,6 +25,7 @@ import androidx.navigation.navArgument
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.ActiveTodayHubStore
+import com.eskerra.go.core.repository.PodcastPlayerDriver
 import com.eskerra.go.core.repository.TodayHubSnapshotStore
 import com.eskerra.go.core.usecase.BuildSafeSyncDiagnostic
 import com.eskerra.go.core.usecase.BuildSyncPreflight
@@ -116,6 +117,7 @@ fun App(
     touchVaultSearchPaths: TouchVaultSearchPaths,
     loadPodcastCatalog: LoadPodcastCatalog,
     markPodcastEpisodesPlayed: MarkPodcastEpisodesPlayed,
+    podcastPlayerDriver: PodcastPlayerDriver,
     onConfigUpdated: (WorkspaceConfig) -> Unit,
     onInboxUiStateChanged: (InboxUiState) -> Unit = {},
     onTodayHubUiStateChanged: (TodayHubUiState) -> Unit = {}
@@ -274,7 +276,8 @@ fun App(
                     currentConfig = currentConfig,
                     filesDir = filesDir,
                     loadPodcastCatalog = loadPodcastCatalog,
-                    markPodcastEpisodesPlayed = markPodcastEpisodesPlayed
+                    markPodcastEpisodesPlayed = markPodcastEpisodesPlayed,
+                    podcastPlayerDriver = podcastPlayerDriver
                 )
             }
 

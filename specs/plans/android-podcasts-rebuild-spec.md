@@ -537,6 +537,14 @@ Registered in `index.js` via `TrackPlayer.registerPlaybackService`.
 
 Without queue-ended reset, Android keeps MediaSession/notification after natural end.
 
+Kotlin implementation note: Eskerra Go uses AndroidX Media3 with an
+`ExoPlayer` hosted by `PodcastPlaybackService` (`MediaSessionService`) and a
+`MediaController`-backed driver in the app process. The driver feeds a pure
+Kotlin `PodcastPlayerMachine` reducer so native states (`idle`, `buffering`,
+`ready`, `ended`, `error`), progress, near-end, and app-close transitions remain
+unit-testable outside Android. Media3 is pinned to `1.8.1` while the project is
+on AGP 8.7 / compileSdk 35; newer Media3 lines require compileSdk 36.
+
 ### 10.6 Transport busy UX
 
 `playbackTransportBusy = isLoading || (native === 'loading' && !seeking)`:
