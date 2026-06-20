@@ -62,6 +62,7 @@ internal object SnapshotNoteJsonCodec {
         append(",\"snippet\":\"").append(escape(summary.snippet)).append('"')
         append(",\"isInbox\":").append(summary.isInbox)
         append(",\"lastModifiedEpochMillis\":").append(summary.lastModifiedEpochMillis)
+        append(",\"sizeBytes\":").append(summary.sizeBytes)
         append('}')
     }
 
@@ -105,7 +106,8 @@ internal object SnapshotNoteJsonCodec {
         title = readQuotedValue(raw, "title"),
         snippet = readQuotedValue(raw, "snippet"),
         isInbox = readBoolean(raw, "isInbox"),
-        lastModifiedEpochMillis = readLong(raw, "lastModifiedEpochMillis")
+        lastModifiedEpochMillis = readLong(raw, "lastModifiedEpochMillis"),
+        sizeBytes = readOptionalLong(raw, "sizeBytes")
     )
 
     private fun readQuotedValue(raw: String, key: String): String {
@@ -143,6 +145,20 @@ internal object SnapshotNoteJsonCodec {
         val token = "\"$key\":"
         val start = raw.indexOf(token)
         require(start >= 0) { "missing $key" }
+        val valueStart = start + token.length
+        val valueEnd = raw.indexOf(',', valueStart).let { comma ->
+            if (comma == -1) raw.indexOf('}', valueStart) else comma
+        }
+        require(valueEnd > valueStart) { "invalid $key" }
+        return raw.substring(valueStart, valueEnd).trim().toLong()
+    }
+
+    private fun readOptionalLong(raw: String, key: String, default: Long = 0L): Long {
+        val token = "\"$key\":"
+        val start = raw.indexOf(token)
+        if (start < 0) {
+            return default
+        }
         val valueStart = start + token.length
         val valueEnd = raw.indexOf(',', valueStart).let { comma ->
             if (comma == -1) raw.indexOf('}', valueStart) else comma

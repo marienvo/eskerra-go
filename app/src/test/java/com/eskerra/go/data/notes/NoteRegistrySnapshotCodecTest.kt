@@ -92,6 +92,37 @@ class NoteRegistrySnapshotCodecTest {
     }
 
     @Test
+    fun encodeAndDecode_roundTripsSizeBytes() {
+        val fingerprint = GateFingerprint("abc123")
+        val note = inboxNote.copy(sizeBytes = 1234L)
+        val registry = NoteRegistry.fromNotes(listOf(note))
+        val raw = NoteRegistrySnapshotCodec.encode(
+            fingerprint = fingerprint,
+            savedAtEpochMs = 99L,
+            registry = registry
+        )
+
+        assertEquals(registry, NoteRegistrySnapshotCodec.decode(raw, fingerprint))
+        assertEquals(true, raw.contains("\"sizeBytes\":1234"))
+    }
+
+    @Test
+    fun decode_legacySnapshotWithoutSizeBytes_defaultsToZero() {
+        val fingerprint = GateFingerprint("abc123")
+        val legacyRaw =
+            """
+            {"workspaceFingerprint":"abc123","savedAtEpochMs":99,"notes":[
+            {"id":"Inbox/hello.md","title":"Hello \"world\"","snippet":"Line\nbreak","isInbox":true,"lastModifiedEpochMillis":42}
+            ]}
+            """.trimIndent()
+
+        val decoded = NoteRegistrySnapshotCodec.decode(legacyRaw, fingerprint)
+
+        assertEquals(0L, decoded.notes.single().sizeBytes)
+        assertEquals(inboxNote, decoded.notes.single())
+    }
+
+    @Test
     fun encode_usesNotesArrayKey_notSummaries() {
         val fingerprint = GateFingerprint("abc123")
         val raw = NoteRegistrySnapshotCodec.encode(
