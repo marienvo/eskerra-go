@@ -70,6 +70,7 @@ import com.eskerra.go.feature.settings.VaultSettingsScreen
 import com.eskerra.go.feature.sync.SyncScreen
 import com.eskerra.go.feature.sync.SyncSettingsScreen
 import com.eskerra.go.feature.sync.SyncUiState
+import com.eskerra.go.feature.todayhub.TodayHubUiState
 import com.eskerra.go.ui.markdown.AmbiguousWikiLinkSheet
 import java.io.File
 
@@ -115,7 +116,8 @@ fun App(
     repairVaultSearchIndex: RepairVaultSearchIndex,
     touchVaultSearchPaths: TouchVaultSearchPaths,
     onConfigUpdated: (WorkspaceConfig) -> Unit,
-    onInboxUiStateChanged: (InboxUiState) -> Unit = {}
+    onInboxUiStateChanged: (InboxUiState) -> Unit = {},
+    onTodayHubUiStateChanged: (TodayHubUiState) -> Unit = {}
 ) {
     var currentConfig by remember(config) { mutableStateOf(config) }
     val workspaceRoot = remember(currentConfig, filesDir) {
@@ -228,7 +230,8 @@ fun App(
                     navController = navController,
                     appSyncViewModel = appSyncViewModel,
                     touchVaultSearchPaths = touchVaultSearchPaths,
-                    onInboxUiStateChanged = onInboxUiStateChanged
+                    onInboxUiStateChanged = onInboxUiStateChanged,
+                    onTodayHubUiStateChanged = onTodayHubUiStateChanged
                 )
             }
 

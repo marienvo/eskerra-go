@@ -43,7 +43,8 @@ internal fun AppInboxRoute(
     navController: NavHostController,
     appSyncViewModel: AppSyncViewModel,
     touchVaultSearchPaths: TouchVaultSearchPaths,
-    onInboxUiStateChanged: (InboxUiState) -> Unit
+    onInboxUiStateChanged: (InboxUiState) -> Unit,
+    onTodayHubUiStateChanged: (TodayHubUiState) -> Unit
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -88,6 +89,9 @@ internal fun AppInboxRoute(
 
     LaunchedEffect(inboxState) {
         onInboxUiStateChanged(inboxState)
+    }
+    LaunchedEffect(todayHubState) {
+        onTodayHubUiStateChanged(todayHubState)
     }
 
     LaunchedEffect(currentRoute) {

@@ -56,6 +56,7 @@ import com.eskerra.go.data.workspace.WorkspaceSetupCompletion
 import com.eskerra.go.data.workspace.WorkspaceStore
 import com.eskerra.go.feature.inbox.InboxUiState
 import com.eskerra.go.feature.setup.WorkspaceSetupScreen
+import com.eskerra.go.feature.todayhub.TodayHubUiState
 import com.eskerra.go.ui.markdown.LocalParsedMarkdownCache
 import com.eskerra.go.ui.theme.EskerraGoTheme
 import java.io.File
@@ -121,10 +122,12 @@ fun AppRoot(
                 )
                 val gateState by gateViewModel.gateState.collectAsState()
                 var inboxUiState by remember { mutableStateOf<InboxUiState?>(null) }
+                var todayHubUiState by remember { mutableStateOf<TodayHubUiState?>(null) }
 
                 AppLaunchSettledEffect(
                     gateState = gateState,
                     inboxUiState = inboxUiState,
+                    todayHubUiState = todayHubUiState,
                     onLaunchSettled = onLaunchSettled
                 )
 
@@ -134,7 +137,10 @@ fun AppRoot(
                     }
 
                     is AppGateState.NeedsSetup -> {
-                        SideEffect { inboxUiState = null }
+                        SideEffect {
+                            inboxUiState = null
+                            todayHubUiState = null
+                        }
                         val activity = LocalContext.current as? ComponentActivity
                         BackHandler {
                             activity?.finish()
@@ -201,7 +207,8 @@ fun AppRoot(
                         repairVaultSearchIndex = repairVaultSearchIndex,
                         touchVaultSearchPaths = touchVaultSearchPaths,
                         onConfigUpdated = gateViewModel::updateReadyConfig,
-                        onInboxUiStateChanged = { inboxUiState = it }
+                        onInboxUiStateChanged = { inboxUiState = it },
+                        onTodayHubUiStateChanged = { todayHubUiState = it }
                     )
                 }
             }
