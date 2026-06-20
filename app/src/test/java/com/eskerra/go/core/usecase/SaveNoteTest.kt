@@ -11,6 +11,7 @@ import com.eskerra.go.data.notes.FakeNoteRegistryRepository
 import com.eskerra.go.data.notes.FakeNoteWriteRepository
 import com.eskerra.go.data.notes.FileNoteRegistryRepository
 import com.eskerra.go.data.notes.FileNoteWriteRepository
+import com.eskerra.go.data.notes.NoteRegistryCache
 import com.eskerra.go.data.workspace.WorkspacePaths
 import java.io.File
 import kotlinx.coroutines.test.runTest
@@ -42,10 +43,9 @@ class SaveNoteTest {
 
         val gitRepository = JGitWorkspaceRepository()
         val writeRepository = FileNoteWriteRepository(gitRepository)
-        val registryRepository = FileNoteRegistryRepository()
         val useCase = SaveNote(
             writeRepository = writeRepository,
-            registryRepository = registryRepository,
+            registryCache = NoteRegistryCache(FileNoteRegistryRepository()),
             loadGitStatusSummary = LoadGitStatusSummary(gitRepository)
         )
 
@@ -62,8 +62,10 @@ class SaveNoteTest {
         gitWorkspace(filesDir)
         val useCase = SaveNote(
             writeRepository = FileNoteWriteRepository(JGitWorkspaceRepository()),
-            registryRepository = FakeNoteRegistryRepository.withInboxNotes(
-                NoteSummary(NoteId("Inbox/First.md"), "First", "", isInbox = true)
+            registryCache = NoteRegistryCache(
+                FakeNoteRegistryRepository.withInboxNotes(
+                    NoteSummary(NoteId("Inbox/First.md"), "First", "", isInbox = true)
+                )
             ),
             loadGitStatusSummary = LoadGitStatusSummary(JGitWorkspaceRepository())
         )
@@ -87,8 +89,10 @@ class SaveNoteTest {
         val noteId = NoteId("Projects/Plan.md")
         val useCase = SaveNote(
             writeRepository = FakeNoteWriteRepository(),
-            registryRepository = FakeNoteRegistryRepository.withInboxNotes(
-                NoteSummary(noteId, "Plan", "", isInbox = false)
+            registryCache = NoteRegistryCache(
+                FakeNoteRegistryRepository.withInboxNotes(
+                    NoteSummary(noteId, "Plan", "", isInbox = false)
+                )
             ),
             loadGitStatusSummary = LoadGitStatusSummary(JGitWorkspaceRepository())
         )
@@ -106,7 +110,7 @@ class SaveNoteTest {
         gitWorkspace(filesDir)
         val useCase = SaveNote(
             writeRepository = FakeNoteWriteRepository(),
-            registryRepository = FakeNoteRegistryRepository(),
+            registryCache = NoteRegistryCache(FakeNoteRegistryRepository()),
             loadGitStatusSummary = LoadGitStatusSummary(JGitWorkspaceRepository())
         )
 
@@ -118,7 +122,7 @@ class SaveNoteTest {
     }
 
     @Test
-    fun saveRefreshesRegistryTwice() = runTest {
+    fun saveRefreshesRegistryOnceWhenCacheWarm() = runTest {
         val filesDir = temp.newFolder("files")
         val workspaceDir = gitWorkspace(filesDir)
         File(workspaceDir, "Inbox").mkdirs()
@@ -128,15 +132,20 @@ class SaveNoteTest {
         val registry = FakeNoteRegistryRepository.withInboxNotes(
             NoteSummary(noteId, "First", "", isInbox = true)
         )
+        val cache = NoteRegistryCache(registry)
+        cache.refresh(config, filesDir)
+        assertEquals(1, registry.refreshCount)
+
         val useCase = SaveNote(
             writeRepository = FileNoteWriteRepository(JGitWorkspaceRepository()),
-            registryRepository = registry,
+            registryCache = cache,
             loadGitStatusSummary = LoadGitStatusSummary(JGitWorkspaceRepository())
         )
 
         useCase(config, filesDir, noteId, "# First\n\nSaved")
 
         assertEquals(2, registry.refreshCount)
+        assertTrue(registry.lastPreviousRegistry != null)
     }
 
     @Test
@@ -149,7 +158,7 @@ class SaveNoteTest {
         val gitRepository = JGitWorkspaceRepository()
         val useCase = SaveNote(
             writeRepository = FileNoteWriteRepository(gitRepository),
-            registryRepository = FileNoteRegistryRepository(),
+            registryCache = NoteRegistryCache(FileNoteRegistryRepository()),
             loadGitStatusSummary = LoadGitStatusSummary(gitRepository)
         )
 

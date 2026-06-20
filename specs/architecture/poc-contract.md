@@ -11,6 +11,19 @@ Eskerra Go PoC proves:
 - Non-inbox notes are read-only
 - Floating shell navigation exists
 
+## Shell bottom navigation
+
+Top-level tab switches use `popUpTo(inbox) { saveState = true }`, `launchSingleTop`, and `restoreState` so sibling stacks (Podcasts, Menu, Search) retain state across round trips. Re-tapping the active tab is a no-op.
+
+Home (inbox) re-selection is decided by [resolveTabNavigation](app/src/main/java/com/eskerra/go/app/AppNavigation.kt) (unit-tested in [AppNavigationTest.kt](app/src/test/java/com/eskerra/go/app/AppNavigationTest.kt)):
+
+| Current route | Home tap | Behavior |
+|---------------|----------|----------|
+| `inbox` | Home | No-op |
+| `note/*` or `editor/*` | Home | Pop to inbox **and reset** (Today Hub → current week, scroll top) |
+| Podcasts / Search / Menu | Home | Pop to inbox **and restore** last home view |
+| `podcasts` | Podcasts | No-op |
+
 ## Inbox note scan rules
 
 When indexing markdown files for the Inbox list:

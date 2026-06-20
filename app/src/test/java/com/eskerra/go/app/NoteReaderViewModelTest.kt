@@ -8,6 +8,7 @@ import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.usecase.LoadNoteForReading
 import com.eskerra.go.data.notes.FakeNoteContentRepository
 import com.eskerra.go.data.notes.FakeNoteRegistryRepository
+import com.eskerra.go.data.notes.NoteRegistryCache
 import com.eskerra.go.data.workspace.WorkspacePaths
 import com.eskerra.go.feature.note.NoteReaderUiState
 import kotlinx.coroutines.Dispatchers
@@ -61,7 +62,7 @@ class NoteReaderViewModelTest {
             config = config,
             filesDir = temp.newFolder("files"),
             noteId = noteId,
-            loadNoteForReading = LoadNoteForReading(registry, content)
+            loadNoteForReading = LoadNoteForReading(NoteRegistryCache(registry), content)
         )
 
         assertEquals(NoteReaderUiState.Loading, viewModel.uiState.value)
@@ -80,7 +81,7 @@ class NoteReaderViewModelTest {
             config = config,
             filesDir = temp.newFolder("files"),
             noteId = noteId,
-            loadNoteForReading = LoadNoteForReading(registry, content)
+            loadNoteForReading = LoadNoteForReading(NoteRegistryCache(registry), content)
         )
 
         val state = viewModel.uiState.value as NoteReaderUiState.Content
@@ -100,7 +101,7 @@ class NoteReaderViewModelTest {
             config = config,
             filesDir = temp.newFolder("files"),
             noteId = noteId,
-            loadNoteForReading = LoadNoteForReading(registry, content)
+            loadNoteForReading = LoadNoteForReading(NoteRegistryCache(registry), content)
         )
 
         assertEquals(NoteReaderUiState.NotFound, viewModel.uiState.value)
@@ -115,7 +116,7 @@ class NoteReaderViewModelTest {
             config = config,
             filesDir = temp.newFolder("files"),
             noteId = noteId,
-            loadNoteForReading = LoadNoteForReading(registry, content)
+            loadNoteForReading = LoadNoteForReading(NoteRegistryCache(registry), content)
         )
 
         assertEquals(
@@ -131,7 +132,7 @@ class NoteReaderViewModelTest {
             filesDir = temp.newFolder("files"),
             noteId = NoteId(""),
             loadNoteForReading = LoadNoteForReading(
-                FakeNoteRegistryRepository(),
+                NoteRegistryCache(FakeNoteRegistryRepository()),
                 FakeNoteContentRepository()
             )
         )
@@ -149,7 +150,10 @@ class NoteReaderViewModelTest {
             config = config,
             filesDir = temp.newFolder("files"),
             noteId = noteId,
-            loadNoteForReading = LoadNoteForReading(registry, FakeNoteContentRepository())
+            loadNoteForReading = LoadNoteForReading(
+                NoteRegistryCache(registry),
+                FakeNoteContentRepository()
+            )
         )
 
         assertEquals(
@@ -170,7 +174,7 @@ class NoteReaderViewModelTest {
             config = config,
             filesDir = temp.newFolder("files"),
             noteId = noteId,
-            loadNoteForReading = LoadNoteForReading(registry, content)
+            loadNoteForReading = LoadNoteForReading(NoteRegistryCache(registry), content)
         )
         dispatcher.scheduler.runCurrent()
         assertEquals(
@@ -202,7 +206,7 @@ class NoteReaderViewModelTest {
             config = config,
             filesDir = temp.newFolder("files"),
             noteId = noteId,
-            loadNoteForReading = LoadNoteForReading(registry, content)
+            loadNoteForReading = LoadNoteForReading(NoteRegistryCache(registry), content)
         )
 
         val original = viewModel.uiState.value as NoteReaderUiState.Content

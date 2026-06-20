@@ -30,6 +30,7 @@ import com.eskerra.go.core.usecase.LoadTodayHubRow
 import com.eskerra.go.core.usecase.LoadVaultSettings
 import com.eskerra.go.core.usecase.MaintainVaultSearchIndex
 import com.eskerra.go.core.usecase.ManualSyncNow
+import com.eskerra.go.core.usecase.PrefetchLinkedNotes
 import com.eskerra.go.core.usecase.ReconcileWorkspaceSyncBranch
 import com.eskerra.go.core.usecase.RecordLastSyncAttempt
 import com.eskerra.go.core.usecase.RefreshRemoteSyncStatus
@@ -50,9 +51,14 @@ import com.eskerra.go.data.notes.CoalescingNoteRegistryRepository
 import com.eskerra.go.data.notes.FileInboxSnapshotStore
 import com.eskerra.go.data.notes.FileNoteContentRepository
 import com.eskerra.go.data.notes.FileNoteRegistryRepository
+import com.eskerra.go.data.notes.FileNoteRegistrySnapshotStore
 import com.eskerra.go.data.notes.FileNoteWriteRepository
+import com.eskerra.go.data.notes.NoteContentCache
+import com.eskerra.go.data.notes.NoteRegistryCache
+import com.eskerra.go.data.notes.ParsedMarkdownCache
 import com.eskerra.go.data.search.SqliteVaultSearchRepository
 import com.eskerra.go.data.todayhub.DataStoreActiveTodayHubStore
+import com.eskerra.go.data.todayhub.FileTodayHubSnapshotStore
 import com.eskerra.go.data.vault.DataStoreLocalSettingsStore
 import com.eskerra.go.data.vault.FileVaultSettingsRepository
 import com.eskerra.go.data.workspace.DataStoreWorkspaceStore
@@ -87,44 +93,56 @@ class MainActivity : ComponentActivity() {
 
         val fileNoteRegistryRepository = FileNoteRegistryRepository()
         val noteRegistryRepository = CoalescingNoteRegistryRepository(fileNoteRegistryRepository)
-        val noteContentRepository = FileNoteContentRepository()
+        val noteContentCache = NoteContentCache(FileNoteContentRepository())
+        val parsedMarkdownCache = ParsedMarkdownCache()
         val noteWriteRepository = FileNoteWriteRepository(gitRepository)
         val loadGitStatusSummary = LoadGitStatusSummary(gitRepository)
 
+        val noteRegistryCache = NoteRegistryCache(
+            repository = noteRegistryRepository,
+            snapshotStore = FileNoteRegistrySnapshotStore()
+        )
+
         val loadInboxSummaries = LoadInboxSummariesCached(
-            delegate = LoadInboxSummaries(noteRegistryRepository),
+            delegate = LoadInboxSummaries(noteRegistryCache),
             snapshotStore = FileInboxSnapshotStore()
         )
         val loadNoteForReading = LoadNoteForReading(
-            registryRepository = noteRegistryRepository,
-            contentRepository = noteContentRepository
+            registryCache = noteRegistryCache,
+            contentRepository = noteContentCache
+        )
+        val prefetchLinkedNotes = PrefetchLinkedNotes(
+            contentCache = noteContentCache,
+            parsedMarkdownCache = parsedMarkdownCache
         )
         val createInboxNote = CreateInboxNote(
             writeRepository = noteWriteRepository,
-            registryRepository = fileNoteRegistryRepository,
+            registryCache = noteRegistryCache,
             loadGitStatusSummary = loadGitStatusSummary
         )
         val deleteInboxNotes = DeleteInboxNotes(
             writeRepository = noteWriteRepository,
-            registryRepository = fileNoteRegistryRepository,
+            registryCache = noteRegistryCache,
             loadGitStatusSummary = loadGitStatusSummary
         )
         val loadEditableNote = LoadEditableNote(
             registryRepository = noteRegistryRepository,
-            contentRepository = noteContentRepository
+            contentRepository = noteContentCache
         )
         val saveNote = SaveNote(
             writeRepository = noteWriteRepository,
-            registryRepository = fileNoteRegistryRepository,
-            loadGitStatusSummary = loadGitStatusSummary
+            registryCache = noteRegistryCache,
+            loadGitStatusSummary = loadGitStatusSummary,
+            contentCache = noteContentCache
         )
 
         val loadTodayHub = LoadTodayHub(
-            registryRepository = noteRegistryRepository,
-            contentRepository = noteContentRepository
+            registryCache = noteRegistryCache,
+            contentRepository = noteContentCache
         )
-        val loadTodayHubRow = LoadTodayHubRow(contentRepository = noteContentRepository)
+        val loadTodayHubRow = LoadTodayHubRow(contentRepository = noteContentCache)
         val activeTodayHubStore = DataStoreActiveTodayHubStore(applicationContext)
+        val todayHubSnapshotStore = FileTodayHubSnapshotStore()
 
         val remoteSyncRepository = JGitRemoteSyncRepository(gitRepository)
         val loadSyncStatus = LoadSyncStatus(remoteSyncRepository)
@@ -150,7 +168,8 @@ class MainActivity : ComponentActivity() {
         val manualSyncNow = ManualSyncNow(
             remoteSyncRepository = remoteSyncRepository,
             credentialStore = credentialStore,
-            registryRepository = fileNoteRegistryRepository,
+            registryCache = noteRegistryCache,
+            contentCache = noteContentCache,
             loadSyncStatus = loadSyncStatus,
             reconcileWorkspaceSyncBranch = reconcileWorkspaceSyncBranch
         )
@@ -189,8 +208,10 @@ class MainActivity : ComponentActivity() {
                 bootCacheStore = bootCacheStore,
                 setupCompletion = setupCompletion,
                 filesDir = filesDir,
+                parsedMarkdownCache = parsedMarkdownCache,
                 loadInboxSummaries = loadInboxSummaries,
                 loadNoteForReading = loadNoteForReading,
+                prefetchLinkedNotes = prefetchLinkedNotes,
                 createInboxNote = createInboxNote,
                 deleteInboxNotes = deleteInboxNotes,
                 loadEditableNote = loadEditableNote,
@@ -199,6 +220,7 @@ class MainActivity : ComponentActivity() {
                 loadTodayHub = loadTodayHub,
                 loadTodayHubRow = loadTodayHubRow,
                 activeTodayHubStore = activeTodayHubStore,
+                todayHubSnapshotStore = todayHubSnapshotStore,
                 loadSyncStatus = loadSyncStatus,
                 refreshRemoteSyncStatus = refreshRemoteSyncStatus,
                 buildSyncPreflight = buildSyncPreflight,

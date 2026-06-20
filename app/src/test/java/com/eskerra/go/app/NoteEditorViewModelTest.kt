@@ -11,6 +11,7 @@ import com.eskerra.go.data.git.JGitWorkspaceRepository
 import com.eskerra.go.data.notes.FakeNoteContentRepository
 import com.eskerra.go.data.notes.FakeNoteRegistryRepository
 import com.eskerra.go.data.notes.FakeNoteWriteRepository
+import com.eskerra.go.data.notes.NoteRegistryCache
 import com.eskerra.go.data.workspace.WorkspacePaths
 import com.eskerra.go.feature.editor.NoteEditorUiState
 import java.io.File
@@ -140,7 +141,7 @@ class NoteEditorViewModelTest {
         )
         val saveNote = SaveNote(
             writeRepository = writeRepository,
-            registryRepository = registry,
+            registryCache = NoteRegistryCache(registry),
             loadGitStatusSummary = loadGitStatusSummary()
         )
         val viewModel = NoteEditorViewModel(
@@ -172,7 +173,7 @@ class NoteEditorViewModelTest {
         )
         val saveNote = SaveNote(
             writeRepository = writeRepository,
-            registryRepository = registry,
+            registryCache = NoteRegistryCache(registry),
             loadGitStatusSummary = loadGitStatusSummary()
         )
         val viewModel = NoteEditorViewModel(
@@ -225,7 +226,7 @@ class NoteEditorViewModelTest {
             loadEditableNote = LoadEditableNote(registry, content),
             saveNote = SaveNote(
                 writeRepository = FakeNoteWriteRepository(),
-                registryRepository = registry,
+                registryCache = NoteRegistryCache(registry),
                 loadGitStatusSummary = loadGitStatusSummary(gitRepository)
             ),
             loadGitStatusSummary = loadGitStatusSummary(gitRepository)
@@ -264,7 +265,7 @@ class NoteEditorViewModelTest {
         loadEditableNote = LoadEditableNote(registry, content),
         saveNote = SaveNote(
             writeRepository = writeRepository,
-            registryRepository = registry,
+            registryCache = NoteRegistryCache(registry),
             loadGitStatusSummary = loadGitStatusSummary()
         ),
         loadGitStatusSummary = loadGitStatusSummary()

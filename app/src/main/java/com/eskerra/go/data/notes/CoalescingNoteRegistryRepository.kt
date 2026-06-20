@@ -20,7 +20,11 @@ class CoalescingNoteRegistryRepository(private val delegate: NoteRegistryReposit
     private val inFlight = mutableMapOf<String, InFlightScan>()
     private val pendingRescan = mutableSetOf<String>()
 
-    override suspend fun refresh(config: WorkspaceConfig, filesDir: File): Result<NoteRegistry> {
+    override suspend fun refresh(
+        config: WorkspaceConfig,
+        filesDir: File,
+        previousRegistry: NoteRegistry?
+    ): Result<NoteRegistry> {
         val key = cacheKey(config, filesDir)
         while (true) {
             val joinTarget = synchronized(inFlight) { inFlight[key] }
@@ -47,7 +51,7 @@ class CoalescingNoteRegistryRepository(private val delegate: NoteRegistryReposit
 
             val result = try {
                 withContext(NonCancellable) {
-                    delegate.refresh(config, filesDir)
+                    delegate.refresh(config, filesDir, previousRegistry)
                 }
             } catch (e: CancellationException) {
                 synchronized(inFlight) {

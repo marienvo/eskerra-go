@@ -16,8 +16,9 @@ import java.nio.file.SimpleFileVisitor
 import java.nio.file.attribute.BasicFileAttributes
 
 /** Scans a workspace directory and returns indexed note summaries. */
-fun interface NoteWorkspaceScanner {
-    fun scan(workspaceDir: File): Result<NoteRegistry>
+interface NoteWorkspaceScanner {
+    fun scan(workspaceDir: File, previousRegistry: NoteRegistry?): Result<NoteRegistry>
+    fun scan(workspaceDir: File): Result<NoteRegistry> = scan(workspaceDir, null)
 }
 
 /**
@@ -26,9 +27,10 @@ fun interface NoteWorkspaceScanner {
  */
 class MarkdownNoteScanner : NoteWorkspaceScanner {
 
-    override fun scan(workspaceDir: File): Result<NoteRegistry> {
+    override fun scan(workspaceDir: File, previousRegistry: NoteRegistry?): Result<NoteRegistry> {
         val root = workspaceDir.canonicalFile
         val summaries = mutableListOf<NoteSummary>()
+        val previousByPath = previousRegistry?.notes?.associateBy { it.id.value } ?: emptyMap()
 
         try {
             Files.walkFileTree(
@@ -67,14 +69,26 @@ class MarkdownNoteScanner : NoteWorkspaceScanner {
                             throw NoteIndexException(NoteIndexError.ScanFailed(error.message))
                         }
                         val isInbox = isInboxNote(notePath.value)
-                        val (title, snippet) = extractTitleAndSnippet(file)
+                        val mtime = attrs.lastModifiedTime().toMillis()
+                        val size = attrs.size()
+                        val previous = previousByPath[relativePath]
+                        val (title, snippet) = if (
+                            previous != null &&
+                            previous.lastModifiedEpochMillis == mtime &&
+                            previous.sizeBytes == size
+                        ) {
+                            previous.title to previous.snippet
+                        } else {
+                            extractTitleAndSnippet(file)
+                        }
 
                         summaries += NoteSummary(
                             id = NoteId(notePath.value),
                             title = title,
                             snippet = snippet,
                             isInbox = isInbox,
-                            lastModifiedEpochMillis = attrs.lastModifiedTime().toMillis()
+                            lastModifiedEpochMillis = mtime,
+                            sizeBytes = size
                         )
                         return FileVisitResult.CONTINUE
                     }
@@ -107,30 +121,31 @@ class MarkdownNoteScanner : NoteWorkspaceScanner {
 
     private fun extractTitleAndSnippet(file: File): Pair<String, String> {
         val fallbackTitle = file.nameWithoutExtension
-        val lines = file.readText().lines()
         var title: String? = null
         var titleLineIndex = -1
+        var snippet: String? = null
 
-        for ((index, line) in lines.withIndex()) {
-            val trimmed = line.trim()
-            if (trimmed.startsWith(H1_PREFIX) && trimmed.length > H1_PREFIX.length) {
-                title = trimmed.removePrefix(H1_PREFIX).trim()
-                titleLineIndex = index
-                break
+        file.bufferedReader().use { reader ->
+            var index = 0
+            while (true) {
+                val line = reader.readLine() ?: break
+                val trimmed = line.trim()
+                if (title == null &&
+                    trimmed.startsWith(H1_PREFIX) &&
+                    trimmed.length > H1_PREFIX.length
+                ) {
+                    title = trimmed.removePrefix(H1_PREFIX).trim()
+                    titleLineIndex = index
+                }
+                if (snippet == null && index != titleLineIndex && trimmed.isNotBlank()) {
+                    snippet = trimmed
+                }
+                if (title != null && snippet != null) break
+                index++
             }
         }
 
-        val resolvedTitle = title ?: fallbackTitle
-        val snippet = lines.asSequence()
-            .withIndex()
-            .filter { (index, line) ->
-                index != titleLineIndex && line.isNotBlank()
-            }
-            .map { (_, line) -> line.trim() }
-            .firstOrNull()
-            .orEmpty()
-
-        return resolvedTitle to snippet
+        return (title ?: fallbackTitle) to (snippet ?: "")
     }
 
     companion object {

@@ -5,6 +5,7 @@ import com.eskerra.go.core.model.NoteSummary
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.data.workspace.WorkspacePaths
 import com.eskerra.go.feature.inbox.InboxUiState
+import com.eskerra.go.feature.todayhub.TodayHubUiState
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -21,7 +22,9 @@ class AppLaunchSettledTest {
 
     @Test
     fun notSettled_whileGateLoading() {
-        assertFalse(isLaunchSettled(AppGateState.Loading, inboxUiState = null))
+        assertFalse(
+            isLaunchSettled(AppGateState.Loading, inboxUiState = null, todayHubUiState = null)
+        )
     }
 
     @Test
@@ -29,7 +32,8 @@ class AppLaunchSettledTest {
         assertTrue(
             isLaunchSettled(
                 AppGateState.NeedsSetup(recoveryMessage = null),
-                inboxUiState = null
+                inboxUiState = null,
+                todayHubUiState = null
             )
         )
     }
@@ -39,7 +43,41 @@ class AppLaunchSettledTest {
         assertFalse(
             isLaunchSettled(
                 AppGateState.Ready(config),
-                inboxUiState = InboxUiState.Loading
+                inboxUiState = InboxUiState.Loading,
+                todayHubUiState = TodayHubUiState.Empty
+            )
+        )
+    }
+
+    @Test
+    fun notSettled_whenReadyAndTodayHubLoading() {
+        assertFalse(
+            isLaunchSettled(
+                AppGateState.Ready(config),
+                inboxUiState = InboxUiState.Empty,
+                todayHubUiState = TodayHubUiState.Loading
+            )
+        )
+    }
+
+    @Test
+    fun notSettled_whenReadyAndTodayHubNull() {
+        assertFalse(
+            isLaunchSettled(
+                AppGateState.Ready(config),
+                inboxUiState = InboxUiState.Empty,
+                todayHubUiState = null
+            )
+        )
+    }
+
+    @Test
+    fun settled_whenReadyAndBothEmpty() {
+        assertTrue(
+            isLaunchSettled(
+                AppGateState.Ready(config),
+                inboxUiState = InboxUiState.Empty,
+                todayHubUiState = TodayHubUiState.Empty
             )
         )
     }
@@ -55,7 +93,8 @@ class AppLaunchSettledTest {
         assertTrue(
             isLaunchSettled(
                 AppGateState.Ready(config),
-                inboxUiState = InboxUiState.Content(listOf(note), isRefreshing = true)
+                inboxUiState = InboxUiState.Content(listOf(note), isRefreshing = true),
+                todayHubUiState = TodayHubUiState.Empty
             )
         )
     }
@@ -65,7 +104,19 @@ class AppLaunchSettledTest {
         assertTrue(
             isLaunchSettled(
                 AppGateState.Ready(config),
-                inboxUiState = InboxUiState.Empty
+                inboxUiState = InboxUiState.Empty,
+                todayHubUiState = TodayHubUiState.Empty
+            )
+        )
+    }
+
+    @Test
+    fun settled_whenReadyAndTodayHubError() {
+        assertTrue(
+            isLaunchSettled(
+                AppGateState.Ready(config),
+                inboxUiState = InboxUiState.Empty,
+                todayHubUiState = TodayHubUiState.Error("vault scan failed")
             )
         )
     }

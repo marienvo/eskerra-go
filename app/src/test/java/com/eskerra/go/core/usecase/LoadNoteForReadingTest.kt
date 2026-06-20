@@ -8,6 +8,8 @@ import com.eskerra.go.core.model.NoteSummary
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.data.notes.FakeNoteContentRepository
 import com.eskerra.go.data.notes.FakeNoteRegistryRepository
+import com.eskerra.go.data.notes.NoteContentCache
+import com.eskerra.go.data.notes.NoteRegistryCache
 import com.eskerra.go.data.workspace.WorkspacePaths
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -32,10 +34,41 @@ class LoadNoteForReadingTest {
     private val filesDir get() = temp.newFolder("files")
 
     @Test
+    fun warmRegistry_doesNotTriggerRefresh() = runTest {
+        val filesDir = temp.newFolder("files")
+        val noteId = NoteId("Inbox/First.md")
+        val fakeRepo = FakeNoteRegistryRepository.withInboxNotes(summary(noteId, "First"))
+        val content = FakeNoteContentRepository.withContent(noteId, "# First")
+        val useCase = LoadNoteForReading(NoteRegistryCache(fakeRepo), content)
+
+        useCase(config, filesDir, noteId).getOrThrow() // cold miss: warms registry via refresh()
+        val refreshesAfterColdMiss = fakeRepo.refreshCount
+
+        useCase(config, filesDir, noteId).getOrThrow() // warm hit: uses current(), no refresh
+
+        assertEquals(refreshesAfterColdMiss, fakeRepo.refreshCount)
+    }
+
+    @Test
+    fun secondOpen_hitsWarmContentCache() = runTest {
+        val filesDir = temp.newFolder("files")
+        val noteId = NoteId("Inbox/First.md")
+        val fakeRepo = FakeNoteRegistryRepository.withInboxNotes(summary(noteId, "First"))
+        val content = FakeNoteContentRepository.withContent(noteId, "# First\n\nBody.")
+        val cache = NoteContentCache(content)
+        val useCase = LoadNoteForReading(NoteRegistryCache(fakeRepo), cache)
+
+        useCase(config, filesDir, noteId).getOrThrow()
+        useCase(config, filesDir, noteId).getOrThrow()
+
+        assertEquals(1, content.loadCount)
+    }
+
+    @Test
     fun successReturnsContentMarkdownAndRegistry() = runTest {
         val firstId = NoteId("Inbox/First.md")
         val secondId = NoteId("Second.md")
-        val registry = FakeNoteRegistryRepository.withInboxNotes(
+        val fakeRepo = FakeNoteRegistryRepository.withInboxNotes(
             summary(firstId, "First"),
             summary(secondId, "Second")
         )
@@ -43,7 +76,7 @@ class LoadNoteForReadingTest {
             noteId = firstId,
             markdown = "Open [[Second]]."
         )
-        val useCase = LoadNoteForReading(registry, content)
+        val useCase = LoadNoteForReading(NoteRegistryCache(fakeRepo), content)
 
         val result = useCase(config, filesDir, firstId)
 
@@ -58,9 +91,9 @@ class LoadNoteForReadingTest {
     @Test
     fun registryRefreshFailureMapsToError() = runTest {
         val noteId = NoteId("Inbox/First.md")
-        val registry = FakeNoteRegistryRepository.failing(NoteIndexError.ScanFailed("boom"))
+        val fakeRepo = FakeNoteRegistryRepository.failing(NoteIndexError.ScanFailed("boom"))
         val content = FakeNoteContentRepository.withContent(noteId, "# First")
-        val useCase = LoadNoteForReading(registry, content)
+        val useCase = LoadNoteForReading(NoteRegistryCache(fakeRepo), content)
 
         val result = useCase(config, filesDir, noteId)
 
@@ -73,9 +106,9 @@ class LoadNoteForReadingTest {
     @Test
     fun notFoundWhenNoteMissingFromRegistry() = runTest {
         val noteId = NoteId("Inbox/First.md")
-        val registry = FakeNoteRegistryRepository()
+        val fakeRepo = FakeNoteRegistryRepository()
         val content = FakeNoteContentRepository.withContent(noteId, "# First")
-        val useCase = LoadNoteForReading(registry, content)
+        val useCase = LoadNoteForReading(NoteRegistryCache(fakeRepo), content)
 
         val result = useCase(config, filesDir, noteId)
 

@@ -109,6 +109,17 @@ class MarkdownNoteScannerTest {
     }
 
     @Test
+    fun scan_usesContentBeforeH1AsSnippet() {
+        val workspace = temp.newFolder("workspace")
+        write(workspace, "Inbox/intro.md", "Intro line.\n# My Title\n\nMore content.")
+
+        val note = scanner.scan(workspace).getOrThrow().notes.single()
+
+        assertEquals("My Title", note.title)
+        assertEquals("Intro line.", note.snippet)
+    }
+
+    @Test
     fun scan_fallsBackToFilenameWhenNoH1() {
         val workspace = temp.newFolder("workspace")
         write(workspace, "Inbox/no-title.md", "Just body text.")
@@ -136,6 +147,59 @@ class MarkdownNoteScannerTest {
 
         assertTrue(registry.notes.isEmpty())
         assertTrue(registry.inboxSummaries.isEmpty())
+    }
+
+    @Test
+    fun scan_reusesMemoizedSummaryWhenMtimeAndSizeUnchanged() {
+        val workspace = temp.newFolder("workspace")
+        val noteFile = write(workspace, "Inbox/cached.md", "# Cached\n\nSnippet.")
+
+        val first = scanner.scan(workspace, null).getOrThrow()
+        assertEquals("Cached", first.notes.single().title)
+        assertEquals("Snippet.", first.notes.single().snippet)
+
+        // If we cannot revoke read permission (e.g., running as root), skip the assertion.
+        org.junit.Assume.assumeTrue(
+            "requires file-permission control",
+            noteFile.setReadable(false) && !noteFile.canRead()
+        )
+        try {
+            val second = scanner.scan(workspace, first).getOrThrow()
+            assertEquals("Cached", second.notes.single().title)
+            assertEquals("Snippet.", second.notes.single().snippet)
+        } finally {
+            noteFile.setReadable(true)
+        }
+    }
+
+    @Test
+    fun scan_readsFileWhenContentChangedSinceLastScan() {
+        val workspace = temp.newFolder("workspace")
+        write(workspace, "Notes/note.md", "# Original\n\nOld snippet.")
+
+        val first = scanner.scan(workspace, null).getOrThrow()
+        assertEquals("Original", first.notes.single().title)
+
+        write(workspace, "Notes/note.md", "# Updated\n\nNew snippet.")
+
+        val second = scanner.scan(workspace, first).getOrThrow()
+        assertEquals("Updated", second.notes.single().title)
+        assertEquals("New snippet.", second.notes.single().snippet)
+    }
+
+    @Test
+    fun scan_readsFileWhenSizeChangedSinceLastScan() {
+        val workspace = temp.newFolder("workspace")
+        val noteFile = write(workspace, "Notes/note.md", "# Original\n\nOld snippet.")
+
+        val first = scanner.scan(workspace, null).getOrThrow()
+        assertEquals("Original", first.notes.single().title)
+
+        noteFile.appendText("\nMore content at end.")
+
+        val second = scanner.scan(workspace, first).getOrThrow()
+        assertEquals("Original", second.notes.single().title)
+        assertTrue(second.notes.single().sizeBytes > first.notes.single().sizeBytes)
     }
 
     @Test
@@ -252,9 +316,10 @@ class MarkdownNoteScannerTest {
         assertEquals(4_200L, note.lastModifiedEpochMillis)
     }
 
-    private fun write(workspace: File, relativePath: String, content: String) {
+    private fun write(workspace: File, relativePath: String, content: String): File {
         val file = File(workspace, relativePath)
         file.parentFile?.mkdirs()
         file.writeText(content)
+        return file
     }
 }

@@ -14,6 +14,7 @@ import com.eskerra.go.data.git.JGitWorkspaceRepository
 import com.eskerra.go.data.git.TestGitRepos
 import com.eskerra.go.data.notes.FileNoteRegistryRepository
 import com.eskerra.go.data.notes.MarkdownNoteScanner
+import com.eskerra.go.data.notes.NoteRegistryCache
 import java.io.File
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -472,7 +473,7 @@ class RemoteSyncSettingsRepositoryTest {
         val manualSync = ManualSyncNow(
             remoteSyncRepository = remoteSync,
             credentialStore = credentials,
-            registryRepository = FileNoteRegistryRepository(),
+            registryCache = NoteRegistryCache(FileNoteRegistryRepository()),
             loadSyncStatus = LoadSyncStatus(remoteSync)
         )
 
@@ -505,7 +506,7 @@ class RemoteSyncSettingsRepositoryTest {
         val manualSync = ManualSyncNow(
             remoteSyncRepository = remoteSync,
             credentialStore = credentials,
-            registryRepository = FileNoteRegistryRepository(),
+            registryCache = NoteRegistryCache(FileNoteRegistryRepository()),
             loadSyncStatus = LoadSyncStatus(remoteSync)
         )
         val result = manualSync(httpsConfig, filesDir)
@@ -541,7 +542,7 @@ class RemoteSyncSettingsRepositoryTest {
         val manualSync = ManualSyncNow(
             remoteSyncRepository = remoteSync,
             credentialStore = credentials,
-            registryRepository = FileNoteRegistryRepository(),
+            registryCache = NoteRegistryCache(FileNoteRegistryRepository()),
             loadSyncStatus = LoadSyncStatus(remoteSync)
         )
         val result = manualSync(config, filesDir)

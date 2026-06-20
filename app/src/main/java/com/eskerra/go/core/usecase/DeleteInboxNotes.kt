@@ -10,14 +10,14 @@ import com.eskerra.go.core.model.NoteSummary
 import com.eskerra.go.core.model.NoteWriteError
 import com.eskerra.go.core.model.NoteWriteException
 import com.eskerra.go.core.model.WorkspaceConfig
-import com.eskerra.go.core.repository.NoteRegistryRepository
+import com.eskerra.go.core.repository.NoteRegistryCachePort
 import com.eskerra.go.core.repository.NoteWriteRepository
 import java.io.File
 
 /** Deletes inbox notes after inbox-only and stale-entry guards. */
 class DeleteInboxNotes(
     private val writeRepository: NoteWriteRepository,
-    private val registryRepository: NoteRegistryRepository,
+    private val registryCache: NoteRegistryCachePort,
     private val loadGitStatusSummary: LoadGitStatusSummary
 ) {
 
@@ -55,7 +55,7 @@ class DeleteInboxNotes(
             }
         }
 
-        val registryResult = registryRepository.refresh(config, filesDir)
+        val registryResult = registryCache.refresh(config, filesDir)
         if (registryResult.isFailure) {
             return Result.failure(
                 DeleteInboxNoteException(

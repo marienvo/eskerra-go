@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -15,6 +16,7 @@ import androidx.navigation.NavHostController
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.ActiveTodayHubStore
+import com.eskerra.go.core.repository.TodayHubSnapshotStore
 import com.eskerra.go.core.usecase.DeleteInboxNotes
 import com.eskerra.go.core.usecase.LoadInboxSummariesCached
 import com.eskerra.go.core.usecase.LoadTodayHub
@@ -35,17 +37,21 @@ internal fun AppInboxRoute(
     loadTodayHub: LoadTodayHub,
     loadTodayHubRow: LoadTodayHubRow,
     activeTodayHubStore: ActiveTodayHubStore,
+    todayHubSnapshotStore: TodayHubSnapshotStore,
     workspaceRoot: File?,
     currentRoute: String?,
     entry: NavBackStackEntry,
     navController: NavHostController,
     appSyncViewModel: AppSyncViewModel,
     touchVaultSearchPaths: TouchVaultSearchPaths,
-    onInboxUiStateChanged: (InboxUiState) -> Unit
+    onInboxUiStateChanged: (InboxUiState) -> Unit,
+    onTodayHubUiStateChanged: (TodayHubUiState) -> Unit,
+    homeReselectSignal: Int
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     var ambiguousCandidates by remember { mutableStateOf<List<NoteId>?>(null) }
+    var scrollResetSignal by remember { mutableIntStateOf(0) }
 
     val inboxViewModel: InboxViewModel = viewModel(
         key = inboxViewModelKey(currentConfig.remoteUri),
@@ -73,12 +79,12 @@ internal fun AppInboxRoute(
             filesDir = filesDir,
             loadTodayHub = loadTodayHub,
             loadTodayHubRow = loadTodayHubRow,
-            activeTodayHubStore = activeTodayHubStore
+            activeTodayHubStore = activeTodayHubStore,
+            todayHubSnapshotStore = todayHubSnapshotStore
         )
     )
 
     val inboxState by inboxViewModel.uiState.collectAsState()
-    val showRefreshIndicator by inboxViewModel.showRefreshIndicator.collectAsState()
     val selectedNoteIds by inboxViewModel.selectedNoteIds.collectAsState()
     val isDeleting by inboxViewModel.isDeleting.collectAsState()
     val deleteError by inboxViewModel.deleteError.collectAsState()
@@ -86,6 +92,9 @@ internal fun AppInboxRoute(
 
     LaunchedEffect(inboxState) {
         onInboxUiStateChanged(inboxState)
+    }
+    LaunchedEffect(todayHubState) {
+        onTodayHubUiStateChanged(todayHubState)
     }
 
     LaunchedEffect(currentRoute) {
@@ -97,13 +106,25 @@ internal fun AppInboxRoute(
         }
     }
 
+    // Re-tapping Home while already on the inbox snaps the Today Hub back to the current week; only
+    // then scroll the list to top. The baseline avoids firing on first composition or on re-entry
+    // (the signal cannot change while the inbox is off-screen, so it always matches the baseline).
+    var lastHandledReselect by remember { mutableIntStateOf(homeReselectSignal) }
+    LaunchedEffect(homeReselectSignal) {
+        if (homeReselectSignal != lastHandledReselect) {
+            lastHandledReselect = homeReselectSignal
+            if (todayHubViewModel.resetToCurrentWeek()) {
+                scrollResetSignal++
+            }
+        }
+    }
+
     InboxScreen(
         state = inboxState,
         todayHubState = todayHubState,
         selectedNoteIds = selectedNoteIds,
         isDeleting = isDeleting,
         deleteError = deleteError,
-        showRefreshIndicator = showRefreshIndicator,
         onRetry = inboxViewModel::refresh,
         onNoteClick = { noteId: NoteId ->
             navController.navigate(AppRoute.note(noteId))
@@ -120,7 +141,8 @@ internal fun AppInboxRoute(
         onAmbiguousWikiLink = { candidates, _ -> ambiguousCandidates = candidates },
         onNoteNotFound = { message -> showNoteNotFoundToast(context, message) },
         onOpenSearch = { navController.navigate(AppRoute.SEARCH) },
-        workspaceRoot = workspaceRoot
+        workspaceRoot = workspaceRoot,
+        scrollToTopSignal = scrollResetSignal
     )
 
     val registry = (todayHubState as? TodayHubUiState.Content)?.registry

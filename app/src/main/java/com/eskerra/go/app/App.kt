@@ -1,10 +1,13 @@
 package com.eskerra.go.app
 
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -16,14 +19,13 @@ import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.WorkspaceConfig
-import com.eskerra.go.core.model.hasSyncWork
 import com.eskerra.go.core.repository.ActiveTodayHubStore
+import com.eskerra.go.core.repository.TodayHubSnapshotStore
 import com.eskerra.go.core.usecase.BuildSafeSyncDiagnostic
 import com.eskerra.go.core.usecase.BuildSyncPreflight
 import com.eskerra.go.core.usecase.ClearRemoteSyncSettings
@@ -42,6 +44,7 @@ import com.eskerra.go.core.usecase.LoadTodayHubRow
 import com.eskerra.go.core.usecase.LoadVaultSettings
 import com.eskerra.go.core.usecase.MaintainVaultSearchIndex
 import com.eskerra.go.core.usecase.ManualSyncNow
+import com.eskerra.go.core.usecase.PrefetchLinkedNotes
 import com.eskerra.go.core.usecase.ReconcileWorkspaceSyncBranch
 import com.eskerra.go.core.usecase.RecordLastSyncAttempt
 import com.eskerra.go.core.usecase.RefreshRemoteSyncStatus
@@ -65,7 +68,7 @@ import com.eskerra.go.feature.podcasts.PodcastsScreen
 import com.eskerra.go.feature.settings.VaultSettingsScreen
 import com.eskerra.go.feature.sync.SyncScreen
 import com.eskerra.go.feature.sync.SyncSettingsScreen
-import com.eskerra.go.feature.sync.SyncUiState
+import com.eskerra.go.feature.todayhub.TodayHubUiState
 import com.eskerra.go.ui.markdown.AmbiguousWikiLinkSheet
 import java.io.File
 
@@ -79,6 +82,7 @@ fun App(
     filesDir: File,
     loadInboxSummaries: LoadInboxSummariesCached,
     loadNoteForReading: LoadNoteForReading,
+    prefetchLinkedNotes: PrefetchLinkedNotes,
     createInboxNote: CreateInboxNote,
     deleteInboxNotes: DeleteInboxNotes,
     loadEditableNote: LoadEditableNote,
@@ -87,6 +91,7 @@ fun App(
     loadTodayHub: LoadTodayHub,
     loadTodayHubRow: LoadTodayHubRow,
     activeTodayHubStore: ActiveTodayHubStore,
+    todayHubSnapshotStore: TodayHubSnapshotStore,
     loadSyncStatus: LoadSyncStatus,
     refreshRemoteSyncStatus: RefreshRemoteSyncStatus,
     buildSyncPreflight: BuildSyncPreflight,
@@ -109,7 +114,8 @@ fun App(
     repairVaultSearchIndex: RepairVaultSearchIndex,
     touchVaultSearchPaths: TouchVaultSearchPaths,
     onConfigUpdated: (WorkspaceConfig) -> Unit,
-    onInboxUiStateChanged: (InboxUiState) -> Unit = {}
+    onInboxUiStateChanged: (InboxUiState) -> Unit = {},
+    onTodayHubUiStateChanged: (TodayHubUiState) -> Unit = {}
 ) {
     var currentConfig by remember(config) { mutableStateOf(config) }
     val workspaceRoot = remember(currentConfig, filesDir) {
@@ -119,6 +125,10 @@ fun App(
     val scope = rememberCoroutineScope()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
+    // Bumped on each Home tap while already on the inbox; the inbox route reacts (it owns the Today
+    // Hub state and decides whether to snap to the current week). A route change can't carry this
+    // because re-tapping Home does not navigate.
+    var homeReselectSignal by remember { mutableIntStateOf(0) }
     val markInboxNotesChanged = {
         navController.markInboxNotesChanged()
     }
@@ -170,40 +180,24 @@ fun App(
     }
 
     val syncIndicator = shellSyncIndicatorState(syncState, remoteConfigured)
-
     AppShell(
         currentRoute = currentRoute,
         syncIndicator = syncIndicator,
-        onSyncClick = {
-            when (val state = syncState) {
-                is SyncUiState.Ready -> when {
-                    !state.status.hasSyncWork -> Unit
-                    state.preflight.canSync -> appSyncViewModel.syncNow()
-                    else -> navController.navigate(AppRoute.SYNC) {
-                        launchSingleTop = true
-                    }
-                }
-                SyncUiState.Loading,
-                is SyncUiState.Syncing,
-                is SyncUiState.Success -> Unit
-                is SyncUiState.Error -> navController.navigate(AppRoute.SYNC) {
-                    launchSingleTop = true
-                }
-            }
-        },
+        onSyncClick = { onShellSyncClick(syncState, appSyncViewModel, navController) },
         onNavigate = { route ->
-            navController.navigate(route) {
-                launchSingleTop = true
-                restoreState = true
-            }
+            navController.navigateTab(currentRoute, route) { homeReselectSignal++ }
         }
     ) { contentModifier ->
         NavHost(
             navController = navController,
             startDestination = AppRoute.INBOX,
-            modifier = contentModifier
+            modifier = contentModifier,
+            enterTransition = { EnterTransition.None },
+            exitTransition = { ExitTransition.None },
+            popEnterTransition = { EnterTransition.None },
+            popExitTransition = { ExitTransition.None }
         ) {
-            composable(AppRoute.INBOX) { entry ->
+            opaqueComposable(AppRoute.INBOX) { entry ->
                 AppInboxRoute(
                     currentConfig = currentConfig,
                     filesDir = filesDir,
@@ -212,17 +206,20 @@ fun App(
                     loadTodayHub = loadTodayHub,
                     loadTodayHubRow = loadTodayHubRow,
                     activeTodayHubStore = activeTodayHubStore,
+                    todayHubSnapshotStore = todayHubSnapshotStore,
                     workspaceRoot = workspaceRoot,
                     currentRoute = currentRoute,
                     entry = entry,
                     navController = navController,
                     appSyncViewModel = appSyncViewModel,
                     touchVaultSearchPaths = touchVaultSearchPaths,
-                    onInboxUiStateChanged = onInboxUiStateChanged
+                    onInboxUiStateChanged = onInboxUiStateChanged,
+                    onTodayHubUiStateChanged = onTodayHubUiStateChanged,
+                    homeReselectSignal = homeReselectSignal
                 )
             }
 
-            composable(AppRoute.CREATE_INBOX) {
+            opaqueComposable(AppRoute.CREATE_INBOX) {
                 val createViewModel: CreateInboxNoteViewModel = viewModel(
                     factory = CreateInboxNoteViewModel.factory(
                         config = currentConfig,
@@ -258,7 +255,7 @@ fun App(
                 )
             }
 
-            composable(AppRoute.SEARCH) {
+            opaqueComposable(AppRoute.SEARCH) {
                 AppSearchRoute(
                     currentConfig = currentConfig,
                     filesDir = filesDir,
@@ -269,11 +266,11 @@ fun App(
                 )
             }
 
-            composable(AppRoute.PODCASTS) {
+            opaqueComposable(AppRoute.PODCASTS) {
                 PodcastsScreen(podcasts = fakePodcasts)
             }
 
-            composable(AppRoute.MENU) {
+            opaqueComposable(AppRoute.MENU) {
                 MenuScreen(
                     items = menuItems,
                     onItemClick = { item ->
@@ -286,7 +283,7 @@ fun App(
                 )
             }
 
-            composable(AppRoute.SYNC) {
+            opaqueComposable(AppRoute.SYNC) {
                 SyncScreen(
                     state = syncState,
                     onSyncNow = appSyncViewModel::syncNow,
@@ -295,7 +292,7 @@ fun App(
                 )
             }
 
-            composable(AppRoute.SETTINGS) {
+            opaqueComposable(AppRoute.SETTINGS) {
                 val vaultSettingsViewModel: VaultSettingsViewModel = viewModel(
                     factory = VaultSettingsViewModel.factory(
                         config = currentConfig,
@@ -321,7 +318,7 @@ fun App(
                 )
             }
 
-            composable(AppRoute.SYNC_SETTINGS) {
+            opaqueComposable(AppRoute.SYNC_SETTINGS) {
                 val settingsViewModel: SyncSettingsViewModel = viewModel(
                     key = currentConfig.syncViewModelKey(),
                     factory = SyncSettingsViewModel.factory(
@@ -350,7 +347,7 @@ fun App(
                 )
             }
 
-            composable(
+            opaqueComposable(
                 route = AppRoute.NOTE_PATTERN,
                 arguments = listOf(
                     navArgument(AppRoute.NOTE_ARG) { type = NavType.StringType }
@@ -363,7 +360,8 @@ fun App(
                         config = currentConfig,
                         filesDir = filesDir,
                         noteId = noteId,
-                        loadNoteForReading = loadNoteForReading
+                        loadNoteForReading = loadNoteForReading,
+                        prefetchLinkedNotes = prefetchLinkedNotes
                     )
                 )
                 val readerState by noteReaderViewModel.uiState.collectAsState()
@@ -411,7 +409,7 @@ fun App(
                 }
             }
 
-            composable(
+            opaqueComposable(
                 route = AppRoute.EDITOR_PATTERN,
                 arguments = listOf(
                     navArgument(AppRoute.EDITOR_ARG) { type = NavType.StringType }

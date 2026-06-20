@@ -90,6 +90,9 @@ class FakeRemoteSyncRepository(
 }
 
 class FakeRegistryRepository : NoteRegistryRepository {
-    override suspend fun refresh(config: WorkspaceConfig, filesDir: File): Result<NoteRegistry> =
-        Result.success(NoteRegistry.fromNotes(emptyList()))
+    override suspend fun refresh(
+        config: WorkspaceConfig,
+        filesDir: File,
+        previousRegistry: NoteRegistry?
+    ): Result<NoteRegistry> = Result.success(NoteRegistry.fromNotes(emptyList()))
 }

@@ -2,6 +2,7 @@ package com.eskerra.go.data.notes
 
 import com.eskerra.go.core.model.NoteIndexError
 import com.eskerra.go.core.model.NoteIndexException
+import com.eskerra.go.core.model.NoteRegistry
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.data.workspace.WorkspacePaths
 import java.io.File
@@ -68,12 +69,48 @@ class FileNoteRegistryRepositoryTest {
     }
 
     @Test
+    fun refresh_passesPreviousRegistryToScanner() = runTest {
+        val filesDir = temp.newFolder("files")
+        val workspaceDir = File(filesDir, WorkspacePaths.DEFAULT_RELATIVE_PATH)
+        workspaceDir.mkdirs()
+        File(workspaceDir, "Inbox").mkdirs()
+        File(workspaceDir, "Inbox/hello.md").writeText("# Hello\n\nBody.")
+
+        val previous = NoteRegistry.fromNotes(
+            listOf(
+                com.eskerra.go.core.model.NoteSummary(
+                    id = com.eskerra.go.core.model.NoteId("Inbox/hello.md"),
+                    title = "Stale",
+                    snippet = "",
+                    isInbox = true
+                )
+            )
+        )
+        var capturedPrevious: NoteRegistry? = null
+        val recordingScanner = object : NoteWorkspaceScanner {
+            override fun scan(
+                workspaceDir: File,
+                previousRegistry: NoteRegistry?
+            ): Result<NoteRegistry> {
+                capturedPrevious = previousRegistry
+                return MarkdownNoteScanner().scan(workspaceDir, previousRegistry)
+            }
+        }
+        val repository = FileNoteRegistryRepository(scanner = recordingScanner)
+
+        repository.refresh(config, filesDir, previous)
+
+        assertEquals(previous, capturedPrevious)
+    }
+
+    @Test
     fun refresh_whenScannerFails_returnsScanFailed() = runTest {
         val filesDir = temp.newFolder("files")
         val workspaceDir = File(filesDir, WorkspacePaths.DEFAULT_RELATIVE_PATH)
         workspaceDir.mkdirs()
-        val failingScanner = NoteWorkspaceScanner {
-            Result.failure(RuntimeException("boom"))
+        val failingScanner = object : NoteWorkspaceScanner {
+            override fun scan(workspaceDir: File, previousRegistry: NoteRegistry?) =
+                Result.failure<NoteRegistry>(RuntimeException("boom"))
         }
         val repository = FileNoteRegistryRepository(scanner = failingScanner)
 

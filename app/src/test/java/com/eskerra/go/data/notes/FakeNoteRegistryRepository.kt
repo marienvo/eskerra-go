@@ -20,6 +20,8 @@ class FakeNoteRegistryRepository(
         private set
     var refreshCount: Int = 0
         private set
+    var lastPreviousRegistry: NoteRegistry? = null
+        private set
 
     fun setResult(result: Result<NoteRegistry>) {
         this.result = result
@@ -29,10 +31,15 @@ class FakeNoteRegistryRepository(
         refreshDelayMs = delayMs
     }
 
-    override suspend fun refresh(config: WorkspaceConfig, filesDir: File): Result<NoteRegistry> {
+    override suspend fun refresh(
+        config: WorkspaceConfig,
+        filesDir: File,
+        previousRegistry: NoteRegistry?
+    ): Result<NoteRegistry> {
         refreshCount += 1
         lastConfig = config
         lastFilesDir = filesDir
+        lastPreviousRegistry = previousRegistry
         if (refreshDelayMs > 0L) {
             delay(refreshDelayMs)
         }

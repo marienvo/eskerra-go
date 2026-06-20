@@ -8,6 +8,7 @@ import com.eskerra.go.data.git.RemoteCallingGitRepository
 import com.eskerra.go.data.notes.FileNoteContentRepository
 import com.eskerra.go.data.notes.FileNoteRegistryRepository
 import com.eskerra.go.data.notes.FileNoteWriteRepository
+import com.eskerra.go.data.notes.NoteRegistryCache
 import com.eskerra.go.data.workspace.WorkspacePaths
 import com.eskerra.go.data.workspace.resolveAppGateState
 import java.io.File
@@ -52,14 +53,14 @@ class OfflineWorkspaceUseCaseTest {
         File(workspaceDir, "Inbox/Offline.md").writeText("# Offline\n\nOriginal")
 
         val gitRepository = RemoteCallingGitRepository()
-        val registryRepository = FileNoteRegistryRepository()
+        val registryCache = NoteRegistryCache(FileNoteRegistryRepository())
         val contentRepository = FileNoteContentRepository()
         val writeRepository = FileNoteWriteRepository(gitRepository)
         val loadGitStatusSummary = LoadGitStatusSummary(gitRepository)
 
-        val inbox = LoadInboxSummaries(registryRepository)
-        val read = LoadNoteForReading(registryRepository, contentRepository)
-        val save = SaveNote(writeRepository, registryRepository, loadGitStatusSummary)
+        val inbox = LoadInboxSummaries(registryCache)
+        val read = LoadNoteForReading(registryCache, contentRepository)
+        val save = SaveNote(writeRepository, registryCache, loadGitStatusSummary)
 
         val noteId = NoteId("Inbox/Offline.md")
         assertTrue(inbox(config, filesDir).isSuccess)

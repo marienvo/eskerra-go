@@ -8,6 +8,7 @@ import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.todayhub.TodayHubFrontmatter
 import com.eskerra.go.data.notes.FakeNoteContentRepository
 import com.eskerra.go.data.notes.FakeNoteRegistryRepository
+import com.eskerra.go.data.notes.NoteRegistryCache
 import com.eskerra.go.data.workspace.WorkspacePaths
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -51,7 +52,7 @@ class LoadTodayHubTest {
     fun returnsNullWhenNoHubs() = runTest {
         val registry = FakeNoteRegistryRepository.withInboxNotes(note("Inbox/a.md"))
         val content = FakeNoteContentRepository.failing(NoteContentError.NotFound)
-        val result = LoadTodayHub(registry, content)(config, filesDir, null)
+        val result = LoadTodayHub(NoteRegistryCache(registry), content)(config, filesDir, null)
         assertTrue(result.isSuccess)
         assertNull(result.getOrThrow())
     }
@@ -66,7 +67,8 @@ class LoadTodayHubTest {
         )
         val content = FakeNoteContentRepository.withContent(NoteId("Daily/Today.md"), hubMarkdown)
 
-        val data = LoadTodayHub(registry, content)(config, filesDir, null).getOrThrow()!!
+        val useCase = LoadTodayHub(NoteRegistryCache(registry), content)
+        val data = useCase(config, filesDir, null).getOrThrow()!!
 
         // First hub by sorted id is Daily/Today.md.
         assertEquals(NoteId("Daily/Today.md"), data.activeHubId)
@@ -88,8 +90,8 @@ class LoadTodayHubTest {
         )
         val content = FakeNoteContentRepository.withContent(NoteId("Work/Today.md"), hubMarkdown)
 
-        val data = LoadTodayHub(registry, content)(config, filesDir, NoteId("Work/Today.md"))
-            .getOrThrow()!!
+        val useCase = LoadTodayHub(NoteRegistryCache(registry), content)
+        val data = useCase(config, filesDir, NoteId("Work/Today.md")).getOrThrow()!!
 
         assertEquals(NoteId("Work/Today.md"), data.activeHubId)
         assertEquals("Work", data.folderLabel)
@@ -99,7 +101,7 @@ class LoadTodayHubTest {
     fun propagatesHubReadFailure() = runTest {
         val registry = FakeNoteRegistryRepository.withInboxNotes(note("Daily/Today.md"))
         val content = FakeNoteContentRepository.failing(NoteContentError.ReadFailed("io"))
-        val result = LoadTodayHub(registry, content)(config, filesDir, null)
+        val result = LoadTodayHub(NoteRegistryCache(registry), content)(config, filesDir, null)
         assertTrue(result.isFailure)
         val error = (result.exceptionOrNull() as NoteContentException).error
         assertTrue(error is NoteContentError.ReadFailed)

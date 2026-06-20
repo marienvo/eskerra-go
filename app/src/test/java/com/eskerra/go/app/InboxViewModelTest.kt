@@ -12,6 +12,7 @@ import com.eskerra.go.data.git.JGitWorkspaceRepository
 import com.eskerra.go.data.notes.FakeInboxSnapshotStore
 import com.eskerra.go.data.notes.FakeNoteRegistryRepository
 import com.eskerra.go.data.notes.FakeNoteWriteRepository
+import com.eskerra.go.data.notes.NoteRegistryCache
 import com.eskerra.go.data.workspace.WorkspacePaths
 import com.eskerra.go.feature.inbox.InboxUiState
 import java.io.File
@@ -109,11 +110,10 @@ class InboxViewModelTest {
         assertEquals(listOf(cachedNote), state.notes)
         assertTrue(state.isRefreshing)
         assertTrue(viewModel.uiState.value !is InboxUiState.Loading)
-        assertFalse(viewModel.showRefreshIndicator.value)
     }
 
     @Test
-    fun backgroundRefresh_showsIndicatorOnlyAfterDebounce() = runTest {
+    fun backgroundRefresh_neverLeavesContentStateForIndicator() = runTest {
         val filesDir = temp.newFolder("files")
         val cachedNote = NoteSummary(
             id = NoteId("Inbox/cached.md"),
@@ -140,15 +140,11 @@ class InboxViewModelTest {
         )
         dispatcher.scheduler.runCurrent()
 
-        assertFalse(viewModel.showRefreshIndicator.value)
-
-        dispatcher.scheduler.advanceTimeBy(InboxViewModel.REFRESH_INDICATOR_DELAY_MS - 1)
+        dispatcher.scheduler.advanceTimeBy(1_000L)
         dispatcher.scheduler.runCurrent()
-        assertFalse(viewModel.showRefreshIndicator.value)
 
-        dispatcher.scheduler.advanceTimeBy(1)
-        dispatcher.scheduler.runCurrent()
-        assertTrue(viewModel.showRefreshIndicator.value)
+        val state = viewModel.uiState.value as InboxUiState.Content
+        assertEquals(listOf(cachedNote), state.notes)
     }
 
     @Test
@@ -224,6 +220,79 @@ class InboxViewModelTest {
 
         assertEquals(InboxUiState.Empty, emptyViewModel.uiState.value)
         assertTrue(failingViewModel.uiState.value is InboxUiState.Error)
+    }
+
+    @Test
+    fun revalidation_withUnchangedNotes_doesNotReplaceNotesList() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(dispatcher)
+
+        val filesDir = temp.newFolder("files")
+        val note = NoteSummary(
+            id = NoteId("Inbox/stable.md"),
+            title = "Stable",
+            snippet = "",
+            isInbox = true
+        )
+        val snapshotStore = FakeInboxSnapshotStore()
+        snapshotStore.save(config, filesDir, listOf(note))
+        val repository = FakeNoteRegistryRepository(
+            result = Result.success(
+                com.eskerra.go.core.model.NoteRegistry.fromNotes(listOf(note))
+            ),
+            refreshDelayMs = 1_000L
+        )
+
+        val viewModel = inboxViewModel(
+            filesDir = filesDir,
+            repository = repository,
+            snapshotStore = snapshotStore
+        )
+        dispatcher.scheduler.runCurrent()
+
+        val initial = viewModel.uiState.value as InboxUiState.Content
+        assertTrue(initial.isRefreshing)
+        val snapshotNotes = initial.notes
+
+        advanceUntilIdle()
+
+        val final = viewModel.uiState.value as InboxUiState.Content
+        assertFalse(final.isRefreshing)
+        // Revalidation returned equal data → notes list reference is preserved, no reflow.
+        assertSame(snapshotNotes, final.notes)
+    }
+
+    @Test
+    fun fastRevalidationWithTrustedSnapshot_staysSilent() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(dispatcher)
+
+        val filesDir = temp.newFolder("files")
+        val note = NoteSummary(
+            id = NoteId("Inbox/cached.md"),
+            title = "Cached",
+            snippet = "",
+            isInbox = true
+        )
+        val repository = FakeNoteRegistryRepository(
+            result = Result.success(
+                com.eskerra.go.core.model.NoteRegistry.fromNotes(listOf(note))
+            ),
+            refreshDelayMs = 0L
+        )
+        val snapshotStore = FakeInboxSnapshotStore()
+        snapshotStore.save(config, filesDir, listOf(note))
+
+        val viewModel = inboxViewModel(
+            filesDir = filesDir,
+            repository = repository,
+            snapshotStore = snapshotStore
+        )
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value as InboxUiState.Content
+        assertEquals(listOf(note), state.notes)
+        assertFalse(state.isRefreshing)
     }
 
     @Test
@@ -305,17 +374,20 @@ class InboxViewModelTest {
         filesDir: File,
         repository: FakeNoteRegistryRepository,
         snapshotStore: FakeInboxSnapshotStore = FakeInboxSnapshotStore()
-    ): InboxViewModel = InboxViewModel(
-        config = config,
-        filesDir = filesDir,
-        loadInboxSummaries = LoadInboxSummariesCached(
-            delegate = LoadInboxSummaries(repository),
-            snapshotStore = snapshotStore
-        ),
-        deleteInboxNotes = DeleteInboxNotes(
-            writeRepository = FakeNoteWriteRepository(),
-            registryRepository = repository,
-            loadGitStatusSummary = LoadGitStatusSummary(JGitWorkspaceRepository())
+    ): InboxViewModel {
+        val cache = NoteRegistryCache(repository)
+        return InboxViewModel(
+            config = config,
+            filesDir = filesDir,
+            loadInboxSummaries = LoadInboxSummariesCached(
+                delegate = LoadInboxSummaries(cache),
+                snapshotStore = snapshotStore
+            ),
+            deleteInboxNotes = DeleteInboxNotes(
+                writeRepository = FakeNoteWriteRepository(),
+                registryCache = cache,
+                loadGitStatusSummary = LoadGitStatusSummary(JGitWorkspaceRepository())
+            )
         )
-    )
+    }
 }

@@ -11,6 +11,7 @@ import com.eskerra.go.data.git.JGitWorkspaceRepository
 import com.eskerra.go.data.notes.FakeNoteContentRepository
 import com.eskerra.go.data.notes.FakeNoteRegistryRepository
 import com.eskerra.go.data.notes.FakeNoteWriteRepository
+import com.eskerra.go.data.notes.NoteRegistryCache
 import com.eskerra.go.data.workspace.WorkspacePaths
 import com.eskerra.go.feature.editor.NoteEditorUiState
 import com.eskerra.go.feature.note.NoteReaderUiState
@@ -136,7 +137,7 @@ class AppNavigationHardeningTest {
         filesDir = temp.newFolder("files"),
         noteId = noteId,
         loadNoteForReading = LoadNoteForReading(
-            FakeNoteRegistryRepository(),
+            NoteRegistryCache(FakeNoteRegistryRepository()),
             FakeNoteContentRepository()
         )
     )
@@ -151,7 +152,7 @@ class AppNavigationHardeningTest {
         ),
         saveNote = SaveNote(
             writeRepository = FakeNoteWriteRepository(),
-            registryRepository = FakeNoteRegistryRepository(),
+            registryCache = NoteRegistryCache(FakeNoteRegistryRepository()),
             loadGitStatusSummary = loadGitStatusSummary()
         ),
         loadGitStatusSummary = loadGitStatusSummary()

@@ -10,7 +10,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -97,15 +96,9 @@ fun NoteScreen(
 
 @Composable
 private fun NoteReaderLoading() {
-    val chrome = LocalShellChromeInsets.current
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(bottom = chrome.bottom, start = 16.dp, end = 16.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        CircularProgressIndicator()
-    }
+    // Neutral background: warm opens complete before first composition so this is never seen;
+    // cold misses show the theme surface color until Content is ready.
+    Box(modifier = Modifier.fillMaxSize())
 }
 
 @Composable

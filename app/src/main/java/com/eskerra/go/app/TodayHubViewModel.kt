@@ -6,12 +6,16 @@ import androidx.lifecycle.viewModelScope
 import com.eskerra.go.core.model.NoteContentError
 import com.eskerra.go.core.model.NoteContentException
 import com.eskerra.go.core.model.NoteId
+import com.eskerra.go.core.model.NoteRegistry
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.ActiveTodayHubStore
+import com.eskerra.go.core.repository.TodayHubSnapshotStore
 import com.eskerra.go.core.todayhub.TodayHubData
+import com.eskerra.go.core.todayhub.TodayHubFrontmatter
 import com.eskerra.go.core.todayhub.TodayHubLabels
 import com.eskerra.go.core.todayhub.TodayHubNavigation
 import com.eskerra.go.core.todayhub.TodayHubRow
+import com.eskerra.go.core.todayhub.TodayHubSnapshot
 import com.eskerra.go.core.todayhub.TodayHubWeeks
 import com.eskerra.go.core.usecase.LoadTodayHub
 import com.eskerra.go.core.usecase.LoadTodayHubRow
@@ -39,6 +43,7 @@ class TodayHubViewModel(
     private val loadTodayHub: LoadTodayHub,
     private val loadTodayHubRow: LoadTodayHubRow,
     private val activeTodayHubStore: ActiveTodayHubStore,
+    private val todayHubSnapshotStore: TodayHubSnapshotStore,
     private val today: () -> LocalDate = { Clock.System.todayIn(TimeZone.currentSystemDefault()) }
 ) : ViewModel() {
 
@@ -57,7 +62,7 @@ class TodayHubViewModel(
     )
 
     init {
-        load(preferredHubId = null, restoreFromStore = true)
+        load(preferredHubId = null, restoreFromStore = true, restoreSnapshotFirst = true)
     }
 
     fun retry() =
@@ -72,6 +77,21 @@ class TodayHubViewModel(
 
     fun nextWeek() = stepWeek(1)
 
+    /**
+     * Resets the selected week back to the current week. Used when the user re-taps Home while
+     * already on the inbox. Returns `true` when it actually changed the week, so the caller can
+     * scroll the list to top only then; `false` when no hub is loaded or already on this week.
+     */
+    fun resetToCurrentWeek(): Boolean {
+        val current = loaded ?: return false
+        val currentStem = TodayHubNavigation.currentWeekStem(today(), current.data.settings.start)
+        if (current.selectedStem == currentStem) return false
+        loaded = current.copy(selectedStem = currentStem)
+        emitContent(rowLoading = false, row = null)
+        loadRow(current.data, currentStem)
+        return true
+    }
+
     private fun stepWeek(delta: Int) {
         val current = loaded ?: return
         val target = TodayHubNavigation.adjacentStem(
@@ -84,10 +104,17 @@ class TodayHubViewModel(
         loadRow(current.data, target)
     }
 
-    private fun load(preferredHubId: NoteId?, restoreFromStore: Boolean) {
+    private fun load(
+        preferredHubId: NoteId?,
+        restoreFromStore: Boolean,
+        restoreSnapshotFirst: Boolean = false
+    ) {
         loadJob?.cancel()
         rowJob?.cancel()
         loadJob = viewModelScope.launch {
+            if (restoreSnapshotFirst) {
+                restoreSnapshot()
+            }
             if (_uiState.value !is TodayHubUiState.Content) {
                 _uiState.value = TodayHubUiState.Loading
             }
@@ -112,21 +139,28 @@ class TodayHubViewModel(
         activeTodayHubStore.persist(data.activeHubId)
         val currentStem = TodayHubNavigation.currentWeekStem(today(), data.settings.start)
         val navigable = TodayHubNavigation.navigableWeekStems(data.availableWeekStems, currentStem)
+        val retainedRow = (_uiState.value as? TodayHubUiState.Content)
+            ?.takeIf { it.activeHubId == data.activeHubId && it.selectedWeekStem == currentStem }
+            ?.row
         loaded = Loaded(data = data, navigableStems = navigable, selectedStem = currentStem)
-        emitContent(rowLoading = false, row = null)
-        loadRow(data, currentStem)
+        emitContent(rowLoading = false, row = retainedRow)
+        loadRow(data, currentStem, showRowLoading = false)
     }
 
     private fun ActiveTodayHubStore.persist(noteId: NoteId) {
         viewModelScope.launch { save(noteId.value) }
     }
 
-    private fun loadRow(data: TodayHubData, stem: String) {
+    private fun loadRow(data: TodayHubData, stem: String, showRowLoading: Boolean = true) {
         rowJob?.cancel()
         rowJob = viewModelScope.launch {
-            val spinner = launch {
-                delay(ROW_NAV_LOADING_DELAY_MS)
-                emitContent(rowLoading = true, row = currentRow())
+            val spinner = if (showRowLoading) {
+                launch {
+                    delay(ROW_NAV_LOADING_DELAY_MS)
+                    emitContent(rowLoading = true, row = currentRow())
+                }
+            } else {
+                null
             }
             val result = loadTodayHubRow(
                 config = config,
@@ -135,10 +169,13 @@ class TodayHubViewModel(
                 weekStartStem = stem,
                 columnCount = data.columnCount
             )
-            spinner.cancel()
+            spinner?.cancel()
             result.fold(
                 onSuccess = { row ->
-                    if (loaded?.selectedStem == stem) emitContent(rowLoading = false, row = row)
+                    if (loaded?.selectedStem == stem) {
+                        emitContent(rowLoading = false, row = row)
+                        saveSnapshotIfCurrentWeek()
+                    }
                 },
                 onFailure = { error ->
                     if (loaded?.selectedStem == stem) {
@@ -152,11 +189,18 @@ class TodayHubViewModel(
     private fun currentRow(): TodayHubRow? = (_uiState.value as? TodayHubUiState.Content)?.row
 
     private fun emitContent(rowLoading: Boolean, row: TodayHubRow?) {
-        val current = loaded ?: return
+        val content = buildContent(rowLoading = rowLoading, row = row) ?: return
+        if (_uiState.value != content) {
+            _uiState.value = content
+        }
+    }
+
+    private fun buildContent(rowLoading: Boolean, row: TodayHubRow?): TodayHubUiState.Content? {
+        val current = loaded ?: return null
         val data = current.data
-        val weekStart = TodayHubWeeks.parseRowStem(current.selectedStem) ?: return
+        val weekStart = TodayHubWeeks.parseRowStem(current.selectedStem) ?: return null
         val progress = TodayHubWeeks.weekProgress(weekStart, today())
-        _uiState.value = TodayHubUiState.Content(
+        return TodayHubUiState.Content(
             hubs = data.hubs,
             activeHubId = data.activeHubId,
             folderLabel = data.folderLabel,
@@ -177,6 +221,61 @@ class TodayHubViewModel(
             row = row,
             rowLoading = rowLoading
         )
+    }
+
+    private suspend fun restoreSnapshot() {
+        val snapshot = todayHubSnapshotStore.read(config, filesDir) ?: return
+        val registry = loadTodayHub.currentRegistry(config, filesDir) ?: return
+        applySnapshot(snapshot, registry)
+    }
+
+    private fun applySnapshot(snapshot: TodayHubSnapshot, registry: NoteRegistry) {
+        val data = TodayHubData(
+            hubs = snapshot.hubs,
+            activeHubId = snapshot.activeHubId,
+            settings = snapshot.settings,
+            introMarkdown = snapshot.introMarkdown,
+            availableWeekStems = snapshot.availableWeekStems,
+            registry = registry
+        )
+        val currentStem = TodayHubNavigation.currentWeekStem(today(), snapshot.settings.start)
+        val navigable = TodayHubNavigation.navigableWeekStems(
+            snapshot.availableWeekStems,
+            currentStem
+        )
+        loaded = Loaded(data = data, navigableStems = navigable, selectedStem = currentStem)
+        emitContent(
+            rowLoading = false,
+            row = snapshot.row?.takeIf { it.weekStartStem == currentStem }
+        )
+    }
+
+    private fun saveSnapshotIfCurrentWeek() {
+        val current = loaded ?: return
+        val content = _uiState.value as? TodayHubUiState.Content ?: return
+        val currentStem = TodayHubNavigation.currentWeekStem(today(), current.data.settings.start)
+        if (content.selectedWeekStem != currentStem) {
+            return
+        }
+        viewModelScope.launch {
+            todayHubSnapshotStore.save(
+                config = config,
+                filesDir = filesDir,
+                snapshot = TodayHubSnapshot(
+                    hubs = content.hubs,
+                    activeHubId = content.activeHubId,
+                    settings = TodayHubFrontmatter.Settings(
+                        perpetualType = current.data.settings.perpetualType,
+                        columns = current.data.settings.columns,
+                        start = current.data.settings.start
+                    ),
+                    introMarkdown = content.introMarkdown,
+                    availableWeekStems = current.data.availableWeekStems,
+                    selectedWeekStem = content.selectedWeekStem,
+                    row = content.row
+                )
+            )
+        }
     }
 
     private fun messageFor(error: Throwable): String {
@@ -205,7 +304,8 @@ class TodayHubViewModel(
             filesDir: File,
             loadTodayHub: LoadTodayHub,
             loadTodayHubRow: LoadTodayHubRow,
-            activeTodayHubStore: ActiveTodayHubStore
+            activeTodayHubStore: ActiveTodayHubStore,
+            todayHubSnapshotStore: TodayHubSnapshotStore
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T = TodayHubViewModel(
@@ -213,7 +313,8 @@ class TodayHubViewModel(
                 filesDir = filesDir,
                 loadTodayHub = loadTodayHub,
                 loadTodayHubRow = loadTodayHubRow,
-                activeTodayHubStore = activeTodayHubStore
+                activeTodayHubStore = activeTodayHubStore,
+                todayHubSnapshotStore = todayHubSnapshotStore
             ) as T
         }
     }

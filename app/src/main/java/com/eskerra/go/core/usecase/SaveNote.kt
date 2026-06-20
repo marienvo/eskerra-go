@@ -9,15 +9,17 @@ import com.eskerra.go.core.model.SaveNoteError
 import com.eskerra.go.core.model.SaveNoteException
 import com.eskerra.go.core.model.SaveNoteResult
 import com.eskerra.go.core.model.WorkspaceConfig
-import com.eskerra.go.core.repository.NoteRegistryRepository
+import com.eskerra.go.core.repository.NoteContentCachePort
+import com.eskerra.go.core.repository.NoteRegistryCachePort
 import com.eskerra.go.core.repository.NoteWriteRepository
 import java.io.File
 
 /** Validates editability, writes markdown, and refreshes registry and Git status. */
 class SaveNote(
     private val writeRepository: NoteWriteRepository,
-    private val registryRepository: NoteRegistryRepository,
-    private val loadGitStatusSummary: LoadGitStatusSummary
+    private val registryCache: NoteRegistryCachePort,
+    private val loadGitStatusSummary: LoadGitStatusSummary,
+    private val contentCache: NoteContentCachePort? = null
 ) {
 
     suspend operator fun invoke(
@@ -30,18 +32,22 @@ class SaveNote(
             return Result.failure(SaveNoteException(SaveNoteError.InvalidNoteId))
         }
 
-        val registryResult = registryRepository.refresh(config, filesDir)
-        if (registryResult.isFailure) {
-            return Result.failure(
-                SaveNoteException(
-                    SaveNoteError.RegistryRefreshFailed(
-                        registryResult.exceptionOrNull()?.message
+        val registry = when (val cached = registryCache.current(config, filesDir)) {
+            null -> {
+                val registryResult = registryCache.refresh(config, filesDir)
+                if (registryResult.isFailure) {
+                    return Result.failure(
+                        SaveNoteException(
+                            SaveNoteError.RegistryRefreshFailed(
+                                registryResult.exceptionOrNull()?.message
+                            )
+                        )
                     )
-                )
-            )
+                }
+                registryResult.getOrThrow()
+            }
+            else -> cached
         }
-
-        val registry = registryResult.getOrThrow()
         val summary = registry.notes.find { it.id == noteId }
             ?: return Result.failure(SaveNoteException(SaveNoteError.NotFound))
 
@@ -53,7 +59,8 @@ class SaveNote(
             return Result.failure(mapWriteFailure(error))
         }
 
-        val refreshedRegistry = registryRepository.refresh(config, filesDir)
+        contentCache?.evict(noteId)
+        val refreshedRegistry = registryCache.refresh(config, filesDir)
         if (refreshedRegistry.isFailure) {
             return Result.failure(
                 SaveNoteException(
