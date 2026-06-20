@@ -2,6 +2,7 @@ package com.eskerra.go.data.notes
 
 import com.eskerra.go.core.markdown.PreparedMarkdown
 import com.eskerra.go.core.markdown.prepareVaultMarkdown
+import com.eskerra.go.core.repository.ParsedMarkdownCachePort
 
 /**
  * Bounded LRU cache of [PreparedMarkdown] keyed by the raw note body, so repeat renders (and
@@ -15,7 +16,7 @@ import com.eskerra.go.core.markdown.prepareVaultMarkdown
 class ParsedMarkdownCache(
     private val maxSize: Int = DEFAULT_SIZE,
     private val prepare: suspend (String) -> PreparedMarkdown = { prepareVaultMarkdown(it) }
-) {
+) : ParsedMarkdownCachePort {
 
     private val lru = object : LinkedHashMap<String, PreparedMarkdown>(maxSize * 2, 0.75f, true) {
         override fun removeEldestEntry(eldest: Map.Entry<String, PreparedMarkdown>): Boolean =
@@ -24,7 +25,7 @@ class ParsedMarkdownCache(
 
     /** Synchronous warm-cache lookup for atomic first-frame rendering; `null` on a miss. */
     @Synchronized
-    fun peek(markdown: String): PreparedMarkdown? = lru[markdown]
+    override fun peek(markdown: String): PreparedMarkdown? = lru[markdown]
 
     /** Returns the prepared body, parsing it (off the main thread) on a cache miss. */
     suspend fun get(markdown: String): PreparedMarkdown {
@@ -35,7 +36,7 @@ class ParsedMarkdownCache(
     }
 
     /** Pre-parses [markdown] into the cache without rendering it (link/note prefetch). */
-    suspend fun warm(markdown: String) {
+    override suspend fun warm(markdown: String) {
         get(markdown)
     }
 

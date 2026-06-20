@@ -1,5 +1,6 @@
 package com.eskerra.go.core.usecase
 
+import com.eskerra.go.core.markdown.PreparedMarkdown
 import com.eskerra.go.core.model.NoteContent
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NotePath
@@ -8,7 +9,9 @@ import com.eskerra.go.core.model.NoteRegistry
 import com.eskerra.go.core.model.NoteSummary
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.NoteContentRepository
+import com.eskerra.go.core.repository.ParsedMarkdownCachePort
 import com.eskerra.go.data.notes.NoteContentCache
+import com.eskerra.go.data.notes.ParsedMarkdownCache
 import java.io.File
 import kotlin.math.max
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -19,6 +22,7 @@ import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -41,9 +45,9 @@ class PrefetchLinkedNotesTest {
         val t1 = note("Notes/T1.md", "T1")
         val t2 = note("Notes/T2.md", "T2")
         val repo = RecordingContentRepository()
-        val useCase = PrefetchLinkedNotes(
+        val useCase = prefetchUseCase(
             contentCache = NoteContentCache(repo),
-            dispatcher = StandardTestDispatcher(testScheduler)
+            testScheduler = testScheduler
         )
 
         useCase(config, filesDir, document("[[T1]] and [[T2]]", source, t1, t2))
@@ -55,25 +59,28 @@ class PrefetchLinkedNotesTest {
     @Test
     fun emptyTargets_doesNothing() = runTest {
         val repo = RecordingContentRepository()
-        val useCase = PrefetchLinkedNotes(
+        val parsed = RecordingParsedMarkdownCache()
+        val useCase = prefetchUseCase(
             contentCache = NoteContentCache(repo),
-            dispatcher = StandardTestDispatcher(testScheduler)
+            parsedMarkdownCache = parsed,
+            testScheduler = testScheduler
         )
 
         useCase(config, filesDir, document("No links here.", source))
         advanceUntilIdle()
 
         assertTrue(repo.started.isEmpty())
+        assertTrue(parsed.warmed.isEmpty())
     }
 
     @Test
     fun boundsConcurrency() = runTest {
         val targets = (1..5).map { note("Notes/T$it.md", "T$it") }
         val repo = RecordingContentRepository(delayMs = 50L)
-        val useCase = PrefetchLinkedNotes(
+        val useCase = prefetchUseCase(
             contentCache = NoteContentCache(repo),
             maxConcurrency = 2,
-            dispatcher = StandardTestDispatcher(testScheduler)
+            testScheduler = testScheduler
         )
         val markdown = targets.joinToString(" ") { "[[${it.title}]]" }
 
@@ -88,10 +95,10 @@ class PrefetchLinkedNotesTest {
     fun cancellation_stopsRemainingPrefetch() = runTest {
         val targets = (1..4).map { note("Notes/T$it.md", "T$it") }
         val repo = RecordingContentRepository(delayMs = 100L)
-        val useCase = PrefetchLinkedNotes(
+        val useCase = prefetchUseCase(
             contentCache = NoteContentCache(repo),
             maxConcurrency = 1,
-            dispatcher = StandardTestDispatcher(testScheduler)
+            testScheduler = testScheduler
         )
         val markdown = targets.joinToString(" ") { "[[${it.title}]]" }
 
@@ -110,10 +117,7 @@ class PrefetchLinkedNotesTest {
         val target = note("Notes/Target.md", "Target")
         val repo = RecordingContentRepository()
         val cache = NoteContentCache(repo)
-        val useCase = PrefetchLinkedNotes(
-            contentCache = cache,
-            dispatcher = StandardTestDispatcher(testScheduler)
-        )
+        val useCase = prefetchUseCase(contentCache = cache, testScheduler = testScheduler)
 
         useCase(config, filesDir, document("[[Target]]", source, target))
         advanceUntilIdle()
@@ -122,6 +126,45 @@ class PrefetchLinkedNotesTest {
         // A later open of the prefetched note hits the warm cache; the delegate is not called again.
         cache.load(config, filesDir, target.id)
         assertEquals(1, repo.started.size)
+    }
+
+    @Test
+    fun warmsParsedCacheForInstantSubsequentRender() = runTest {
+        val target = note("Notes/Target.md", "Target")
+        val repo = RecordingContentRepository()
+        val parseCounter = CountingPrepare()
+        val parsedCache = ParsedMarkdownCache(prepare = parseCounter.prepare)
+        val useCase = prefetchUseCase(
+            contentCache = NoteContentCache(repo),
+            parsedMarkdownCache = parsedCache,
+            testScheduler = testScheduler
+        )
+
+        useCase(config, filesDir, document("[[Target]]", source, target))
+        advanceUntilIdle()
+
+        val body = "body:${target.id.value}"
+        assertEquals(1, parseCounter.callCount)
+        assertNotNull(parsedCache.peek(body))
+
+        parsedCache.get(body)
+        assertEquals(1, parseCounter.callCount)
+    }
+
+    private fun prefetchUseCase(
+        contentCache: NoteContentCache,
+        parsedMarkdownCache: ParsedMarkdownCachePort = RecordingParsedMarkdownCache(),
+        maxConcurrency: Int = PrefetchLinkedNotes.DEFAULT_CONCURRENCY,
+        testScheduler: kotlinx.coroutines.test.TestCoroutineScheduler
+    ): PrefetchLinkedNotes {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        return PrefetchLinkedNotes(
+            contentCache = contentCache,
+            parsedMarkdownCache = parsedMarkdownCache,
+            maxConcurrency = maxConcurrency,
+            contentDispatcher = dispatcher,
+            parseDispatcher = dispatcher
+        )
     }
 
     private fun note(path: String, title: String) =
@@ -138,6 +181,26 @@ class PrefetchLinkedNotesTest {
             content = NoteContent(source.id, path, markdown),
             registry = NoteRegistry.fromNotes(listOf(source) + others)
         )
+    }
+
+    private class CountingPrepare {
+        var callCount = 0
+            private set
+
+        val prepare: suspend (String) -> PreparedMarkdown = {
+            callCount++
+            PreparedMarkdown(emptyList())
+        }
+    }
+
+    private class RecordingParsedMarkdownCache : ParsedMarkdownCachePort {
+        val warmed = mutableListOf<String>()
+
+        override fun peek(markdown: String): PreparedMarkdown? = null
+
+        override suspend fun warm(markdown: String) {
+            warmed += markdown
+        }
     }
 
     private class RecordingContentRepository(private val delayMs: Long = 0L) :

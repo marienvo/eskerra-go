@@ -55,6 +55,7 @@ import com.eskerra.go.data.notes.FileNoteRegistrySnapshotStore
 import com.eskerra.go.data.notes.FileNoteWriteRepository
 import com.eskerra.go.data.notes.NoteContentCache
 import com.eskerra.go.data.notes.NoteRegistryCache
+import com.eskerra.go.data.notes.ParsedMarkdownCache
 import com.eskerra.go.data.search.SqliteVaultSearchRepository
 import com.eskerra.go.data.todayhub.DataStoreActiveTodayHubStore
 import com.eskerra.go.data.todayhub.FileTodayHubSnapshotStore
@@ -93,6 +94,7 @@ class MainActivity : ComponentActivity() {
         val fileNoteRegistryRepository = FileNoteRegistryRepository()
         val noteRegistryRepository = CoalescingNoteRegistryRepository(fileNoteRegistryRepository)
         val noteContentCache = NoteContentCache(FileNoteContentRepository())
+        val parsedMarkdownCache = ParsedMarkdownCache()
         val noteWriteRepository = FileNoteWriteRepository(gitRepository)
         val loadGitStatusSummary = LoadGitStatusSummary(gitRepository)
 
@@ -109,7 +111,10 @@ class MainActivity : ComponentActivity() {
             registryCache = noteRegistryCache,
             contentRepository = noteContentCache
         )
-        val prefetchLinkedNotes = PrefetchLinkedNotes(contentCache = noteContentCache)
+        val prefetchLinkedNotes = PrefetchLinkedNotes(
+            contentCache = noteContentCache,
+            parsedMarkdownCache = parsedMarkdownCache
+        )
         val createInboxNote = CreateInboxNote(
             writeRepository = noteWriteRepository,
             registryCache = noteRegistryCache,
@@ -203,6 +208,7 @@ class MainActivity : ComponentActivity() {
                 bootCacheStore = bootCacheStore,
                 setupCompletion = setupCompletion,
                 filesDir = filesDir,
+                parsedMarkdownCache = parsedMarkdownCache,
                 loadInboxSummaries = loadInboxSummaries,
                 loadNoteForReading = loadNoteForReading,
                 prefetchLinkedNotes = prefetchLinkedNotes,

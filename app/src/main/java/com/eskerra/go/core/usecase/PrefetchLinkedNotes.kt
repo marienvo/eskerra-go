@@ -4,6 +4,7 @@ import com.eskerra.go.core.markdown.PrefetchLinkTargets
 import com.eskerra.go.core.model.NoteReaderDocument
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.NoteContentCachePort
+import com.eskerra.go.core.repository.ParsedMarkdownCachePort
 import java.io.File
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -16,22 +17,28 @@ import kotlinx.coroutines.withContext
 
 /**
  * Warms the content cache with the notes linked from the open note, so a wiki-link tap reads
- * from memory instead of disk. The registry is already cached, so resolution is in-memory; only the
- * link targets' content is read.
+ * from memory instead of disk. Also pre-parses each target body into the parsed-markdown cache
+ * used by [com.eskerra.go.ui.markdown.VaultMarkdownView], so a warm link open paints atomically.
+ *
+ * The registry is already cached, so resolution is in-memory; only the link targets' content is
+ * read, then parsed.
  *
  * - **Lifecycle / cancel:** runs inside the caller's coroutine (the reader ViewModel scope).
  *   Cancelling that scope — e.g. when the reader is disposed or the user navigates on — cancels
  *   every in-flight prefetch through structured concurrency ([coroutineScope] + [withContext]).
- * - **Off the main thread:** all reads run on [dispatcher] (IO).
- * - **Bounded concurrency:** at most [maxConcurrency] reads run at once, so a densely linked note
- *   cannot flood the IO pool or starve a real on-tap load.
+ * - **Off the main thread:** content reads run on [contentDispatcher] (IO); parsing runs on
+ *   [parseDispatcher] (Default).
+ * - **Bounded concurrency:** at most [maxConcurrency] targets are processed at once, so a densely
+ *   linked note cannot flood the IO pool or starve a real on-tap load.
  * - **Best effort:** per-target failures are ignored (`load` returns a `Result`); a missing or
  *   locked file must never surface in the reader.
  */
 class PrefetchLinkedNotes(
     private val contentCache: NoteContentCachePort,
+    private val parsedMarkdownCache: ParsedMarkdownCachePort,
     private val maxConcurrency: Int = DEFAULT_CONCURRENCY,
-    private val dispatcher: CoroutineDispatcher = Dispatchers.IO
+    private val contentDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val parseDispatcher: CoroutineDispatcher = Dispatchers.Default
 ) {
 
     suspend operator fun invoke(
@@ -46,13 +53,17 @@ class PrefetchLinkedNotes(
         )
         if (targets.isEmpty()) return
 
-        withContext(dispatcher) {
+        withContext(contentDispatcher) {
             val gate = Semaphore(maxConcurrency)
             coroutineScope {
                 targets.map { noteId ->
                     async {
                         gate.withPermit {
-                            contentCache.load(config, filesDir, noteId)
+                            val content = contentCache.load(config, filesDir, noteId).getOrNull()
+                                ?: return@withPermit
+                            withContext(parseDispatcher) {
+                                parsedMarkdownCache.warm(content.markdown)
+                            }
                         }
                     }
                 }.awaitAll()
