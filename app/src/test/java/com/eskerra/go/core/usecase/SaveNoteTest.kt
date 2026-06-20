@@ -122,7 +122,7 @@ class SaveNoteTest {
     }
 
     @Test
-    fun saveRefreshesRegistryTwice() = runTest {
+    fun saveRefreshesRegistryOnceWhenCacheWarm() = runTest {
         val filesDir = temp.newFolder("files")
         val workspaceDir = gitWorkspace(filesDir)
         File(workspaceDir, "Inbox").mkdirs()
@@ -132,15 +132,20 @@ class SaveNoteTest {
         val registry = FakeNoteRegistryRepository.withInboxNotes(
             NoteSummary(noteId, "First", "", isInbox = true)
         )
+        val cache = NoteRegistryCache(registry)
+        cache.refresh(config, filesDir)
+        assertEquals(1, registry.refreshCount)
+
         val useCase = SaveNote(
             writeRepository = FileNoteWriteRepository(JGitWorkspaceRepository()),
-            registryCache = NoteRegistryCache(registry),
+            registryCache = cache,
             loadGitStatusSummary = LoadGitStatusSummary(JGitWorkspaceRepository())
         )
 
         useCase(config, filesDir, noteId, "# First\n\nSaved")
 
         assertEquals(2, registry.refreshCount)
+        assertTrue(registry.lastPreviousRegistry != null)
     }
 
     @Test

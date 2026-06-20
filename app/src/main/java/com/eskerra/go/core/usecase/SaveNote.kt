@@ -32,18 +32,22 @@ class SaveNote(
             return Result.failure(SaveNoteException(SaveNoteError.InvalidNoteId))
         }
 
-        val registryResult = registryCache.refresh(config, filesDir)
-        if (registryResult.isFailure) {
-            return Result.failure(
-                SaveNoteException(
-                    SaveNoteError.RegistryRefreshFailed(
-                        registryResult.exceptionOrNull()?.message
+        val registry = when (val cached = registryCache.current(config, filesDir)) {
+            null -> {
+                val registryResult = registryCache.refresh(config, filesDir)
+                if (registryResult.isFailure) {
+                    return Result.failure(
+                        SaveNoteException(
+                            SaveNoteError.RegistryRefreshFailed(
+                                registryResult.exceptionOrNull()?.message
+                            )
+                        )
                     )
-                )
-            )
+                }
+                registryResult.getOrThrow()
+            }
+            else -> cached
         }
-
-        val registry = registryResult.getOrThrow()
         val summary = registry.notes.find { it.id == noteId }
             ?: return Result.failure(SaveNoteException(SaveNoteError.NotFound))
 
@@ -56,7 +60,6 @@ class SaveNote(
         }
 
         contentCache?.evict(noteId)
-        registryCache.invalidate(config, filesDir)
         val refreshedRegistry = registryCache.refresh(config, filesDir)
         if (refreshedRegistry.isFailure) {
             return Result.failure(

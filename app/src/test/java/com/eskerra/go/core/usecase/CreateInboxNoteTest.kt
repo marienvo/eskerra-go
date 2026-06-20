@@ -116,10 +116,13 @@ class CreateInboxNoteTest {
         val filesDir = temp.newFolder("files")
         gitWorkspace(filesDir)
         val registry = FakeNoteRegistryRepository()
+        val cache = NoteRegistryCache(registry)
+        cache.refresh(config, filesDir)
+        assertEquals(1, registry.refreshCount)
         val writeRepository = FakeNoteWriteRepository()
         val useCase = CreateInboxNote(
             writeRepository = writeRepository,
-            registryCache = NoteRegistryCache(registry),
+            registryCache = cache,
             loadGitStatusSummary = LoadGitStatusSummary(JGitWorkspaceRepository())
         )
 
@@ -141,7 +144,8 @@ class CreateInboxNoteTest {
 
         useCase(config, filesDir, "Mijn idee")
 
-        assertEquals(1, registry.refreshCount)
+        assertEquals(2, registry.refreshCount)
+        assertTrue(registry.lastPreviousRegistry != null)
     }
 
     @Test

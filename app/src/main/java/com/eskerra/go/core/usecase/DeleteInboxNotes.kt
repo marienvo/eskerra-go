@@ -55,7 +55,6 @@ class DeleteInboxNotes(
             }
         }
 
-        registryCache.invalidate(config, filesDir)
         val registryResult = registryCache.refresh(config, filesDir)
         if (registryResult.isFailure) {
             return Result.failure(

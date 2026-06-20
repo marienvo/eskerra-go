@@ -79,6 +79,28 @@ class DeleteInboxNotesTest {
     }
 
     @Test
+    fun deleteRefreshesRegistryOnceWhenCacheWarm() = runTest {
+        val filesDir = temp.newFolder("files")
+        gitWorkspace(filesDir)
+        val note = summary(NoteId("Inbox/delete-me.md"))
+        val registry = FakeNoteRegistryRepository.withInboxNotes(note)
+        val cache = NoteRegistryCache(registry)
+        cache.refresh(config, filesDir)
+        assertEquals(1, registry.refreshCount)
+
+        val useCase = DeleteInboxNotes(
+            writeRepository = FakeNoteWriteRepository(),
+            registryCache = cache,
+            loadGitStatusSummary = LoadGitStatusSummary(JGitWorkspaceRepository())
+        )
+
+        useCase(config, filesDir, listOf(note.id), listOf(note))
+
+        assertEquals(2, registry.refreshCount)
+        assertTrue(registry.lastPreviousRegistry != null)
+    }
+
+    @Test
     fun rejectsNonInboxPath() = runTest {
         val filesDir = temp.newFolder("files")
         gitWorkspace(filesDir)
