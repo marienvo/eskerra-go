@@ -19,6 +19,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.eskerra.go.core.repository.ActiveTodayHubStore
 import com.eskerra.go.core.repository.BootCacheStore
+import com.eskerra.go.core.repository.PodcastCatalogSnapshotStore
 import com.eskerra.go.core.repository.PodcastPlayerDriver
 import com.eskerra.go.core.repository.TodayHubSnapshotStore
 import com.eskerra.go.core.usecase.BuildSafeSyncDiagnostic
@@ -116,6 +117,7 @@ fun AppRoot(
     loadPodcastArtwork: LoadPodcastArtwork,
     podcastPlayerDriver: PodcastPlayerDriver,
     syncPodcastVaultRefresh: SyncPodcastVaultRefresh,
+    catalogSnapshotStore: PodcastCatalogSnapshotStore,
     onLaunchSettled: () -> Unit = {}
 ) {
     EskerraGoTheme(darkTheme = true) {
@@ -223,6 +225,7 @@ fun AppRoot(
                         loadPodcastArtwork = loadPodcastArtwork,
                         podcastPlayerDriver = podcastPlayerDriver,
                         syncPodcastVaultRefresh = syncPodcastVaultRefresh,
+                        catalogSnapshotStore = catalogSnapshotStore,
                         onConfigUpdated = gateViewModel::updateReadyConfig,
                         onInboxUiStateChanged = { inboxUiState = it },
                         onTodayHubUiStateChanged = { todayHubUiState = it }

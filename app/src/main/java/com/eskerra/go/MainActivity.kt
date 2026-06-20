@@ -70,6 +70,7 @@ import com.eskerra.go.data.notes.NoteRegistryCache
 import com.eskerra.go.data.notes.ParsedMarkdownCache
 import com.eskerra.go.data.player.Media3PodcastPlayerDriver
 import com.eskerra.go.data.podcast.FilePodcastCatalogRepository
+import com.eskerra.go.data.podcast.FilePodcastCatalogSnapshotStore
 import com.eskerra.go.data.podcast.FilePodcastFileRepository
 import com.eskerra.go.data.podcast.artwork.FilePodcastArtworkRepository
 import com.eskerra.go.data.podcast.rss.FilePodcastRssVaultSync
@@ -231,6 +232,7 @@ class MainActivity : ComponentActivity() {
         val touchVaultSearchPaths = TouchVaultSearchPaths(vaultSearchRepository)
 
         val loadPodcastCatalog = LoadPodcastCatalog(FilePodcastCatalogRepository())
+        val catalogSnapshotStore = FilePodcastCatalogSnapshotStore()
         val syncMarkPlayedChange = SyncPodcastChange(
             remoteSyncRepository = remoteSyncRepository,
             credentialStore = credentialStore,
@@ -339,6 +341,7 @@ class MainActivity : ComponentActivity() {
                 loadPodcastArtwork = loadPodcastArtwork,
                 podcastPlayerDriver = podcastPlayerDriver,
                 syncPodcastVaultRefresh = syncPodcastVaultRefresh,
+                catalogSnapshotStore = catalogSnapshotStore,
                 onLaunchSettled = {
                     if (keepSplashOnScreen) {
                         keepSplashOnScreen = false

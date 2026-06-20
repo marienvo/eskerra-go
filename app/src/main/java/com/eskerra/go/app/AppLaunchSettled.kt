@@ -14,6 +14,13 @@ internal const val MIN_SPLASH_HOLD_MS = 150L
  *
  * For [AppGateState.Ready], both [inboxUiState] and [todayHubUiState] must be non-null and
  * non-Loading so the splash is held until the first meaningful frame of the home screen.
+ *
+ * Bootstrap timing (spec §6.2): the podcast warm-start preload
+ * ([com.eskerra.go.core.repository.PodcastCatalogSnapshotStore.read]) deliberately does **not**
+ * participate in launch settlement. Episodes is a non-home tab, and phase-1 work must not block
+ * first render of unrelated tabs; the snapshot is painted lazily by `PodcastsViewModel` when the
+ * Episodes tab mounts (which happens at gate Ready), so warm start is coupled to gate timing
+ * without holding the splash.
  */
 internal fun isLaunchSettled(
     gateState: AppGateState,

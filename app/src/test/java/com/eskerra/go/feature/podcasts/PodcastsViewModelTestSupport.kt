@@ -207,6 +207,12 @@ internal class FakePodcastPlayerDriver : PodcastPlayerDriver {
         )
     }
 
+    override fun seekTo(positionMs: Long) {
+        mutableState.value = mutableState.value.copy(
+            positionMs = positionMs.coerceAtLeast(0L)
+        )
+    }
+
     override fun release() = Unit
 
     fun emit(state: PodcastPlaybackState) {

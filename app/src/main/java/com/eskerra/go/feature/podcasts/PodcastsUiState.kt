@@ -8,7 +8,10 @@ sealed interface PodcastsUiState {
 
     data class Content(
         val sections: List<PodcastSection>,
-        val playerState: PodcastPlaybackState = PodcastPlaybackState()
+        val playerState: PodcastPlaybackState = PodcastPlaybackState(),
+        val selectedEpisodeIds: Set<String> = emptySet(),
+        val markInFlight: Boolean = false,
+        val markError: String? = null
     ) : PodcastsUiState
 
     data object Empty : PodcastsUiState

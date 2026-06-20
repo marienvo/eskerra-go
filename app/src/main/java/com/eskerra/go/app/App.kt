@@ -25,6 +25,7 @@ import androidx.navigation.navArgument
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.ActiveTodayHubStore
+import com.eskerra.go.core.repository.PodcastCatalogSnapshotStore
 import com.eskerra.go.core.repository.PodcastPlayerDriver
 import com.eskerra.go.core.repository.TodayHubSnapshotStore
 import com.eskerra.go.core.usecase.BuildSafeSyncDiagnostic
@@ -123,6 +124,7 @@ fun App(
     loadPodcastArtwork: LoadPodcastArtwork,
     podcastPlayerDriver: PodcastPlayerDriver,
     syncPodcastVaultRefresh: SyncPodcastVaultRefresh,
+    catalogSnapshotStore: PodcastCatalogSnapshotStore,
     onConfigUpdated: (WorkspaceConfig) -> Unit,
     onInboxUiStateChanged: (InboxUiState) -> Unit = {},
     onTodayHubUiStateChanged: (TodayHubUiState) -> Unit = {}
@@ -197,9 +199,20 @@ fun App(
     }
 
     val syncIndicator = shellSyncIndicatorState(syncState, remoteConfigured)
+    val podcastShellBridge = remember { PodcastShellBridge() }
+    val miniPlayerMount = rememberAppShellMiniPlayerMount(
+        currentConfig = currentConfig,
+        filesDir = filesDir,
+        loadPodcastArtwork = loadPodcastArtwork,
+        markPodcastEpisodesPlayed = markPodcastEpisodesPlayed,
+        podcastPlayerDriver = podcastPlayerDriver,
+        bridge = podcastShellBridge
+    )
     AppShell(
         currentRoute = currentRoute,
         syncIndicator = syncIndicator,
+        miniPlayerVisible = miniPlayerMount.visible,
+        miniPlayer = miniPlayerMount.content,
         onSyncClick = { onShellSyncClick(syncState, appSyncViewModel, navController) },
         onNavigate = { route ->
             navController.navigateTab(currentRoute, route) { homeReselectSignal++ }
@@ -293,6 +306,8 @@ fun App(
                     loadPodcastArtwork = loadPodcastArtwork,
                     podcastPlayerDriver = podcastPlayerDriver,
                     syncPodcastVaultRefresh = syncPodcastVaultRefresh,
+                    catalogSnapshotStore = catalogSnapshotStore,
+                    podcastShellBridge = podcastShellBridge,
                     playlistPollingHost = playlistPollingHost
                 )
             }

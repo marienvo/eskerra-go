@@ -14,6 +14,7 @@ import com.eskerra.go.core.model.PodcastPlaybackState
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.playlist.resolvePodcastPlaylistHydration
 import com.eskerra.go.core.playlist.shouldClearPlaylistForCatalog
+import com.eskerra.go.core.repository.PodcastCatalogSnapshotStore
 import com.eskerra.go.core.repository.PodcastPlayerDriver
 import com.eskerra.go.core.usecase.LoadPodcastArtwork
 import com.eskerra.go.core.usecase.LoadPodcastCatalog
@@ -37,7 +38,9 @@ class PodcastsViewModel(
     private val podcastPlaylistSync: PodcastPlaylistSync,
     private val podcastPlayerDriver: PodcastPlayerDriver,
     private val syncPodcastVaultRefresh: SyncPodcastVaultRefresh,
-    private val loadPodcastArtwork: LoadPodcastArtwork
+    private val loadPodcastArtwork: LoadPodcastArtwork,
+    private val catalogSnapshotStore: PodcastCatalogSnapshotStore? = null,
+    private val onExitMiniPlayerArtworkMode: () -> Unit = {}
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<PodcastsUiState>(PodcastsUiState.Loading)
@@ -60,7 +63,20 @@ class PodcastsViewModel(
     private var userActionInFlight = false
     private var lastObservedPlaylistGeneration = 0
 
+    private val selectionController = PodcastsSelectionController(
+        scope = viewModelScope,
+        readContent = { _uiState.value as? PodcastsUiState.Content },
+        updateContent = { _uiState.value = it },
+        onExitMiniPlayerArtworkMode = onExitMiniPlayerArtworkMode,
+        markEpisodes = { episodes -> markPodcastEpisodesPlayed(config, filesDir, episodes) },
+        onMarkedUpdated = {
+            clearRemotePlaylist()
+            reloadCatalog()
+        }
+    )
+
     init {
+        warmStartFromSnapshot()
         refresh()
         viewModelScope.launch {
             podcastPlayerDriver.state.collect { playerState ->
@@ -68,6 +84,27 @@ class PodcastsViewModel(
                 handlePlaylistSideEffects(playerState)
                 autoMarkNearEndOrEnded(playerState)
             }
+        }
+    }
+
+    /**
+     * Warm start: paint the persisted catalog snapshot before the full reload
+     * finishes so Episodes shows cached sections instead of a spinner (spec §6.2).
+     * Only applies while still [PodcastsUiState.Loading], so it never clobbers an
+     * already-resolved fresh reload or error.
+     */
+    private fun warmStartFromSnapshot() {
+        val store = catalogSnapshotStore ?: return
+        viewModelScope.launch {
+            val snapshot = store.read(config, filesDir) ?: return@launch
+            if (_uiState.value !is PodcastsUiState.Loading) return@launch
+            val playerState = podcastPlayerDriver.state.value
+            if (snapshot.sections.isEmpty() && !playerState.hasActiveEpisode) return@launch
+            lastCatalog = snapshot
+            _uiState.value = PodcastsUiState.Content(
+                sections = snapshot.sections,
+                playerState = playerState
+            )
         }
     }
 
@@ -105,14 +142,19 @@ class PodcastsViewModel(
                 restorePlaylistOnceIfNeeded(catalog)
                 val playerState = podcastPlayerDriver.state.value
                 val shouldShowEmpty = catalog.sections.isEmpty() && !playerState.hasActiveEpisode
+                val previous = _uiState.value as? PodcastsUiState.Content
                 _uiState.value = if (shouldShowEmpty) {
                     PodcastsUiState.Empty
                 } else {
                     PodcastsUiState.Content(
                         sections = catalog.sections,
-                        playerState = playerState
+                        playerState = playerState,
+                        selectedEpisodeIds = previous?.selectedEpisodeIds.orEmpty(),
+                        markInFlight = false,
+                        markError = null
                     )
                 }
+                catalogSnapshotStore?.save(config, filesDir, catalog)
                 viewModelScope.launch {
                     loadPodcastArtwork.primeForCatalog(config, filesDir, catalog)
                 }
@@ -130,12 +172,26 @@ class PodcastsViewModel(
     }
 
     fun onEpisodeClick(episode: PodcastEpisode) {
-        val current = podcastPlayerDriver.state.value
-        if (current.isPlaying && current.isActiveEpisode(episode)) return
+        val current = _uiState.value as? PodcastsUiState.Content ?: return
+        if (current.selectedEpisodeIds.isNotEmpty() || current.markInFlight) return
+        val playback = podcastPlayerDriver.state.value
+        if (playback.isPlaying && playback.isActiveEpisode(episode)) return
         launchUserAction {
             podcastPlayerDriver.play(episode, startPositionForEpisode(episode))
             queuePersist(podcastPlayerDriver.state.value)
         }
+    }
+
+    fun onEpisodeArtworkClick(episode: PodcastEpisode) {
+        selectionController.onArtworkClick(episode)
+    }
+
+    fun clearSelection() {
+        selectionController.clear()
+    }
+
+    fun markSelectedEpisodes() {
+        selectionController.markSelected()
     }
 
     fun pausePlayback() = launchUserAction {
@@ -180,6 +236,11 @@ class PodcastsViewModel(
 
     fun seekBy(deltaMs: Long) {
         podcastPlayerDriver.seekBy(deltaMs)
+        queuePersist(podcastPlayerDriver.state.value)
+    }
+
+    fun seekTo(positionMs: Long) {
+        podcastPlayerDriver.seekTo(positionMs)
         queuePersist(podcastPlayerDriver.state.value)
     }
 
@@ -321,6 +382,13 @@ class PodcastsViewModel(
         return if (entry.episodeId == episode.id) entry.positionMs.coerceAtLeast(0L) else 0L
     }
 
+    private fun updateContent(block: (PodcastsUiState.Content) -> PodcastsUiState.Content) {
+        val current = _uiState.value
+        if (current is PodcastsUiState.Content) {
+            _uiState.value = block(current)
+        }
+    }
+
     private fun updatePlayerState(playerState: PodcastPlaybackState) {
         val current = _uiState.value
         if (current is PodcastsUiState.Content) {
@@ -367,6 +435,7 @@ class PodcastsViewModel(
         const val WORKSPACE_MISSING_MESSAGE = "Workspace files are missing."
         const val LOAD_ERROR_MESSAGE = "Could not load podcast episodes."
         const val REFRESH_ERROR_MESSAGE = "Could not refresh podcast episodes."
+        const val MARK_SELECTED_ERROR_MESSAGE = "Could not archive selected episodes."
 
         fun factory(
             config: WorkspaceConfig,
@@ -376,7 +445,9 @@ class PodcastsViewModel(
             podcastPlaylistSync: PodcastPlaylistSync,
             podcastPlayerDriver: PodcastPlayerDriver,
             syncPodcastVaultRefresh: SyncPodcastVaultRefresh,
-            loadPodcastArtwork: LoadPodcastArtwork
+            loadPodcastArtwork: LoadPodcastArtwork,
+            catalogSnapshotStore: PodcastCatalogSnapshotStore? = null,
+            onExitMiniPlayerArtworkMode: () -> Unit = {}
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T = PodcastsViewModel(
@@ -387,7 +458,9 @@ class PodcastsViewModel(
                 podcastPlaylistSync,
                 podcastPlayerDriver,
                 syncPodcastVaultRefresh,
-                loadPodcastArtwork
+                loadPodcastArtwork,
+                catalogSnapshotStore,
+                onExitMiniPlayerArtworkMode
             ) as T
         }
     }

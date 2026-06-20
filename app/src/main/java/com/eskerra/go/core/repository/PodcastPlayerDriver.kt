@@ -19,5 +19,7 @@ interface PodcastPlayerDriver {
 
     fun seekBy(deltaMs: Long)
 
+    fun seekTo(positionMs: Long)
+
     fun release()
 }

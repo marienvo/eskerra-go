@@ -123,6 +123,13 @@ class Media3PodcastPlayerDriver(context: Context) : PodcastPlayerDriver {
         }
     }
 
+    override fun seekTo(positionMs: Long) {
+        withController { mediaController ->
+            mediaController.seekTo(positionMs.coerceAtLeast(0L))
+            publishProgress(mediaController)
+        }
+    }
+
     override fun release() {
         progressJob?.cancel()
         controller?.removeListener(listener)

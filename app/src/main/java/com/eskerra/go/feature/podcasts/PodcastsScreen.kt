@@ -1,6 +1,7 @@
 package com.eskerra.go.feature.podcasts
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,12 +13,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Forward10
-import androidx.compose.material.icons.outlined.Pause
-import androidx.compose.material.icons.outlined.PlayArrow
-import androidx.compose.material.icons.outlined.Replay10
-import androidx.compose.material.icons.outlined.Stop
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -30,6 +29,7 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -55,9 +55,9 @@ private object PodcastUiTokens {
     val StatusMuted = Color(0xFF9A9A9A)
     val Divider = Color(0xFF333333)
     val ArtworkPlaceholder = Color(0xFF3A3A3A)
-    val ArtworkIcon = Color(0xFF8F8F8F)
     val Accent = Color(0xFF4FAFE6)
     val StripTrack = Color(0x1F4FAFE6)
+    val SelectionBorder = Color(0xFF4FAFE6)
 }
 
 private val RefreshStripHeight = 3.dp
@@ -74,10 +74,9 @@ fun PodcastsScreen(
     onRetry: () -> Unit,
     onRefresh: () -> Unit,
     onEpisodeClick: (PodcastEpisode) -> Unit,
-    onPausePlayback: () -> Unit,
-    onResumePlayback: () -> Unit,
-    onStopPlayback: () -> Unit,
-    onSeekBy: (Long) -> Unit,
+    onEpisodeArtworkClick: (PodcastEpisode) -> Unit,
+    onClearSelection: () -> Unit,
+    onMarkSelected: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -86,8 +85,6 @@ fun PodcastsScreen(
             .background(PodcastUiTokens.ListBackground)
     ) {
         RefreshStrip(refreshState)
-        // `isRefreshing` is always false so no list-attached spinner shows; the
-        // header strip is the sole refresh affordance (spec §7.4).
         PullToRefreshBox(
             isRefreshing = false,
             onRefresh = onRefresh,
@@ -104,15 +101,17 @@ fun PodcastsScreen(
                 is PodcastsUiState.Content -> CatalogContent(
                     sections = state.sections,
                     playerState = state.playerState,
+                    selectedEpisodeIds = state.selectedEpisodeIds,
+                    markInFlight = state.markInFlight,
+                    markError = state.markError,
                     refreshError = refreshState.error,
                     config = config,
                     filesDir = filesDir,
                     loadPodcastArtwork = loadPodcastArtwork,
                     onEpisodeClick = onEpisodeClick,
-                    onPausePlayback = onPausePlayback,
-                    onResumePlayback = onResumePlayback,
-                    onStopPlayback = onStopPlayback,
-                    onSeekBy = onSeekBy
+                    onEpisodeArtworkClick = onEpisodeArtworkClick,
+                    onClearSelection = onClearSelection,
+                    onMarkSelected = onMarkSelected
                 )
             }
         }
@@ -193,20 +192,45 @@ private fun ErrorContent(message: String, onRetry: () -> Unit) {
 private fun CatalogContent(
     sections: List<PodcastSection>,
     playerState: PodcastPlaybackState,
+    selectedEpisodeIds: Set<String>,
+    markInFlight: Boolean,
+    markError: String?,
     refreshError: String?,
     config: WorkspaceConfig,
     filesDir: File,
     loadPodcastArtwork: LoadPodcastArtwork,
     onEpisodeClick: (PodcastEpisode) -> Unit,
-    onPausePlayback: () -> Unit,
-    onResumePlayback: () -> Unit,
-    onStopPlayback: () -> Unit,
-    onSeekBy: (Long) -> Unit
+    onEpisodeArtworkClick: (PodcastEpisode) -> Unit,
+    onClearSelection: () -> Unit,
+    onMarkSelected: () -> Unit
 ) {
+    val hasSelection = selectedEpisodeIds.isNotEmpty()
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = shellScrollContentPadding()
     ) {
+        item(key = "header-bar") {
+            PodcastsHeaderBar(
+                hasSelection = hasSelection,
+                selectedCount = selectedEpisodeIds.size,
+                markInFlight = markInFlight,
+                onClearSelection = onClearSelection,
+                onMarkSelected = onMarkSelected
+            )
+        }
+        markError?.let { error ->
+            item(key = "mark-error") {
+                Text(
+                    text = error,
+                    color = PodcastUiTokens.StatusMuted,
+                    fontSize = 13.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp)
+                )
+            }
+        }
         if (refreshError != null) {
             item(key = "refresh-error") {
                 Text(
@@ -217,17 +241,6 @@ private fun CatalogContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 8.dp)
-                )
-            }
-        }
-        if (playerState.hasActiveEpisode) {
-            item(key = "now-playing") {
-                NowPlayingCard(
-                    playerState = playerState,
-                    onPausePlayback = onPausePlayback,
-                    onResumePlayback = onResumePlayback,
-                    onStopPlayback = onStopPlayback,
-                    onSeekBy = onSeekBy
                 )
             }
         }
@@ -248,8 +261,12 @@ private fun CatalogContent(
                     filesDir = filesDir,
                     loadPodcastArtwork = loadPodcastArtwork,
                     playerState = playerState,
+                    isSelected = episode.id in selectedEpisodeIds,
+                    selectionActive = hasSelection,
+                    markInFlight = markInFlight,
                     showBottomDivider = !isLastRow,
-                    onClick = { onEpisodeClick(episode) }
+                    onArtworkClick = { onEpisodeArtworkClick(episode) },
+                    onRowClick = { onEpisodeClick(episode) }
                 )
             }
         }
@@ -257,70 +274,44 @@ private fun CatalogContent(
 }
 
 @Composable
-private fun NowPlayingCard(
-    playerState: PodcastPlaybackState,
-    onPausePlayback: () -> Unit,
-    onResumePlayback: () -> Unit,
-    onStopPlayback: () -> Unit,
-    onSeekBy: (Long) -> Unit
+private fun PodcastsHeaderBar(
+    hasSelection: Boolean,
+    selectedCount: Int,
+    markInFlight: Boolean,
+    onClearSelection: () -> Unit,
+    onMarkSelected: () -> Unit
 ) {
-    val episode = playerState.activeEpisode ?: return
-    Column(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0xFF1D1D1D))
-            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .padding(start = 8.dp, end = 8.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = episode.title,
-            color = PodcastUiTokens.Title,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-        Text(
-            text = "${episode.seriesName} - ${playerStatusText(playerState)}",
-            color = PodcastUiTokens.MutedMeta,
-            fontSize = 12.sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(top = 2.dp)
-        )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = formatElapsed(playerState.positionMs),
-                color = PodcastUiTokens.MutedMeta,
-                fontSize = 12.sp,
-                modifier = Modifier.weight(1f)
-            )
-            IconButton(onClick = { onSeekBy(-10_000L) }, enabled = !playerState.transportBusy) {
-                Icon(Icons.Outlined.Replay10, contentDescription = "Back 10 seconds")
-            }
-            IconButton(
-                onClick = if (playerState.isPlaying) onPausePlayback else onResumePlayback,
-                enabled = !playerState.transportBusy
-            ) {
+        if (hasSelection) {
+            IconButton(onClick = onClearSelection, enabled = !markInFlight) {
                 Icon(
-                    imageVector = if (playerState.isPlaying) {
-                        Icons.Outlined.Pause
-                    } else {
-                        Icons.Outlined.PlayArrow
-                    },
-                    contentDescription = if (playerState.isPlaying) "Pause" else "Play",
-                    tint = PodcastUiTokens.Accent
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Clear selection",
+                    tint = Color.White
                 )
             }
-            IconButton(onClick = { onSeekBy(10_000L) }, enabled = !playerState.transportBusy) {
-                Icon(Icons.Outlined.Forward10, contentDescription = "Forward 10 seconds")
-            }
-            IconButton(onClick = onStopPlayback, enabled = !playerState.transportBusy) {
-                Icon(Icons.Outlined.Stop, contentDescription = "Stop")
+            Text(
+                text = "$selectedCount selected",
+                color = Color.White,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f)
+            )
+            IconButton(onClick = onMarkSelected, enabled = !markInFlight) {
+                if (markInFlight) {
+                    CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+                } else {
+                    Icon(
+                        imageVector = Icons.Outlined.Archive,
+                        contentDescription = "Archive selected episodes",
+                        tint = Color.White
+                    )
+                }
             }
         }
     }
@@ -352,28 +343,51 @@ private fun EpisodeRow(
     filesDir: File,
     loadPodcastArtwork: LoadPodcastArtwork,
     playerState: PodcastPlaybackState,
+    isSelected: Boolean,
+    selectionActive: Boolean,
+    markInFlight: Boolean,
     showBottomDivider: Boolean,
-    onClick: () -> Unit
+    onArtworkClick: () -> Unit,
+    onRowClick: () -> Unit
 ) {
     val dateLabel = RelativeCalendarLabel.formatFromIsoDate(episode.date)
     val artworkFeedUrl = episode.rssFeedUrl ?: sectionRssFeedUrl
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(enabled = !playerState.transportBusy, onClick = onClick)
-    ) {
+    val rowEnabled = !playerState.transportBusy && !markInFlight && !selectionActive
+    Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .then(
+                    if (rowEnabled) {
+                        Modifier.clickable(onClick = onRowClick)
+                    } else {
+                        Modifier
+                    }
+                )
                 .padding(vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            val artworkModifier = Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .then(
+                    if (isSelected) {
+                        Modifier.border(
+                            width = 2.dp,
+                            color = PodcastUiTokens.SelectionBorder,
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                    } else {
+                        Modifier
+                    }
+                )
+                .clickable(enabled = !markInFlight, onClick = onArtworkClick)
             PodcastArtworkImage(
                 rssFeedUrl = artworkFeedUrl,
                 config = config,
                 filesDir = filesDir,
                 loadPodcastArtwork = loadPodcastArtwork,
-                modifier = Modifier.size(40.dp),
+                modifier = artworkModifier,
                 cornerRadius = 8.dp
             )
             Column(
@@ -434,11 +448,4 @@ private fun playerStatusText(playerState: PodcastPlaybackState): String = when (
     PodcastPlaybackPhase.STOPPED -> "Stopped"
     PodcastPlaybackPhase.ERROR -> playerState.errorMessage ?: "Playback error"
     PodcastPlaybackPhase.IDLE -> "Tap to play"
-}
-
-private fun formatElapsed(positionMs: Long): String {
-    val totalSeconds = (positionMs / 1_000L).coerceAtLeast(0L)
-    val minutes = totalSeconds / 60L
-    val seconds = totalSeconds % 60L
-    return "%d:%02d".format(minutes, seconds)
 }
