@@ -7,7 +7,6 @@ import com.eskerra.go.core.model.NotePath
 import com.eskerra.go.core.model.NoteRegistry
 import com.eskerra.go.core.model.NoteSummary
 import com.eskerra.go.core.vault.VaultVisibility
-import com.eskerra.go.data.perf.SnappyPerfLog
 import java.io.File
 import java.nio.file.FileVisitResult
 import java.nio.file.Files
@@ -29,7 +28,6 @@ interface NoteWorkspaceScanner {
 class MarkdownNoteScanner : NoteWorkspaceScanner {
 
     override fun scan(workspaceDir: File, previousRegistry: NoteRegistry?): Result<NoteRegistry> {
-        val scanStartNanos = System.nanoTime()
         val root = workspaceDir.canonicalFile
         val summaries = mutableListOf<NoteSummary>()
         val previousByPath = previousRegistry?.notes?.associateBy { it.id.value } ?: emptyMap()
@@ -104,11 +102,6 @@ class MarkdownNoteScanner : NoteWorkspaceScanner {
             )
         }
 
-        SnappyPerfLog.log(
-            event = "vault_scan",
-            durationMs = SnappyPerfLog.elapsedMs(scanStartNanos),
-            extras = mapOf("noteCount" to summaries.size)
-        )
         return Result.success(NoteRegistry.fromNotes(summaries))
     }
 

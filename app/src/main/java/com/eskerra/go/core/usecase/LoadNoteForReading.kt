@@ -10,7 +10,6 @@ import com.eskerra.go.core.model.NoteReaderDocument
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.NoteContentRepository
 import com.eskerra.go.data.notes.NoteRegistryCache
-import com.eskerra.go.data.perf.SnappyPerfLog
 import java.io.File
 
 /**
@@ -28,14 +27,11 @@ class LoadNoteForReading(
         filesDir: File,
         noteId: NoteId
     ): Result<NoteReaderDocument> {
-        val openStartNanos = System.nanoTime()
         if (NotePath.fromRelativePath(noteId.value).isFailure) {
             return Result.failure(NoteContentException(NoteContentError.InvalidNoteId))
         }
 
-        val registryStartNanos = System.nanoTime()
         val registryResult = registryCache.refresh(config, filesDir)
-        val registryMs = SnappyPerfLog.elapsedMs(registryStartNanos)
         if (registryResult.isFailure) {
             return Result.failure(registryFailure(registryResult.exceptionOrNull()))
         }
@@ -44,22 +40,11 @@ class LoadNoteForReading(
         val summary = registry.notes.find { it.id == noteId }
             ?: return Result.failure(NoteContentException(NoteContentError.NotFound))
 
-        val contentStartNanos = System.nanoTime()
         val contentResult = contentRepository.load(config, filesDir, noteId)
-        val contentMs = SnappyPerfLog.elapsedMs(contentStartNanos)
         if (contentResult.isFailure) {
             return Result.failure(contentResult.exceptionOrNull()!!)
         }
 
-        SnappyPerfLog.log(
-            event = "note_open",
-            durationMs = SnappyPerfLog.elapsedMs(openStartNanos),
-            extras = mapOf(
-                "noteId" to noteId.value,
-                "registryMs" to registryMs,
-                "contentMs" to contentMs
-            )
-        )
         return Result.success(
             NoteReaderDocument(
                 note = summary,
