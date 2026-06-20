@@ -78,16 +78,18 @@ class TodayHubViewModel(
     fun nextWeek() = stepWeek(1)
 
     /**
-     * Resets the selected week back to the current week. Used by the home-reset signal when the
-     * user re-taps Home from a drill-down. No-op when no hub is loaded or already on this week.
+     * Resets the selected week back to the current week. Used when the user re-taps Home while
+     * already on the inbox. Returns `true` when it actually changed the week, so the caller can
+     * scroll the list to top only then; `false` when no hub is loaded or already on this week.
      */
-    fun resetToCurrentWeek() {
-        val current = loaded ?: return
+    fun resetToCurrentWeek(): Boolean {
+        val current = loaded ?: return false
         val currentStem = TodayHubNavigation.currentWeekStem(today(), current.data.settings.start)
-        if (current.selectedStem == currentStem) return
+        if (current.selectedStem == currentStem) return false
         loaded = current.copy(selectedStem = currentStem)
         emitContent(rowLoading = false, row = null)
         loadRow(current.data, currentStem)
+        return true
     }
 
     private fun stepWeek(delta: Int) {

@@ -7,6 +7,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -124,6 +125,10 @@ fun App(
     val scope = rememberCoroutineScope()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
+    // Bumped on each Home tap while already on the inbox; the inbox route reacts (it owns the Today
+    // Hub state and decides whether to snap to the current week). A route change can't carry this
+    // because re-tapping Home does not navigate.
+    var homeReselectSignal by remember { mutableIntStateOf(0) }
     val markInboxNotesChanged = {
         navController.markInboxNotesChanged()
     }
@@ -180,7 +185,7 @@ fun App(
         syncIndicator = syncIndicator,
         onSyncClick = { onShellSyncClick(syncState, appSyncViewModel, navController) },
         onNavigate = { route ->
-            navController.navigateTab(currentRoute, route) { navController.markHomeReset() }
+            navController.navigateTab(currentRoute, route) { homeReselectSignal++ }
         }
     ) { contentModifier ->
         NavHost(
@@ -209,7 +214,8 @@ fun App(
                     appSyncViewModel = appSyncViewModel,
                     touchVaultSearchPaths = touchVaultSearchPaths,
                     onInboxUiStateChanged = onInboxUiStateChanged,
-                    onTodayHubUiStateChanged = onTodayHubUiStateChanged
+                    onTodayHubUiStateChanged = onTodayHubUiStateChanged,
+                    homeReselectSignal = homeReselectSignal
                 )
             }
 

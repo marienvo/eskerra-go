@@ -285,8 +285,10 @@ class TodayHubViewModelTest {
             (vm.uiState.value as TodayHubUiState.Content).selectedWeekStem
         )
 
-        vm.resetToCurrentWeek()
+        // Returns true: it changed the week. A second reset is a no-op (already current) → false.
+        assertTrue(vm.resetToCurrentWeek())
         advanceUntilIdle()
+        assertFalse(vm.resetToCurrentWeek())
 
         val state = vm.uiState.value as TodayHubUiState.Content
         assertEquals("2026-04-06", state.selectedWeekStem)

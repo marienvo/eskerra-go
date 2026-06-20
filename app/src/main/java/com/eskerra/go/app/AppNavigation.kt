@@ -16,32 +16,46 @@ import com.eskerra.go.feature.sync.SyncUiState
 /**
  * Shell navigation semantics: what a bottom-nav / shell tab tap does, given the current route.
  * Extracted from [App] to keep that file within budget and so the branching — which has several
- * reset/restore edge cases — can be unit-tested without a live NavController.
+ * restore/reset edge cases — can be unit-tested without a live NavController.
  *
  * The home (inbox) destination is the NavHost start destination, so it is always at the root of the
- * back stack. Sibling top-level tabs (podcasts, menu) use the multiple-back-stack save/restore
- * pattern so their state survives a round trip. Re-tapping a tab does the least surprising thing:
+ * back stack. Top-level tabs use the multiple-back-stack save/restore pattern so a stack survives a
+ * round trip. Home behaves progressively:
  *
- * - Re-tapping the current tab is a no-op.
- * - Home while on a note/editor (a drill-down from home) pops to home **and resets** it (Today Hub
- *   back to the current week, list scrolled to top).
- * - Home while on another top-level tab pops to home **and restores** it as last seen.
+ * - Re-tapping a non-home tab that is already current is a no-op.
+ * - Home from a note/editor (a drill-down from home) pops back to the inbox; the Today Hub keeps the
+ *   week it was on (no reset).
+ * - Home from another top-level tab (Podcasts/Menu/Search) restores the home stack exactly as last
+ *   left — including a note that was open there.
+ * - Home while already on the inbox snaps the Today Hub to the current week (and scrolls to top) when
+ *   it is on another week, otherwise does nothing. The inbox route makes that call since it owns the
+ *   Today Hub state.
  */
 internal sealed interface TabNavAction {
-    /** Already here — do nothing. */
+    /** Re-selecting the current non-home tab — do nothing. */
     data object NoOp : TabNavAction
 
-    /** Pop back to the home start destination; [reset] requests a fresh home view. */
-    data class PopHome(val reset: Boolean) : TabNavAction
+    /**
+     * Re-tapping Home while already on the inbox: the inbox route snaps the Today Hub to the current
+     * week (and scrolls to top) if it is on another week, otherwise does nothing.
+     */
+    data object ReselectHome : TabNavAction
 
-    /** Switch to a sibling top-level tab, saving the outgoing stack and restoring the target's. */
+    /** Pop a note/editor (a drill-down from home) back to the inbox, keeping the Today Hub's week. */
+    data object PopHome : TabNavAction
+
+    /**
+     * Navigate to a top-level tab, saving the outgoing stack and restoring the target's. Used for
+     * sibling tabs and for Home from a sibling, so Home restores the home stack exactly as last left
+     * (including a note that was open there).
+     */
     data object NavigateTab : TabNavAction
 
     /** Plain push of a transient destination (e.g. create-inbox). */
     data object Push : TabNavAction
 }
 
-/** Note reader / editor are drill-downs from home; re-tapping Home from them resets home. */
+/** Note reader / editor are drill-downs from home; Home from them pops back to the inbox. */
 internal fun isInboxChildRoute(route: String?): Boolean =
     route == AppRoute.NOTE_PATTERN || route == AppRoute.EDITOR_PATTERN
 
@@ -49,9 +63,9 @@ internal fun isInboxChildRoute(route: String?): Boolean =
 internal fun resolveTabNavigation(currentRoute: String?, targetRoute: String): TabNavAction =
     when (targetRoute) {
         AppRoute.INBOX -> when {
-            currentRoute == AppRoute.INBOX -> TabNavAction.NoOp
-            isInboxChildRoute(currentRoute) -> TabNavAction.PopHome(reset = true)
-            else -> TabNavAction.PopHome(reset = false)
+            currentRoute == AppRoute.INBOX -> TabNavAction.ReselectHome
+            isInboxChildRoute(currentRoute) -> TabNavAction.PopHome
+            else -> TabNavAction.NavigateTab
         }
         currentRoute -> TabNavAction.NoOp
         AppRoute.CREATE_INBOX -> TabNavAction.Push
@@ -59,21 +73,19 @@ internal fun resolveTabNavigation(currentRoute: String?, targetRoute: String): T
     }
 
 /**
- * Applies [resolveTabNavigation] to this controller. [onHomeReset] is invoked (before popping) when
- * home should reset to a fresh view; the inbox route consumes it to reset Today Hub and scroll
- * position.
+ * Applies [resolveTabNavigation] to this controller. [onHomeReselected] is invoked when Home is
+ * tapped while already on the inbox; the inbox route decides whether to snap the Today Hub to the
+ * current week and scroll to top.
  */
 internal fun NavHostController.navigateTab(
     currentRoute: String?,
     targetRoute: String,
-    onHomeReset: () -> Unit
+    onHomeReselected: () -> Unit
 ) {
-    when (val action = resolveTabNavigation(currentRoute, targetRoute)) {
+    when (resolveTabNavigation(currentRoute, targetRoute)) {
         TabNavAction.NoOp -> Unit
-        is TabNavAction.PopHome -> {
-            if (action.reset) onHomeReset()
-            popBackStack(AppRoute.INBOX, false)
-        }
+        TabNavAction.ReselectHome -> onHomeReselected()
+        TabNavAction.PopHome -> popBackStack(AppRoute.INBOX, false)
         TabNavAction.NavigateTab -> navigate(targetRoute) {
             popUpTo(AppRoute.INBOX) { saveState = true }
             launchSingleTop = true

@@ -10,25 +10,25 @@ class AppNavigationTest {
     // --- Home (inbox) re-selection -------------------------------------------------------------
 
     @Test
-    fun home_whileOnInbox_isNoOp() {
+    fun home_whileOnInbox_reselectsHome() {
         assertEquals(
-            TabNavAction.NoOp,
+            TabNavAction.ReselectHome,
             resolveTabNavigation(currentRoute = AppRoute.INBOX, targetRoute = AppRoute.INBOX)
         )
     }
 
     @Test
-    fun home_fromNote_popsAndResets() {
+    fun home_fromNote_popsToInbox() {
         assertEquals(
-            TabNavAction.PopHome(reset = true),
+            TabNavAction.PopHome,
             resolveTabNavigation(currentRoute = AppRoute.NOTE_PATTERN, targetRoute = AppRoute.INBOX)
         )
     }
 
     @Test
-    fun home_fromEditor_popsAndResets() {
+    fun home_fromEditor_popsToInbox() {
         assertEquals(
-            TabNavAction.PopHome(reset = true),
+            TabNavAction.PopHome,
             resolveTabNavigation(
                 currentRoute = AppRoute.EDITOR_PATTERN,
                 targetRoute = AppRoute.INBOX
@@ -37,25 +37,25 @@ class AppNavigationTest {
     }
 
     @Test
-    fun home_fromPodcasts_popsWithoutReset() {
+    fun home_fromPodcasts_restoresHomeStack() {
         assertEquals(
-            TabNavAction.PopHome(reset = false),
+            TabNavAction.NavigateTab,
             resolveTabNavigation(currentRoute = AppRoute.PODCASTS, targetRoute = AppRoute.INBOX)
         )
     }
 
     @Test
-    fun home_fromMenu_popsWithoutReset() {
+    fun home_fromMenu_restoresHomeStack() {
         assertEquals(
-            TabNavAction.PopHome(reset = false),
+            TabNavAction.NavigateTab,
             resolveTabNavigation(currentRoute = AppRoute.MENU, targetRoute = AppRoute.INBOX)
         )
     }
 
     @Test
-    fun home_fromSearch_popsWithoutReset() {
+    fun home_fromSearch_restoresHomeStack() {
         assertEquals(
-            TabNavAction.PopHome(reset = false),
+            TabNavAction.NavigateTab,
             resolveTabNavigation(currentRoute = AppRoute.SEARCH, targetRoute = AppRoute.INBOX)
         )
     }
@@ -129,9 +129,9 @@ class AppNavigationTest {
     // --- Edge: unknown current route -----------------------------------------------------------
 
     @Test
-    fun home_fromNullRoute_popsWithoutReset() {
+    fun home_fromNullRoute_navigatesToInbox() {
         assertEquals(
-            TabNavAction.PopHome(reset = false),
+            TabNavAction.NavigateTab,
             resolveTabNavigation(currentRoute = null, targetRoute = AppRoute.INBOX)
         )
     }

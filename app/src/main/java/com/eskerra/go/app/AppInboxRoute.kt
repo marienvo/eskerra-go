@@ -45,7 +45,8 @@ internal fun AppInboxRoute(
     appSyncViewModel: AppSyncViewModel,
     touchVaultSearchPaths: TouchVaultSearchPaths,
     onInboxUiStateChanged: (InboxUiState) -> Unit,
-    onTodayHubUiStateChanged: (TodayHubUiState) -> Unit
+    onTodayHubUiStateChanged: (TodayHubUiState) -> Unit,
+    homeReselectSignal: Int
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -103,9 +104,18 @@ internal fun AppInboxRoute(
             todayHubViewModel.retry()
             appSyncViewModel.refreshLocalStatusQuietly()
         }
-        if (consumeHomeReset(currentRoute, entry.savedStateHandle)) {
-            todayHubViewModel.resetToCurrentWeek()
-            scrollResetSignal++
+    }
+
+    // Re-tapping Home while already on the inbox snaps the Today Hub back to the current week; only
+    // then scroll the list to top. The baseline avoids firing on first composition or on re-entry
+    // (the signal cannot change while the inbox is off-screen, so it always matches the baseline).
+    var lastHandledReselect by remember { mutableIntStateOf(homeReselectSignal) }
+    LaunchedEffect(homeReselectSignal) {
+        if (homeReselectSignal != lastHandledReselect) {
+            lastHandledReselect = homeReselectSignal
+            if (todayHubViewModel.resetToCurrentWeek()) {
+                scrollResetSignal++
+            }
         }
     }
 
