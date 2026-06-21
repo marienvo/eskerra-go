@@ -57,6 +57,18 @@ class AppShellInitialRouteTest {
     }
 
     @Test
+    fun topLevelGraphRouteForHierarchy_mapsNestedGraphDestinations() {
+        assertEquals(
+            AppRoute.PODCASTS_GRAPH,
+            topLevelGraphRouteForHierarchy(sequenceOf(AppRoute.PODCASTS, AppRoute.PODCASTS_GRAPH))
+        )
+        assertEquals(
+            AppRoute.HOME_GRAPH,
+            topLevelGraphRouteForHierarchy(sequenceOf(AppRoute.INBOX, AppRoute.HOME_GRAPH))
+        )
+    }
+
+    @Test
     fun shouldDismissSplashWithoutInbox_onlyForPodcastsGraph() {
         assertTrue(shouldDismissSplashWithoutInbox(AppRoute.PODCASTS_GRAPH))
         assertFalse(shouldDismissSplashWithoutInbox(AppRoute.HOME_GRAPH))

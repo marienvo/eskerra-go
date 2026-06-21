@@ -6,6 +6,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -136,6 +137,13 @@ fun App(
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
     val currentRoute = currentDestination?.route
+    val destinationTopLevelRoute = topLevelGraphRouteForDestination(currentDestination)
+    var currentTopLevelRoute by remember { mutableStateOf(AppRoute.HOME_GRAPH) }
+    LaunchedEffect(destinationTopLevelRoute) {
+        if (destinationTopLevelRoute != null) {
+            currentTopLevelRoute = destinationTopLevelRoute
+        }
+    }
     // Bumped on each Home tap while already on the inbox; the inbox route reacts (it owns the Today
     // Hub state and decides whether to snap to the current week). A route change can't carry this
     // because re-tapping Home does not navigate.
@@ -219,14 +227,20 @@ fun App(
         onPodcastFirstLaunchChanged = onPodcastFirstLaunchChanged
     )
     AppShell(
-        currentDestination = currentDestination,
+        selectedTopLevelRoute = destinationTopLevelRoute ?: currentTopLevelRoute,
         syncIndicator = syncIndicator,
         miniPlayerVisible = miniPlayerMount.visible,
         miniPlayer = miniPlayerMount.content,
         onSyncClick = { onShellSyncClick(syncState, appSyncViewModel, navController) },
         onMenuClick = { menuOpen = true },
         onNavigate = { route ->
-            navController.navigateTab(currentRoute, route) { homeReselectSignal++ }
+            navController.navigateTab(
+                currentRoute = currentRoute,
+                currentTopLevelRoute = destinationTopLevelRoute ?: currentTopLevelRoute,
+                targetRoute = route
+            ) {
+                homeReselectSignal++
+            }
         }
     ) { contentModifier ->
         val navGraphContext = AppNavGraphContext(

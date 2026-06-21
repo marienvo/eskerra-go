@@ -43,6 +43,18 @@ class AppNavigationTest {
     }
 
     @Test
+    fun home_fromPodcastStackNote_switchesToHomeGraph() {
+        assertEquals(
+            TopLevelNavAction.NavigateTab,
+            resolveTopLevelNavigation(
+                currentRoute = AppRoute.NOTE_PATTERN,
+                targetRoute = AppRoute.HOME_GRAPH,
+                currentTopLevelRoute = AppRoute.PODCASTS_GRAPH
+            )
+        )
+    }
+
+    @Test
     fun home_fromEditor_popsToInbox() {
         assertEquals(
             TopLevelNavAction.PopHome,
@@ -62,6 +74,18 @@ class AppNavigationTest {
             resolveTopLevelNavigation(
                 currentRoute = AppRoute.CREATE_INBOX,
                 targetRoute = AppRoute.INBOX
+            )
+        )
+    }
+
+    @Test
+    fun home_fromCreateInboxOnPodcasts_popsTransientFirst() {
+        assertEquals(
+            TopLevelNavAction.PopTransientThenNavigateTab,
+            resolveTopLevelNavigation(
+                currentRoute = AppRoute.CREATE_INBOX,
+                targetRoute = AppRoute.HOME_GRAPH,
+                currentTopLevelRoute = AppRoute.PODCASTS_GRAPH
             )
         )
     }

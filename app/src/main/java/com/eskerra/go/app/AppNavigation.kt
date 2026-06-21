@@ -94,17 +94,27 @@ private fun isHomeRoute(route: String?): Boolean =
 private fun isPodcastsRoute(route: String?): Boolean =
     route == AppRoute.PODCASTS || route == AppRoute.PODCASTS_GRAPH
 
+private fun inferredTopLevelRoute(route: String?): String? = when {
+    isHomeRoute(route) || isInboxChildRoute(route) -> AppRoute.HOME_GRAPH
+    isPodcastsRoute(route) -> AppRoute.PODCASTS_GRAPH
+    else -> null
+}
+
 /** Pure decision for what a shell tab tap should do. Side-effect free for unit testing. */
 internal fun resolveTopLevelNavigation(
     currentRoute: String?,
-    targetRoute: String
+    targetRoute: String,
+    currentTopLevelRoute: String? = inferredTopLevelRoute(currentRoute)
 ): TopLevelNavAction = when {
     isHomeRoute(targetRoute) -> when {
         currentRoute == AppRoute.INBOX -> TopLevelNavAction.ReselectHome
-        isInboxChildRoute(currentRoute) -> TopLevelNavAction.PopHome
+        isInboxChildRoute(currentRoute) && currentTopLevelRoute == AppRoute.HOME_GRAPH ->
+            TopLevelNavAction.PopHome
+        isTransientRoute(currentRoute) -> TopLevelNavAction.PopTransientThenNavigateTab
         else -> TopLevelNavAction.NavigateTab
     }
-    isPodcastsRoute(targetRoute) && isPodcastsRoute(currentRoute) -> TopLevelNavAction.NoOp
+    isPodcastsRoute(targetRoute) && currentTopLevelRoute == AppRoute.PODCASTS_GRAPH ->
+        TopLevelNavAction.NoOp
     currentRoute == targetRoute -> TopLevelNavAction.NoOp
     targetRoute == AppRoute.CREATE_INBOX -> TopLevelNavAction.Push
     isTransientRoute(currentRoute) -> TopLevelNavAction.PopTransientThenNavigateTab
@@ -119,9 +129,10 @@ internal fun resolveTopLevelNavigation(
 internal fun NavHostController.navigateTab(
     currentRoute: String?,
     targetRoute: String,
+    currentTopLevelRoute: String? = inferredTopLevelRoute(currentRoute),
     onHomeReselected: () -> Unit
 ) {
-    when (resolveTopLevelNavigation(currentRoute, targetRoute)) {
+    when (resolveTopLevelNavigation(currentRoute, targetRoute, currentTopLevelRoute)) {
         TopLevelNavAction.NoOp -> Unit
         TopLevelNavAction.ReselectHome -> onHomeReselected()
         TopLevelNavAction.PopHome -> popBackStack(AppRoute.INBOX, false)

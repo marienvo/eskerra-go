@@ -16,11 +16,21 @@ internal fun resolveInitialShellRoute(
 internal fun shellModeForDestination(destination: NavDestination?): AppShellMode? =
     shellModeForRouteHierarchy(destination?.hierarchy?.map { it.route }.orEmpty())
 
-internal fun shellModeForRouteHierarchy(routeHierarchy: Sequence<String?>): AppShellMode? {
+internal fun topLevelGraphRouteForDestination(destination: NavDestination?): String? =
+    topLevelGraphRouteForHierarchy(destination?.hierarchy?.map { it.route }.orEmpty())
+
+internal fun shellModeForRouteHierarchy(routeHierarchy: Sequence<String?>): AppShellMode? =
+    when (topLevelGraphRouteForHierarchy(routeHierarchy)) {
+        AppRoute.PODCASTS_GRAPH -> AppShellMode.PODCASTS
+        AppRoute.HOME_GRAPH -> AppShellMode.HOME
+        else -> null
+    }
+
+internal fun topLevelGraphRouteForHierarchy(routeHierarchy: Sequence<String?>): String? {
     val routes = routeHierarchy.toSet()
     return when {
-        AppRoute.PODCASTS_GRAPH in routes -> AppShellMode.PODCASTS
-        AppRoute.HOME_GRAPH in routes -> AppShellMode.HOME
+        AppRoute.PODCASTS_GRAPH in routes -> AppRoute.PODCASTS_GRAPH
+        AppRoute.HOME_GRAPH in routes -> AppRoute.HOME_GRAPH
         else -> null
     }
 }
