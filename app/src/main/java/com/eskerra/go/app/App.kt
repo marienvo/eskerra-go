@@ -199,6 +199,8 @@ fun App(
     }
 
     val syncIndicator = shellSyncIndicatorState(syncState, remoteConfigured)
+    val selectedTopLevelRoute = destinationTopLevelRoute ?: currentTopLevelRoute
+    val inPodcastMode = selectedTopLevelRoute == AppRoute.PODCASTS_GRAPH
     val podcastShellBridge = remember { PodcastShellBridge() }
     val miniPlayerMount = rememberAppShellMiniPlayerMount(
         currentConfig = currentConfig,
@@ -206,7 +208,8 @@ fun App(
         loadPodcastArtwork = loadPodcastArtwork,
         markPodcastEpisodesPlayed = markPodcastEpisodesPlayed,
         podcastPlayerDriver = podcastPlayerDriver,
-        bridge = podcastShellBridge
+        bridge = podcastShellBridge,
+        inPodcastMode = inPodcastMode
     )
     AppPodcastBootstrap(
         currentConfig = currentConfig,
@@ -224,7 +227,7 @@ fun App(
         onPodcastFirstLaunchChanged = onPodcastFirstLaunchChanged
     )
     AppShell(
-        selectedTopLevelRoute = destinationTopLevelRoute ?: currentTopLevelRoute,
+        selectedTopLevelRoute = selectedTopLevelRoute,
         syncIndicator = syncIndicator,
         miniPlayerVisible = miniPlayerMount.visible,
         miniPlayer = miniPlayerMount.content,

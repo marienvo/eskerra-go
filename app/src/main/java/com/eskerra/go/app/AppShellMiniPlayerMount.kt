@@ -14,6 +14,9 @@ internal data class AppShellMiniPlayerMount(
     val content: (@Composable () -> Unit)?
 )
 
+internal fun shouldShowShellMiniPlayer(hasActiveEpisode: Boolean, inPodcastMode: Boolean): Boolean =
+    hasActiveEpisode && inPodcastMode
+
 @Composable
 internal fun rememberAppShellMiniPlayerMount(
     currentConfig: WorkspaceConfig,
@@ -21,10 +24,14 @@ internal fun rememberAppShellMiniPlayerMount(
     loadPodcastArtwork: LoadPodcastArtwork,
     markPodcastEpisodesPlayed: MarkPodcastEpisodesPlayed,
     podcastPlayerDriver: PodcastPlayerDriver,
-    bridge: PodcastShellBridge
+    bridge: PodcastShellBridge,
+    inPodcastMode: Boolean
 ): AppShellMiniPlayerMount {
     val playerState by podcastPlayerDriver.state.collectAsState()
-    val visible = playerState.hasActiveEpisode
+    val visible = shouldShowShellMiniPlayer(
+        hasActiveEpisode = playerState.hasActiveEpisode,
+        inPodcastMode = inPodcastMode
+    )
     val content: (@Composable () -> Unit)? = if (visible) {
         {
             AppPodcastMiniPlayerHost(
