@@ -178,20 +178,15 @@ internal fun NavGraphBuilder.sharedDestinations(ctx: AppNavGraphContext) {
         val createState by createViewModel.uiState.collectAsState()
 
         LaunchedEffect(createViewModel) {
-            createViewModel.savedNoteId.collect { noteId ->
-                if (noteId != null) {
-                    ctx.markInboxNotesChanged()
-                    ctx.appSyncViewModel.refreshLocalStatusQuietly()
-                    ctx.scope.touchVaultSearchPathsAsync(
-                        ctx.touchVaultSearchPaths,
-                        ctx.currentConfig,
-                        ctx.filesDir,
-                        listOf(noteId.value)
-                    )
-                    ctx.navController.navigate(AppRoute.note(noteId)) {
-                        popUpTo(AppRoute.CREATE_INBOX) { inclusive = true }
-                    }
-                }
+            createViewModel.savedNoteEvents.collect { noteId ->
+                ctx.markInboxNotesChanged()
+                ctx.appSyncViewModel.refreshLocalStatusQuietly()
+                ctx.scope.touchVaultSearchPathsAsync(
+                    ctx.touchVaultSearchPaths,
+                    ctx.currentConfig,
+                    ctx.filesDir,
+                    listOf(noteId.value)
+                )
             }
         }
 

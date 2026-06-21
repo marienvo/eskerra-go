@@ -201,6 +201,17 @@ fun App(
     val syncIndicator = shellSyncIndicatorState(syncState, remoteConfigured)
     val selectedTopLevelRoute = destinationTopLevelRoute ?: currentTopLevelRoute
     val inPodcastMode = selectedTopLevelRoute == AppRoute.PODCASTS_GRAPH
+    val newNoteInputState = rememberShellNewNoteInputState(
+        currentConfig = currentConfig,
+        filesDir = filesDir,
+        createInboxNote = createInboxNote,
+        touchVaultSearchPaths = touchVaultSearchPaths,
+        appSyncViewModel = appSyncViewModel,
+        scope = scope,
+        currentRoute = currentRoute,
+        selectedTopLevelRoute = selectedTopLevelRoute,
+        markInboxNotesChanged = markInboxNotesChanged
+    )
     val podcastShellBridge = remember { PodcastShellBridge() }
     val miniPlayerMount = rememberAppShellMiniPlayerMount(
         currentConfig = currentConfig,
@@ -231,6 +242,13 @@ fun App(
         syncIndicator = syncIndicator,
         miniPlayerVisible = miniPlayerMount.visible,
         miniPlayer = miniPlayerMount.content,
+        newNoteInputVisible = newNoteInputState.visible,
+        newNoteDraft = newNoteInputState.draft,
+        newNoteCanSave = newNoteInputState.canSave,
+        newNoteIsSaving = newNoteInputState.isSaving,
+        newNoteErrorMessage = newNoteInputState.errorMessage,
+        onNewNoteDraftChange = newNoteInputState.onDraftChange,
+        onNewNoteSave = newNoteInputState.onSave,
         onSyncClick = { onShellSyncClick(syncState, appSyncViewModel, navController) },
         onMenuClick = { menuOpen = true },
         onNavigate = { route ->

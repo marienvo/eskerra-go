@@ -10,9 +10,9 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
-/** Vertical space reserved for floating shell chrome (sync, menu, taskbar). */
+/** Vertical space reserved for floating shell chrome. */
 internal val ShellTopChromeHeight = 56.dp
-internal val ShellBottomChromeHeight = 104.dp
+internal val ShellNewNoteInputHeight = 112.dp
 internal val ShellMiniPlayerHeight = 168.dp
 
 private val ShellHorizontalContentPadding = 16.dp
@@ -28,19 +28,31 @@ data class ShellChromeInsets(val top: Dp, val bottom: Dp) {
 fun calculateShellChromeInsets(
     statusBarTop: Dp,
     navigationBarBottom: Dp,
-    miniPlayerVisible: Boolean = false
+    miniPlayerVisible: Boolean = false,
+    newNoteInputVisible: Boolean = false
 ) = ShellChromeInsets(
     top = ShellTopChromeHeight + statusBarTop,
-    bottom = ShellBottomChromeHeight +
-        navigationBarBottom +
-        if (miniPlayerVisible) ShellMiniPlayerHeight else 0.dp
+    bottom = navigationBarBottom +
+        when {
+            miniPlayerVisible -> ShellMiniPlayerHeight
+            newNoteInputVisible -> ShellNewNoteInputHeight
+            else -> 0.dp
+        }
 )
 
 @Composable
-fun rememberShellChromeInsets(miniPlayerVisible: Boolean = false): ShellChromeInsets {
+fun rememberShellChromeInsets(
+    miniPlayerVisible: Boolean = false,
+    newNoteInputVisible: Boolean = false
+): ShellChromeInsets {
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val navigationBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    return calculateShellChromeInsets(statusBarTop, navigationBarBottom, miniPlayerVisible)
+    return calculateShellChromeInsets(
+        statusBarTop = statusBarTop,
+        navigationBarBottom = navigationBarBottom,
+        miniPlayerVisible = miniPlayerVisible,
+        newNoteInputVisible = newNoteInputVisible
+    )
 }
 
 val LocalShellChromeInsets = compositionLocalOf { ShellChromeInsets.Zero }
