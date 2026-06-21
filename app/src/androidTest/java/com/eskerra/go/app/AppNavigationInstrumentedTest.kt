@@ -45,7 +45,7 @@ class AppNavigationInstrumentedTest {
         }
         assertCurrentRoute(AppRoute.NOTE_PATTERN)
 
-        composeRule.onNodeWithContentDescription("Home").performClick()
+        composeRule.onNodeWithContentDescription("Notes").performClick()
         assertCurrentRoute(AppRoute.INBOX)
 
         composeRule.onNodeWithContentDescription("Podcasts").performClick()

@@ -9,7 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Podcasts
 import androidx.compose.material3.Icon
@@ -27,7 +27,7 @@ import com.eskerra.go.ui.theme.EskerraChromeTokens
 /**
  * Floating navigation shell. It overlays controls on top of the current screen:
  * - top and bottom edge scrims so content fades under the floating chrome
- * - top-left Home and Podcasts tab buttons (icon + label)
+ * - top-left Notes and Podcasts tab buttons (icon + label)
  * - a bottom new-note input while reading the vault
  * - a top-right sync button (when remote is configured) and hamburger Menu button
  *
@@ -76,8 +76,8 @@ fun AppShell(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 TopLevelTabButton(
-                    icon = Icons.Filled.Home,
-                    label = "Home",
+                    icon = Icons.AutoMirrored.Filled.MenuBook,
+                    label = "Notes",
                     selected = selectedTopLevelRoute == AppRoute.HOME_GRAPH,
                     onClick = { onNavigate(AppRoute.HOME_GRAPH) }
                 )
