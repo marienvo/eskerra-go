@@ -134,7 +134,8 @@ fun App(
     val navController = rememberNavController()
     val scope = rememberCoroutineScope()
     val backStackEntry by navController.currentBackStackEntryAsState()
-    val currentRoute = backStackEntry?.destination?.route
+    val currentDestination = backStackEntry?.destination
+    val currentRoute = currentDestination?.route
     // Bumped on each Home tap while already on the inbox; the inbox route reacts (it owns the Today
     // Hub state and decides whether to snap to the current week). A route change can't carry this
     // because re-tapping Home does not navigate.
@@ -214,10 +215,11 @@ fun App(
         loadPodcastArtwork = loadPodcastArtwork,
         playlistPollingHost = playlistPollingHost,
         bridge = podcastShellBridge,
+        currentDestination = currentDestination,
         onPodcastFirstLaunchChanged = onPodcastFirstLaunchChanged
     )
     AppShell(
-        currentRoute = currentRoute,
+        currentDestination = currentDestination,
         syncIndicator = syncIndicator,
         miniPlayerVisible = miniPlayerMount.visible,
         miniPlayer = miniPlayerMount.content,

@@ -70,7 +70,10 @@ class AppNavigationTest {
     fun home_fromPodcasts_restoresHomeStack() {
         assertEquals(
             TopLevelNavAction.NavigateTab,
-            resolveTopLevelNavigation(currentRoute = AppRoute.PODCASTS, targetRoute = AppRoute.INBOX)
+            resolveTopLevelNavigation(
+                currentRoute = AppRoute.PODCASTS,
+                targetRoute = AppRoute.INBOX
+            )
         )
         assertEquals(
             TopLevelNavAction.NavigateTab,
@@ -95,7 +98,10 @@ class AppNavigationTest {
     fun podcasts_fromInbox_navigatesTab() {
         assertEquals(
             TopLevelNavAction.NavigateTab,
-            resolveTopLevelNavigation(currentRoute = AppRoute.INBOX, targetRoute = AppRoute.PODCASTS)
+            resolveTopLevelNavigation(
+                currentRoute = AppRoute.INBOX,
+                targetRoute = AppRoute.PODCASTS
+            )
         )
         assertEquals(
             TopLevelNavAction.NavigateTab,

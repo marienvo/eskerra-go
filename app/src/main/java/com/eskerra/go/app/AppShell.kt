@@ -24,6 +24,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavDestination
+import androidx.navigation.NavDestination.Companion.hierarchy
 import com.eskerra.go.ui.theme.EskerraChromeTokens
 
 /**
@@ -39,7 +41,7 @@ import com.eskerra.go.ui.theme.EskerraChromeTokens
  */
 @Composable
 fun AppShell(
-    currentRoute: String?,
+    currentDestination: NavDestination?,
     syncIndicator: ShellSyncIndicatorState?,
     miniPlayerVisible: Boolean = false,
     miniPlayer: (@Composable () -> Unit)? = null,
@@ -78,7 +80,7 @@ fun AppShell(
             }
 
             BottomTaskbar(
-                currentRoute = currentRoute,
+                currentDestination = currentDestination,
                 onHome = { onNavigate(AppRoute.HOME_GRAPH) },
                 onAdd = { onNavigate(AppRoute.CREATE_INBOX) },
                 onPodcasts = { onNavigate(AppRoute.PODCASTS_GRAPH) },
@@ -104,7 +106,7 @@ fun AppShell(
 
 @Composable
 private fun BottomTaskbar(
-    currentRoute: String?,
+    currentDestination: NavDestination?,
     onHome: () -> Unit,
     onAdd: () -> Unit,
     onPodcasts: () -> Unit,
@@ -124,7 +126,7 @@ private fun BottomTaskbar(
             TaskbarButton(
                 icon = Icons.Filled.Home,
                 contentDescription = "Home",
-                selected = currentRoute == AppRoute.INBOX,
+                selected = currentDestination.isInGraph(AppRoute.HOME_GRAPH),
                 onClick = onHome
             )
             FloatingActionButton(
@@ -136,12 +138,15 @@ private fun BottomTaskbar(
             TaskbarButton(
                 icon = Icons.Filled.Podcasts,
                 contentDescription = "Podcasts",
-                selected = currentRoute == AppRoute.PODCASTS,
+                selected = currentDestination.isInGraph(AppRoute.PODCASTS_GRAPH),
                 onClick = onPodcasts
             )
         }
     }
 }
+
+private fun NavDestination?.isInGraph(route: String): Boolean =
+    this?.hierarchy?.any { it.route == route } == true
 
 @Composable
 private fun TaskbarButton(

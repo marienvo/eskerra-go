@@ -9,6 +9,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.navigation.NavDestination
 import androidx.navigation.NavHostController
 import com.eskerra.go.core.model.PodcastPlaybackPhase
 import com.eskerra.go.core.model.WorkspaceConfig
@@ -34,6 +35,7 @@ internal fun AppPodcastBootstrap(
     loadPodcastArtwork: LoadPodcastArtwork,
     playlistPollingHost: PlaylistR2PollingHost?,
     bridge: PodcastShellBridge,
+    currentDestination: NavDestination?,
     onPodcastFirstLaunchChanged: (Boolean) -> Unit
 ) {
     AppPodcastPlaylistEffects(
@@ -67,8 +69,10 @@ internal fun AppPodcastBootstrap(
         }
     }
 
-    LaunchedEffect(currentRoute) {
-        shellModeForRoute(currentRoute)?.let { podcastShellStateWiring.persistAppShellMode(it) }
+    LaunchedEffect(currentDestination) {
+        shellModeForDestination(currentDestination)?.let {
+            podcastShellStateWiring.persistAppShellMode(it)
+        }
     }
 
     LaunchedEffect(playerState) {
