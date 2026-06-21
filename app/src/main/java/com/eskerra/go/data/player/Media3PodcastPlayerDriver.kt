@@ -80,11 +80,12 @@ class Media3PodcastPlayerDriver(context: Context) : PodcastPlayerDriver {
         val cachedArtworkUri = peekArtworkUri(episode)
         withController { mediaController ->
             val item = mediaItemForEpisode(episode, cachedArtworkUri)
-            mediaController.setMediaItem(item)
+            // Set the start position atomically with the item. A separate seekTo() issued right
+            // after setMediaItem()/prepare() over the MediaController IPC is unreliable for a
+            // freshly loaded item and can be dropped, so resuming a restored session would start
+            // at 0 instead of the saved position.
+            mediaController.setMediaItem(item, startPositionMs.coerceAtLeast(0L))
             mediaController.prepare()
-            if (startPositionMs > 0L) {
-                mediaController.seekTo(startPositionMs)
-            }
             mediaController.play()
             publishNativeSnapshot(mediaController)
         }
