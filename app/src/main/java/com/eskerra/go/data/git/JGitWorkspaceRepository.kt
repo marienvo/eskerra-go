@@ -157,10 +157,10 @@ class JGitWorkspaceRepository(
 
     override fun stageAll(workingDir: File): Result<Unit> = runCatching {
         GitIndexLockRecovery.clearStaleLock(workingDir).getOrThrow()
-        val changedPaths = Git.open(workingDir).use { git ->
-            changedPathsFrom(git.status().call())
+        Git.open(workingDir).use { git ->
+            val changedPaths = changedPathsFrom(git.status().call())
+            GitChangeStager.stagePaths(git, workingDir, changedPaths)
         }
-        GitChangeStager.stagePaths(workingDir, changedPaths)
     }
 
     override fun commit(workingDir: File, message: String): Result<String> = runCatching {
