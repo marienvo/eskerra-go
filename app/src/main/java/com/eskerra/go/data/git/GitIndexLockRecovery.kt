@@ -8,7 +8,9 @@ object GitIndexLockRecovery {
     fun clearStaleLock(workingDir: File): Result<Unit> = runCatching {
         val lock = File(workingDir, ".git/index.lock")
         if (lock.exists()) {
-            lock.delete()
+            check(lock.delete()) {
+                "Failed to delete stale index.lock at ${lock.absolutePath}"
+            }
         }
     }
 }
