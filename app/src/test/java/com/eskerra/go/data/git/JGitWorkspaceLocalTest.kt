@@ -94,6 +94,27 @@ class JGitWorkspaceLocalTest {
     }
 
     @Test
+    fun stageAll_stagesPodcastRssCacheFilesWithEmojiNames() {
+        val dir = temp.newFolder("workspace")
+        repo.initOrOpen(dir).getOrThrow()
+
+        val generalDir = File(dir, "General").apply { mkdirs() }
+        val rssName = String(Character.toChars(0x1F4FB)) + " Daily News.md"
+        File(generalDir, rssName).writeText("# RSS cache\n")
+        File(generalDir, "2026 News - podcasts.md").writeText("- [ ] episode\n")
+
+        val dirtyStatus = repo.status(dir).getOrThrow()
+        assertEquals(2, dirtyStatus.changedPaths.size)
+
+        repo.stageAll(dir).getOrThrow()
+        val commitId = repo.commit(dir, "Stage podcast files").getOrThrow()
+        assertTrue(commitId.isNotBlank())
+
+        val finalStatus = repo.status(dir).getOrThrow()
+        assertFalse(finalStatus.hasUncommittedChanges)
+    }
+
+    @Test
     fun writeFile_writesContentInsideWorkingDir() {
         val dir = temp.newFolder("workspace")
         repo.initOrOpen(dir).getOrThrow()

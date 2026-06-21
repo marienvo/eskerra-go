@@ -6,6 +6,7 @@ import com.eskerra.go.data.workspace.RemoteUriSecurity
 import java.io.File
 import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.api.MergeCommand
+import org.eclipse.jgit.api.Status
 import org.eclipse.jgit.api.TransportCommand
 import org.eclipse.jgit.api.TransportConfigCallback
 import org.eclipse.jgit.lib.PersonIdent
@@ -97,14 +98,7 @@ class JGitWorkspaceRepository(
     override fun status(workingDir: File): Result<GitWorkspaceStatus> = runCatching {
         Git.open(workingDir).use { git ->
             val status = git.status().call()
-            val changedPaths = buildSet {
-                addAll(status.added)
-                addAll(status.changed)
-                addAll(status.modified)
-                addAll(status.removed)
-                addAll(status.missing)
-                addAll(status.untracked)
-            }
+            val changedPaths = changedPathsFrom(status)
             GitWorkspaceStatus(
                 branch = git.repository.branch,
                 hasUncommittedChanges = !status.isClean,
@@ -162,12 +156,11 @@ class JGitWorkspaceRepository(
     }
 
     override fun stageAll(workingDir: File): Result<Unit> = runCatching {
-        Git.open(workingDir).use { git ->
-            // Stage new and modified files.
-            git.add().addFilepattern(".").call()
-            // Stage deletions (add alone does not record removals).
-            git.add().addFilepattern(".").setUpdate(true).call()
+        GitIndexLockRecovery.clearStaleLock(workingDir).getOrThrow()
+        val changedPaths = Git.open(workingDir).use { git ->
+            changedPathsFrom(git.status().call())
         }
+        GitChangeStager.stagePaths(workingDir, changedPaths)
     }
 
     override fun commit(workingDir: File, message: String): Result<String> = runCatching {
@@ -264,6 +257,15 @@ class JGitWorkspaceRepository(
     }
 
     private fun isGitRepository(workingDir: File): Boolean = File(workingDir, ".git").exists()
+
+    private fun changedPathsFrom(status: Status): Set<String> = buildSet {
+        addAll(status.added)
+        addAll(status.changed)
+        addAll(status.modified)
+        addAll(status.removed)
+        addAll(status.missing)
+        addAll(status.untracked)
+    }
 
     private fun <C : TransportCommand<*, *>> C.withTransportConfig(): C {
         transportConfigCallback?.let { setTransportConfigCallback(it) }

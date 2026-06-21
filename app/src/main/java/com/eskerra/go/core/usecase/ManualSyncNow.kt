@@ -10,6 +10,7 @@ import com.eskerra.go.core.repository.NoteRegistryCachePort
 import com.eskerra.go.core.repository.RemoteSyncRepository
 import com.eskerra.go.data.credentials.CredentialStore
 import com.eskerra.go.data.git.GitBranchNameValidator
+import com.eskerra.go.data.git.GitIndexLockRecovery
 import com.eskerra.go.data.git.GitSyncMutex
 import com.eskerra.go.data.git.SyncGitErrorMapper
 import com.eskerra.go.data.workspace.RemoteUriSecurity
@@ -83,6 +84,10 @@ class ManualSyncNow(
             remoteSyncRepository.abortInProgressOperation(workspaceDir).getOrElse { error ->
                 return Result.failure(SyncGitErrorMapper.mapFailure(error))
             }
+        }
+
+        GitIndexLockRecovery.clearStaleLock(workspaceDir).getOrElse { error ->
+            return Result.failure(SyncGitErrorMapper.mapFailure(error))
         }
 
         val remoteUri = config.remoteUri?.trim().orEmpty()
