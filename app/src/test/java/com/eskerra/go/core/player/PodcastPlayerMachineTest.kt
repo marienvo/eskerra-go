@@ -82,6 +82,25 @@ class PodcastPlayerMachineTest {
     }
 
     @Test
+    fun progressTickZeroWhilePrimed_keepsRestoredPositionAndDuration() {
+        val state = PodcastPlaybackState(
+            activeEpisode = sampleEpisode(),
+            phase = PodcastPlaybackPhase.PRIMED,
+            positionMs = 100_000L,
+            durationMs = 120_000L
+        )
+
+        val next = PodcastPlayerMachine.reduce(
+            state,
+            PodcastPlayerEvent.ProgressChanged(positionMs = 0L, durationMs = null)
+        )
+
+        assertEquals(PodcastPlaybackPhase.PRIMED, next.phase)
+        assertEquals(100_000L, next.positionMs)
+        assertEquals(120_000L, next.durationMs)
+    }
+
+    @Test
     fun nativeBufferingWithPlayWhenReady_mapsToLoading() {
         val state = primedState()
 

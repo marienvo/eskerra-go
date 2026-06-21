@@ -140,13 +140,30 @@ object PodcastPlayerMachine {
             }
 
             is PodcastPlayerEvent.ProgressChanged -> {
-                val positionMs = sanitizedPosition(event.positionMs)
-                val durationMs = event.durationMs?.takeIf { it > 0L }
-                state.copy(
-                    phase = progressPhase(state.phase, positionMs, durationMs),
-                    positionMs = positionMs,
-                    durationMs = durationMs
-                )
+                // The progress ticker keeps running for a primed/paused session whose native media
+                // item is not loaded yet (e.g. after launch restore), reporting position 0. Ignore
+                // it so it can't reset the restored resume point (and null out the duration).
+                val transientZeroPosition =
+                    event.positionMs == 0L &&
+                        state.positionMs > 0L &&
+                        state.hasActiveEpisode &&
+                        (
+                            state.phase == PodcastPlaybackPhase.PRIMED ||
+                                state.phase == PodcastPlaybackPhase.LOADING ||
+                                state.phase == PodcastPlaybackPhase.PAUSED ||
+                                state.phase == PodcastPlaybackPhase.NEAR_END_PAUSED
+                            )
+                if (transientZeroPosition) {
+                    state
+                } else {
+                    val positionMs = sanitizedPosition(event.positionMs)
+                    val durationMs = event.durationMs?.takeIf { it > 0L }
+                    state.copy(
+                        phase = progressPhase(state.phase, positionMs, durationMs),
+                        positionMs = positionMs,
+                        durationMs = durationMs
+                    )
+                }
             }
 
             is PodcastPlayerEvent.PlaybackError -> state.copy(

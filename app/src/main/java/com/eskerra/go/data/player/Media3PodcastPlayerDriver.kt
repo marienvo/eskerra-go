@@ -294,6 +294,9 @@ class Media3PodcastPlayerDriver(context: Context) : PodcastPlayerDriver {
 
     private fun publishProgress(mediaController: MediaController? = controller) {
         val current = mediaController ?: return
+        // No media item loaded (e.g. a primed/restored session before play): the controller
+        // reports position 0, which must not overwrite the restored resume point.
+        if (current.currentMediaItem == null) return
         reduce(
             PodcastPlayerEvent.ProgressChanged(
                 positionMs = current.currentPosition,
