@@ -1,6 +1,7 @@
 package com.eskerra.go.app
 
 import com.eskerra.go.core.model.AppShellMode
+import com.eskerra.go.core.model.NoteId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -72,5 +73,18 @@ class AppShellInitialRouteTest {
     fun shouldDismissSplashWithoutInbox_onlyForPodcastsGraph() {
         assertTrue(shouldDismissSplashWithoutInbox(AppRoute.PODCASTS_GRAPH))
         assertFalse(shouldDismissSplashWithoutInbox(AppRoute.HOME_GRAPH))
+    }
+
+    @Test
+    fun shouldShowNewNoteInput_onlyInHomeModeOnVaultReaderRoutes() {
+        val noteRoute = AppRoute.note(NoteId("Inbox/A.md"))
+
+        assertTrue(shouldShowNewNoteInput(AppRoute.INBOX, AppShellMode.HOME))
+        assertTrue(shouldShowNewNoteInput(noteRoute, AppShellMode.HOME))
+
+        assertFalse(shouldShowNewNoteInput(AppRoute.EDITOR_PATTERN, AppShellMode.HOME))
+        assertFalse(shouldShowNewNoteInput(AppRoute.SEARCH, AppShellMode.HOME))
+        assertFalse(shouldShowNewNoteInput(AppRoute.INBOX, AppShellMode.PODCASTS))
+        assertFalse(shouldShowNewNoteInput(null, AppShellMode.HOME))
     }
 }

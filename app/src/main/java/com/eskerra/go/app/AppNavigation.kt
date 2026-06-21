@@ -21,9 +21,8 @@ import com.eskerra.go.feature.sync.SyncUiState
  * Each tab is a nested graph; `homeGraph` (start = inbox) is the NavHost start destination, so the
  * inbox is always at the root of the back stack. Switching tabs uses the multiple-back-stack
  * save/restore pattern (popUpTo the graph start with `saveState`, `restoreState` on the way in) so a
- * tab's stack — including a note opened there — survives a round trip. Drill-downs (note/editor) and
- * the create-inbox screen are shared top-level destinations that push onto whichever tab stack is
- * active. The behaviour:
+ * tab's stack — including a note opened there — survives a round trip. Drill-downs (note/editor) are
+ * shared top-level destinations that push onto whichever tab stack is active. The behaviour:
  *
  * - Re-tapping a non-home tab that is already current is a no-op.
  * - Home from a note/editor (a drill-down from home) pops back to the inbox; the Today Hub keeps the
@@ -33,9 +32,6 @@ import com.eskerra.go.feature.sync.SyncUiState
  * - Home while already on the inbox snaps the Today Hub to the current week (and scrolls to top) when
  *   it is on another week, otherwise does nothing. The inbox route makes that call since it owns the
  *   Today Hub state.
- * - Switching tabs while a transient destination (create-inbox) is on top first pops the transient
- *   without saving it, then does the save/restore switch — so the transient can never be stashed in a
- *   saved tab stack and leak back on top of the next tab (the "New note on Home" bug).
  */
 internal sealed interface TopLevelNavAction {
     /** Re-selecting the current non-home tab — do nothing. */
@@ -56,37 +52,11 @@ internal sealed interface TopLevelNavAction {
      * (including a note that was open there).
      */
     data object NavigateTab : TopLevelNavAction
-
-    /**
-     * Switching tabs while a transient destination (create-inbox) is on top: pop the transient first
-     * (no save), then do the [NavigateTab] save/restore switch from the route underneath. Keeps the
-     * transient out of any saved tab stack.
-     */
-    data object PopTransientThenNavigateTab : TopLevelNavAction
-
-    /** Plain push of a transient destination (e.g. create-inbox). */
-    data object Push : TopLevelNavAction
 }
 
-/**
- * Transient destinations: pushed contextually (the Add button) and never meant to survive a tab
- * switch. They must be popped before any save/restore switch so they cannot be stashed in a saved
- * back stack and leak back on top of the next tab.
- */
-internal val TRANSIENT_ROUTES: Set<String> = setOf(AppRoute.CREATE_INBOX)
-
-internal fun isTransientRoute(route: String?): Boolean = route in TRANSIENT_ROUTES
-
-/**
- * Drill-downs reachable from home; Home from them pops back to the inbox.
- *
- * [AppRoute.CREATE_INBOX] is a transient push (the Add button) and must pop cleanly: if Home from it
- * went through the save/restore tab switch, its entry would be stashed in a saved back stack and then
- * leak back on top of the next tab. Treating it as an inbox child makes Home pop it instead.
- */
+/** Drill-downs reachable from home; Home from them pops back to the inbox. */
 internal fun isInboxChildRoute(route: String?): Boolean = route == AppRoute.NOTE_PATTERN ||
-    route == AppRoute.EDITOR_PATTERN ||
-    route == AppRoute.CREATE_INBOX
+    route == AppRoute.EDITOR_PATTERN
 
 private fun isHomeRoute(route: String?): Boolean =
     route == AppRoute.INBOX || route == AppRoute.HOME_GRAPH
@@ -110,18 +80,8 @@ internal fun resolveTopLevelNavigation(
         currentRoute == AppRoute.INBOX -> TopLevelNavAction.ReselectHome
         isInboxChildRoute(currentRoute) && currentTopLevelRoute == AppRoute.HOME_GRAPH ->
             TopLevelNavAction.PopHome
-        isTransientRoute(currentRoute) -> TopLevelNavAction.PopTransientThenNavigateTab
         else -> TopLevelNavAction.NavigateTab
     }
-    // Re-tapping the Add button while it is already on top: a single-top push is a no-op, so this
-    // must win over the transient-pop branch below (which would otherwise pop and re-navigate).
-    targetRoute == AppRoute.CREATE_INBOX -> TopLevelNavAction.Push
-    // A transient (create-inbox) on top must be popped before any "already on this tab" decision —
-    // even when it sits on the target tab's own stack. The transient is a shared destination with no
-    // top-level graph in its hierarchy, so `currentTopLevelRoute` still reads as the underlying tab;
-    // without this branch re-tapping that tab resolves to NoOp and the transient never leaves (the
-    // "stuck on New note" bug).
-    isTransientRoute(currentRoute) -> TopLevelNavAction.PopTransientThenNavigateTab
     isPodcastsRoute(targetRoute) && currentTopLevelRoute == AppRoute.PODCASTS_GRAPH ->
         TopLevelNavAction.NoOp
     currentRoute == targetRoute -> TopLevelNavAction.NoOp
@@ -144,15 +104,6 @@ internal fun NavHostController.navigateTab(
         TopLevelNavAction.ReselectHome -> onHomeReselected()
         TopLevelNavAction.PopHome -> popBackStack(AppRoute.INBOX, false)
         TopLevelNavAction.NavigateTab -> navigateTopLevel(targetRoute)
-        TopLevelNavAction.PopTransientThenNavigateTab -> {
-            // Drop the transient (create-inbox) without saving it, then run the normal save/restore
-            // switch from the route underneath, so the transient never lands in a saved tab stack.
-            popBackStack()
-            navigateTopLevel(targetRoute)
-        }
-        TopLevelNavAction.Push -> navigate(targetRoute) {
-            launchSingleTop = true
-        }
     }
 }
 

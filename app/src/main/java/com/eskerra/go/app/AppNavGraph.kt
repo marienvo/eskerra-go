@@ -21,7 +21,6 @@ import com.eskerra.go.core.repository.PodcastPlayerDriver
 import com.eskerra.go.core.repository.TodayHubSnapshotStore
 import com.eskerra.go.core.usecase.ClearPodcastPlaybackSnapshot
 import com.eskerra.go.core.usecase.ClearRemoteSyncSettings
-import com.eskerra.go.core.usecase.CreateInboxNote
 import com.eskerra.go.core.usecase.DeleteInboxNotes
 import com.eskerra.go.core.usecase.EnsureDeviceInstanceId
 import com.eskerra.go.core.usecase.LoadEditableNote
@@ -49,7 +48,6 @@ import com.eskerra.go.core.usecase.SearchVault
 import com.eskerra.go.core.usecase.SyncPodcastVaultRefresh
 import com.eskerra.go.core.usecase.TestRemoteConnection
 import com.eskerra.go.core.usecase.TouchVaultSearchPaths
-import com.eskerra.go.feature.editor.CreateInboxScreen
 import com.eskerra.go.feature.editor.NoteEditorScreen
 import com.eskerra.go.feature.inbox.InboxUiState
 import com.eskerra.go.feature.note.NoteReaderUiState
@@ -78,7 +76,6 @@ internal data class AppNavGraphContext(
     val loadInboxSummaries: LoadInboxSummariesCached,
     val loadNoteForReading: LoadNoteForReading,
     val prefetchLinkedNotes: PrefetchLinkedNotes,
-    val createInboxNote: CreateInboxNote,
     val deleteInboxNotes: DeleteInboxNotes,
     val loadEditableNote: LoadEditableNote,
     val saveNote: SaveNote,
@@ -167,41 +164,6 @@ internal fun NavGraphBuilder.podcastsGraph(ctx: AppNavGraphContext) {
 }
 
 internal fun NavGraphBuilder.sharedDestinations(ctx: AppNavGraphContext) {
-    opaqueComposable(AppRoute.CREATE_INBOX) {
-        val createViewModel: CreateInboxNoteViewModel = viewModel(
-            factory = CreateInboxNoteViewModel.factory(
-                config = ctx.currentConfig,
-                filesDir = ctx.filesDir,
-                createInboxNote = ctx.createInboxNote
-            )
-        )
-        val createState by createViewModel.uiState.collectAsState()
-
-        LaunchedEffect(createViewModel) {
-            createViewModel.savedNoteId.collect { noteId ->
-                if (noteId != null) {
-                    ctx.markInboxNotesChanged()
-                    ctx.appSyncViewModel.refreshLocalStatusQuietly()
-                    ctx.scope.touchVaultSearchPathsAsync(
-                        ctx.touchVaultSearchPaths,
-                        ctx.currentConfig,
-                        ctx.filesDir,
-                        listOf(noteId.value)
-                    )
-                    ctx.navController.navigate(AppRoute.note(noteId)) {
-                        popUpTo(AppRoute.CREATE_INBOX) { inclusive = true }
-                    }
-                }
-            }
-        }
-
-        CreateInboxScreen(
-            state = createState,
-            onBack = { ctx.navController.popBackStack() },
-            onDraftChange = createViewModel::updateDraft,
-            onSave = createViewModel::save
-        )
-    }
     opaqueComposable(AppRoute.SEARCH) {
         AppSearchRoute(
             currentConfig = ctx.currentConfig,

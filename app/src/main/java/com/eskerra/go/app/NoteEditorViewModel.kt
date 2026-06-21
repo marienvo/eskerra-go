@@ -204,8 +204,8 @@ class CreateInboxNoteViewModel(
     )
     val uiState: StateFlow<CreateInboxUiState> = _uiState.asStateFlow()
 
-    private val _savedNoteId = MutableStateFlow<NoteId?>(null)
-    val savedNoteId: StateFlow<NoteId?> = _savedNoteId.asStateFlow()
+    private val _savedNoteEvents = Channel<NoteId>(Channel.BUFFERED)
+    val savedNoteEvents = _savedNoteEvents.receiveAsFlow()
 
     private var saveJob: Job? = null
 
@@ -232,7 +232,13 @@ class CreateInboxNoteViewModel(
             _uiState.value = current.copy(isSaving = true, errorMessage = null)
             createInboxNote(config, filesDir, current.draft).fold(
                 onSuccess = { result ->
-                    _savedNoteId.value = result.note.id
+                    _uiState.value = CreateInboxUiState.Content(
+                        draft = "",
+                        isSaving = false,
+                        canSave = false,
+                        errorMessage = null
+                    )
+                    _savedNoteEvents.trySend(result.note.id)
                 },
                 onFailure = { error ->
                     val failed = _uiState.value as? CreateInboxUiState.Content ?: current

@@ -103,6 +103,20 @@ class WorkspaceSetupErrorTest {
     }
 
     @Test
+    fun mapCloneFailure_prefersInvalidRepositoryOverRemoteUnavailableForMissingFileRemote() {
+        val error = mapCloneFailure(
+            RuntimeException(
+                "unable to access 'file:///tmp/missing.git': No such file or directory"
+            ),
+            branch = "main"
+        )
+        assertTrue(
+            "expected InvalidRepository but was ${error.error}",
+            error.error is WorkspaceSetupError.InvalidRepository
+        )
+    }
+
+    @Test
     fun authenticationFailed_hasStableMessage() {
         val message = WorkspaceSetupError.AuthenticationFailed.message()
         assertTrue(message == "Authentication failed.")

@@ -12,6 +12,7 @@ import com.eskerra.go.data.notes.NoteRegistryCache
 import com.eskerra.go.data.workspace.WorkspacePaths
 import com.eskerra.go.feature.editor.CreateInboxUiState
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -53,15 +54,15 @@ class CreateInboxNoteViewModelTest {
     fun initDoesNotCreateNote() = runTest {
         val viewModel = createViewModel()
 
-        assertNull(viewModel.savedNoteId.value)
         val state = viewModel.uiState.value as CreateInboxUiState.Content
         assertEquals("", state.draft)
         assertFalse(state.canSave)
     }
 
     @Test
-    fun saveEmitsNoteIdForReaderNavigation() = runTest {
+    fun saveEmitsNoteIdAndResetsDraft() = runTest {
         val noteId = NoteId("Inbox/Mijn idee.md")
+        val savedNoteIds = mutableListOf<NoteId>()
         val registry = FakeNoteRegistryRepository.withInboxNotes(
             NoteSummary(noteId, "Mijn idee", "", isInbox = true, lastModifiedEpochMillis = 1L)
         )
@@ -75,11 +76,20 @@ class CreateInboxNoteViewModelTest {
             filesDir = temp.newFolder("files"),
             createInboxNote = useCase
         )
+        val collectJob = launch {
+            viewModel.savedNoteEvents.collect { savedNoteIds += it }
+        }
         viewModel.updateDraft("Mijn idee\nBody")
         viewModel.save()
         advanceUntilIdle()
 
-        assertEquals(noteId, viewModel.savedNoteId.value)
+        assertEquals(listOf(noteId), savedNoteIds)
+        val state = viewModel.uiState.value as CreateInboxUiState.Content
+        assertEquals("", state.draft)
+        assertFalse(state.canSave)
+        assertFalse(state.isSaving)
+        assertNull(state.errorMessage)
+        collectJob.cancel()
     }
 
     @Test

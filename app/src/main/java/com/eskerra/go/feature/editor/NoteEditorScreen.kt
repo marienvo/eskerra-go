@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -25,18 +24,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.dp
 import com.eskerra.go.app.LocalShellChromeInsets
 import com.eskerra.go.core.model.GitStatusSummary
-import kotlinx.coroutines.delay
 
 /**
  * Stateless markdown editor. Receives [NoteEditorUiState] and reports user actions
@@ -93,129 +85,6 @@ fun NoteEditorScreen(
             )
         }
     }
-}
-
-@Composable
-fun CreateInboxScreen(
-    state: CreateInboxUiState,
-    onBack: () -> Unit,
-    onDraftChange: (String) -> Unit,
-    onSave: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val chrome = LocalShellChromeInsets.current
-    Column(modifier = modifier.fillMaxSize()) {
-        IconButton(
-            onClick = onBack,
-            modifier = Modifier.padding(
-                top = chrome.top,
-                start = 16.dp,
-                end = 16.dp
-            )
-        ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Back",
-                tint = MaterialTheme.colorScheme.onSurface
-            )
-        }
-
-        when (state) {
-            is CreateInboxUiState.Content -> CreateInboxContent(
-                state = state,
-                onDraftChange = onDraftChange,
-                onSave = onSave,
-                modifier = Modifier.weight(1f)
-            )
-        }
-    }
-}
-
-@Composable
-private fun CreateInboxContent(
-    state: CreateInboxUiState.Content,
-    onDraftChange: (String) -> Unit,
-    onSave: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val focusRequester = remember { FocusRequester() }
-    val keyboardController = LocalSoftwareKeyboardController.current
-    LaunchedEffect(Unit) {
-        delay(CREATE_INBOX_FOCUS_DELAY_MS)
-        focusRequester.requestFocus()
-        keyboardController?.show()
-    }
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(start = 16.dp, end = 16.dp)
-    ) {
-        BorderlessComposeEditor(
-            value = state.draft,
-            onValueChange = onDraftChange,
-            placeholder = "First line is title (H1)...",
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
-            readOnly = state.isSaving,
-            focusRequester = focusRequester
-        )
-
-        EditorSaveBar(
-            buttonText = if (state.isSaving) "Saving…" else "Save",
-            enabled = state.canSave && !state.isSaving,
-            message = state.errorMessage,
-            messageIsError = true,
-            onSave = onSave
-        )
-    }
-}
-
-@Composable
-private fun BorderlessComposeEditor(
-    value: String,
-    onValueChange: (String) -> Unit,
-    placeholder: String,
-    modifier: Modifier = Modifier,
-    readOnly: Boolean = false,
-    focusRequester: FocusRequester? = null
-) {
-    val scrollState = rememberScrollState()
-    val textStyle = MaterialTheme.typography.bodyLarge.copy(
-        color = MaterialTheme.colorScheme.onSurface
-    )
-    val placeholderColor = MaterialTheme.colorScheme.onSurfaceVariant
-    BasicTextField(
-        value = value,
-        onValueChange = onValueChange,
-        modifier = modifier
-            .then(
-                if (focusRequester != null) {
-                    Modifier.focusRequester(focusRequester)
-                } else {
-                    Modifier
-                }
-            )
-            .verticalScroll(scrollState),
-        readOnly = readOnly,
-        textStyle = textStyle,
-        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-        decorationBox = { innerTextField ->
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.TopStart
-            ) {
-                if (value.isEmpty()) {
-                    Text(
-                        text = placeholder,
-                        style = textStyle,
-                        color = placeholderColor
-                    )
-                }
-                innerTextField()
-            }
-        }
-    )
 }
 
 @Composable
@@ -388,6 +257,3 @@ private fun EditorMessage(title: String, body: String, onRetry: (() -> Unit)?) {
         }
     }
 }
-
-/** Matches notebox AddNoteScreen Android focus delay after navigation settles. */
-private const val CREATE_INBOX_FOCUS_DELAY_MS = 250L

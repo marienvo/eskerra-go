@@ -21,7 +21,6 @@ import androidx.navigation.navigation
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.eskerra.go.core.model.NoteId
 import org.junit.Assert.assertEquals
-import org.junit.Assert.fail
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -32,22 +31,6 @@ class AppNavigationInstrumentedTest {
     val composeRule = createComposeRule()
 
     private lateinit var navController: NavHostController
-
-    @Test
-    fun newNote_thenPodcasts_thenHome_showsHome() {
-        setTestContent()
-
-        assertCurrentRoute(AppRoute.INBOX)
-        composeRule.onNodeWithContentDescription("Add").performClick()
-        assertCurrentRoute(AppRoute.CREATE_INBOX)
-
-        composeRule.onNodeWithContentDescription("Podcasts").performClick()
-        assertCurrentRoute(AppRoute.PODCASTS)
-
-        composeRule.onNodeWithContentDescription("Home").performClick()
-        assertCurrentRoute(AppRoute.INBOX)
-        assertRouteNotInBackStack(AppRoute.CREATE_INBOX)
-    }
 
     @Test
     fun searchNote_fromPodcasts_staysInPodcastsStack() {
@@ -121,7 +104,6 @@ class AppNavigationInstrumentedTest {
                 ) {
                     composable(AppRoute.PODCASTS) {}
                 }
-                composable(AppRoute.CREATE_INBOX) {}
                 composable(AppRoute.SEARCH) {}
                 composable(
                     route = AppRoute.NOTE_PATTERN,
@@ -137,17 +119,6 @@ class AppNavigationInstrumentedTest {
         composeRule.waitForIdle()
         composeRule.runOnIdle {
             assertEquals(expectedRoute, navController.currentDestination?.route)
-        }
-    }
-
-    private fun assertRouteNotInBackStack(route: String) {
-        composeRule.runOnIdle {
-            try {
-                navController.getBackStackEntry(route)
-                fail("Expected $route to be absent from the active back stack")
-            } catch (_: IllegalArgumentException) {
-                // Expected: the transient route was popped before the tab switch saved state.
-            }
         }
     }
 }

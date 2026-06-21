@@ -66,31 +66,6 @@ class AppNavigationTest {
     }
 
     @Test
-    fun home_fromCreateInbox_popsToInbox() {
-        // CREATE_INBOX is a transient push; Home must pop it cleanly rather than stashing it in a
-        // saved back stack (which would leak "New note" back on top of the next tab switch).
-        assertEquals(
-            TopLevelNavAction.PopHome,
-            resolveTopLevelNavigation(
-                currentRoute = AppRoute.CREATE_INBOX,
-                targetRoute = AppRoute.INBOX
-            )
-        )
-    }
-
-    @Test
-    fun home_fromCreateInboxOnPodcasts_popsTransientFirst() {
-        assertEquals(
-            TopLevelNavAction.PopTransientThenNavigateTab,
-            resolveTopLevelNavigation(
-                currentRoute = AppRoute.CREATE_INBOX,
-                targetRoute = AppRoute.HOME_GRAPH,
-                currentTopLevelRoute = AppRoute.PODCASTS_GRAPH
-            )
-        )
-    }
-
-    @Test
     fun home_fromPodcasts_restoresHomeStack() {
         assertEquals(
             TopLevelNavAction.NavigateTab,
@@ -165,57 +140,6 @@ class AppNavigationTest {
         )
     }
 
-    // --- Transient pop on tab switch (the "New note" leak regression) --------------------------
-
-    @Test
-    fun tabSwitch_fromCreateInbox_popsTransientFirst() {
-        // Home -> + (New note) -> Podcasts must pop the transient before saving the home stack, so
-        // "New note" cannot be restored on top of Home later.
-        assertEquals(
-            TopLevelNavAction.PopTransientThenNavigateTab,
-            resolveTopLevelNavigation(
-                currentRoute = AppRoute.CREATE_INBOX,
-                targetRoute = AppRoute.PODCASTS
-            )
-        )
-        assertEquals(
-            TopLevelNavAction.PopTransientThenNavigateTab,
-            resolveTopLevelNavigation(
-                currentRoute = AppRoute.CREATE_INBOX,
-                targetRoute = AppRoute.PODCASTS_GRAPH
-            )
-        )
-    }
-
-    @Test
-    fun podcasts_fromCreateInboxOnPodcasts_popsTransientFirst() {
-        // Podcasts -> + (New note) -> Podcasts. The transient sits on the podcasts stack, so the
-        // remembered top-level still reads as PODCASTS_GRAPH; re-tapping Podcasts must pop the
-        // transient rather than no-op and leave "New note" stuck on screen.
-        assertEquals(
-            TopLevelNavAction.PopTransientThenNavigateTab,
-            resolveTopLevelNavigation(
-                currentRoute = AppRoute.CREATE_INBOX,
-                targetRoute = AppRoute.PODCASTS_GRAPH,
-                currentTopLevelRoute = AppRoute.PODCASTS_GRAPH
-            )
-        )
-    }
-
-    @Test
-    fun createInbox_whileOnCreateInbox_isPush() {
-        // Re-tapping Add while the transient is already on top stays a single-top push (a no-op),
-        // not a transient pop-and-renavigate.
-        assertEquals(
-            TopLevelNavAction.Push,
-            resolveTopLevelNavigation(
-                currentRoute = AppRoute.CREATE_INBOX,
-                targetRoute = AppRoute.CREATE_INBOX,
-                currentTopLevelRoute = AppRoute.PODCASTS_GRAPH
-            )
-        )
-    }
-
     @Test
     fun note_savedInHomeStack_survivesTabRoundTrip() {
         // A note is a drill-down, not a transient: switching to Podcasts saves the home stack (note
@@ -236,30 +160,6 @@ class AppNavigationTest {
         )
     }
 
-    // --- Transient push ------------------------------------------------------------------------
-
-    @Test
-    fun createInbox_fromInbox_isPush() {
-        assertEquals(
-            TopLevelNavAction.Push,
-            resolveTopLevelNavigation(
-                currentRoute = AppRoute.INBOX,
-                targetRoute = AppRoute.CREATE_INBOX
-            )
-        )
-    }
-
-    @Test
-    fun createInbox_fromNote_isPush() {
-        assertEquals(
-            TopLevelNavAction.Push,
-            resolveTopLevelNavigation(
-                currentRoute = AppRoute.NOTE_PATTERN,
-                targetRoute = AppRoute.CREATE_INBOX
-            )
-        )
-    }
-
     // --- Edge: unknown current route -----------------------------------------------------------
 
     @Test
@@ -273,10 +173,9 @@ class AppNavigationTest {
     // --- isInboxChildRoute ---------------------------------------------------------------------
 
     @Test
-    fun inboxChildRoutes_recognizeNoteEditorAndCreateInbox() {
+    fun inboxChildRoutes_recognizeNoteAndEditor() {
         assertTrue(isInboxChildRoute(AppRoute.NOTE_PATTERN))
         assertTrue(isInboxChildRoute(AppRoute.EDITOR_PATTERN))
-        assertTrue(isInboxChildRoute(AppRoute.CREATE_INBOX))
     }
 
     @Test
