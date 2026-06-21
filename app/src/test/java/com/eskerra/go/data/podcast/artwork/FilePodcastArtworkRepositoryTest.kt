@@ -123,6 +123,30 @@ class FilePodcastArtworkRepositoryTest {
     }
 
     @Test
+    fun resolveUri_nonHttpArtworkUrl_doesNotCrashOrCacheNull() = runTest {
+        val feedUrl = "https://example.com/feed.xml"
+        val rssXml = """
+            <?xml version="1.0"?>
+            <rss xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd" version="2.0">
+              <channel>
+                <title>Demo</title>
+                <itunes:image href="/relative/cover.png"/>
+              </channel>
+            </rss>
+        """.trimIndent()
+
+        val uri = repository.resolveUri(
+            workspaceKey = "vault-a",
+            rssFeedUrl = feedUrl,
+            fetchRssXml = { rssXml },
+            allowNetwork = true
+        )
+
+        assertEquals(null, uri)
+        assertEquals(null, repository.peekMemoryUri("vault-a", feedUrl))
+    }
+
+    @Test
     fun loadMetadataFromDisk_hydratesMemoryAfterRestart() = runTest {
         val cacheKey = podcastImageCacheKey("https://example.com/feed")
         val localUri = File(filesDir, "cached.png").apply {

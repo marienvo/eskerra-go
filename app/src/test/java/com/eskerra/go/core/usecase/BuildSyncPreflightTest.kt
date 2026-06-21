@@ -86,6 +86,18 @@ class BuildSyncPreflightTest {
         assertEquals(null, preflight.blockReason)
     }
 
+    @Test
+    fun mergeInProgress_canSync() = runTest {
+        val setup = cloneSeededWorkspace()
+        File(setup.workspaceDir, ".git/MERGE_HEAD").writeText("deadbeef")
+
+        val preflight = buildPreflight(setup.config, setup.filesDir)
+
+        assertTrue(preflight.canSync)
+        assertTrue(preflight.repoInterventionRequired)
+        assertTrue(preflight.userMessage.contains("recover"))
+    }
+
     private data class Setup(
         val config: WorkspaceConfig,
         val filesDir: File,

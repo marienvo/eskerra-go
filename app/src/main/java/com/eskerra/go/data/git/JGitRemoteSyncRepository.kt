@@ -57,7 +57,10 @@ class JGitRemoteSyncRepository(
     override fun stagePaths(workingDir: File, relativePaths: Set<String>): Result<Unit> =
         runCatching {
             if (relativePaths.isEmpty()) return@runCatching
-            GitChangeStager.stagePaths(workingDir, relativePaths)
+            GitIndexLockRecovery.clearStaleLock(workingDir).getOrThrow()
+            Git.open(workingDir).use { git ->
+                GitChangeStager.stagePaths(git, workingDir, relativePaths)
+            }
         }
 
     override fun stageAllChanges(workingDir: File): Result<Unit> =

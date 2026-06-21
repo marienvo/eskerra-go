@@ -16,7 +16,7 @@ Rules:
 - Git operations live only in data/git.
 - Markdown parsing and wiki-link resolution live outside UI.
 - Inbox editability is a domain rule: inbox notes editable, all other notes read-only.
-- Manual inbox sync commits Inbox/ only; podcast mark-as-played and RSS refresh auto-commit General/ podcast paths in separate commits (shared git mutex; see sync-hardening spec).
+- Manual vault sync (`ManualSyncNow`) commits all safe local changes with auto-merge on divergence; RSS refresh delegates to the same engine; mark-as-played uses a scoped podcast-only channel (shared git mutex; see sync-hardening spec).
 - No WorkManager/AlarmManager scheduled background sync.
 - No multi-workspace support.
 - Prefer small files. New files over 250 lines need justification.

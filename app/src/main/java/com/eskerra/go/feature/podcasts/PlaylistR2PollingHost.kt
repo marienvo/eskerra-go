@@ -69,6 +69,11 @@ class PlaylistR2PollingHost(
 
     fun getEtag(): String? = poller.getEtag()
 
+    /** Re-evaluate activation when external inputs (for example R2 settings load) change. */
+    fun refreshActiveState() {
+        updateActive()
+    }
+
     private fun updateActive() {
         poller.setActive(appForeground && isR2Configured() && !playbackActive)
     }

@@ -98,16 +98,6 @@ class BuildSyncPreflight(
         val repoInterventionRequired = remoteSyncRepository.requiresManualIntervention(
             workspaceDir!!
         )
-        if (repoInterventionRequired) {
-            return blocked(
-                SyncError.ManualInterventionRequired,
-                workspaceReady = true,
-                remoteConfigured = true,
-                credentialPresent = true,
-                repoInterventionRequired = true,
-                userMessage = SyncError.ManualInterventionRequired.message()
-            )
-        }
 
         val workspaceStatus = remoteSyncRepository.status(workspaceDir).getOrNull()
         val workingPartition = workspaceStatus?.changedPaths
@@ -125,8 +115,7 @@ class BuildSyncPreflight(
         val aheadCount = comparison?.aheadCount ?: 0
         val behindCount = comparison?.behindCount ?: 0
 
-        // Local changes outside Inbox/ no longer block: they are committed and synced.
-        // Only genuinely unsafe paths (.git internals, `..`) stop a sync.
+        // Vault sync commits all safe local changes. Only unsafe paths block sync.
         val blockReason = when {
             unsafePathCount > 0 -> SyncError.UnsafeLocalPath
             stagedUnsafeCount > 0 -> SyncError.UnsafeLocalPath
@@ -136,6 +125,8 @@ class BuildSyncPreflight(
         val localChangeCount = inboxChangeCount + nonInboxChangeCount
         val userMessage = when {
             blockReason != null -> blockReason.message()
+            repoInterventionRequired ->
+                "Ready to sync. Sync will recover from an interrupted Git operation."
             localChangeCount > 0 -> "Ready to sync $localChangeCount local change(s)."
             behindCount > 0 -> "Ready to sync. Remote has $behindCount commit(s) to integrate."
             aheadCount > 0 -> "Ready to sync. Local branch is $aheadCount commit(s) ahead."
@@ -155,7 +146,7 @@ class BuildSyncPreflight(
             stagedUnsafeCount = stagedUnsafeCount,
             aheadCount = aheadCount,
             behindCount = behindCount,
-            repoInterventionRequired = false,
+            repoInterventionRequired = repoInterventionRequired,
             userMessage = userMessage
         )
     }

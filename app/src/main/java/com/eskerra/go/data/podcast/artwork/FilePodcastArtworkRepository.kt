@@ -112,7 +112,7 @@ class FilePodcastArtworkRepository(
         metaMap[cacheKey] = updated
         metadataStore.write(workspaceKey, metaMap.toMap())
         val uri = renderableUri(updated)
-        memoryUris[memoryKey] = uri
+        uri?.let { memoryUris[memoryKey] = it }
         return uri
     }
 
@@ -153,7 +153,7 @@ class FilePodcastArtworkRepository(
         metaMap[cacheKey] = updated
         metadataStore.write(workspaceKey, metaMap.toMap())
         val uri = renderableUri(updated)
-        memoryUris[memoryKey] = uri
+        uri?.let { memoryUris[memoryKey] = it }
         return uri
     }
 

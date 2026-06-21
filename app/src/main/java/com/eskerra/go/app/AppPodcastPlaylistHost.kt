@@ -47,6 +47,9 @@ internal fun rememberPlaylistR2PollingHost(
             )
         }
     }
+    LaunchedEffect(r2Configured, pollingHost) {
+        pollingHost?.refreshActiveState()
+    }
     AppPodcastPlaylistEffects(
         pollingHost = pollingHost,
         podcastPlayerDriver = podcastPlayerDriver

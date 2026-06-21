@@ -18,7 +18,7 @@ Native Android app for the Eskerra Markdown vault. Core note workflows and the E
 - Compose shell, workspace setup, inbox/reader/wiki navigation, Today Hub
 - Inbox note create/edit/save/delete with Git dirty status
 - Full-text vault search (SQLite FTS5)
-- Manual HTTPS remote sync (inbox-only commits, fast-forward integration)
+- Manual HTTPS remote sync (all local vault changes; fast-forward or auto-merge with conflict sidecars)
 - Vault settings UI including Cloudflare R2 credentials
 - Restart/offline reliability, boot optimization, stale-while-revalidate caches
 - Episodes/podcasts: catalog, Media3 playback, mini player, R2 playlist handoff, pure-Kotlin RSS refresh, mark-as-played, and auto git commit+push per podcast operation
@@ -31,8 +31,8 @@ Specs and product boundaries live in [`specs/`](specs/). Agent and project rules
 ## Product scope
 
 - Git-first setup for one workspace.
-- Clone from `file://` or sanitized `https://` remotes; manual inbox sync for HTTPS.
-- Read, write (inbox only), commit, fetch, fast-forward, and push path.
+- Clone from `file://` or sanitized `https://` remotes; manual vault sync for HTTPS.
+- Read, write (inbox only), commit all safe local changes, fetch, integrate (fast-forward or auto-merge), and push.
 - Inbox list from markdown files; Today Hub; vault search.
 - Podcast episodes: catalog, playback, R2 playlist sync, RSS refresh.
 - Non-inbox notes are read-only except podcast checkbox writes under `General/`.
@@ -40,8 +40,9 @@ Specs and product boundaries live in [`specs/`](specs/). Agent and project rules
 
 **Git sync channels** (see [`specs/architecture/sync-hardening-and-recovery.md`](specs/architecture/sync-hardening-and-recovery.md)):
 
-- Manual sync: **Inbox/** commits only.
-- Podcast mark-as-played and RSS refresh: **separate auto-commits** for changed `General/` podcast paths, then fetch + fast-forward + push when possible. Shared git mutex with manual sync.
+- Manual vault sync: commits **all safe local changes**; auto-merges on divergence with conflict sidecars.
+- Podcast RSS refresh: writes `General/` from RSS, then runs the vault sync engine.
+- Podcast mark-as-played: **scoped auto-commit** for changed `General/` podcast paths only, then fetch + fast-forward + push when possible. Shared git mutex with vault sync.
 
 **Out of scope:**
 

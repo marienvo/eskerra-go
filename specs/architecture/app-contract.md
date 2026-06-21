@@ -5,11 +5,11 @@ Product behavior and boundaries for the native Android app. Non-obvious rules th
 ## Core capabilities
 
 - Git-first workspace setup (one workspace per install).
-- Clone from `file://` or sanitized `https://` remotes; manual inbox sync for HTTPS.
+- Clone from `file://` or sanitized `https://` remotes; manual vault sync for HTTPS.
 - Inbox list from markdown files; create and edit inbox notes; non-inbox notes read-only.
 - Markdown reader with clickable wiki links (title or filename stem, case-insensitive; path-like targets stay case-sensitive).
 - Full-text vault search (SQLite FTS5).
-- Manual HTTPS remote sync (explicit user action): inbox-only commits, fast-forward integration.
+- Manual HTTPS remote sync (explicit user action): commits all local vault changes; integrates remote via fast-forward or auto-merge with conflict sidecars.
 - Podcast episodes tab: catalog, playback, R2 playlist handoff, RSS refresh, mark-as-played.
 - Floating shell navigation with tab state preservation.
 
@@ -40,16 +40,17 @@ Inbox cold start may show the last cached inbox list briefly while the workspace
 
 ## Git write and sync channels
 
-All JGit mutations share one process-wide mutex so manual inbox sync and podcast auto-sync never overlap. Details: [sync-hardening-and-recovery.md](sync-hardening-and-recovery.md).
+All JGit mutations share one process-wide mutex so vault sync and podcast auto-sync never overlap. Details: [sync-hardening-and-recovery.md](sync-hardening-and-recovery.md).
 
-| Channel | Trigger | Staged paths | Commit | Push |
+| Channel | Trigger | Staged paths | Integration | Push |
 | --- | --- | --- | --- | --- |
-| Manual inbox sync | User taps sync | `Inbox/` only | One commit if inbox dirty | After fetch + fast-forward when ahead |
-| Podcast auto-sync | Mark-as-played or RSS refresh complete | Changed podcast paths under `General/` only | **One commit per operation** (separate message) | Same fetch + FF + push rules |
+| Manual vault sync | User taps sync | All safe local changes | FF when behind; auto-merge on divergence | Yes, with retry |
+| Podcast RSS refresh | Pull-to-refresh | RSS writes `General/`; then vault sync engine | Same as vault sync | Same as vault sync |
+| Podcast mark-as-played | Checkbox | Changed podcast paths under `General/` only | **Fast-forward only** | Best-effort; pending on divergence |
 
 Podcast auto-sync is foreground work tied to user actions, not a background scheduler.
 
-Integration is **fast-forward only**. Diverged histories require manual Git repair; the app does not auto-merge, rebase, or reset.
+Vault sync (manual button and RSS refresh) auto-merges diverged histories with conflict sidecars. Podcast mark-as-played never auto-merges, rebase, or reset.
 
 ## Sync branch alignment
 
