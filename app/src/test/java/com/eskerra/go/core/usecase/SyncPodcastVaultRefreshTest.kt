@@ -57,6 +57,32 @@ class SyncPodcastVaultRefreshTest {
     }
 
     @Test
+    fun `refresh succeeds when best-effort sync fails after a local merge`() = runTest {
+        val useCase = SyncPodcastVaultRefresh(
+            vaultSync = object : PodcastRssVaultSync {
+                override suspend fun refresh(
+                    config: WorkspaceConfig,
+                    filesDir: File,
+                    onProgress: (PodcastRefreshProgress) -> Unit
+                ) = Result.success(PodcastRssVaultSyncSummary(2, 1, 0))
+            },
+            syncPodcastChange = { _, _ ->
+                Result.failure(
+                    com.eskerra.go.core.model.SyncException(
+                        com.eskerra.go.core.model.SyncError.MissingRemoteConfig
+                    )
+                )
+            },
+            dispatcher = UnconfinedTestDispatcher(testScheduler)
+        )
+
+        val result = useCase(config, filesDir).getOrThrow()
+
+        assertEquals(2, result.rss.refreshedFileCount)
+        assertTrue(result.sync.pendingPush)
+    }
+
+    @Test
     fun `concurrent callers coalesce into a single in-flight run`() = runTest {
         val dispatcher = UnconfinedTestDispatcher(testScheduler)
         val refreshCount = AtomicInteger(0)

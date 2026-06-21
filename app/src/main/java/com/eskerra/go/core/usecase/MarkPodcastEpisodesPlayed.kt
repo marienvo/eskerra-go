@@ -76,7 +76,10 @@ class MarkPodcastEpisodesPlayed(
             )
         }
 
-        val sync = syncPodcastChange(config, filesDir).getOrElse { return Result.failure(it) }
+        // The episodes are already flipped on disk, so a failed best-effort sync (no remote,
+        // missing credential, offline, push rejected) must not surface as "could not archive".
+        // The local commit rides the next successful vault sync; the archive itself succeeded.
+        val sync = syncPodcastChange(config, filesDir).getOrElse { PodcastSyncResult.PENDING }
         return Result.success(
             MarkPodcastEpisodesPlayedResult(updatedPaths = updatedPaths, sync = sync)
         )

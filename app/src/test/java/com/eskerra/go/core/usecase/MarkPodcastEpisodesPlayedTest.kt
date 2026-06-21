@@ -111,6 +111,38 @@ class MarkPodcastEpisodesPlayedTest {
     }
 
     @Test
+    fun syncFailure_stillSucceedsLocallyAsPendingPush() = runTest {
+        val setup = seedWorkspace(
+            "General/2026 News - podcasts.md" to NEWS_FILE
+        )
+        val useCase = MarkPodcastEpisodesPlayed(
+            podcastFileRepository = FilePodcastFileRepository(),
+            syncPodcastChange = { _, _ ->
+                Result.failure(
+                    com.eskerra.go.core.model.SyncException(
+                        com.eskerra.go.core.model.SyncError.MissingRemoteConfig
+                    )
+                )
+            }
+        )
+
+        val result = useCase(
+            setup.config,
+            setup.filesDir,
+            listOf(episode("https://cdn/ep1.mp3", "2026 News - podcasts.md"))
+        ).getOrThrow()
+
+        // Local archive succeeded; the failed best-effort push is reported as pending.
+        assertTrue(result.updated)
+        assertEquals(listOf("General/2026 News - podcasts.md"), result.updatedPaths)
+        assertTrue(result.sync.pendingPush)
+        assertFalse(result.sync.committed)
+
+        val content = File(setup.workspaceDir, "General/2026 News - podcasts.md").readText()
+        assertTrue(content.contains("- [x] 2026-03-15; First"))
+    }
+
+    @Test
     fun unknownEpisode_doesNotCommit() = runTest {
         val setup = seedWorkspace(
             "General/2026 News - podcasts.md" to NEWS_FILE

@@ -94,6 +94,35 @@ class FilePodcastCatalogRepositoryTest {
     }
 
     @Test
+    fun load_assignsPerSeriesFeedUrlsWhenSectionBundlesMultipleShows() = runTest {
+        val filesDir = temp.newFolder("files")
+        val workspaceDir = workspace(filesDir)
+        val generalDir = File(workspaceDir, FilePodcastCatalogRepository.GENERAL_DIRECTORY)
+        generalDir.mkdirs()
+        File(generalDir, "2026 News - podcasts.md").writeText(
+            "- [ ] 2026-03-15; Morning [$play](https://cdn/daily.mp3) (Daily News)\n" +
+                "- [ ] 2026-03-15; Weekly wrap [$play](https://cdn/weekly.mp3) (Weekly News)\n"
+        )
+        File(generalDir, "2026 News.md").writeText(
+            "- [ ] [[📻 Daily News.md]]\n- [ ] [[📻 Weekly News.md]]\n"
+        )
+        File(generalDir, "📻 Daily News.md").writeText(
+            "---\nrssFeedUrl: https://feed.example/daily.xml\n---\n# Daily News\n"
+        )
+        File(generalDir, "📻 Weekly News.md").writeText(
+            "---\nrssFeedUrl: https://feed.example/weekly.xml\n---\n# Weekly News\n"
+        )
+
+        val catalog = FilePodcastCatalogRepository(currentYear = { 2026 })
+            .load(config, filesDir)
+            .getOrThrow()
+
+        val byMp3 = catalog.allEpisodes.associateBy { it.mp3Url }
+        assertEquals("https://feed.example/daily.xml", byMp3["https://cdn/daily.mp3"]?.rssFeedUrl)
+        assertEquals("https://feed.example/weekly.xml", byMp3["https://cdn/weekly.mp3"]?.rssFeedUrl)
+    }
+
+    @Test
     fun load_deduplicatesSameMp3AcrossStubFiles() = runTest {
         val filesDir = temp.newFolder("files")
         val workspaceDir = workspace(filesDir)

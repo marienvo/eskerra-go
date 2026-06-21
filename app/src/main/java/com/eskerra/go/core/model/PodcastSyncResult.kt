@@ -21,5 +21,17 @@ data class PodcastSyncResult(
             pushed = false,
             pendingPush = false
         )
+
+        /**
+         * Local change persisted on disk but the best-effort git sync could not run
+         * (no remote, missing credential, offline, push rejected, …). The next sync
+         * picks up the outstanding work; the local operation is still a success.
+         */
+        val PENDING = PodcastSyncResult(
+            committed = false,
+            commitId = null,
+            pushed = false,
+            pendingPush = true
+        )
     }
 }

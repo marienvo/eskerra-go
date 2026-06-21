@@ -62,8 +62,10 @@ class SyncPodcastVaultRefresh(
     ): Result<PodcastVaultRefreshResult> {
         val summary = vaultSync.refresh(config, filesDir, onProgress)
             .getOrElse { return Result.failure(it) }
-        val sync = syncPodcastChange(config, filesDir)
-            .getOrElse { return Result.failure(it) }
+        // The RSS merge already landed in the working tree, so a failed best-effort sync
+        // (no remote, missing credential, offline, push rejected) must not surface as
+        // "could not refresh". The local commit rides the next successful vault sync.
+        val sync = syncPodcastChange(config, filesDir).getOrElse { PodcastSyncResult.PENDING }
         return Result.success(PodcastVaultRefreshResult(rss = summary, sync = sync))
     }
 }

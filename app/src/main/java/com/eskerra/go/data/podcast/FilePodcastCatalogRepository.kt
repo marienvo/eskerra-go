@@ -9,6 +9,8 @@ import com.eskerra.go.core.podcast.buildPodcastSections
 import com.eskerra.go.core.podcast.isPodcastEpisodesFile
 import com.eskerra.go.core.podcast.parsePodcastFiles
 import com.eskerra.go.core.podcast.resolveSectionFeedUrls
+import com.eskerra.go.core.podcast.resolveSeriesFeedUrls
+import com.eskerra.go.core.podcast.rss.PodcastMarkdownLinks
 import com.eskerra.go.core.repository.PodcastCatalogRepository
 import com.eskerra.go.data.workspace.WorkspacePaths
 import java.io.File
@@ -62,19 +64,18 @@ class FilePodcastCatalogRepository(private val currentYear: () -> Int = { Year.n
 
                 val parsed = parsePodcastFiles(stubFiles, year)
                 val feedUrlsBySection = resolveSectionFeedUrls(generalDir, year)
+                val feedUrlsBySeries = resolveSeriesFeedUrls(generalDir)
                 val enrichedEpisodes = parsed.allEpisodes.map { episode ->
-                    val feedUrl = feedUrlsBySection[episode.sectionTitle]
+                    // Prefer the episode's own show feed so each podcast keeps its own artwork;
+                    // fall back to the section feed when a show has no resolvable feed file.
+                    val feedUrl =
+                        feedUrlsBySeries[PodcastMarkdownLinks.normalizeTitleKey(episode.seriesName)]
+                            ?: feedUrlsBySection[episode.sectionTitle]
                     if (feedUrl == null) episode else episode.copy(rssFeedUrl = feedUrl)
                 }
-                val sections = buildPodcastSections(enrichedEpisodes).map { section ->
-                    val feedUrl = feedUrlsBySection[section.title]
-                    section.copy(
-                        rssFeedUrl = feedUrl,
-                        episodes = section.episodes.map { episode ->
-                            if (feedUrl == null) episode else episode.copy(rssFeedUrl = feedUrl)
-                        }
-                    )
-                }
+                // buildPodcastSections derives each section's feed from its (already per-series
+                // enriched) episodes, so episode-level artwork is preserved per show.
+                val sections = buildPodcastSections(enrichedEpisodes)
                 Result.success(
                     PodcastCatalog(
                         allEpisodes = enrichedEpisodes,
