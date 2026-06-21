@@ -32,10 +32,10 @@ import com.eskerra.go.ui.theme.EskerraChromeTokens
  * - a bottom floating taskbar with Home, a large centered Add, and Podcasts
  * - a top-right sync button (when remote is configured) and hamburger Menu button
  *
- * The shell owns no app state. It reports navigation intents through [onNavigate]
- * and renders the active screen edge-to-edge via [content]. Scrollable screens
- * should apply [LocalShellChromeInsets] through [shellScrollContentPadding] so
- * content can pass under the floating chrome while remaining reachable.
+ * The shell owns no app state. It reports navigation intents through [onNavigate], the menu overlay
+ * through [onMenuClick], and renders the active screen edge-to-edge via [content]. Scrollable screens
+ * should apply [LocalShellChromeInsets] through [shellScrollContentPadding] so content can pass under
+ * the floating chrome while remaining reachable.
  */
 @Composable
 fun AppShell(
@@ -44,6 +44,7 @@ fun AppShell(
     miniPlayerVisible: Boolean = false,
     miniPlayer: (@Composable () -> Unit)? = null,
     onSyncClick: () -> Unit,
+    onMenuClick: () -> Unit,
     onNavigate: (route: String) -> Unit,
     content: @Composable (contentModifier: Modifier) -> Unit
 ) {
@@ -71,7 +72,7 @@ fun AppShell(
                         onClick = onSyncClick
                     )
                 }
-                SmallFloatingActionButton(onClick = { onNavigate(AppRoute.MENU) }) {
+                SmallFloatingActionButton(onClick = onMenuClick) {
                     Icon(Icons.Filled.Menu, contentDescription = "Menu")
                 }
             }

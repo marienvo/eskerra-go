@@ -2,6 +2,8 @@ package com.eskerra.go.app
 
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -150,6 +152,9 @@ fun App(
     // Hub state and decides whether to snap to the current week). A route change can't carry this
     // because re-tapping Home does not navigate.
     var homeReselectSignal by remember { mutableIntStateOf(0) }
+    // The hamburger menu is an overlay, not a NavHost destination: opening it must not navigate, so
+    // the underlying route (wherever you were) stays put and closing it cannot jump back to Home.
+    var menuOpen by remember { mutableStateOf(false) }
     val markInboxNotesChanged = {
         navController.markInboxNotesChanged()
     }
@@ -230,6 +235,7 @@ fun App(
         miniPlayerVisible = miniPlayerMount.visible,
         miniPlayer = miniPlayerMount.content,
         onSyncClick = { onShellSyncClick(syncState, appSyncViewModel, navController) },
+        onMenuClick = { menuOpen = true },
         onNavigate = { route ->
             navController.navigateTab(currentRoute, route) { homeReselectSignal++ }
         }
@@ -329,19 +335,6 @@ fun App(
                     loadLocalSettings = loadLocalSettings,
                     podcastShellBridge = podcastShellBridge,
                     playlistPollingHost = playlistPollingHost
-                )
-            }
-
-            opaqueComposable(AppRoute.MENU) {
-                MenuScreen(
-                    items = menuItems,
-                    onItemClick = { item ->
-                        when (item) {
-                            MENU_SEARCH -> navController.navigate(AppRoute.SEARCH)
-                            MENU_SYNC -> navController.navigate(AppRoute.SYNC)
-                            MENU_SETTINGS -> navController.navigate(AppRoute.SETTINGS)
-                        }
-                    }
                 )
             }
 
@@ -518,6 +511,36 @@ fun App(
                 )
             }
         }
+    }
+
+    if (menuOpen) {
+        AppMenuSheet(
+            onDismiss = { menuOpen = false },
+            onItemClick = { item ->
+                menuOpen = false
+                when (item) {
+                    MENU_SEARCH -> navController.navigate(AppRoute.SEARCH)
+                    MENU_SYNC -> navController.navigate(AppRoute.SYNC)
+                    MENU_SETTINGS -> navController.navigate(AppRoute.SETTINGS)
+                }
+            }
+        )
+    }
+}
+
+/**
+ * Hamburger menu rendered as a [ModalBottomSheet] overlay. It dismisses on scrim tap and Back
+ * (handled by [ModalBottomSheet]); selecting an item closes the sheet and navigates. Opening or
+ * closing it never touches the NavHost, so the route underneath is preserved.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AppMenuSheet(
+    onDismiss: () -> Unit,
+    onItemClick: (String) -> Unit
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        MenuScreen(items = menuItems, onItemClick = onItemClick)
     }
 }
 

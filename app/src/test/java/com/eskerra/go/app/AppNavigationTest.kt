@@ -37,18 +37,23 @@ class AppNavigationTest {
     }
 
     @Test
-    fun home_fromPodcasts_restoresHomeStack() {
+    fun home_fromCreateInbox_popsToInbox() {
+        // CREATE_INBOX is a transient push; Home must pop it cleanly rather than stashing it in a
+        // saved back stack (which would leak "New note" back on top of the next tab switch).
         assertEquals(
-            TabNavAction.NavigateTab,
-            resolveTabNavigation(currentRoute = AppRoute.PODCASTS, targetRoute = AppRoute.INBOX)
+            TabNavAction.PopHome,
+            resolveTabNavigation(
+                currentRoute = AppRoute.CREATE_INBOX,
+                targetRoute = AppRoute.INBOX
+            )
         )
     }
 
     @Test
-    fun home_fromMenu_restoresHomeStack() {
+    fun home_fromPodcasts_restoresHomeStack() {
         assertEquals(
             TabNavAction.NavigateTab,
-            resolveTabNavigation(currentRoute = AppRoute.MENU, targetRoute = AppRoute.INBOX)
+            resolveTabNavigation(currentRoute = AppRoute.PODCASTS, targetRoute = AppRoute.INBOX)
         )
     }
 
@@ -71,26 +76,10 @@ class AppNavigationTest {
     }
 
     @Test
-    fun menu_fromInbox_navigatesTab() {
-        assertEquals(
-            TabNavAction.NavigateTab,
-            resolveTabNavigation(currentRoute = AppRoute.INBOX, targetRoute = AppRoute.MENU)
-        )
-    }
-
-    @Test
     fun podcasts_whileOnPodcasts_isNoOp() {
         assertEquals(
             TabNavAction.NoOp,
             resolveTabNavigation(currentRoute = AppRoute.PODCASTS, targetRoute = AppRoute.PODCASTS)
-        )
-    }
-
-    @Test
-    fun menu_whileOnMenu_isNoOp() {
-        assertEquals(
-            TabNavAction.NoOp,
-            resolveTabNavigation(currentRoute = AppRoute.MENU, targetRoute = AppRoute.MENU)
         )
     }
 
@@ -139,9 +128,10 @@ class AppNavigationTest {
     // --- isInboxChildRoute ---------------------------------------------------------------------
 
     @Test
-    fun inboxChildRoutes_recognizeNoteAndEditor() {
+    fun inboxChildRoutes_recognizeNoteEditorAndCreateInbox() {
         assertTrue(isInboxChildRoute(AppRoute.NOTE_PATTERN))
         assertTrue(isInboxChildRoute(AppRoute.EDITOR_PATTERN))
+        assertTrue(isInboxChildRoute(AppRoute.CREATE_INBOX))
     }
 
     @Test
