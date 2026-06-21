@@ -6,5 +6,5 @@ internal fun shouldShowNewNoteInput(currentRoute: String?, shellMode: AppShellMo
     if (shellMode != AppShellMode.HOME) {
         return false
     }
-    return currentRoute == AppRoute.INBOX || currentRoute?.startsWith("note/") == true
+    return currentRoute == AppRoute.INBOX || AppRoute.isConcreteNoteRoute(currentRoute)
 }

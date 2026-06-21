@@ -35,4 +35,11 @@ object AppRoute {
 
     /** Decodes the raw editor route argument back into a [NoteId]. */
     fun decodeEditorNoteId(raw: String): NoteId = NoteId(NoteRouteCodec.decode(raw))
+
+    /** Whether [route] is a concrete note-reader destination (not the nav graph pattern). */
+    internal fun isConcreteNoteRoute(route: String?): Boolean {
+        if (route == null) return false
+        val prefix = NOTE_PATTERN.substringBefore("{")
+        return route.startsWith(prefix)
+    }
 }

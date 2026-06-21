@@ -2,6 +2,8 @@ package com.eskerra.go.app
 
 import com.eskerra.go.core.model.NoteId
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AppRouteTest {
@@ -49,6 +51,16 @@ class AppRouteTest {
         )
         assertEquals("note/$encoded", noteRoute)
         assertEquals("editor/$encoded", editorRoute)
+    }
+
+    @Test
+    fun isConcreteNoteRoute_matchesNoteReaderRoutesOnly() {
+        val noteId = NoteId("Inbox/First.md")
+
+        assertTrue(AppRoute.isConcreteNoteRoute(AppRoute.note(noteId)))
+        assertFalse(AppRoute.isConcreteNoteRoute(AppRoute.EDITOR_PATTERN))
+        assertFalse(AppRoute.isConcreteNoteRoute(AppRoute.INBOX))
+        assertFalse(AppRoute.isConcreteNoteRoute(null))
     }
 
     @Test
