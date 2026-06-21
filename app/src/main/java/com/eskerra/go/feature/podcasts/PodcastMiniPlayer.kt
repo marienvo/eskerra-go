@@ -69,7 +69,7 @@ fun PodcastMiniPlayer(
     onSeekBy: (Long) -> Unit,
     onSeekTo: (Long) -> Unit,
     markInFlight: Boolean = false,
-    markError: String? = null,
+    markError: PodcastsActionError? = null,
     modifier: Modifier = Modifier
 ) {
     val episode = playerState.activeEpisode ?: return
@@ -164,7 +164,7 @@ fun PodcastMiniPlayer(
         }
         markError?.let { error ->
             Text(
-                text = error,
+                text = podcastsActionErrorText(error),
                 color = MiniPlayerTokens.Muted,
                 fontSize = 11.sp,
                 maxLines = 2,

@@ -139,8 +139,8 @@ class PodcastsViewModelTest {
         val state = viewModel.uiState.value
         assertTrue(state is PodcastsUiState.Error)
         assertEquals(
-            PodcastsViewModel.WORKSPACE_MISSING_MESSAGE,
-            (state as PodcastsUiState.Error).message
+            PodcastCatalogError.WorkspaceMissing,
+            (state as PodcastsUiState.Error).error
         )
     }
 

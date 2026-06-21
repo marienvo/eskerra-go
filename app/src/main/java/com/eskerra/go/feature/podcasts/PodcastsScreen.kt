@@ -41,13 +41,16 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.eskerra.go.R
 import com.eskerra.go.app.LocalShellChromeInsets
 import com.eskerra.go.core.datetime.RelativeCalendarLabel
+import com.eskerra.go.core.model.PodcastCatalogError
 import com.eskerra.go.core.model.PodcastEpisode
 import com.eskerra.go.core.model.PodcastPlaybackPhase
 import com.eskerra.go.core.model.PodcastPlaybackState
@@ -81,7 +84,7 @@ fun PodcastsScreen(
     config: WorkspaceConfig,
     filesDir: File,
     loadPodcastArtwork: LoadPodcastArtwork,
-    hintMessage: String? = null,
+    showPauseToSwitchHint: Boolean = false,
     onRetry: () -> Unit,
     onRefresh: () -> Unit,
     onEpisodeClick: (PodcastEpisode) -> Unit,
@@ -96,9 +99,9 @@ fun PodcastsScreen(
             .background(PodcastUiTokens.ListBackground)
     ) {
         RefreshStrip(refreshState)
-        hintMessage?.let { message ->
+        if (showPauseToSwitchHint) {
             Text(
-                text = message,
+                text = stringResource(R.string.podcasts_hint_pause_to_switch),
                 color = PodcastUiTokens.Accent,
                 fontSize = 13.sp,
                 textAlign = TextAlign.Center,
@@ -150,7 +153,7 @@ fun PodcastsScreen(
                     }
                     is PodcastsUiState.Error -> item(key = "error") {
                         ErrorContent(
-                            message = state.message,
+                            error = state.error,
                             onRetry = onRetry,
                             modifier = fillItemModifier
                         )
@@ -232,13 +235,21 @@ private fun EmptyContent(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun ErrorContent(message: String, onRetry: () -> Unit, modifier: Modifier = Modifier) {
+private fun ErrorContent(
+    error: PodcastCatalogError,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text(text = message, color = PodcastUiTokens.MutedMeta, textAlign = TextAlign.Center)
+        Text(
+            text = podcastCatalogErrorText(error),
+            color = PodcastUiTokens.MutedMeta,
+            textAlign = TextAlign.Center
+        )
         Button(onClick = onRetry, modifier = Modifier.padding(top = 16.dp)) {
             Text("Retry")
         }
@@ -250,8 +261,8 @@ private fun LazyListScope.podcastCatalogItems(
     playerState: PodcastPlaybackState,
     selectedEpisodeIds: Set<String>,
     markInFlight: Boolean,
-    markError: String?,
-    refreshError: String?,
+    markError: PodcastsActionError?,
+    refreshError: PodcastsActionError?,
     config: WorkspaceConfig,
     filesDir: File,
     loadPodcastArtwork: LoadPodcastArtwork,
@@ -273,7 +284,7 @@ private fun LazyListScope.podcastCatalogItems(
     markError?.let { error ->
         item(key = "mark-error") {
             Text(
-                text = error,
+                text = podcastsActionErrorText(error),
                 color = PodcastUiTokens.StatusMuted,
                 fontSize = 13.sp,
                 textAlign = TextAlign.Center,
@@ -286,7 +297,7 @@ private fun LazyListScope.podcastCatalogItems(
     if (refreshError != null) {
         item(key = "refresh-error") {
             Text(
-                text = refreshError,
+                text = podcastsActionErrorText(refreshError),
                 color = PodcastUiTokens.StatusMuted,
                 fontSize = 13.sp,
                 textAlign = TextAlign.Center,
