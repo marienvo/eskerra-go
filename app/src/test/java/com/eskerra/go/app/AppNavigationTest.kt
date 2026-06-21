@@ -12,12 +12,12 @@ class AppNavigationTest {
     @Test
     fun home_whileOnInbox_reselectsHome() {
         assertEquals(
-            TabNavAction.ReselectHome,
-            resolveTabNavigation(currentRoute = AppRoute.INBOX, targetRoute = AppRoute.INBOX)
+            TopLevelNavAction.ReselectHome,
+            resolveTopLevelNavigation(currentRoute = AppRoute.INBOX, targetRoute = AppRoute.INBOX)
         )
         assertEquals(
-            TabNavAction.ReselectHome,
-            resolveTabNavigation(
+            TopLevelNavAction.ReselectHome,
+            resolveTopLevelNavigation(
                 currentRoute = AppRoute.INBOX,
                 targetRoute = AppRoute.HOME_GRAPH
             )
@@ -27,12 +27,15 @@ class AppNavigationTest {
     @Test
     fun home_fromNote_popsToInbox() {
         assertEquals(
-            TabNavAction.PopHome,
-            resolveTabNavigation(currentRoute = AppRoute.NOTE_PATTERN, targetRoute = AppRoute.INBOX)
+            TopLevelNavAction.PopHome,
+            resolveTopLevelNavigation(
+                currentRoute = AppRoute.NOTE_PATTERN,
+                targetRoute = AppRoute.INBOX
+            )
         )
         assertEquals(
-            TabNavAction.PopHome,
-            resolveTabNavigation(
+            TopLevelNavAction.PopHome,
+            resolveTopLevelNavigation(
                 currentRoute = AppRoute.NOTE_PATTERN,
                 targetRoute = AppRoute.HOME_GRAPH
             )
@@ -42,8 +45,8 @@ class AppNavigationTest {
     @Test
     fun home_fromEditor_popsToInbox() {
         assertEquals(
-            TabNavAction.PopHome,
-            resolveTabNavigation(
+            TopLevelNavAction.PopHome,
+            resolveTopLevelNavigation(
                 currentRoute = AppRoute.EDITOR_PATTERN,
                 targetRoute = AppRoute.INBOX
             )
@@ -55,8 +58,8 @@ class AppNavigationTest {
         // CREATE_INBOX is a transient push; Home must pop it cleanly rather than stashing it in a
         // saved back stack (which would leak "New note" back on top of the next tab switch).
         assertEquals(
-            TabNavAction.PopHome,
-            resolveTabNavigation(
+            TopLevelNavAction.PopHome,
+            resolveTopLevelNavigation(
                 currentRoute = AppRoute.CREATE_INBOX,
                 targetRoute = AppRoute.INBOX
             )
@@ -66,12 +69,12 @@ class AppNavigationTest {
     @Test
     fun home_fromPodcasts_restoresHomeStack() {
         assertEquals(
-            TabNavAction.NavigateTab,
-            resolveTabNavigation(currentRoute = AppRoute.PODCASTS, targetRoute = AppRoute.INBOX)
+            TopLevelNavAction.NavigateTab,
+            resolveTopLevelNavigation(currentRoute = AppRoute.PODCASTS, targetRoute = AppRoute.INBOX)
         )
         assertEquals(
-            TabNavAction.NavigateTab,
-            resolveTabNavigation(
+            TopLevelNavAction.NavigateTab,
+            resolveTopLevelNavigation(
                 currentRoute = AppRoute.PODCASTS,
                 targetRoute = AppRoute.HOME_GRAPH
             )
@@ -81,8 +84,8 @@ class AppNavigationTest {
     @Test
     fun home_fromSearch_restoresHomeStack() {
         assertEquals(
-            TabNavAction.NavigateTab,
-            resolveTabNavigation(currentRoute = AppRoute.SEARCH, targetRoute = AppRoute.INBOX)
+            TopLevelNavAction.NavigateTab,
+            resolveTopLevelNavigation(currentRoute = AppRoute.SEARCH, targetRoute = AppRoute.INBOX)
         )
     }
 
@@ -91,12 +94,12 @@ class AppNavigationTest {
     @Test
     fun podcasts_fromInbox_navigatesTab() {
         assertEquals(
-            TabNavAction.NavigateTab,
-            resolveTabNavigation(currentRoute = AppRoute.INBOX, targetRoute = AppRoute.PODCASTS)
+            TopLevelNavAction.NavigateTab,
+            resolveTopLevelNavigation(currentRoute = AppRoute.INBOX, targetRoute = AppRoute.PODCASTS)
         )
         assertEquals(
-            TabNavAction.NavigateTab,
-            resolveTabNavigation(
+            TopLevelNavAction.NavigateTab,
+            resolveTopLevelNavigation(
                 currentRoute = AppRoute.INBOX,
                 targetRoute = AppRoute.PODCASTS_GRAPH
             )
@@ -106,12 +109,15 @@ class AppNavigationTest {
     @Test
     fun podcasts_whileOnPodcasts_isNoOp() {
         assertEquals(
-            TabNavAction.NoOp,
-            resolveTabNavigation(currentRoute = AppRoute.PODCASTS, targetRoute = AppRoute.PODCASTS)
+            TopLevelNavAction.NoOp,
+            resolveTopLevelNavigation(
+                currentRoute = AppRoute.PODCASTS,
+                targetRoute = AppRoute.PODCASTS
+            )
         )
         assertEquals(
-            TabNavAction.NoOp,
-            resolveTabNavigation(
+            TopLevelNavAction.NoOp,
+            resolveTopLevelNavigation(
                 currentRoute = AppRoute.PODCASTS,
                 targetRoute = AppRoute.PODCASTS_GRAPH
             )
@@ -121,10 +127,52 @@ class AppNavigationTest {
     @Test
     fun podcasts_fromNote_navigatesTab() {
         assertEquals(
-            TabNavAction.NavigateTab,
-            resolveTabNavigation(
+            TopLevelNavAction.NavigateTab,
+            resolveTopLevelNavigation(
                 currentRoute = AppRoute.NOTE_PATTERN,
                 targetRoute = AppRoute.PODCASTS
+            )
+        )
+    }
+
+    // --- Transient pop on tab switch (the "New note" leak regression) --------------------------
+
+    @Test
+    fun tabSwitch_fromCreateInbox_popsTransientFirst() {
+        // Home -> + (New note) -> Podcasts must pop the transient before saving the home stack, so
+        // "New note" cannot be restored on top of Home later.
+        assertEquals(
+            TopLevelNavAction.PopTransientThenNavigateTab,
+            resolveTopLevelNavigation(
+                currentRoute = AppRoute.CREATE_INBOX,
+                targetRoute = AppRoute.PODCASTS
+            )
+        )
+        assertEquals(
+            TopLevelNavAction.PopTransientThenNavigateTab,
+            resolveTopLevelNavigation(
+                currentRoute = AppRoute.CREATE_INBOX,
+                targetRoute = AppRoute.PODCASTS_GRAPH
+            )
+        )
+    }
+
+    @Test
+    fun note_savedInHomeStack_survivesTabRoundTrip() {
+        // A note is a drill-down, not a transient: switching to Podcasts saves the home stack (note
+        // included) rather than popping it, and Home later restores it.
+        assertEquals(
+            TopLevelNavAction.NavigateTab,
+            resolveTopLevelNavigation(
+                currentRoute = AppRoute.NOTE_PATTERN,
+                targetRoute = AppRoute.PODCASTS_GRAPH
+            )
+        )
+        assertEquals(
+            TopLevelNavAction.NavigateTab,
+            resolveTopLevelNavigation(
+                currentRoute = AppRoute.PODCASTS,
+                targetRoute = AppRoute.HOME_GRAPH
             )
         )
     }
@@ -134,16 +182,19 @@ class AppNavigationTest {
     @Test
     fun createInbox_fromInbox_isPush() {
         assertEquals(
-            TabNavAction.Push,
-            resolveTabNavigation(currentRoute = AppRoute.INBOX, targetRoute = AppRoute.CREATE_INBOX)
+            TopLevelNavAction.Push,
+            resolveTopLevelNavigation(
+                currentRoute = AppRoute.INBOX,
+                targetRoute = AppRoute.CREATE_INBOX
+            )
         )
     }
 
     @Test
     fun createInbox_fromNote_isPush() {
         assertEquals(
-            TabNavAction.Push,
-            resolveTabNavigation(
+            TopLevelNavAction.Push,
+            resolveTopLevelNavigation(
                 currentRoute = AppRoute.NOTE_PATTERN,
                 targetRoute = AppRoute.CREATE_INBOX
             )
@@ -155,8 +206,8 @@ class AppNavigationTest {
     @Test
     fun home_fromNullRoute_navigatesToInbox() {
         assertEquals(
-            TabNavAction.NavigateTab,
-            resolveTabNavigation(currentRoute = null, targetRoute = AppRoute.INBOX)
+            TopLevelNavAction.NavigateTab,
+            resolveTopLevelNavigation(currentRoute = null, targetRoute = AppRoute.INBOX)
         )
     }
 
