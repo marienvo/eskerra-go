@@ -66,18 +66,24 @@ internal fun isInboxChildRoute(route: String?): Boolean = route == AppRoute.NOTE
     route == AppRoute.EDITOR_PATTERN ||
     route == AppRoute.CREATE_INBOX
 
+private fun isHomeRoute(route: String?): Boolean =
+    route == AppRoute.INBOX || route == AppRoute.HOME_GRAPH
+
+private fun isPodcastsRoute(route: String?): Boolean =
+    route == AppRoute.PODCASTS || route == AppRoute.PODCASTS_GRAPH
+
 /** Pure decision for what a shell tab tap should do. Side-effect free for unit testing. */
-internal fun resolveTabNavigation(currentRoute: String?, targetRoute: String): TabNavAction =
-    when (targetRoute) {
-        AppRoute.INBOX -> when {
-            currentRoute == AppRoute.INBOX -> TabNavAction.ReselectHome
-            isInboxChildRoute(currentRoute) -> TabNavAction.PopHome
-            else -> TabNavAction.NavigateTab
-        }
-        currentRoute -> TabNavAction.NoOp
-        AppRoute.CREATE_INBOX -> TabNavAction.Push
+internal fun resolveTabNavigation(currentRoute: String?, targetRoute: String): TabNavAction = when {
+    isHomeRoute(targetRoute) -> when {
+        currentRoute == AppRoute.INBOX -> TabNavAction.ReselectHome
+        isInboxChildRoute(currentRoute) -> TabNavAction.PopHome
         else -> TabNavAction.NavigateTab
     }
+    isPodcastsRoute(targetRoute) && currentRoute == AppRoute.PODCASTS -> TabNavAction.NoOp
+    currentRoute == targetRoute -> TabNavAction.NoOp
+    targetRoute == AppRoute.CREATE_INBOX -> TabNavAction.Push
+    else -> TabNavAction.NavigateTab
+}
 
 /**
  * Applies [resolveTabNavigation] to this controller. [onHomeReselected] is invoked when Home is

@@ -12,6 +12,7 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
+import androidx.navigation.navigation
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.ActiveTodayHubStore
@@ -117,47 +118,51 @@ internal data class AppNavGraphContext(
 )
 
 internal fun NavGraphBuilder.homeGraph(ctx: AppNavGraphContext) {
-    opaqueComposable(AppRoute.INBOX) { entry ->
-        AppInboxRoute(
-            currentConfig = ctx.currentConfig,
-            filesDir = ctx.filesDir,
-            loadInboxSummaries = ctx.loadInboxSummaries,
-            deleteInboxNotes = ctx.deleteInboxNotes,
-            loadTodayHub = ctx.loadTodayHub,
-            loadTodayHubRow = ctx.loadTodayHubRow,
-            activeTodayHubStore = ctx.activeTodayHubStore,
-            todayHubSnapshotStore = ctx.todayHubSnapshotStore,
-            workspaceRoot = ctx.workspaceRoot,
-            currentRoute = ctx.currentRoute,
-            entry = entry,
-            navController = ctx.navController,
-            appSyncViewModel = ctx.appSyncViewModel,
-            touchVaultSearchPaths = ctx.touchVaultSearchPaths,
-            onInboxUiStateChanged = ctx.onInboxUiStateChanged,
-            onTodayHubUiStateChanged = ctx.onTodayHubUiStateChanged,
-            homeReselectSignal = ctx.homeReselectSignal
-        )
+    navigation(startDestination = AppRoute.INBOX, route = AppRoute.HOME_GRAPH) {
+        opaqueComposable(AppRoute.INBOX) { entry ->
+            AppInboxRoute(
+                currentConfig = ctx.currentConfig,
+                filesDir = ctx.filesDir,
+                loadInboxSummaries = ctx.loadInboxSummaries,
+                deleteInboxNotes = ctx.deleteInboxNotes,
+                loadTodayHub = ctx.loadTodayHub,
+                loadTodayHubRow = ctx.loadTodayHubRow,
+                activeTodayHubStore = ctx.activeTodayHubStore,
+                todayHubSnapshotStore = ctx.todayHubSnapshotStore,
+                workspaceRoot = ctx.workspaceRoot,
+                currentRoute = ctx.currentRoute,
+                entry = entry,
+                navController = ctx.navController,
+                appSyncViewModel = ctx.appSyncViewModel,
+                touchVaultSearchPaths = ctx.touchVaultSearchPaths,
+                onInboxUiStateChanged = ctx.onInboxUiStateChanged,
+                onTodayHubUiStateChanged = ctx.onTodayHubUiStateChanged,
+                homeReselectSignal = ctx.homeReselectSignal
+            )
+        }
     }
 }
 
 internal fun NavGraphBuilder.podcastsGraph(ctx: AppNavGraphContext) {
-    opaqueComposable(AppRoute.PODCASTS) {
-        AppPodcastsRoute(
-            currentConfig = ctx.currentConfig,
-            filesDir = ctx.filesDir,
-            loadPodcastCatalog = ctx.loadPodcastCatalog,
-            markPodcastEpisodesPlayed = ctx.markPodcastEpisodesPlayed,
-            podcastPlaylistSync = ctx.podcastPlaylistSync,
-            loadPodcastArtwork = ctx.loadPodcastArtwork,
-            podcastPlayerDriver = ctx.podcastPlayerDriver,
-            syncPodcastVaultRefresh = ctx.syncPodcastVaultRefresh,
-            catalogSnapshotStore = ctx.catalogSnapshotStore,
-            persistPodcastPlaybackSnapshot = ctx.persistPodcastPlaybackSnapshot,
-            clearPodcastPlaybackSnapshot = ctx.clearPodcastPlaybackSnapshot,
-            loadLocalSettings = ctx.loadLocalSettings,
-            podcastShellBridge = ctx.podcastShellBridge,
-            playlistPollingHost = ctx.playlistPollingHost
-        )
+    navigation(startDestination = AppRoute.PODCASTS, route = AppRoute.PODCASTS_GRAPH) {
+        opaqueComposable(AppRoute.PODCASTS) {
+            AppPodcastsRoute(
+                currentConfig = ctx.currentConfig,
+                filesDir = ctx.filesDir,
+                loadPodcastCatalog = ctx.loadPodcastCatalog,
+                markPodcastEpisodesPlayed = ctx.markPodcastEpisodesPlayed,
+                podcastPlaylistSync = ctx.podcastPlaylistSync,
+                loadPodcastArtwork = ctx.loadPodcastArtwork,
+                podcastPlayerDriver = ctx.podcastPlayerDriver,
+                syncPodcastVaultRefresh = ctx.syncPodcastVaultRefresh,
+                catalogSnapshotStore = ctx.catalogSnapshotStore,
+                persistPodcastPlaybackSnapshot = ctx.persistPodcastPlaybackSnapshot,
+                clearPodcastPlaybackSnapshot = ctx.clearPodcastPlaybackSnapshot,
+                loadLocalSettings = ctx.loadLocalSettings,
+                podcastShellBridge = ctx.podcastShellBridge,
+                playlistPollingHost = ctx.playlistPollingHost
+            )
+        }
     }
 }
 

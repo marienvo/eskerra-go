@@ -79,9 +79,9 @@ fun AppShell(
 
             BottomTaskbar(
                 currentRoute = currentRoute,
-                onHome = { onNavigate(AppRoute.INBOX) },
+                onHome = { onNavigate(AppRoute.HOME_GRAPH) },
                 onAdd = { onNavigate(AppRoute.CREATE_INBOX) },
-                onPodcasts = { onNavigate(AppRoute.PODCASTS) },
+                onPodcasts = { onNavigate(AppRoute.PODCASTS_GRAPH) },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .navigationBarsPadding()

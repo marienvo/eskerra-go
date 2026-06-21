@@ -283,7 +283,7 @@ fun App(
         )
         NavHost(
             navController = navController,
-            startDestination = AppRoute.INBOX,
+            startDestination = AppRoute.HOME_GRAPH,
             modifier = contentModifier,
             enterTransition = { EnterTransition.None },
             exitTransition = { ExitTransition.None },

@@ -8,6 +8,9 @@ import com.eskerra.go.core.model.NoteId
  * with URL escaping themselves.
  */
 object AppRoute {
+    const val HOME_GRAPH = "home-graph"
+    const val PODCASTS_GRAPH = "podcasts-graph"
+
     const val INBOX = "inbox"
     const val CREATE_INBOX = "create-inbox"
     const val SEARCH = "search"

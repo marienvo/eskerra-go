@@ -15,6 +15,13 @@ class AppNavigationTest {
             TabNavAction.ReselectHome,
             resolveTabNavigation(currentRoute = AppRoute.INBOX, targetRoute = AppRoute.INBOX)
         )
+        assertEquals(
+            TabNavAction.ReselectHome,
+            resolveTabNavigation(
+                currentRoute = AppRoute.INBOX,
+                targetRoute = AppRoute.HOME_GRAPH
+            )
+        )
     }
 
     @Test
@@ -22,6 +29,13 @@ class AppNavigationTest {
         assertEquals(
             TabNavAction.PopHome,
             resolveTabNavigation(currentRoute = AppRoute.NOTE_PATTERN, targetRoute = AppRoute.INBOX)
+        )
+        assertEquals(
+            TabNavAction.PopHome,
+            resolveTabNavigation(
+                currentRoute = AppRoute.NOTE_PATTERN,
+                targetRoute = AppRoute.HOME_GRAPH
+            )
         )
     }
 
@@ -55,6 +69,13 @@ class AppNavigationTest {
             TabNavAction.NavigateTab,
             resolveTabNavigation(currentRoute = AppRoute.PODCASTS, targetRoute = AppRoute.INBOX)
         )
+        assertEquals(
+            TabNavAction.NavigateTab,
+            resolveTabNavigation(
+                currentRoute = AppRoute.PODCASTS,
+                targetRoute = AppRoute.HOME_GRAPH
+            )
+        )
     }
 
     @Test
@@ -73,6 +94,13 @@ class AppNavigationTest {
             TabNavAction.NavigateTab,
             resolveTabNavigation(currentRoute = AppRoute.INBOX, targetRoute = AppRoute.PODCASTS)
         )
+        assertEquals(
+            TabNavAction.NavigateTab,
+            resolveTabNavigation(
+                currentRoute = AppRoute.INBOX,
+                targetRoute = AppRoute.PODCASTS_GRAPH
+            )
+        )
     }
 
     @Test
@@ -80,6 +108,13 @@ class AppNavigationTest {
         assertEquals(
             TabNavAction.NoOp,
             resolveTabNavigation(currentRoute = AppRoute.PODCASTS, targetRoute = AppRoute.PODCASTS)
+        )
+        assertEquals(
+            TabNavAction.NoOp,
+            resolveTabNavigation(
+                currentRoute = AppRoute.PODCASTS,
+                targetRoute = AppRoute.PODCASTS_GRAPH
+            )
         )
     }
 
