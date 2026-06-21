@@ -47,6 +47,11 @@ class Media3PodcastPlayerDriver(context: Context) : PodcastPlayerDriver {
     private var progressJob: Job? = null
     private var artworkJob: Job? = null
     private var playRequestGeneration = 0
+
+    // While resuming, the controller briefly reports position 0 until setMediaItem's start
+    // position is applied. Hold the resume target so published positions never dip below it
+    // during that window; cleared once the real position catches up.
+    private var resumeTargetMs: Long? = null
     private var peekArtworkUri: (PodcastEpisode) -> String? = { null }
     private var resolveArtworkUri: suspend (PodcastEpisode) -> String? = { null }
 
@@ -76,6 +81,7 @@ class Media3PodcastPlayerDriver(context: Context) : PodcastPlayerDriver {
         playRequestGeneration += 1
         val generation = playRequestGeneration
         artworkJob?.cancel()
+        resumeTargetMs = startPositionMs.takeIf { it > 0L }
         reduce(PodcastPlayerEvent.EpisodePlayRequested(episode, startPositionMs))
         val cachedArtworkUri = peekArtworkUri(episode)
         withController { mediaController ->
@@ -131,6 +137,7 @@ class Media3PodcastPlayerDriver(context: Context) : PodcastPlayerDriver {
     }
 
     override fun stop() {
+        resumeTargetMs = null
         reduce(PodcastPlayerEvent.StopRequested)
         withController { mediaController ->
             mediaController.stop()
@@ -287,7 +294,7 @@ class Media3PodcastPlayerDriver(context: Context) : PodcastPlayerDriver {
             PodcastPlayerEvent.NativeStateChanged(
                 nativeState = current.playbackState.toNativeState(),
                 playWhenReady = current.playWhenReady,
-                positionMs = current.currentPosition,
+                positionMs = effectivePosition(current.currentPosition),
                 durationMs = current.duration.takeIf { it != C.TIME_UNSET && it > 0L }
             )
         )
@@ -300,10 +307,24 @@ class Media3PodcastPlayerDriver(context: Context) : PodcastPlayerDriver {
         if (current.currentMediaItem == null) return
         reduce(
             PodcastPlayerEvent.ProgressChanged(
-                positionMs = current.currentPosition,
+                positionMs = effectivePosition(current.currentPosition),
                 durationMs = current.duration.takeIf { it != C.TIME_UNSET && it > 0L }
             )
         )
+    }
+
+    /**
+     * During a resume, report the resume target instead of a not-yet-applied lower position so the
+     * UI never dips toward 0 while [androidx.media3.session.MediaController.setMediaItem]'s start
+     * position settles. Clears the target once the real position reaches it.
+     */
+    private fun effectivePosition(rawPositionMs: Long): Long {
+        val target = resumeTargetMs ?: return rawPositionMs
+        if (rawPositionMs >= target) {
+            resumeTargetMs = null
+            return rawPositionMs
+        }
+        return target
     }
 
     private fun startProgressTicker() {
