@@ -13,6 +13,10 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.EskerraGo">
+        <meta-data
+            android:name="io.sentry.auto-init"
+            android:value="false" />
+
         <!-- adjustResize applies on API 26-29; API 30+ uses edge-to-edge IME insets in Compose. -->
         <activity
             android:name=".MainActivity"
