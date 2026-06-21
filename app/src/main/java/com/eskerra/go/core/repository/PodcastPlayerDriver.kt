@@ -10,6 +10,16 @@ interface PodcastPlayerDriver {
 
     fun play(episode: PodcastEpisode, startPositionMs: Long = 0L)
 
+    /**
+     * Supplies artwork URI resolvers for media-session metadata. [peekArtworkUri] must be cheap
+     * and synchronous; [resolveArtworkUri] may touch disk/network and can update the active media
+     * item after playback has already started.
+     */
+    fun configureArtworkResolver(
+        peekArtworkUri: (PodcastEpisode) -> String?,
+        resolveArtworkUri: suspend (PodcastEpisode) -> String?
+    ) {}
+
     fun hydrate(episode: PodcastEpisode, positionMs: Long, durationMs: Long?)
 
     fun pause()

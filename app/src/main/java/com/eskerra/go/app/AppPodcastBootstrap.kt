@@ -46,6 +46,19 @@ internal fun AppPodcastBootstrap(
     val playerState by podcastPlayerDriver.state.collectAsState()
 
     LaunchedEffect(currentConfig, filesDir) {
+        podcastPlayerDriver.configureArtworkResolver(
+            peekArtworkUri = { episode ->
+                loadPodcastArtwork.peek(currentConfig, filesDir, episode.rssFeedUrl)
+            },
+            resolveArtworkUri = { episode ->
+                loadPodcastArtwork.resolve(
+                    config = currentConfig,
+                    filesDir = filesDir,
+                    rssFeedUrl = episode.rssFeedUrl,
+                    allowNetwork = true
+                )
+            }
+        )
         loadPodcastArtwork.primeFromDisk(currentConfig, filesDir)
     }
 
