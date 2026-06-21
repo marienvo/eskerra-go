@@ -56,9 +56,4 @@ class AppRouteTest {
         val decoded = AppRoute.decodeNoteId("")
         assertEquals(NoteId(""), decoded)
     }
-
-    @Test
-    fun createInboxRouteIsDefined() {
-        assertEquals("create-inbox", AppRoute.CREATE_INBOX)
-    }
 }

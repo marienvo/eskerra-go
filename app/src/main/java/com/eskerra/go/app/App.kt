@@ -274,7 +274,6 @@ fun App(
             loadInboxSummaries = loadInboxSummaries,
             loadNoteForReading = loadNoteForReading,
             prefetchLinkedNotes = prefetchLinkedNotes,
-            createInboxNote = createInboxNote,
             deleteInboxNotes = deleteInboxNotes,
             loadEditableNote = loadEditableNote,
             saveNote = saveNote,

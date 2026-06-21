@@ -12,7 +12,6 @@ object AppRoute {
     const val PODCASTS_GRAPH = "podcasts-graph"
 
     const val INBOX = "inbox"
-    const val CREATE_INBOX = "create-inbox"
     const val SEARCH = "search"
     const val PODCASTS = "podcasts"
     const val SYNC = "sync"
