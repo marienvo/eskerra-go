@@ -10,18 +10,25 @@ import com.eskerra.go.core.repository.NoteRegistryCachePort
 import com.eskerra.go.core.repository.RemoteSyncRepository
 import com.eskerra.go.data.credentials.CredentialStore
 import com.eskerra.go.data.git.GitBranchNameValidator
+import com.eskerra.go.data.git.GitSyncMutex
 import com.eskerra.go.data.git.SyncGitErrorMapper
 import com.eskerra.go.data.workspace.RemoteUriSecurity
 import com.eskerra.go.data.workspace.WorkspacePaths
 import java.io.File
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
 
 /**
- * Orchestrates explicit user-triggered manual Git sync for a configured remote
- * workspace. See Step 9 sync algorithm in the project plan.
+ * Orchestrates explicit user-triggered vault Git sync for a configured remote workspace.
+ *
+ * Vault sync commits all safe local working-tree changes, integrates remote changes
+ * (fast-forward when behind; auto-merge with conflict sidecars when diverged), and
+ * pushes. Recovers from interrupted Git operations before proceeding. Shares one
+ * [GitSyncMutex] with podcast auto-sync. See [specs/architecture/sync-hardening-and-recovery.md].
  */
 class ManualSyncNow(
     private val remoteSyncRepository: RemoteSyncRepository,
@@ -30,17 +37,18 @@ class ManualSyncNow(
     private val contentCache: NoteContentCachePort? = null,
     private val loadSyncStatus: LoadSyncStatus,
     private val reconcileWorkspaceSyncBranch: ReconcileWorkspaceSyncBranch? = null,
+    private val gitSyncMutex: GitSyncMutex = GitSyncMutex(),
+    private val clock: () -> Instant = Instant::now,
+    private val zoneId: ZoneId = ZoneId.systemDefault(),
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO
 ) {
-
-    private val syncMutex = Mutex()
 
     suspend operator fun invoke(
         config: WorkspaceConfig,
         filesDir: File,
         onProgress: (SyncProgressStep) -> Unit = {}
     ): Result<SyncResult> = withContext(dispatcher) {
-        if (!syncMutex.tryLock()) {
+        if (!gitSyncMutex.mutex.tryLock()) {
             return@withContext Result.failure(SyncException(SyncError.SyncAlreadyRunning))
         }
         try {
@@ -56,7 +64,7 @@ class ManualSyncNow(
                 }
             }
         } finally {
-            syncMutex.unlock()
+            gitSyncMutex.mutex.unlock()
         }
     }
 
@@ -74,8 +82,11 @@ class ManualSyncNow(
             return Result.failure(SyncException(SyncError.WorkspaceUnavailable))
         }
 
+        // Recover from a half-finished Git operation instead of refusing to sync.
         if (remoteSyncRepository.requiresManualIntervention(workspaceDir)) {
-            return Result.failure(SyncException(SyncError.ManualInterventionRequired))
+            remoteSyncRepository.abortInProgressOperation(workspaceDir).getOrElse { error ->
+                return Result.failure(SyncGitErrorMapper.mapFailure(error))
+            }
         }
 
         val remoteUri = config.remoteUri?.trim().orEmpty()
@@ -104,11 +115,11 @@ class ManualSyncNow(
             return Result.failure(SyncGitErrorMapper.mapFailure(error, branch))
         }
 
-        validateWorkingTreePaths(workspaceDir, workspaceStatus.changedPaths).getOrElse { error ->
+        // The only hard stop left: genuinely unsafe paths (.git internals, `..`).
+        // Everything else is committed and synced unconditionally.
+        ensureNoUnsafePaths(workspaceStatus.changedPaths).getOrElse { error ->
             return Result.failure(error)
         }
-
-        val partition = remoteSyncRepository.partitionChanges(workspaceStatus.changedPaths)
 
         val effectiveBranch = remoteSyncRepository
             .ensureLocalBranch(workspaceDir, branch, httpsToken)
@@ -118,28 +129,17 @@ class ManualSyncNow(
 
         var committed = false
         var commitId: String? = null
-        if (partition.inboxPaths.isNotEmpty()) {
-            validateWorkingTreePaths(
-                workspaceDir,
-                remoteSyncRepository.status(workspaceDir).getOrElse { error ->
-                    return Result.failure(SyncGitErrorMapper.mapFailure(error, branch))
-                }.changedPaths
-            ).getOrElse { error ->
-                return Result.failure(error)
-            }
-
+        if (workspaceStatus.hasUncommittedChanges) {
             onProgress(SyncProgressStep.CommittingInboxChanges)
-            remoteSyncRepository.stageInboxChanges(workspaceDir).getOrElse { error ->
+            remoteSyncRepository.stageAllChanges(workspaceDir).getOrElse { error ->
                 return Result.failure(SyncGitErrorMapper.mapFailure(error, branch))
             }
-
-            validateStagedPaths(workspaceDir).getOrElse { error ->
+            ensureNoUnsafeStaged(workspaceDir).getOrElse { error ->
                 return Result.failure(error)
             }
-
             commitId = remoteSyncRepository.commitStaged(
                 workingDir = workspaceDir,
-                message = INBOX_COMMIT_MESSAGE
+                message = LOCAL_COMMIT_MESSAGE
             ).getOrElse { error ->
                 return Result.failure(SyncGitErrorMapper.mapFailure(error, branch))
             }
@@ -151,50 +151,80 @@ class ManualSyncNow(
             return Result.failure(SyncGitErrorMapper.mapFailure(error, branch))
         }
 
-        val comparison = remoteSyncRepository
-            .compareWithRemote(workspaceDir, effectiveBranch)
-            .getOrElse { error ->
-                return Result.failure(SyncGitErrorMapper.mapFailure(error, effectiveBranch))
-            }
-        if (comparison.remoteBranchMissing) {
-            return Result.failure(SyncException(SyncError.RemoteBranchNotFound(effectiveBranch)))
-        }
-
         var pulled = false
-        if (comparison.isDiverged) {
-            return Result.failure(SyncException(SyncError.Diverged))
-        }
-        if (comparison.aheadCount > 0 && comparison.behindCount > 0) {
-            return Result.failure(SyncException(SyncError.ConflictRisk))
-        }
-
-        if (comparison.localIsAncestorOfRemote && !comparison.isEqual) {
-            onProgress(SyncProgressStep.IntegratingRemote)
-            remoteSyncRepository
-                .fastForwardToRemote(workspaceDir, effectiveBranch)
-                .getOrElse { error ->
-                    return Result.failure(SyncGitErrorMapper.mapFailure(error, effectiveBranch))
-                }
-            pulled = true
-        }
-
         var pushed = false
-        val postIntegration = remoteSyncRepository.compareWithRemote(workspaceDir, effectiveBranch)
-            .getOrElse { error ->
-                return Result.failure(SyncGitErrorMapper.mapFailure(error, effectiveBranch))
-            }
+        val conflictCopies = mutableListOf<String>()
 
-        if (postIntegration.remoteIsAncestorOfLocal && !postIntegration.isEqual) {
-            onProgress(SyncProgressStep.PushingLocalCommits)
-            remoteSyncRepository
-                .push(workspaceDir, effectiveBranch, httpsToken)
+        var attempt = 0
+        while (true) {
+            attempt++
+            val comparison = remoteSyncRepository
+                .compareWithRemote(workspaceDir, effectiveBranch)
                 .getOrElse { error ->
                     return Result.failure(SyncGitErrorMapper.mapFailure(error, effectiveBranch))
                 }
-            pushed = true
-            remoteSyncRepository.fetch(workspaceDir, httpsToken).getOrElse { error ->
-                return Result.failure(SyncGitErrorMapper.mapFailure(error, effectiveBranch))
+            if (comparison.remoteBranchMissing) {
+                return Result.failure(
+                    SyncException(SyncError.RemoteBranchNotFound(effectiveBranch))
+                )
             }
+
+            // Integrate remote into local: fast-forward when purely behind, otherwise
+            // merge (saving local copies of any conflicts; remote wins the canonical file).
+            if (comparison.localIsAncestorOfRemote && !comparison.isEqual) {
+                onProgress(SyncProgressStep.IntegratingRemote)
+                remoteSyncRepository
+                    .fastForwardToRemote(workspaceDir, effectiveBranch)
+                    .getOrElse { error ->
+                        return Result.failure(SyncGitErrorMapper.mapFailure(error, effectiveBranch))
+                    }
+                pulled = true
+            } else if (comparison.isDiverged ||
+                (comparison.aheadCount > 0 && comparison.behindCount > 0)
+            ) {
+                onProgress(SyncProgressStep.IntegratingRemote)
+                val outcome = remoteSyncRepository
+                    .mergeRemote(workspaceDir, effectiveBranch, conflictLabel())
+                    .getOrElse { error ->
+                        return Result.failure(SyncGitErrorMapper.mapFailure(error, effectiveBranch))
+                    }
+                pulled = true
+                conflictCopies += outcome.conflictCopies
+            }
+
+            val postIntegration = remoteSyncRepository
+                .compareWithRemote(workspaceDir, effectiveBranch)
+                .getOrElse { error ->
+                    return Result.failure(SyncGitErrorMapper.mapFailure(error, effectiveBranch))
+                }
+
+            if (postIntegration.remoteIsAncestorOfLocal && !postIntegration.isEqual) {
+                onProgress(SyncProgressStep.PushingLocalCommits)
+                val pushResult =
+                    remoteSyncRepository.push(workspaceDir, effectiveBranch, httpsToken)
+                if (pushResult.isFailure) {
+                    val mapped = SyncGitErrorMapper.mapFailure(
+                        pushResult.exceptionOrNull() ?: RuntimeException("push failed"),
+                        effectiveBranch
+                    )
+                    // A rejected push means the remote advanced mid-sync: re-fetch and
+                    // re-integrate so we still end up pushed, no matter what.
+                    if (mapped.error is SyncError.PushRejected && attempt < MAX_PUSH_ATTEMPTS) {
+                        remoteSyncRepository.fetch(workspaceDir, httpsToken).getOrElse { error ->
+                            return Result.failure(
+                                SyncGitErrorMapper.mapFailure(error, effectiveBranch)
+                            )
+                        }
+                        continue
+                    }
+                    return Result.failure(mapped)
+                }
+                pushed = true
+                remoteSyncRepository.fetch(workspaceDir, httpsToken).getOrElse { error ->
+                    return Result.failure(SyncGitErrorMapper.mapFailure(error, effectiveBranch))
+                }
+            }
+            break
         }
 
         onProgress(SyncProgressStep.RefreshingNotes)
@@ -211,27 +241,21 @@ class ManualSyncNow(
                 commitId = commitId,
                 pushed = pushed,
                 pulled = pulled,
-                registryRefreshed = registryRefreshed
+                registryRefreshed = registryRefreshed,
+                conflictCopies = conflictCopies.toList()
             )
         )
     }
 
-    private fun validateWorkingTreePaths(
-        workspaceDir: File,
-        changedPaths: Set<String>
-    ): Result<Unit> {
-        validateStagedPaths(workspaceDir).getOrElse { return Result.failure(it) }
+    private fun ensureNoUnsafePaths(changedPaths: Set<String>): Result<Unit> {
         val partition = remoteSyncRepository.partitionChanges(changedPaths)
         if (partition.unsafePaths.isNotEmpty()) {
             return Result.failure(SyncException(SyncError.UnsafeLocalPath))
         }
-        if (partition.nonInboxPaths.isNotEmpty()) {
-            return Result.failure(SyncException(SyncError.NonInboxLocalChanges))
-        }
         return Result.success(Unit)
     }
 
-    private fun validateStagedPaths(workspaceDir: File): Result<Unit> {
+    private fun ensureNoUnsafeStaged(workspaceDir: File): Result<Unit> {
         val stagedPaths = remoteSyncRepository.readStagedPaths(workspaceDir).getOrElse { error ->
             return Result.failure(SyncGitErrorMapper.mapFailure(error))
         }
@@ -239,11 +263,11 @@ class ManualSyncNow(
         if (stagedPartition.unsafePaths.isNotEmpty()) {
             return Result.failure(SyncException(SyncError.UnsafeLocalPath))
         }
-        if (stagedPartition.nonInboxPaths.isNotEmpty()) {
-            return Result.failure(SyncException(SyncError.NonInboxStagedChanges))
-        }
         return Result.success(Unit)
     }
+
+    private fun conflictLabel(): String =
+        "conflict " + CONFLICT_TIMESTAMP.format(clock().atZone(zoneId))
 
     private suspend fun readHttpsToken(
         config: WorkspaceConfig,
@@ -262,6 +286,12 @@ class ManualSyncNow(
     }
 
     companion object {
-        const val INBOX_COMMIT_MESSAGE = "Update inbox notes from Eskerra Go"
+        const val LOCAL_COMMIT_MESSAGE = "Sync local changes from Eskerra Go"
+
+        /** Max integrate+push cycles before giving up on a racing remote. */
+        private const val MAX_PUSH_ATTEMPTS = 3
+
+        private val CONFLICT_TIMESTAMP: DateTimeFormatter =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH.mm.ss")
     }
 }

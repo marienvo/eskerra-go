@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.dp
 /** Vertical space reserved for floating shell chrome (sync, menu, taskbar). */
 internal val ShellTopChromeHeight = 56.dp
 internal val ShellBottomChromeHeight = 104.dp
+internal val ShellMiniPlayerHeight = 168.dp
 
 private val ShellHorizontalContentPadding = 16.dp
 
@@ -24,16 +25,22 @@ data class ShellChromeInsets(val top: Dp, val bottom: Dp) {
     }
 }
 
-fun calculateShellChromeInsets(statusBarTop: Dp, navigationBarBottom: Dp) = ShellChromeInsets(
+fun calculateShellChromeInsets(
+    statusBarTop: Dp,
+    navigationBarBottom: Dp,
+    miniPlayerVisible: Boolean = false
+) = ShellChromeInsets(
     top = ShellTopChromeHeight + statusBarTop,
-    bottom = ShellBottomChromeHeight + navigationBarBottom
+    bottom = ShellBottomChromeHeight +
+        navigationBarBottom +
+        if (miniPlayerVisible) ShellMiniPlayerHeight else 0.dp
 )
 
 @Composable
-fun rememberShellChromeInsets(): ShellChromeInsets {
+fun rememberShellChromeInsets(miniPlayerVisible: Boolean = false): ShellChromeInsets {
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val navigationBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    return calculateShellChromeInsets(statusBarTop, navigationBarBottom)
+    return calculateShellChromeInsets(statusBarTop, navigationBarBottom, miniPlayerVisible)
 }
 
 val LocalShellChromeInsets = compositionLocalOf { ShellChromeInsets.Zero }

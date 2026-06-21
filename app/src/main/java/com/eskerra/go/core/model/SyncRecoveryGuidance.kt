@@ -29,10 +29,15 @@ object SyncRecoveryGuidance {
             localNotesAvailable = false
         )
         SyncError.NonInboxLocalChanges -> SyncRecoveryAction(
-            hint = "Commit or revert changes outside Inbox/ with Git on a computer before syncing."
+            hint = "Unexpected local changes outside Inbox/ were detected. " +
+                "Vault sync normally commits these; if sync is blocked, inspect the repo with Git on a computer."
         )
         SyncError.NonInboxStagedChanges -> SyncRecoveryAction(
-            hint = "Unstage or commit non-Inbox/ files with Git on a computer before syncing."
+            hint = "Non-Inbox/ files are staged in Git. Vault sync normally handles this; " +
+                "if sync is blocked, unstage or commit them with Git on a computer."
+        )
+        SyncError.UnexpectedStagedChanges -> SyncRecoveryAction(
+            hint = "Unstage unexpected files with Git on a computer before podcast sync runs."
         )
         SyncError.UnsafeLocalPath -> SyncRecoveryAction(
             hint = "Fix unsafe working tree paths with Git on a computer before syncing."
@@ -53,8 +58,8 @@ object SyncRecoveryGuidance {
             suggestOpenSettings = true
         )
         SyncError.Diverged -> SyncRecoveryAction(
-            hint = "Local and remote histories diverged. Reconcile with Git on a computer; " +
-                "do not reset from the app."
+            hint = "Local and remote histories diverged. Tap Sync to integrate automatically, " +
+                "or reconcile with Git on a computer if you prefer manual control."
         )
         SyncError.ConflictRisk -> SyncRecoveryAction(
             hint = "Local and remote changes conflict. Reconcile with Git on a computer; " +
@@ -65,8 +70,9 @@ object SyncRecoveryGuidance {
                 "local commits were kept."
         )
         SyncError.ManualInterventionRequired -> SyncRecoveryAction(
-            hint = "Finish or abort the in-progress Git operation on a computer " +
-                "before syncing again."
+            hint = "Git was interrupted. Tap Sync to recover automatically, " +
+                "or finish or abort the operation on a computer " +
+                "before podcast mark-as-played."
         )
         SyncError.SyncAlreadyRunning -> SyncRecoveryAction(
             hint = "Wait for the current sync to finish."

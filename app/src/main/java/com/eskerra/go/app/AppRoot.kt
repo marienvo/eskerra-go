@@ -19,6 +19,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.eskerra.go.core.repository.ActiveTodayHubStore
 import com.eskerra.go.core.repository.BootCacheStore
+import com.eskerra.go.core.repository.PodcastCatalogSnapshotStore
+import com.eskerra.go.core.repository.PodcastPlayerDriver
 import com.eskerra.go.core.repository.TodayHubSnapshotStore
 import com.eskerra.go.core.usecase.BuildSafeSyncDiagnostic
 import com.eskerra.go.core.usecase.BuildSyncPreflight
@@ -31,6 +33,8 @@ import com.eskerra.go.core.usecase.LoadGitStatusSummary
 import com.eskerra.go.core.usecase.LoadInboxSummariesCached
 import com.eskerra.go.core.usecase.LoadLocalSettings
 import com.eskerra.go.core.usecase.LoadNoteForReading
+import com.eskerra.go.core.usecase.LoadPodcastArtwork
+import com.eskerra.go.core.usecase.LoadPodcastCatalog
 import com.eskerra.go.core.usecase.LoadRemoteSyncSettings
 import com.eskerra.go.core.usecase.LoadSyncStatus
 import com.eskerra.go.core.usecase.LoadTodayHub
@@ -38,6 +42,7 @@ import com.eskerra.go.core.usecase.LoadTodayHubRow
 import com.eskerra.go.core.usecase.LoadVaultSettings
 import com.eskerra.go.core.usecase.MaintainVaultSearchIndex
 import com.eskerra.go.core.usecase.ManualSyncNow
+import com.eskerra.go.core.usecase.MarkPodcastEpisodesPlayed
 import com.eskerra.go.core.usecase.PrefetchLinkedNotes
 import com.eskerra.go.core.usecase.ReconcileWorkspaceSyncBranch
 import com.eskerra.go.core.usecase.RecordLastSyncAttempt
@@ -48,6 +53,7 @@ import com.eskerra.go.core.usecase.SaveNote
 import com.eskerra.go.core.usecase.SaveRemoteSyncSettings
 import com.eskerra.go.core.usecase.SaveVaultSettings
 import com.eskerra.go.core.usecase.SearchVault
+import com.eskerra.go.core.usecase.SyncPodcastVaultRefresh
 import com.eskerra.go.core.usecase.TestRemoteConnection
 import com.eskerra.go.core.usecase.TouchVaultSearchPaths
 import com.eskerra.go.core.usecase.UpdateSyncToken
@@ -105,6 +111,14 @@ fun AppRoot(
     maintainVaultSearchIndex: MaintainVaultSearchIndex,
     repairVaultSearchIndex: RepairVaultSearchIndex,
     touchVaultSearchPaths: TouchVaultSearchPaths,
+    loadPodcastCatalog: LoadPodcastCatalog,
+    markPodcastEpisodesPlayed: MarkPodcastEpisodesPlayed,
+    podcastPlaylistWiring: PodcastPlaylistWiring,
+    loadPodcastArtwork: LoadPodcastArtwork,
+    podcastPlayerDriver: PodcastPlayerDriver,
+    syncPodcastVaultRefresh: SyncPodcastVaultRefresh,
+    catalogSnapshotStore: PodcastCatalogSnapshotStore,
+    podcastShellStateWiring: PodcastShellStateWiring,
     onLaunchSettled: () -> Unit = {}
 ) {
     EskerraGoTheme(darkTheme = true) {
@@ -123,11 +137,13 @@ fun AppRoot(
                 val gateState by gateViewModel.gateState.collectAsState()
                 var inboxUiState by remember { mutableStateOf<InboxUiState?>(null) }
                 var todayHubUiState by remember { mutableStateOf<TodayHubUiState?>(null) }
+                var podcastFirstLaunch by remember { mutableStateOf(false) }
 
                 AppLaunchSettledEffect(
                     gateState = gateState,
                     inboxUiState = inboxUiState,
                     todayHubUiState = todayHubUiState,
+                    podcastFirstLaunch = podcastFirstLaunch,
                     onLaunchSettled = onLaunchSettled
                 )
 
@@ -206,9 +222,18 @@ fun AppRoot(
                         maintainVaultSearchIndex = maintainVaultSearchIndex,
                         repairVaultSearchIndex = repairVaultSearchIndex,
                         touchVaultSearchPaths = touchVaultSearchPaths,
+                        loadPodcastCatalog = loadPodcastCatalog,
+                        markPodcastEpisodesPlayed = markPodcastEpisodesPlayed,
+                        podcastPlaylistWiring = podcastPlaylistWiring,
+                        loadPodcastArtwork = loadPodcastArtwork,
+                        podcastPlayerDriver = podcastPlayerDriver,
+                        syncPodcastVaultRefresh = syncPodcastVaultRefresh,
+                        catalogSnapshotStore = catalogSnapshotStore,
+                        podcastShellStateWiring = podcastShellStateWiring,
                         onConfigUpdated = gateViewModel::updateReadyConfig,
                         onInboxUiStateChanged = { inboxUiState = it },
-                        onTodayHubUiStateChanged = { todayHubUiState = it }
+                        onTodayHubUiStateChanged = { todayHubUiState = it },
+                        onPodcastFirstLaunchChanged = { podcastFirstLaunch = it }
                     )
                 }
             }

@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Canonical agent instructions for **eskerra-go** (Android/Kotlin/Jetpack Compose PoC).
+Canonical agent instructions for **eskerra-go** (Android/Kotlin/Jetpack Compose).
 
 Shared conventions (language, quality, specs discipline, testing, skills, git guardrails) are synced from the sibling **notebox** repo. Re-sync with:
 
@@ -21,9 +21,14 @@ Architecture style (hybrid layering + feature slices) and placement rules for ne
 - Git operations live only in `data/git`.
 - Markdown parsing and wiki-link resolution live outside UI.
 - Inbox editability is a domain rule: inbox notes editable, all other notes read-only.
-- No background sync in the PoC (no automatic commit/push/pull; read-only remote `fetch` for the shell indicator is allowed — see [`specs/architecture/sync-hardening-and-recovery.md`](specs/architecture/sync-hardening-and-recovery.md)).
-- Full-text search uses **Android's bundled SQLite FTS5** (`SQLiteOpenHelper`). No Rust/RN native module. See [`specs/plans/android-vault-notes-rebuild-plan.md`](specs/plans/android-vault-notes-rebuild-plan.md) (Phase 7) for the index schema, reconcile strategy, and ranker tiers.
-- No multi-workspace support in the PoC.
+- **Git sync channels** (see [`specs/architecture/sync-hardening-and-recovery.md`](specs/architecture/sync-hardening-and-recovery.md)):
+  - Manual vault sync (`ManualSyncNow`): commits all safe local changes, auto-merges on divergence with conflict sidecars, recovers interrupted Git ops before proceeding.
+  - Podcast RSS refresh delegates to `ManualSyncNow` via `SyncPodcastChangesViaVaultSync` after RSS writes `General/`.
+  - Podcast mark-as-played uses `SyncPodcastChange`: stages changed **General/** podcast paths only, fetch + fast-forward + push; no auto-merge/rebase/reset on divergence.
+  - All git mutations share one mutex.
+  - No WorkManager/AlarmManager scheduled sync; read-only remote `fetch` for the shell indicator is allowed on foreground.
+- Full-text search uses **Android's bundled SQLite FTS5** (`SQLiteOpenHelper`). See [`specs/plans/android-vault-notes-rebuild-plan.md`](specs/plans/android-vault-notes-rebuild-plan.md) (Phase 7) for the index schema, reconcile strategy, and ranker tiers.
+- No multi-workspace support.
 - Module budgets enforce file size in CI. New `.kt` files may not exceed **400** lines without a baseline entry; files **≥800** lines may not grow without an intentional baseline bump. See [`specs/team-scalability/README.md`](specs/team-scalability/README.md) and [`scripts/module-budget-baseline.json`](scripts/module-budget-baseline.json).
 - Every feature slice must include at least one unit test for domain/data behavior.
 
@@ -41,7 +46,7 @@ Do not reintroduce a `_android/` staging folder; commit assets directly under `a
 
 ## Specs
 
-Non-obvious decisions and PoC scope live under [`specs/`](specs/). See also [`.cursor/rules/project-conventions.mdc`](.cursor/rules/project-conventions.mdc).
+Non-obvious decisions and product boundaries live under [`specs/`](specs/). See also [`.cursor/rules/project-conventions.mdc`](.cursor/rules/project-conventions.mdc).
 
 ## Git hooks (no npm/Husky)
 

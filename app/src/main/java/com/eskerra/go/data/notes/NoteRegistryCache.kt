@@ -25,8 +25,8 @@ import kotlinx.coroutines.sync.withLock
  *
  * A [Mutex] serializes refresh / cold-load / invalidate so concurrent callers never trigger
  * redundant full scans or torn snapshot writes. Externally-changed files (e.g. a git pull) only
- * surface after the next [refresh]; in the PoC there is no background sync, so callers must
- * [refresh] after manual sync.
+ * surface after the next [refresh]; callers must [refresh] after manual sync or when
+ * external vault changes are expected.
  */
 class NoteRegistryCache(
     private val repository: NoteRegistryRepository,

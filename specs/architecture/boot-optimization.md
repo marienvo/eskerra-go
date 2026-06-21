@@ -71,7 +71,7 @@ Wiki-link opens use [NoteContentCache](app/src/main/java/com/eskerra/go/data/not
 - **Invalidation:** fingerprint mismatch ignores stale file; successful scan overwrites snapshot.
 - **Empty inbox:** a valid snapshot uses `"summaries":[]` and round-trips to an empty list (cache hit on next cold start).
 
-Inbox ordering after refresh remains last-modified descending per [poc-contract.md](poc-contract.md).
+Inbox ordering after refresh remains last-modified descending per [app-contract.md](app-contract.md).
 
 ### Inbox stale-while-revalidate (SWR)
 
@@ -100,5 +100,5 @@ Implementation:
 
 ## Out of scope
 
-- Background sync
+- WorkManager/AlarmManager scheduled sync
 - Multi-workspace snapshot keys

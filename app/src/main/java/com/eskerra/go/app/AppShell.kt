@@ -41,18 +41,21 @@ import com.eskerra.go.ui.theme.EskerraChromeTokens
 fun AppShell(
     currentRoute: String?,
     syncIndicator: ShellSyncIndicatorState?,
+    miniPlayerVisible: Boolean = false,
+    miniPlayer: (@Composable () -> Unit)? = null,
     onSyncClick: () -> Unit,
     onNavigate: (route: String) -> Unit,
     content: @Composable (contentModifier: Modifier) -> Unit
 ) {
-    val chromeInsets = rememberShellChromeInsets()
+    val chromeInsets = rememberShellChromeInsets(miniPlayerVisible)
 
     CompositionLocalProvider(LocalShellChromeInsets provides chromeInsets) {
         Box(modifier = Modifier.fillMaxSize()) {
-            content(Modifier.fillMaxSize())
-
-            ShellTopEdgeScrim(modifier = Modifier.align(Alignment.TopCenter))
-            ShellBottomEdgeScrim(modifier = Modifier.align(Alignment.BottomCenter))
+            content(
+                Modifier
+                    .fillMaxSize()
+                    .shellEdgeScrimOverlay()
+            )
 
             Row(
                 modifier = Modifier
@@ -83,6 +86,17 @@ fun AppShell(
                     .navigationBarsPadding()
                     .padding(16.dp)
             )
+
+            if (miniPlayer != null) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .navigationBarsPadding()
+                        .padding(start = 16.dp, end = 16.dp, bottom = 104.dp)
+                ) {
+                    miniPlayer()
+                }
+            }
         }
     }
 }

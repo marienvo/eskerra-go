@@ -10,7 +10,7 @@ Related documents:
 
 ## Purpose
 
-The Android PoC is still a single Gradle module (`:app`), so merge-conflict risk lives at the **file** level. Module budgets stop megamodules from growing silently and force intentional splits when a file must stay large.
+The app is still a single Gradle module (`:app`), so merge-conflict risk lives at the **file** level. Module budgets stop megamodules from growing silently and force intentional splits when a file must stay large.
 
 ## Current hotspots
 

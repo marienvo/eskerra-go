@@ -11,47 +11,46 @@ repo; Android work belongs here.
 
 ## Status
 
-This repository is an Android PoC, not a complete production app.
+Native Android app for the Eskerra Markdown vault. Core note workflows and the Episodes (podcasts) tab are implemented.
 
-- **Steps 1–7:** Compose shell, JGit spike, workspace setup, real inbox/reader/wiki
-  navigation, and inbox note create/edit/save with Git dirty status.
-- **Step 8:** restart/offline reliability, clearer loading/empty/error states, and
-  removal of fake production note paths.
-- **Step 9:** manual HTTPS remote sync (explicit user action only), Keystore-backed
-  token storage, inbox-only app commits, fast-forward integration, and safe typed
-  sync errors. Use a disposable private repo first; see manual verification below.
+**Implemented:**
 
-The core golden path works: configure a workspace, browse inbox notes, read wiki
-links, create and edit inbox notes, see Git dirty status, reopen offline after
-restart, and manually sync against a sanitized HTTPS remote when configured.
-Dashboard, Podcasts, and Menu remain placeholders.
+- Compose shell, workspace setup, inbox/reader/wiki navigation, Today Hub
+- Inbox note create/edit/save/delete with Git dirty status
+- Full-text vault search (SQLite FTS5)
+- Manual HTTPS remote sync (all local vault changes; fast-forward or auto-merge with conflict sidecars)
+- Vault settings UI including Cloudflare R2 credentials
+- Restart/offline reliability, boot optimization, stale-while-revalidate caches
+- Episodes/podcasts: catalog, Media3 playback, mini player, R2 playlist handoff, pure-Kotlin RSS refresh, mark-as-played, and auto git commit+push per podcast operation
 
-Specs and PoC scope live in [`specs/`](specs/). Agent and project rules live in
+Specs and product boundaries live in [`specs/`](specs/). Agent and project rules live in
 [`AGENTS.md`](AGENTS.md).
 
 ---
 
-## Target behavior
-
-The PoC target is intentionally narrow:
+## Product scope
 
 - Git-first setup for one workspace.
-- Clone from `file://` or sanitized `https://` remotes; manual sync for HTTPS.
-- Read, write (inbox only), commit, fetch, fast-forward, and push path.
-- Inbox list from markdown files.
-- Add flow that creates an editable inbox note.
-- Markdown reader with clickable wiki links.
-- Non-inbox notes are read-only.
+- Clone from `file://` or sanitized `https://` remotes; manual vault sync for HTTPS.
+- Read, write (inbox only), commit all safe local changes, fetch, integrate (fast-forward or auto-merge), and push.
+- Inbox list from markdown files; Today Hub; vault search.
+- Podcast episodes: catalog, playback, R2 playlist sync, RSS refresh.
+- Non-inbox notes are read-only except podcast checkbox writes under `General/`.
 - Floating shell navigation.
 
-Explicitly out of scope for the PoC:
+**Git sync channels** (see [`specs/architecture/sync-hardening-and-recovery.md`](specs/architecture/sync-hardening-and-recovery.md)):
 
-- Full-text search.
-- Background sync.
+- Manual vault sync: commits **all safe local changes**; auto-merges on divergence with conflict sidecars.
+- Podcast RSS refresh: writes `General/` from RSS, then runs the vault sync engine.
+- Podcast mark-as-played: **scoped auto-commit** for changed `General/` podcast paths only, then fetch + fast-forward + push when possible. Shared git mutex with vault sync.
+
+**Out of scope:**
+
 - Multi-workspace support.
-- Conflict resolution.
-- Podcast playback.
-- Dashboard content.
+- Automatic merge/rebase/conflict-resolution UI.
+- WorkManager/AlarmManager scheduled background sync.
+- SSH remotes.
+- iOS.
 
 ---
 
@@ -207,7 +206,8 @@ HTTPS remotes require on-device verification (see manual checklist above).
 
 HTTPS token auth uses an in-memory JGit credential provider. Tokens are stored
 in Keystore-backed encrypted app-private files, not in DataStore metadata or
-`.git/config`. SSH and background sync are out of scope.
+`.git/config`. SSH is not supported. Scheduled background sync is not used;
+podcast operations may auto-commit and push on user action (see sync-hardening spec).
 
 ---
 
@@ -216,10 +216,10 @@ in Keystore-backed encrypted app-private files, not in DataStore metadata or
 Read [`AGENTS.md`](AGENTS.md) before changing behavior. It is the canonical
 project instruction file for this repo.
 
-Non-obvious decisions, PoC boundaries, and spike findings live under
+Non-obvious decisions and architecture notes live under
 [`specs/`](specs/), especially:
 
-- [`specs/architecture/poc-contract.md`](specs/architecture/poc-contract.md)
+- [`specs/architecture/app-contract.md`](specs/architecture/app-contract.md)
 - [`specs/architecture/git-spike-findings.md`](specs/architecture/git-spike-findings.md)
 - [`specs/plans/workspace-setup.md`](specs/plans/workspace-setup.md)
 
@@ -266,12 +266,9 @@ This is a short summary, not legal advice. For exact terms, read
 ## Known limitations
 
 - Android only; iOS is not a target.
-- PoC status: core inbox/note/editor flow is local-first; Dashboard, Podcasts,
-  and Menu are placeholders.
-- One workspace only.
-- No background sync, full-text search, conflict resolution, podcast playback,
-  or dashboard content in the PoC.
-- Manual HTTPS sync is implemented but must be validated on a disposable
-  private repo before use on a valuable vault (see
+- One workspace per install.
+- Manual inbox sync and podcast auto-sync use fast-forward-only integration; diverged histories require manual Git repair outside the app.
+- Podcast tab rebuild in progress (stub UI until feature phases land).
+- Manual HTTPS sync should be validated on a disposable private repo before use on a valuable vault (see
   [`docs/verification/step-09-disposable-repo-manual-test.md`](docs/verification/step-09-disposable-repo-manual-test.md)).
-- SSH, background sync, and automatic conflict resolution are not implemented.
+- SSH and WorkManager scheduled sync are not implemented.

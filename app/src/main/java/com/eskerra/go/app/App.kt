@@ -25,6 +25,8 @@ import androidx.navigation.navArgument
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.ActiveTodayHubStore
+import com.eskerra.go.core.repository.PodcastCatalogSnapshotStore
+import com.eskerra.go.core.repository.PodcastPlayerDriver
 import com.eskerra.go.core.repository.TodayHubSnapshotStore
 import com.eskerra.go.core.usecase.BuildSafeSyncDiagnostic
 import com.eskerra.go.core.usecase.BuildSyncPreflight
@@ -37,6 +39,8 @@ import com.eskerra.go.core.usecase.LoadGitStatusSummary
 import com.eskerra.go.core.usecase.LoadInboxSummariesCached
 import com.eskerra.go.core.usecase.LoadLocalSettings
 import com.eskerra.go.core.usecase.LoadNoteForReading
+import com.eskerra.go.core.usecase.LoadPodcastArtwork
+import com.eskerra.go.core.usecase.LoadPodcastCatalog
 import com.eskerra.go.core.usecase.LoadRemoteSyncSettings
 import com.eskerra.go.core.usecase.LoadSyncStatus
 import com.eskerra.go.core.usecase.LoadTodayHub
@@ -44,6 +48,7 @@ import com.eskerra.go.core.usecase.LoadTodayHubRow
 import com.eskerra.go.core.usecase.LoadVaultSettings
 import com.eskerra.go.core.usecase.MaintainVaultSearchIndex
 import com.eskerra.go.core.usecase.ManualSyncNow
+import com.eskerra.go.core.usecase.MarkPodcastEpisodesPlayed
 import com.eskerra.go.core.usecase.PrefetchLinkedNotes
 import com.eskerra.go.core.usecase.ReconcileWorkspaceSyncBranch
 import com.eskerra.go.core.usecase.RecordLastSyncAttempt
@@ -54,6 +59,7 @@ import com.eskerra.go.core.usecase.SaveNote
 import com.eskerra.go.core.usecase.SaveRemoteSyncSettings
 import com.eskerra.go.core.usecase.SaveVaultSettings
 import com.eskerra.go.core.usecase.SearchVault
+import com.eskerra.go.core.usecase.SyncPodcastVaultRefresh
 import com.eskerra.go.core.usecase.TestRemoteConnection
 import com.eskerra.go.core.usecase.TouchVaultSearchPaths
 import com.eskerra.go.core.usecase.UpdateSyncToken
@@ -64,7 +70,6 @@ import com.eskerra.go.feature.inbox.InboxUiState
 import com.eskerra.go.feature.menu.MenuScreen
 import com.eskerra.go.feature.note.NoteReaderUiState
 import com.eskerra.go.feature.note.NoteScreen
-import com.eskerra.go.feature.podcasts.PodcastsScreen
 import com.eskerra.go.feature.settings.VaultSettingsScreen
 import com.eskerra.go.feature.sync.SyncScreen
 import com.eskerra.go.feature.sync.SyncSettingsScreen
@@ -113,14 +118,30 @@ fun App(
     maintainVaultSearchIndex: MaintainVaultSearchIndex,
     repairVaultSearchIndex: RepairVaultSearchIndex,
     touchVaultSearchPaths: TouchVaultSearchPaths,
+    loadPodcastCatalog: LoadPodcastCatalog,
+    markPodcastEpisodesPlayed: MarkPodcastEpisodesPlayed,
+    podcastPlaylistWiring: PodcastPlaylistWiring,
+    loadPodcastArtwork: LoadPodcastArtwork,
+    podcastPlayerDriver: PodcastPlayerDriver,
+    syncPodcastVaultRefresh: SyncPodcastVaultRefresh,
+    catalogSnapshotStore: PodcastCatalogSnapshotStore,
+    podcastShellStateWiring: PodcastShellStateWiring,
     onConfigUpdated: (WorkspaceConfig) -> Unit,
     onInboxUiStateChanged: (InboxUiState) -> Unit = {},
-    onTodayHubUiStateChanged: (TodayHubUiState) -> Unit = {}
+    onTodayHubUiStateChanged: (TodayHubUiState) -> Unit = {},
+    onPodcastFirstLaunchChanged: (Boolean) -> Unit = {}
 ) {
     var currentConfig by remember(config) { mutableStateOf(config) }
     val workspaceRoot = remember(currentConfig, filesDir) {
         WorkspacePaths.resolve(filesDir, currentConfig.relativePath).getOrNull()
     }
+    val playlistPollingHost = rememberPlaylistR2PollingHost(
+        workspaceRoot = workspaceRoot,
+        loadVaultSettings = loadVaultSettings,
+        playlistSyncRepository = podcastPlaylistWiring.repository,
+        playlistR2ConditionalFetch = podcastPlaylistWiring.conditionalFetch,
+        podcastPlayerDriver = podcastPlayerDriver
+    )
     val navController = rememberNavController()
     val scope = rememberCoroutineScope()
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -180,9 +201,33 @@ fun App(
     }
 
     val syncIndicator = shellSyncIndicatorState(syncState, remoteConfigured)
+    val podcastShellBridge = remember { PodcastShellBridge() }
+    val miniPlayerMount = rememberAppShellMiniPlayerMount(
+        currentConfig = currentConfig,
+        filesDir = filesDir,
+        loadPodcastArtwork = loadPodcastArtwork,
+        markPodcastEpisodesPlayed = markPodcastEpisodesPlayed,
+        podcastPlayerDriver = podcastPlayerDriver,
+        bridge = podcastShellBridge
+    )
+    AppPodcastBootstrap(
+        currentConfig = currentConfig,
+        filesDir = filesDir,
+        workspaceRoot = workspaceRoot,
+        currentRoute = currentRoute,
+        navController = navController,
+        podcastPlayerDriver = podcastPlayerDriver,
+        podcastShellStateWiring = podcastShellStateWiring,
+        podcastPlaylistSync = podcastPlaylistWiring.sync,
+        playlistPollingHost = playlistPollingHost,
+        bridge = podcastShellBridge,
+        onPodcastFirstLaunchChanged = onPodcastFirstLaunchChanged
+    )
     AppShell(
         currentRoute = currentRoute,
         syncIndicator = syncIndicator,
+        miniPlayerVisible = miniPlayerMount.visible,
+        miniPlayer = miniPlayerMount.content,
         onSyncClick = { onShellSyncClick(syncState, appSyncViewModel, navController) },
         onNavigate = { route ->
             navController.navigateTab(currentRoute, route) { homeReselectSignal++ }
@@ -267,7 +312,24 @@ fun App(
             }
 
             opaqueComposable(AppRoute.PODCASTS) {
-                PodcastsScreen(podcasts = fakePodcasts)
+                AppPodcastsRoute(
+                    currentConfig = currentConfig,
+                    filesDir = filesDir,
+                    loadPodcastCatalog = loadPodcastCatalog,
+                    markPodcastEpisodesPlayed = markPodcastEpisodesPlayed,
+                    podcastPlaylistSync = podcastPlaylistWiring.sync,
+                    loadPodcastArtwork = loadPodcastArtwork,
+                    podcastPlayerDriver = podcastPlayerDriver,
+                    syncPodcastVaultRefresh = syncPodcastVaultRefresh,
+                    catalogSnapshotStore = catalogSnapshotStore,
+                    persistPodcastPlaybackSnapshot =
+                    podcastShellStateWiring.persistPodcastPlaybackSnapshot,
+                    clearPodcastPlaybackSnapshot =
+                    podcastShellStateWiring.clearPodcastPlaybackSnapshot,
+                    loadLocalSettings = loadLocalSettings,
+                    podcastShellBridge = podcastShellBridge,
+                    playlistPollingHost = playlistPollingHost
+                )
             }
 
             opaqueComposable(AppRoute.MENU) {

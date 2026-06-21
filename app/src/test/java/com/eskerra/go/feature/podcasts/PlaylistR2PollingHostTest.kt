@@ -52,6 +52,33 @@ class PlaylistR2PollingHostTest {
         }
 
     @Test
+    fun `refreshActiveState activates poller when R2 becomes configured`() =
+        runTest(StandardTestDispatcher()) {
+            var r2Configured = false
+            var fetchCount = 0
+            val h = PlaylistR2PollingHost(
+                syncRepository = FakePlaylistSyncRepository(),
+                workspaceRoot = workspace,
+                isR2Configured = { r2Configured },
+                fetchConditional = {
+                    fetchCount++
+                    R2ConditionalResult.NotModified
+                },
+                scope = this,
+                intervalMs = 1_000L
+            )
+            h.setAppForeground(true)
+            runCurrent()
+            assertEquals(0, fetchCount)
+
+            r2Configured = true
+            h.refreshActiveState()
+            runCurrent()
+            assertEquals(1, fetchCount)
+            h.dispose()
+        }
+
+    @Test
     fun `poller stays inactive when R2 not configured`() = runTest(StandardTestDispatcher()) {
         var fetchCount = 0
         val h =

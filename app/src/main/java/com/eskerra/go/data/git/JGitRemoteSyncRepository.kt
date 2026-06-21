@@ -1,6 +1,7 @@
 package com.eskerra.go.data.git
 
 import com.eskerra.go.core.model.GitWorkspaceStatus
+import com.eskerra.go.core.model.MergeOutcome
 import com.eskerra.go.core.model.RemoteBranchComparison
 import com.eskerra.go.core.model.SyncChangePartition
 import com.eskerra.go.core.model.SyncStatusState
@@ -11,12 +12,17 @@ import java.io.File
 import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.api.MergeCommand
 import org.eclipse.jgit.api.MergeResult
+import org.eclipse.jgit.api.RebaseCommand
+import org.eclipse.jgit.api.ResetCommand
 import org.eclipse.jgit.api.TransportCommand
+import org.eclipse.jgit.lib.ObjectId
 import org.eclipse.jgit.lib.Ref
 import org.eclipse.jgit.lib.Repository
+import org.eclipse.jgit.merge.MergeStrategy
 import org.eclipse.jgit.revwalk.RevCommit
 import org.eclipse.jgit.revwalk.RevWalk
 import org.eclipse.jgit.transport.RemoteRefUpdate
+import org.eclipse.jgit.treewalk.TreeWalk
 
 /**
  * JGit-backed [RemoteSyncRepository] for manual sync.
@@ -48,8 +54,157 @@ class JGitRemoteSyncRepository(
         }
     }
 
+    override fun stagePaths(workingDir: File, relativePaths: Set<String>): Result<Unit> =
+        runCatching {
+            if (relativePaths.isEmpty()) return@runCatching
+            Git.open(workingDir).use { git ->
+                for (path in relativePaths) {
+                    val pattern = path.replace('\\', '/').trimStart('/')
+                    if (pattern.isBlank()) continue
+                    git.add().addFilepattern(pattern).call()
+                    git.add().addFilepattern(pattern).setUpdate(true).call()
+                }
+            }
+        }
+
+    override fun stageAllChanges(workingDir: File): Result<Unit> =
+        gitRepository.stageAll(workingDir)
+
+    override fun abortInProgressOperation(workingDir: File): Result<Unit> = runCatching {
+        val gitDir = File(workingDir, ".git")
+        val rebaseInProgress = File(gitDir, "rebase-merge").isDirectory ||
+            File(gitDir, "rebase-apply").isDirectory
+        Git.open(workingDir).use { git ->
+            if (rebaseInProgress) {
+                git.rebase().setOperation(RebaseCommand.Operation.ABORT).call()
+            } else {
+                // Hard reset clears MERGE_HEAD/CHERRY_PICK_HEAD/REVERT_HEAD and the
+                // partially-applied working tree, returning to the last good commit.
+                git.reset().setMode(ResetCommand.ResetType.HARD).setRef("HEAD").call()
+            }
+        }
+    }
+
     override fun commitStaged(workingDir: File, message: String): Result<String> =
         gitRepository.commit(workingDir, message)
+
+    override fun mergeRemote(
+        workingDir: File,
+        branch: String,
+        conflictLabel: String
+    ): Result<MergeOutcome> {
+        val merge = runCatching {
+            Git.open(workingDir).use { git ->
+                val repository = git.repository
+                val remoteRef = requireRemoteRef(repository, branch)
+                val mergeResult = git.merge()
+                    .include(remoteRef.objectId)
+                    .setStrategy(MergeStrategy.RECURSIVE)
+                    .setCommit(false)
+                    .call()
+                val copies = if (mergeResult.mergeStatus == MergeResult.MergeStatus.CONFLICTING) {
+                    resolveConflictsRemoteWins(
+                        git = git,
+                        repository = repository,
+                        remoteId = remoteRef.objectId,
+                        conflictPaths = mergeResult.conflicts?.keys.orEmpty(),
+                        conflictLabel = conflictLabel,
+                        workingDir = workingDir
+                    )
+                } else {
+                    emptyList()
+                }
+                MergeAttempt(mergeResult.mergeStatus, copies)
+            }
+        }.getOrElse { return Result.failure(it) }
+
+        return when (merge.status) {
+            MergeResult.MergeStatus.ALREADY_UP_TO_DATE ->
+                Result.success(MergeOutcome(merged = false))
+            MergeResult.MergeStatus.FAST_FORWARD ->
+                Result.success(MergeOutcome(merged = true))
+            MergeResult.MergeStatus.MERGED,
+            MergeResult.MergeStatus.MERGED_NOT_COMMITTED,
+            MergeResult.MergeStatus.CONFLICTING ->
+                // Records a two-parent merge commit (JGit reads MERGE_HEAD from disk).
+                gitRepository.commit(workingDir, MERGE_COMMIT_MESSAGE)
+                    .map { MergeOutcome(merged = true, conflictCopies = merge.conflictCopies) }
+            else ->
+                Result.failure(IllegalStateException("merge failed: ${merge.status}"))
+        }
+    }
+
+    /**
+     * Resolves each conflicting path remote-wins: saves the local version to a sidecar
+     * copy, then writes the remote version (or removes the file when the remote deleted
+     * it). Returns the repo-relative copy paths created.
+     */
+    private fun resolveConflictsRemoteWins(
+        git: Git,
+        repository: Repository,
+        remoteId: ObjectId,
+        conflictPaths: Set<String>,
+        conflictLabel: String,
+        workingDir: File
+    ): List<String> {
+        val copies = mutableListOf<String>()
+        for (path in conflictPaths) {
+            val oursBytes = readBlobBytes(repository, "HEAD", path)
+            if (oursBytes != null) {
+                val copyPath = conflictCopyPath(path, conflictLabel)
+                writeWorkspaceFile(workingDir, copyPath, oursBytes)
+                git.add().addFilepattern(copyPath).call()
+                copies += copyPath
+            }
+            val theirsBytes = readBlobBytes(repository, remoteId.name, path)
+            if (theirsBytes != null) {
+                writeWorkspaceFile(workingDir, path, theirsBytes)
+                git.add().addFilepattern(path).call()
+            } else {
+                // Remote deleted the file; remote-wins means the deletion stands.
+                git.rm().addFilepattern(path).call()
+            }
+        }
+        return copies
+    }
+
+    private fun readBlobBytes(repository: Repository, revision: String, path: String): ByteArray? {
+        val commitId = repository.resolve(revision) ?: return null
+        RevWalk(repository).use { revWalk ->
+            val tree = revWalk.parseCommit(commitId).tree
+            TreeWalk.forPath(repository, path, tree)?.use { treeWalk ->
+                return repository.open(treeWalk.getObjectId(0)).bytes
+            }
+        }
+        return null
+    }
+
+    private fun writeWorkspaceFile(workingDir: File, relativePath: String, bytes: ByteArray) {
+        val base = workingDir.canonicalFile
+        val target = File(base, relativePath).canonicalFile
+        require(target.toPath().startsWith(base.toPath())) {
+            "resolved path escapes workspace: $relativePath"
+        }
+        target.parentFile?.mkdirs()
+        target.writeBytes(bytes)
+    }
+
+    /** Inserts " ([label])" before the file extension, e.g. `note (conflict …).md`. */
+    private fun conflictCopyPath(path: String, label: String): String {
+        val normalized = path.replace('\\', '/')
+        val dir = normalized.substringBeforeLast('/', "")
+        val name = normalized.substringAfterLast('/')
+        val dot = name.lastIndexOf('.')
+        val baseName = if (dot > 0) name.substring(0, dot) else name
+        val extension = if (dot > 0) name.substring(dot) else ""
+        val copyName = "$baseName ($label)$extension"
+        return if (dir.isEmpty()) copyName else "$dir/$copyName"
+    }
+
+    private data class MergeAttempt(
+        val status: MergeResult.MergeStatus,
+        val conflictCopies: List<String>
+    )
 
     override fun fetch(workingDir: File, httpsToken: String?): Result<Unit> = runCatching {
         Git.open(workingDir).use { git ->
@@ -297,5 +452,6 @@ class JGitRemoteSyncRepository(
 
     private companion object {
         const val ORIGIN = "origin"
+        const val MERGE_COMMIT_MESSAGE = "Merge remote changes from Eskerra Go"
     }
 }

@@ -11,7 +11,7 @@ import kotlin.math.roundToInt
  * Reminder date-token grammar and read-only pill classification.
  *
  * Mirrors the read-only subset of
- * `apps/desktop/src/editor/noteEditor/dateToken/dateToken.ts`. The PoC renders pills only — no
+ * `apps/desktop/src/editor/noteEditor/dateToken/dateToken.ts`. The app renders pills only — no
  * picker/editing — so the token-snapping and default-time helpers are intentionally omitted.
  */
 object DateToken {
