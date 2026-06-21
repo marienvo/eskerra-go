@@ -62,10 +62,9 @@ internal sealed interface TabNavAction {
  * went through the save/restore tab switch, its entry would be stashed in a saved back stack and then
  * leak back on top of the next tab. Treating it as an inbox child makes Home pop it instead.
  */
-internal fun isInboxChildRoute(route: String?): Boolean =
-    route == AppRoute.NOTE_PATTERN ||
-        route == AppRoute.EDITOR_PATTERN ||
-        route == AppRoute.CREATE_INBOX
+internal fun isInboxChildRoute(route: String?): Boolean = route == AppRoute.NOTE_PATTERN ||
+    route == AppRoute.EDITOR_PATTERN ||
+    route == AppRoute.CREATE_INBOX
 
 /** Pure decision for what a shell tab tap should do. Side-effect free for unit testing. */
 internal fun resolveTabNavigation(currentRoute: String?, targetRoute: String): TabNavAction =
