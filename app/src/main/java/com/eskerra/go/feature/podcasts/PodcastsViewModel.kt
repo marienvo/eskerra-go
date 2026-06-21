@@ -214,12 +214,10 @@ class PodcastsViewModel(
 
     fun pausePlayback() = launchUserAction {
         podcastPlayerDriver.pause()
-        val state = podcastPlayerDriver.state.value
-        if (state.positionMs < MIN_PROGRESS_MS) {
-            launchUserAction { playlistPersistence.clearRemotePlaylist() }
-        } else {
-            queuePersist(state)
-        }
+        // An explicit pause keeps the session resumable regardless of progress; only an
+        // explicit stop/archive clears the playlist. Clearing here let the foreground poller
+        // observe the change and tear the paused session down (closing the mini player).
+        queuePersist(podcastPlayerDriver.state.value)
     }
 
     fun resumePlayback() {
@@ -291,7 +289,7 @@ class PodcastsViewModel(
 
     private suspend fun syncPlaylistFromRemote() {
         val root = workspaceRoot ?: return
-        if (podcastPlayerDriver.state.value.isPlaying) return
+        if (hasActiveLocalSession()) return
         if (userActionInFlight) return
         val catalog = lastCatalog ?: return
         val entry = podcastPlaylistSync.read(root)
@@ -319,8 +317,8 @@ class PodcastsViewModel(
             resetPlaybackIfIdle()
             return
         }
+        if (hasActiveLocalSession()) return
         val current = podcastPlayerDriver.state.value
-        if (current.isPlaying) return
         if (
             current.activeEpisode?.id == hydration.episode.id &&
             current.phase != PodcastPlaybackPhase.IDLE
@@ -371,10 +369,38 @@ class PodcastsViewModel(
         playlistPersistence.queuePersist(playerState)
     }
 
+    /**
+     * Tears down only a disposable resume hint — a hydrated-but-never-played [PRIMED] session or
+     * an already-[STOPPED] one. A live, user-facing session (PLAYING/PAUSED/LOADING) is
+     * authoritative and must never be dropped by remote sync; that is what closed the mini player
+     * after an early pause.
+     */
     private fun resetPlaybackIfIdle() {
         val current = podcastPlayerDriver.state.value
-        if (!current.isPlaying && current.hasActiveEpisode) {
+        if (!current.hasActiveEpisode) return
+        val disposableHint = current.phase == PodcastPlaybackPhase.PRIMED ||
+            current.phase == PodcastPlaybackPhase.STOPPED
+        if (disposableHint) {
             podcastPlayerDriver.stop()
+        }
+    }
+
+    /**
+     * A live, user-facing session: an active episode the user is playing, has paused, or is
+     * loading. Remote playlist sync must defer to it rather than re-hydrating or tearing it down.
+     * A [PRIMED] hint (which itself came from sync) is not "active" and may be updated remotely.
+     */
+    private fun hasActiveLocalSession(): Boolean {
+        val current = podcastPlayerDriver.state.value
+        if (!current.hasActiveEpisode) return false
+        return when (current.phase) {
+            PodcastPlaybackPhase.PLAYING,
+            PodcastPlaybackPhase.NEAR_END_PLAYING,
+            PodcastPlaybackPhase.PAUSED,
+            PodcastPlaybackPhase.NEAR_END_PAUSED,
+            PodcastPlaybackPhase.LOADING -> true
+
+            else -> false
         }
     }
 
