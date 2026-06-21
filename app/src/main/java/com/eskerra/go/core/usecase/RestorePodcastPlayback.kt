@@ -23,6 +23,10 @@ class RestorePodcastPlayback(
         filesDir: File,
         workspaceRoot: File?
     ): Result {
+        // Wait for the MediaController to connect so currentNativeSession() reflects a session
+        // that is already playing (e.g. when launched from the notification) instead of racing
+        // the async connect and seeing nothing.
+        podcastPlayerDriver.awaitConnection()
         val settings = localSettingsStore.load()
         val localSnapshot = settings.playbackSnapshot()
         val remoteEntry = workspaceRoot?.let { podcastPlaylistSync.read(it) }
@@ -44,6 +48,14 @@ class RestorePodcastPlayback(
             remoteEntry = remoteEntry,
             nativeSession = nativeSession
         ) ?: return Result(hydrated = false, preferredShellMode = preferredShellMode)
+
+        // A live native session is the source of truth: adopt its actual play/pause state and
+        // live position so returning from the notification reflects what is really playing,
+        // rather than priming from a possibly-stale persisted snapshot.
+        if (nativeSession != null && nativeSession.episodeId == hydration.episode.id) {
+            podcastPlayerDriver.adoptNativeSession(hydration.episode, nativeSession)
+            return Result(hydrated = true, preferredShellMode = AppShellMode.PODCASTS)
+        }
 
         val current = podcastPlayerDriver.state.value
         if (current.isPlaying) {

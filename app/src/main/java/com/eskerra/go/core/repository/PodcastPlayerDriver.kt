@@ -24,5 +24,20 @@ interface PodcastPlayerDriver {
 
     fun currentNativeSession(): PodcastNativeSessionSnapshot?
 
+    /**
+     * Suspends until the underlying media session connection has settled (or a bounded timeout
+     * elapses). Call before [currentNativeSession] on app launch so restore reads the live
+     * session instead of racing an async connect and seeing none. No-op for drivers that connect
+     * synchronously.
+     */
+    suspend fun awaitConnection() {}
+
+    /**
+     * Reflects the live native session ([snapshot]) into [state] for [episode] without issuing any
+     * transport command. Used on launch/reconnect so the in-app player shows what is actually
+     * playing (play/pause + live position), rather than a possibly-stale persisted snapshot.
+     */
+    fun adoptNativeSession(episode: PodcastEpisode, snapshot: PodcastNativeSessionSnapshot) {}
+
     fun release()
 }

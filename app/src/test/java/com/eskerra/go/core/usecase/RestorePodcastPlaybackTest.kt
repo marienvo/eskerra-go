@@ -173,6 +173,23 @@ class RestorePodcastPlaybackTest {
         override fun seekBy(deltaMs: Long) = Unit
         override fun seekTo(positionMs: Long) = Unit
         override fun currentNativeSession(): PodcastNativeSessionSnapshot? = nativeSession
+
+        override fun adoptNativeSession(
+            episode: PodcastEpisode,
+            snapshot: PodcastNativeSessionSnapshot
+        ) {
+            mutableState.value = PodcastPlaybackState(
+                activeEpisode = episode,
+                phase = if (snapshot.isPlaying) {
+                    PodcastPlaybackPhase.PLAYING
+                } else {
+                    PodcastPlaybackPhase.PAUSED
+                },
+                positionMs = snapshot.positionMs,
+                durationMs = snapshot.durationMs
+            )
+        }
+
         override fun release() = Unit
     }
 

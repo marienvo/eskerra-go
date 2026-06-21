@@ -19,6 +19,7 @@ import com.eskerra.go.core.player.PodcastPlayerMachine
 import com.eskerra.go.core.repository.PodcastPlayerDriver
 import com.google.common.util.concurrent.ListenableFuture
 import java.util.concurrent.Executor
+import kotlin.coroutines.resume
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -28,6 +29,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeoutOrNull
 
 class Media3PodcastPlayerDriver(context: Context) : PodcastPlayerDriver {
 
@@ -129,6 +132,40 @@ class Media3PodcastPlayerDriver(context: Context) : PodcastPlayerDriver {
             mediaController.seekTo(positionMs.coerceAtLeast(0L))
             publishProgress(mediaController)
         }
+    }
+
+    override suspend fun awaitConnection() {
+        if (controller != null) return
+        val future = controllerFuture ?: return
+        withTimeoutOrNull(CONNECT_TIMEOUT_MS) {
+            suspendCancellableCoroutine { continuation ->
+                future.addListener(
+                    { if (continuation.isActive) continuation.resume(Unit) },
+                    mainExecutor
+                )
+            }
+        }
+    }
+
+    override fun adoptNativeSession(
+        episode: PodcastEpisode,
+        snapshot: PodcastNativeSessionSnapshot
+    ) {
+        reduce(
+            PodcastPlayerEvent.PlaylistHydrated(
+                episode = episode,
+                positionMs = snapshot.positionMs,
+                durationMs = snapshot.durationMs
+            )
+        )
+        reduce(
+            PodcastPlayerEvent.NativeStateChanged(
+                nativeState = PodcastNativePlaybackState.READY,
+                playWhenReady = snapshot.isPlaying,
+                positionMs = snapshot.positionMs,
+                durationMs = snapshot.durationMs
+            )
+        )
     }
 
     override fun currentNativeSession(): PodcastNativeSessionSnapshot? {
@@ -235,5 +272,6 @@ class Media3PodcastPlayerDriver(context: Context) : PodcastPlayerDriver {
 
     private companion object {
         const val PROGRESS_TICK_MS = 1_000L
+        const val CONNECT_TIMEOUT_MS = 2_000L
     }
 }
