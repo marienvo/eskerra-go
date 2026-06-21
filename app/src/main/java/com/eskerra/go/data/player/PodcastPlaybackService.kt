@@ -28,19 +28,20 @@ class PodcastPlaybackService : MediaSessionService() {
         mediaSession
 
     /**
-     * Keep playing in the background when the app task is swiped away, so the user can return
-     * via the notification and resync. Only stop the service if nothing is actively playing,
-     * otherwise a paused session would leave a dangling notification.
+     * Replaces the default [MediaSessionService.onTaskRemoved] behavior (do not call super).
+     * The platform default checks [ExoPlayer.isPlaying], not [ExoPlayer.playWhenReady], and
+     * would stop a session that is still buffering. Keep the service alive when playback is
+     * intended ([ExoPlayer.playWhenReady] with a loaded item); otherwise stop to avoid a
+     * dangling paused notification.
      */
     override fun onTaskRemoved(rootIntent: Intent?) {
         val activePlayer = player
-        val playing = activePlayer != null &&
+        val keepAlive = activePlayer != null &&
             activePlayer.playWhenReady &&
             activePlayer.mediaItemCount > 0
-        if (!playing) {
+        if (!keepAlive) {
             stopSelf()
         }
-        super.onTaskRemoved(rootIntent)
     }
 
     override fun onDestroy() {

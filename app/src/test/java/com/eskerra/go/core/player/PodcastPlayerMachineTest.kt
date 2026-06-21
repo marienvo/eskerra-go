@@ -39,6 +39,25 @@ class PodcastPlayerMachineTest {
     }
 
     @Test
+    fun nativeBufferingWithPlayWhenReady_mapsToLoading() {
+        val state = primedState()
+
+        val next = PodcastPlayerMachine.reduce(
+            state,
+            PodcastPlayerEvent.NativeStateChanged(
+                nativeState = PodcastNativePlaybackState.BUFFERING,
+                playWhenReady = true,
+                positionMs = 2_000L,
+                durationMs = 60_000L
+            )
+        )
+
+        assertEquals(PodcastPlaybackPhase.LOADING, next.phase)
+        assertTrue(next.transportBusy)
+        assertEquals(2_000L, next.positionMs)
+    }
+
+    @Test
     fun nativeReadyPlaying_mapsToPlaying() {
         val state = primedState()
 

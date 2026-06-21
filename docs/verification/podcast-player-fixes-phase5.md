@@ -41,6 +41,9 @@ available, and the remaining checklist requires interactive playback in a config
 - pause/resume early and late
 - background + notification return
 - cold launch into paused/playing session
-- task-swipe behavior
+- task-swipe behavior (including swipe away **during buffering** on a slow connection:
+  notification stays, playback continues; tap notification → Podcasts mode with LOADING or
+  PLAYING and live position)
+- task-swipe while paused → service stops (no dangling notification)
 - episode switching gate
 - notification artwork and lockscreen controls

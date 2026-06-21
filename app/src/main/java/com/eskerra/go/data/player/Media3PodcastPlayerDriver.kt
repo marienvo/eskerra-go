@@ -177,10 +177,12 @@ class Media3PodcastPlayerDriver(context: Context) : PodcastPlayerDriver {
                 durationMs = snapshot.durationMs
             )
         )
+        val mediaController = controller
         reduce(
             PodcastPlayerEvent.NativeStateChanged(
-                nativeState = PodcastNativePlaybackState.READY,
-                playWhenReady = snapshot.isPlaying,
+                nativeState = mediaController?.playbackState?.toNativeState()
+                    ?: PodcastNativePlaybackState.READY,
+                playWhenReady = mediaController?.playWhenReady ?: snapshot.isPlaying,
                 positionMs = snapshot.positionMs,
                 durationMs = snapshot.durationMs
             )
