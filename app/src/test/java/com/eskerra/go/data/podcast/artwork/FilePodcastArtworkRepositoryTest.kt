@@ -99,7 +99,7 @@ class FilePodcastArtworkRepositoryTest {
     }
 
     @Test
-    fun resolveUri_afterMetadataLoad_returnsLocalUriWithinNinetyDays() = runTest {
+    fun resolveUri_afterMetadataLoad_returnsLocalUriAtNinetyDayBoundary() = runTest {
         val now = 1_000_000_000_000L
         val feedUrl = "https://example.com/feed"
         val cacheKey = podcastImageCacheKey(feedUrl)

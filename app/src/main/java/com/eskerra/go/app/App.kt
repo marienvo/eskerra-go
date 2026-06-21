@@ -2,8 +2,6 @@ package com.eskerra.go.app
 
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -63,7 +61,6 @@ import com.eskerra.go.core.usecase.TouchVaultSearchPaths
 import com.eskerra.go.core.usecase.UpdateSyncToken
 import com.eskerra.go.data.workspace.WorkspacePaths
 import com.eskerra.go.feature.inbox.InboxUiState
-import com.eskerra.go.feature.menu.MenuScreen
 import com.eskerra.go.feature.todayhub.TodayHubUiState
 import java.io.File
 
@@ -316,7 +313,6 @@ fun App(
         AppMenuSheet(
             onDismiss = { menuOpen = false },
             onItemClick = { item ->
-                menuOpen = false
                 when (item) {
                     MENU_SEARCH -> navController.navigate(AppRoute.SEARCH)
                     MENU_SYNC -> navController.navigate(AppRoute.SYNC)
@@ -324,18 +320,5 @@ fun App(
                 }
             }
         )
-    }
-}
-
-/**
- * Hamburger menu rendered as a [ModalBottomSheet] overlay. It dismisses on scrim tap and Back
- * (handled by [ModalBottomSheet]); selecting an item closes the sheet and navigates. Opening or
- * closing it never touches the NavHost, so the route underneath is preserved.
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun AppMenuSheet(onDismiss: () -> Unit, onItemClick: (String) -> Unit) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        MenuScreen(items = menuItems, onItemClick = onItemClick)
     }
 }

@@ -344,7 +344,7 @@ private fun EditorSaveBar(
 
 @Composable
 private fun editorBottomActionPadding() =
-    if (WindowInsets.ime.asPaddingValues().calculateBottomPadding() > 0.dp) {
+    if (WindowInsets.ime.asPaddingValues().calculateBottomPadding() >= 10.dp) {
         0.dp
     } else {
         LocalShellChromeInsets.current.bottom
