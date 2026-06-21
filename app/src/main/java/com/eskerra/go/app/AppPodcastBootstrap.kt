@@ -15,6 +15,7 @@ import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.playlist.RESUMABLE_PODCAST_MIN_PROGRESS_MS
 import com.eskerra.go.core.playlist.toPersistedSnapshot
 import com.eskerra.go.core.repository.PodcastPlayerDriver
+import com.eskerra.go.core.usecase.LoadPodcastArtwork
 import com.eskerra.go.core.usecase.PodcastPlaylistSync
 import com.eskerra.go.feature.podcasts.PlaylistR2PollingHost
 import java.io.File
@@ -30,6 +31,7 @@ internal fun AppPodcastBootstrap(
     podcastPlayerDriver: PodcastPlayerDriver,
     podcastShellStateWiring: PodcastShellStateWiring,
     podcastPlaylistSync: PodcastPlaylistSync,
+    loadPodcastArtwork: LoadPodcastArtwork,
     playlistPollingHost: PlaylistR2PollingHost?,
     bridge: PodcastShellBridge,
     onPodcastFirstLaunchChanged: (Boolean) -> Unit
@@ -41,6 +43,10 @@ internal fun AppPodcastBootstrap(
     val scope = rememberCoroutineScope()
     var initialNavigationDone by remember(currentConfig) { mutableStateOf(false) }
     val playerState by podcastPlayerDriver.state.collectAsState()
+
+    LaunchedEffect(currentConfig, filesDir) {
+        loadPodcastArtwork.primeFromDisk(currentConfig, filesDir)
+    }
 
     LaunchedEffect(currentConfig, workspaceRoot) {
         val restore = podcastShellStateWiring.restorePodcastPlayback(

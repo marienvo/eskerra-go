@@ -10,6 +10,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import coil.Coil
+import coil.ImageLoader
+import coil.disk.DiskCache
+import coil.memory.MemoryCache
 import com.eskerra.go.app.AppRoot
 import com.eskerra.go.app.PodcastPlaylistWiring
 import com.eskerra.go.app.PodcastShellStateWiring
@@ -95,6 +99,7 @@ import com.eskerra.go.data.workspace.DefaultRemoteSyncSettingsRepository
 import com.eskerra.go.data.workspace.DefaultWorkspaceSetupCompletion
 import com.eskerra.go.data.workspace.DefaultWorkspaceSetupRepository
 import com.eskerra.go.data.workspace.GateFingerprintComputer
+import java.io.File
 import okhttp3.OkHttpClient
 
 /** Single entry point. Hosts the Compose UI and nothing else. */
@@ -254,6 +259,7 @@ class MainActivity : ComponentActivity() {
             runVaultSync = { cfg, files -> manualSyncNow(cfg, files) }
         )
         val okHttpClient = OkHttpClient()
+        installImageLoader(okHttpClient)
         val rssFeedFetcher = OkHttpRssFeedFetcher(okHttpClient)
         val syncPodcastVaultRefresh = SyncPodcastVaultRefresh(
             vaultSync = FilePodcastRssVaultSync(fetcher = rssFeedFetcher),
@@ -376,5 +382,30 @@ class MainActivity : ComponentActivity() {
         podcastPlayerDriver?.release()
         podcastPlayerDriver = null
         super.onDestroy()
+    }
+
+    private fun installImageLoader(okHttpClient: OkHttpClient) {
+        Coil.setImageLoader(
+            ImageLoader.Builder(applicationContext)
+                .okHttpClient(okHttpClient)
+                .memoryCache {
+                    MemoryCache.Builder(applicationContext)
+                        .maxSizePercent(0.20)
+                        .build()
+                }
+                .diskCache {
+                    DiskCache.Builder()
+                        .directory(File(cacheDir, COIL_DISK_CACHE_DIR))
+                        .maxSizeBytes(COIL_DISK_CACHE_MAX_SIZE_BYTES)
+                        .build()
+                }
+                .respectCacheHeaders(false)
+                .build()
+        )
+    }
+
+    companion object {
+        private const val COIL_DISK_CACHE_DIR = "coil-image-cache"
+        private const val COIL_DISK_CACHE_MAX_SIZE_BYTES = 100L * 1024L * 1024L
     }
 }

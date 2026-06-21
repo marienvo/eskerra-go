@@ -219,6 +219,7 @@ fun App(
         podcastPlayerDriver = podcastPlayerDriver,
         podcastShellStateWiring = podcastShellStateWiring,
         podcastPlaylistSync = podcastPlaylistWiring.sync,
+        loadPodcastArtwork = loadPodcastArtwork,
         playlistPollingHost = playlistPollingHost,
         bridge = podcastShellBridge,
         onPodcastFirstLaunchChanged = onPodcastFirstLaunchChanged
@@ -299,7 +300,6 @@ fun App(
                     onSave = createViewModel::save
                 )
             }
-
             opaqueComposable(AppRoute.SEARCH) {
                 AppSearchRoute(
                     currentConfig = currentConfig,

@@ -97,4 +97,76 @@ class FilePodcastArtworkRepositoryTest {
 
         assertEquals(localUri, freshRepo.peekMemoryUri("vault-a", "https://example.com/feed"))
     }
+
+    @Test
+    fun resolveUri_afterMetadataLoad_returnsLocalUriWithinNinetyDays() = runTest {
+        val now = 1_000_000_000_000L
+        val feedUrl = "https://example.com/feed"
+        val cacheKey = podcastImageCacheKey(feedUrl)
+        val localUri = File(filesDir, "cached.png").apply {
+            writeBytes(byteArrayOf(1, 2, 3))
+        }.toURI().toString()
+        PodcastArtworkMetadataStore(filesDir).write(
+            "vault-a",
+            mapOf(
+                cacheKey to PodcastArtworkMeta(
+                    cacheKey = cacheKey,
+                    localFileUri = localUri,
+                    localUpdatedAtMs = now - FilePodcastArtworkRepository.LOCAL_FILE_TTL_MS
+                )
+            )
+        )
+
+        val freshRepo = FilePodcastArtworkRepository(
+            filesDir = filesDir,
+            httpClient = OkHttpClient(),
+            clock = { now }
+        )
+        freshRepo.loadMetadataFromDisk("vault-a")
+
+        val uri = freshRepo.resolveUri(
+            workspaceKey = "vault-a",
+            rssFeedUrl = feedUrl,
+            fetchRssXml = { error("Network should not be used") },
+            allowNetwork = false
+        )
+
+        assertEquals(localUri, uri)
+    }
+
+    @Test
+    fun resolveUri_afterMetadataLoad_ignoresLocalUriAfterNinetyDays() = runTest {
+        val now = 1_000_000_000_000L
+        val feedUrl = "https://example.com/feed"
+        val cacheKey = podcastImageCacheKey(feedUrl)
+        val localUri = File(filesDir, "cached.png").apply {
+            writeBytes(byteArrayOf(1, 2, 3))
+        }.toURI().toString()
+        PodcastArtworkMetadataStore(filesDir).write(
+            "vault-a",
+            mapOf(
+                cacheKey to PodcastArtworkMeta(
+                    cacheKey = cacheKey,
+                    localFileUri = localUri,
+                    localUpdatedAtMs = now - FilePodcastArtworkRepository.LOCAL_FILE_TTL_MS - 1L
+                )
+            )
+        )
+
+        val freshRepo = FilePodcastArtworkRepository(
+            filesDir = filesDir,
+            httpClient = OkHttpClient(),
+            clock = { now }
+        )
+        freshRepo.loadMetadataFromDisk("vault-a")
+
+        val uri = freshRepo.resolveUri(
+            workspaceKey = "vault-a",
+            rssFeedUrl = feedUrl,
+            fetchRssXml = { error("Network should not be used") },
+            allowNetwork = false
+        )
+
+        assertEquals(null, uri)
+    }
 }
