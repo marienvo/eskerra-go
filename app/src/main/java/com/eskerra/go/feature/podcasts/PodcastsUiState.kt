@@ -1,5 +1,7 @@
 package com.eskerra.go.feature.podcasts
 
+import com.eskerra.go.core.model.PodcastCatalogError
+import com.eskerra.go.core.model.PodcastCatalogException
 import com.eskerra.go.core.model.PodcastPlaybackState
 import com.eskerra.go.core.model.PodcastSection
 
@@ -33,3 +35,12 @@ data class PodcastRefreshState(
 sealed interface PodcastsUiEvent {
     data object PauseToSwitchEpisode : PodcastsUiEvent
 }
+
+/** Maps a catalog-load failure to the user-facing error message shown in [PodcastsUiState.Error]. */
+internal fun podcastCatalogErrorMessage(error: Throwable): String =
+    when ((error as? PodcastCatalogException)?.error) {
+        PodcastCatalogError.InvalidWorkspacePath -> PodcastsViewModel.WORKSPACE_UNAVAILABLE_MESSAGE
+        PodcastCatalogError.WorkspaceMissing -> PodcastsViewModel.WORKSPACE_MISSING_MESSAGE
+        is PodcastCatalogError.LoadFailed -> PodcastsViewModel.LOAD_ERROR_MESSAGE
+        null -> PodcastsViewModel.LOAD_ERROR_MESSAGE
+    }

@@ -39,6 +39,49 @@ class PodcastPlayerMachineTest {
     }
 
     @Test
+    fun playRequested_forResume_keepsStartPositionAndDuration() {
+        val state = PodcastPlaybackState(
+            activeEpisode = sampleEpisode(),
+            phase = PodcastPlaybackPhase.PAUSED,
+            positionMs = 30_000L,
+            durationMs = 60_000L
+        )
+
+        val next = PodcastPlayerMachine.reduce(
+            state,
+            PodcastPlayerEvent.EpisodePlayRequested(sampleEpisode(), startPositionMs = 30_000L)
+        )
+
+        assertEquals(PodcastPlaybackPhase.LOADING, next.phase)
+        assertEquals(30_000L, next.positionMs)
+        assertEquals(60_000L, next.durationMs)
+        assertTrue(next.transportBusy)
+    }
+
+    @Test
+    fun nativeZeroPositionWhileLoading_keepsKnownResumePosition() {
+        val state = PodcastPlaybackState(
+            activeEpisode = sampleEpisode(),
+            phase = PodcastPlaybackPhase.LOADING,
+            positionMs = 30_000L,
+            durationMs = 60_000L
+        )
+
+        val next = PodcastPlayerMachine.reduce(
+            state,
+            PodcastPlayerEvent.NativeStateChanged(
+                nativeState = PodcastNativePlaybackState.BUFFERING,
+                playWhenReady = true,
+                positionMs = 0L,
+                durationMs = 60_000L
+            )
+        )
+
+        assertEquals(PodcastPlaybackPhase.LOADING, next.phase)
+        assertEquals(30_000L, next.positionMs)
+    }
+
+    @Test
     fun nativeBufferingWithPlayWhenReady_mapsToLoading() {
         val state = primedState()
 

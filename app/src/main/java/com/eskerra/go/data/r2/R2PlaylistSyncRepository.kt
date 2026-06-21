@@ -2,6 +2,7 @@ package com.eskerra.go.data.r2
 
 import com.eskerra.go.core.model.EskerraSettings
 import com.eskerra.go.core.model.PlaylistEntry
+import com.eskerra.go.core.model.PlaylistReadOutcome
 import com.eskerra.go.core.model.PlaylistWriteResult
 import com.eskerra.go.core.model.R2Config
 import com.eskerra.go.core.playlist.isRemotePlaylistNewerThanKnown
@@ -40,12 +41,15 @@ class R2PlaylistSyncRepository(
 ) : PlaylistSyncRepository {
 
     /** Keeps the settled read per workspace so a prime can be reused (see TS coalescer). */
-    private val readCache = mutableMapOf<String, Deferred<PlaylistEntry?>>()
+    private val readCache = mutableMapOf<String, Deferred<PlaylistReadOutcome>>()
 
-    override suspend fun readPlaylist(workspaceRoot: File): PlaylistEntry? {
+    override suspend fun readPlaylist(workspaceRoot: File): PlaylistEntry? =
+        (readPlaylistOutcome(workspaceRoot) as? PlaylistReadOutcome.Present)?.entry
+
+    override suspend fun readPlaylistOutcome(workspaceRoot: File): PlaylistReadOutcome {
         val key = workspaceRoot.path
-        val existing: Deferred<PlaylistEntry?>?
-        val owned = CompletableDeferred<PlaylistEntry?>()
+        val existing: Deferred<PlaylistReadOutcome>?
+        val owned = CompletableDeferred<PlaylistReadOutcome>()
         synchronized(readCache) {
             existing = readCache[key]
             if (existing == null) readCache[key] = owned
@@ -69,21 +73,23 @@ class R2PlaylistSyncRepository(
         }
     }
 
-    private suspend fun doRead(workspaceRoot: File): PlaylistEntry? {
+    private suspend fun doRead(workspaceRoot: File): PlaylistReadOutcome {
         val r2 = resolveR2(workspaceRoot)
         if (r2 == null) {
             persistKnown(null, null)
-            return null
+            return PlaylistReadOutcome.Unavailable
         }
         return try {
             val remote = withContext(ioDispatcher) { r2Client.get(r2) }
             persistKnown(remote?.updatedAt, remote?.controlRevision)
-            remote
+            remote?.let { PlaylistReadOutcome.Present(it) } ?: PlaylistReadOutcome.Empty
         } catch (e: CancellationException) {
             throw e
         } catch (_: Throwable) {
+            // Transient failure: clear watermarks (a later write re-resolves against remote) but
+            // never report Empty — local playback state must survive an unreachable R2.
             persistKnown(null, null)
-            null
+            PlaylistReadOutcome.Unavailable
         }
     }
 
@@ -105,7 +111,7 @@ class R2PlaylistSyncRepository(
         val remote = withContext(ioDispatcher) { r2Client.get(r2) }
         if (remote != null && isRemotePlaylistNewerThanKnown(remote, knownUpdated, knownRev)) {
             persistKnown(remote.updatedAt, remote.controlRevision)
-            cacheResolved(key, remote)
+            cacheResolved(key, PlaylistReadOutcome.Present(remote))
             return PlaylistWriteResult.Superseded(remote)
         }
 
@@ -113,7 +119,7 @@ class R2PlaylistSyncRepository(
         val saved = entry.copy(updatedAt = nextTs)
         withContext(ioDispatcher) { r2Client.put(r2, saved) }
         persistKnown(saved.updatedAt, saved.controlRevision)
-        cacheResolved(key, saved)
+        cacheResolved(key, PlaylistReadOutcome.Present(saved))
         return PlaylistWriteResult.Saved(saved)
     }
 
@@ -128,7 +134,7 @@ class R2PlaylistSyncRepository(
         if (legacy.isFile) {
             withContext(ioDispatcher) { legacy.delete() }
         }
-        cacheResolved(workspaceRoot.path, null)
+        cacheResolved(workspaceRoot.path, PlaylistReadOutcome.Empty)
     }
 
     override fun invalidateReadCache(workspaceRoot: File) {
@@ -157,11 +163,11 @@ class R2PlaylistSyncRepository(
         )
     }
 
-    private fun cacheResolved(key: String, value: PlaylistEntry?) {
+    private fun cacheResolved(key: String, value: PlaylistReadOutcome) {
         synchronized(readCache) { readCache[key] = CompletableDeferred(value) }
     }
 
-    private fun dropCache(key: String, owned: Deferred<PlaylistEntry?>) {
+    private fun dropCache(key: String, owned: Deferred<PlaylistReadOutcome>) {
         synchronized(readCache) { if (readCache[key] === owned) readCache.remove(key) }
     }
 }

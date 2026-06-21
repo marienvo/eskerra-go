@@ -3,6 +3,7 @@ package com.eskerra.go.data.r2
 import com.eskerra.go.core.model.EskerraLocalSettings
 import com.eskerra.go.core.model.EskerraSettings
 import com.eskerra.go.core.model.PlaylistEntry
+import com.eskerra.go.core.model.PlaylistReadOutcome
 import com.eskerra.go.core.model.PlaylistWriteResult
 import com.eskerra.go.core.model.R2Config
 import com.eskerra.go.core.repository.LocalSettingsStore
@@ -171,6 +172,51 @@ class R2PlaylistSyncRepositoryTest {
         repo.readPlaylist(tempFolder.root)
 
         assertEquals(2, client.getCount)
+    }
+
+    // ── readPlaylistOutcome ─────────────────────────────────────────────────────
+
+    @Test
+    fun `readPlaylistOutcome without R2 is Unavailable`() = runTest {
+        val client = FakeR2Client()
+        val repo = repo(EskerraSettings(r2 = null), FakeLocalSettingsStore(), client)
+
+        assertEquals(
+            PlaylistReadOutcome.Unavailable,
+            repo.readPlaylistOutcome(tempFolder.root)
+        )
+        assertEquals(0, client.getCount)
+    }
+
+    @Test
+    fun `readPlaylistOutcome reports Empty when R2 has no object`() = runTest {
+        val client = FakeR2Client(getResult = null)
+        val repo = repo(EskerraSettings(r2 = r2Config), FakeLocalSettingsStore(), client)
+
+        assertEquals(PlaylistReadOutcome.Empty, repo.readPlaylistOutcome(tempFolder.root))
+    }
+
+    @Test
+    fun `readPlaylistOutcome reports Present with the remote entry`() = runTest {
+        val remote = entry(updatedAt = 7)
+        val client = FakeR2Client(getResult = remote)
+        val repo = repo(EskerraSettings(r2 = r2Config), FakeLocalSettingsStore(), client)
+
+        assertEquals(
+            PlaylistReadOutcome.Present(remote),
+            repo.readPlaylistOutcome(tempFolder.root)
+        )
+    }
+
+    @Test
+    fun `readPlaylistOutcome is Unavailable not Empty when the GET fails`() = runTest {
+        val client = FakeR2Client(getThrows = R2PlaylistException("boom"))
+        val repo = repo(EskerraSettings(r2 = r2Config), FakeLocalSettingsStore(), client)
+
+        assertEquals(
+            PlaylistReadOutcome.Unavailable,
+            repo.readPlaylistOutcome(tempFolder.root)
+        )
     }
 
     // ── writePlaylist ──────────────────────────────────────────────────────────

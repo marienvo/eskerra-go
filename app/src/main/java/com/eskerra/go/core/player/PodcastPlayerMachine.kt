@@ -20,7 +20,8 @@ sealed interface PodcastPlayerEvent {
         val durationMs: Long?
     ) : PodcastPlayerEvent
 
-    data class EpisodePlayRequested(val episode: PodcastEpisode) : PodcastPlayerEvent
+    data class EpisodePlayRequested(val episode: PodcastEpisode, val startPositionMs: Long = 0L) :
+        PodcastPlayerEvent
     data object PauseRequested : PodcastPlayerEvent
     data object ResumeRequested : PodcastPlayerEvent
     data object StopRequested : PodcastPlayerEvent
@@ -53,6 +54,15 @@ object PodcastPlayerMachine {
             is PodcastPlayerEvent.EpisodePlayRequested -> PodcastPlaybackState(
                 activeEpisode = event.episode,
                 phase = PodcastPlaybackPhase.LOADING,
+                // Carry the resume position so LOADING ("Resuming…") shows where playback will
+                // continue instead of flashing 0%. Keep the duration when re-playing the same
+                // episode so the progress bar denominator is stable across the resume.
+                positionMs = sanitizedPosition(event.startPositionMs),
+                durationMs = if (state.activeEpisode?.id == event.episode.id) {
+                    state.durationMs
+                } else {
+                    null
+                },
                 transportBusy = true
             )
 
@@ -79,30 +89,41 @@ object PodcastPlayerMachine {
             )
 
             is PodcastPlayerEvent.NativeStateChanged -> {
-                val nativeIdleWithoutLoadedMedia =
-                    event.nativeState == PodcastNativePlaybackState.IDLE &&
-                        event.positionMs == 0L &&
+                // A zero position reported while we already hold a known position is a transient
+                // artifact of (re)loading a media item before a pending seek lands. Never let it
+                // reset the displayed position of a primed/paused/loading session — that is what
+                // flashes 0% on resume.
+                val transientZeroPosition =
+                    event.positionMs == 0L &&
+                        state.positionMs > 0L &&
                         state.hasActiveEpisode &&
-                        state.positionMs > 0L
-                if (
-                    nativeIdleWithoutLoadedMedia &&
-                    (
-                        state.phase == PodcastPlaybackPhase.PRIMED ||
-                            state.phase == PodcastPlaybackPhase.PAUSED ||
-                            state.phase == PodcastPlaybackPhase.NEAR_END_PAUSED
-                        )
-                ) {
+                        event.nativeState != PodcastNativePlaybackState.ENDED &&
+                        (
+                            state.phase == PodcastPlaybackPhase.PRIMED ||
+                                state.phase == PodcastPlaybackPhase.LOADING ||
+                                state.phase == PodcastPlaybackPhase.PAUSED ||
+                                state.phase == PodcastPlaybackPhase.NEAR_END_PAUSED
+                            )
+                val nativeIdleWithoutLoadedMedia =
+                    transientZeroPosition &&
+                        event.nativeState == PodcastNativePlaybackState.IDLE &&
+                        state.phase != PodcastPlaybackPhase.LOADING
+                if (nativeIdleWithoutLoadedMedia) {
                     state
                 } else {
                     state.copy(
                         phase = phaseFromNative(
                             nativeState = event.nativeState,
                             playWhenReady = event.playWhenReady,
-                            positionMs = event.positionMs,
+                            positionMs = if (transientZeroPosition) {
+                                state.positionMs
+                            } else {
+                                event.positionMs
+                            },
                             durationMs = event.durationMs,
                             hasActiveEpisode = state.activeEpisode != null
                         ),
-                        positionMs = if (nativeIdleWithoutLoadedMedia) {
+                        positionMs = if (transientZeroPosition) {
                             state.positionMs
                         } else {
                             sanitizedPosition(event.positionMs)

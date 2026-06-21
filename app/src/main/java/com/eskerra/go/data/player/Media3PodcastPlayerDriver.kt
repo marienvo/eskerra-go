@@ -76,7 +76,7 @@ class Media3PodcastPlayerDriver(context: Context) : PodcastPlayerDriver {
         playRequestGeneration += 1
         val generation = playRequestGeneration
         artworkJob?.cancel()
-        reduce(PodcastPlayerEvent.EpisodePlayRequested(episode))
+        reduce(PodcastPlayerEvent.EpisodePlayRequested(episode, startPositionMs))
         val cachedArtworkUri = peekArtworkUri(episode)
         withController { mediaController ->
             val item = mediaItemForEpisode(episode, cachedArtworkUri)
