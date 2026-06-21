@@ -65,7 +65,7 @@ class ManualSyncNowTest {
         assertTrue(result.isSuccess)
         assertTrue(result.getOrThrow().committed)
         val message = lastCommitMessage(setup.workspaceDir)
-        assertTrue(message?.contains(ManualSyncNow.INBOX_COMMIT_MESSAGE) == true)
+        assertTrue(message?.contains(ManualSyncNow.LOCAL_COMMIT_MESSAGE) == true)
     }
 
     @Test
@@ -424,7 +424,7 @@ class ManualSyncNowTest {
 
         org.eclipse.jgit.api.Git.open(setup.workspaceDir).use { git ->
             val commit = git.log().call()
-                .first { it.fullMessage.contains(ManualSyncNow.INBOX_COMMIT_MESSAGE) }
+                .first { it.fullMessage.contains(ManualSyncNow.LOCAL_COMMIT_MESSAGE) }
             val parent = commit.parents.firstOrNull()
                 ?: error("Expected sync commit to have a parent")
             val reader = git.repository.newObjectReader()

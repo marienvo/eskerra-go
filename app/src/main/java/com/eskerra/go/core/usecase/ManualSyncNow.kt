@@ -23,8 +23,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Orchestrates explicit user-triggered manual Git sync for a configured remote
- * workspace. See Step 9 sync algorithm in the project plan.
+ * Orchestrates explicit user-triggered vault Git sync for a configured remote workspace.
+ *
+ * Vault sync commits all safe local working-tree changes, integrates remote changes
+ * (fast-forward when behind; auto-merge with conflict sidecars when diverged), and
+ * pushes. Recovers from interrupted Git operations before proceeding. Shares one
+ * [GitSyncMutex] with podcast auto-sync. See [specs/architecture/sync-hardening-and-recovery.md].
  */
 class ManualSyncNow(
     private val remoteSyncRepository: RemoteSyncRepository,
@@ -283,9 +287,6 @@ class ManualSyncNow(
 
     companion object {
         const val LOCAL_COMMIT_MESSAGE = "Sync local changes from Eskerra Go"
-
-        /** Kept for backward compatibility; local commits now cover all paths. */
-        const val INBOX_COMMIT_MESSAGE = LOCAL_COMMIT_MESSAGE
 
         /** Max integrate+push cycles before giving up on a racing remote. */
         private const val MAX_PUSH_ATTEMPTS = 3

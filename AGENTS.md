@@ -22,9 +22,10 @@ Architecture style (hybrid layering + feature slices) and placement rules for ne
 - Markdown parsing and wiki-link resolution live outside UI.
 - Inbox editability is a domain rule: inbox notes editable, all other notes read-only.
 - **Git sync channels** (see [`specs/architecture/sync-hardening-and-recovery.md`](specs/architecture/sync-hardening-and-recovery.md)):
-  - Manual inbox sync commits **Inbox/** changes only (`ManualSyncNow`).
-  - Podcast mark-as-played and RSS refresh auto-commit changed **General/** podcast paths in **separate commits**, then fetch + fast-forward + push when possible.
-  - All git mutations share one mutex; no auto-merge/rebase/reset on divergence.
+  - Manual vault sync (`ManualSyncNow`): commits all safe local changes, auto-merges on divergence with conflict sidecars, recovers interrupted Git ops before proceeding.
+  - Podcast RSS refresh delegates to `ManualSyncNow` via `SyncPodcastChangesViaVaultSync` after RSS writes `General/`.
+  - Podcast mark-as-played uses `SyncPodcastChange`: stages changed **General/** podcast paths only, fetch + fast-forward + push; no auto-merge/rebase/reset on divergence.
+  - All git mutations share one mutex.
   - No WorkManager/AlarmManager scheduled sync; read-only remote `fetch` for the shell indicator is allowed on foreground.
 - Full-text search uses **Android's bundled SQLite FTS5** (`SQLiteOpenHelper`). See [`specs/plans/android-vault-notes-rebuild-plan.md`](specs/plans/android-vault-notes-rebuild-plan.md) (Phase 7) for the index schema, reconcile strategy, and ranker tiers.
 - No multi-workspace support.
