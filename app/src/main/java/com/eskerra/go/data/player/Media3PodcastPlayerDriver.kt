@@ -316,15 +316,17 @@ class Media3PodcastPlayerDriver(context: Context) : PodcastPlayerDriver {
     /**
      * During a resume, report the resume target instead of a not-yet-applied lower position so the
      * UI never dips toward 0 while [androidx.media3.session.MediaController.setMediaItem]'s start
-     * position settles. Clears the target once the real position reaches it.
+     * position settles — including across the buffering→playing transition, where a stray 0 can
+     * still arrive. Only release the clamp once playback is actually running and the real position
+     * has reached the target; until then always clamp up to it.
      */
     private fun effectivePosition(rawPositionMs: Long): Long {
         val target = resumeTargetMs ?: return rawPositionMs
-        if (rawPositionMs >= target) {
+        if (controller?.isPlaying == true && rawPositionMs >= target) {
             resumeTargetMs = null
             return rawPositionMs
         }
-        return target
+        return maxOf(rawPositionMs, target)
     }
 
     private fun startProgressTicker() {
