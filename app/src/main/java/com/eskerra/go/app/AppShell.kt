@@ -19,16 +19,20 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.eskerra.go.ui.theme.EskerraChromeTokens
 
 /**
  * Floating navigation shell. It overlays controls on top of the current screen:
  * - top and bottom edge scrims so content fades under the status bar and taskbar
+ * - top-left Home and Podcasts tab buttons (icon + label)
  * - a bottom floating taskbar with Home, a large centered Add, and Podcasts
  * - a top-right sync button (when remote is configured) and hamburger Menu button
  *
@@ -57,6 +61,28 @@ fun AppShell(
                     .fillMaxSize()
                     .shellEdgeScrimOverlay()
             )
+
+            Row(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .statusBarsPadding()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TopLevelTabButton(
+                    icon = Icons.Filled.Home,
+                    label = "Home",
+                    selected = selectedTopLevelRoute == AppRoute.HOME_GRAPH,
+                    onClick = { onNavigate(AppRoute.HOME_GRAPH) }
+                )
+                TopLevelTabButton(
+                    icon = Icons.Filled.Podcasts,
+                    label = "Podcasts",
+                    selected = selectedTopLevelRoute == AppRoute.PODCASTS_GRAPH,
+                    onClick = { onNavigate(AppRoute.PODCASTS_GRAPH) }
+                )
+            }
 
             Row(
                 modifier = Modifier
@@ -103,6 +129,31 @@ fun AppShell(
 }
 
 @Composable
+private fun TopLevelTabButton(
+    icon: ImageVector,
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    val tint = if (selected) {
+        EskerraChromeTokens.HeaderText
+    } else {
+        EskerraChromeTokens.HeaderInactive
+    }
+    TextButton(onClick = onClick) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = tint,
+            modifier = Modifier
+                .padding(end = 4.dp)
+                .size(20.dp)
+        )
+        Text(text = label, color = tint)
+    }
+}
+
+@Composable
 private fun BottomTaskbar(
     selectedTopLevelRoute: String?,
     onHome: () -> Unit,
@@ -145,7 +196,7 @@ private fun BottomTaskbar(
 
 @Composable
 private fun TaskbarButton(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     contentDescription: String,
     selected: Boolean,
     onClick: () -> Unit
