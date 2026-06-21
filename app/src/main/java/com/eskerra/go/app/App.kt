@@ -12,17 +12,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import androidx.navigation.navArgument
-import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.ActiveTodayHubStore
 import com.eskerra.go.core.repository.PodcastCatalogSnapshotStore
@@ -64,17 +60,8 @@ import com.eskerra.go.core.usecase.TestRemoteConnection
 import com.eskerra.go.core.usecase.TouchVaultSearchPaths
 import com.eskerra.go.core.usecase.UpdateSyncToken
 import com.eskerra.go.data.workspace.WorkspacePaths
-import com.eskerra.go.feature.editor.CreateInboxScreen
-import com.eskerra.go.feature.editor.NoteEditorScreen
 import com.eskerra.go.feature.inbox.InboxUiState
-import com.eskerra.go.feature.menu.MenuScreen
-import com.eskerra.go.feature.note.NoteReaderUiState
-import com.eskerra.go.feature.note.NoteScreen
-import com.eskerra.go.feature.settings.VaultSettingsScreen
-import com.eskerra.go.feature.sync.SyncScreen
-import com.eskerra.go.feature.sync.SyncSettingsScreen
 import com.eskerra.go.feature.todayhub.TodayHubUiState
-import com.eskerra.go.ui.markdown.AmbiguousWikiLinkSheet
 import java.io.File
 
 /**
@@ -145,11 +132,22 @@ fun App(
     val navController = rememberNavController()
     val scope = rememberCoroutineScope()
     val backStackEntry by navController.currentBackStackEntryAsState()
-    val currentRoute = backStackEntry?.destination?.route
+    val currentDestination = backStackEntry?.destination
+    val currentRoute = currentDestination?.route
+    val destinationTopLevelRoute = topLevelGraphRouteForDestination(currentDestination)
+    var currentTopLevelRoute by remember { mutableStateOf(AppRoute.HOME_GRAPH) }
+    LaunchedEffect(destinationTopLevelRoute) {
+        if (destinationTopLevelRoute != null) {
+            currentTopLevelRoute = destinationTopLevelRoute
+        }
+    }
     // Bumped on each Home tap while already on the inbox; the inbox route reacts (it owns the Today
     // Hub state and decides whether to snap to the current week). A route change can't carry this
     // because re-tapping Home does not navigate.
     var homeReselectSignal by remember { mutableIntStateOf(0) }
+    // The hamburger menu is an overlay, not a NavHost destination: opening it must not navigate, so
+    // the underlying route (wherever you were) stays put and closing it cannot jump back to Home.
+    var menuOpen by remember { mutableStateOf(false) }
     val markInboxNotesChanged = {
         navController.markInboxNotesChanged()
     }
@@ -219,307 +217,108 @@ fun App(
         podcastPlayerDriver = podcastPlayerDriver,
         podcastShellStateWiring = podcastShellStateWiring,
         podcastPlaylistSync = podcastPlaylistWiring.sync,
+        loadPodcastArtwork = loadPodcastArtwork,
         playlistPollingHost = playlistPollingHost,
         bridge = podcastShellBridge,
+        currentDestination = currentDestination,
         onPodcastFirstLaunchChanged = onPodcastFirstLaunchChanged
     )
     AppShell(
-        currentRoute = currentRoute,
+        selectedTopLevelRoute = destinationTopLevelRoute ?: currentTopLevelRoute,
         syncIndicator = syncIndicator,
         miniPlayerVisible = miniPlayerMount.visible,
         miniPlayer = miniPlayerMount.content,
         onSyncClick = { onShellSyncClick(syncState, appSyncViewModel, navController) },
+        onMenuClick = { menuOpen = true },
         onNavigate = { route ->
-            navController.navigateTab(currentRoute, route) { homeReselectSignal++ }
+            navController.navigateTab(
+                currentRoute = currentRoute,
+                currentTopLevelRoute = destinationTopLevelRoute ?: currentTopLevelRoute,
+                targetRoute = route
+            ) {
+                homeReselectSignal++
+            }
         }
     ) { contentModifier ->
+        val navGraphContext = AppNavGraphContext(
+            currentConfig = currentConfig,
+            filesDir = filesDir,
+            workspaceRoot = workspaceRoot,
+            currentRoute = currentRoute,
+            navController = navController,
+            scope = scope,
+            appSyncViewModel = appSyncViewModel,
+            syncState = syncState,
+            homeReselectSignal = homeReselectSignal,
+            loadInboxSummaries = loadInboxSummaries,
+            loadNoteForReading = loadNoteForReading,
+            prefetchLinkedNotes = prefetchLinkedNotes,
+            createInboxNote = createInboxNote,
+            deleteInboxNotes = deleteInboxNotes,
+            loadEditableNote = loadEditableNote,
+            saveNote = saveNote,
+            loadGitStatusSummary = loadGitStatusSummary,
+            loadTodayHub = loadTodayHub,
+            loadTodayHubRow = loadTodayHubRow,
+            activeTodayHubStore = activeTodayHubStore,
+            todayHubSnapshotStore = todayHubSnapshotStore,
+            loadRemoteSyncSettings = loadRemoteSyncSettings,
+            saveRemoteSyncSettings = saveRemoteSyncSettings,
+            clearRemoteSyncSettings = clearRemoteSyncSettings,
+            testRemoteConnection = testRemoteConnection,
+            loadVaultSettings = loadVaultSettings,
+            saveVaultSettings = saveVaultSettings,
+            loadLocalSettings = loadLocalSettings,
+            saveLocalSettings = saveLocalSettings,
+            ensureDeviceInstanceId = ensureDeviceInstanceId,
+            searchVault = searchVault,
+            maintainVaultSearchIndex = maintainVaultSearchIndex,
+            repairVaultSearchIndex = repairVaultSearchIndex,
+            touchVaultSearchPaths = touchVaultSearchPaths,
+            loadPodcastCatalog = loadPodcastCatalog,
+            markPodcastEpisodesPlayed = markPodcastEpisodesPlayed,
+            podcastPlaylistSync = podcastPlaylistWiring.sync,
+            loadPodcastArtwork = loadPodcastArtwork,
+            podcastPlayerDriver = podcastPlayerDriver,
+            syncPodcastVaultRefresh = syncPodcastVaultRefresh,
+            catalogSnapshotStore = catalogSnapshotStore,
+            persistPodcastPlaybackSnapshot = podcastShellStateWiring.persistPodcastPlaybackSnapshot,
+            clearPodcastPlaybackSnapshot = podcastShellStateWiring.clearPodcastPlaybackSnapshot,
+            podcastShellBridge = podcastShellBridge,
+            playlistPollingHost = playlistPollingHost,
+            markInboxNotesChanged = markInboxNotesChanged,
+            onConfigUpdated = { updated ->
+                currentConfig = updated
+                onConfigUpdated(updated)
+            },
+            onInboxUiStateChanged = onInboxUiStateChanged,
+            onTodayHubUiStateChanged = onTodayHubUiStateChanged
+        )
         NavHost(
             navController = navController,
-            startDestination = AppRoute.INBOX,
+            startDestination = AppRoute.HOME_GRAPH,
             modifier = contentModifier,
             enterTransition = { EnterTransition.None },
             exitTransition = { ExitTransition.None },
             popEnterTransition = { EnterTransition.None },
             popExitTransition = { ExitTransition.None }
         ) {
-            opaqueComposable(AppRoute.INBOX) { entry ->
-                AppInboxRoute(
-                    currentConfig = currentConfig,
-                    filesDir = filesDir,
-                    loadInboxSummaries = loadInboxSummaries,
-                    deleteInboxNotes = deleteInboxNotes,
-                    loadTodayHub = loadTodayHub,
-                    loadTodayHubRow = loadTodayHubRow,
-                    activeTodayHubStore = activeTodayHubStore,
-                    todayHubSnapshotStore = todayHubSnapshotStore,
-                    workspaceRoot = workspaceRoot,
-                    currentRoute = currentRoute,
-                    entry = entry,
-                    navController = navController,
-                    appSyncViewModel = appSyncViewModel,
-                    touchVaultSearchPaths = touchVaultSearchPaths,
-                    onInboxUiStateChanged = onInboxUiStateChanged,
-                    onTodayHubUiStateChanged = onTodayHubUiStateChanged,
-                    homeReselectSignal = homeReselectSignal
-                )
-            }
-
-            opaqueComposable(AppRoute.CREATE_INBOX) {
-                val createViewModel: CreateInboxNoteViewModel = viewModel(
-                    factory = CreateInboxNoteViewModel.factory(
-                        config = currentConfig,
-                        filesDir = filesDir,
-                        createInboxNote = createInboxNote
-                    )
-                )
-                val createState by createViewModel.uiState.collectAsState()
-
-                LaunchedEffect(createViewModel) {
-                    createViewModel.savedNoteId.collect { noteId ->
-                        if (noteId != null) {
-                            markInboxNotesChanged()
-                            appSyncViewModel.refreshLocalStatusQuietly()
-                            scope.touchVaultSearchPathsAsync(
-                                touchVaultSearchPaths,
-                                currentConfig,
-                                filesDir,
-                                listOf(noteId.value)
-                            )
-                            navController.navigate(AppRoute.note(noteId)) {
-                                popUpTo(AppRoute.CREATE_INBOX) { inclusive = true }
-                            }
-                        }
-                    }
-                }
-
-                CreateInboxScreen(
-                    state = createState,
-                    onBack = { navController.popBackStack() },
-                    onDraftChange = createViewModel::updateDraft,
-                    onSave = createViewModel::save
-                )
-            }
-
-            opaqueComposable(AppRoute.SEARCH) {
-                AppSearchRoute(
-                    currentConfig = currentConfig,
-                    filesDir = filesDir,
-                    searchVault = searchVault,
-                    maintainVaultSearchIndex = maintainVaultSearchIndex,
-                    repairVaultSearchIndex = repairVaultSearchIndex,
-                    navController = navController
-                )
-            }
-
-            opaqueComposable(AppRoute.PODCASTS) {
-                AppPodcastsRoute(
-                    currentConfig = currentConfig,
-                    filesDir = filesDir,
-                    loadPodcastCatalog = loadPodcastCatalog,
-                    markPodcastEpisodesPlayed = markPodcastEpisodesPlayed,
-                    podcastPlaylistSync = podcastPlaylistWiring.sync,
-                    loadPodcastArtwork = loadPodcastArtwork,
-                    podcastPlayerDriver = podcastPlayerDriver,
-                    syncPodcastVaultRefresh = syncPodcastVaultRefresh,
-                    catalogSnapshotStore = catalogSnapshotStore,
-                    persistPodcastPlaybackSnapshot =
-                    podcastShellStateWiring.persistPodcastPlaybackSnapshot,
-                    clearPodcastPlaybackSnapshot =
-                    podcastShellStateWiring.clearPodcastPlaybackSnapshot,
-                    loadLocalSettings = loadLocalSettings,
-                    podcastShellBridge = podcastShellBridge,
-                    playlistPollingHost = playlistPollingHost
-                )
-            }
-
-            opaqueComposable(AppRoute.MENU) {
-                MenuScreen(
-                    items = menuItems,
-                    onItemClick = { item ->
-                        when (item) {
-                            MENU_SEARCH -> navController.navigate(AppRoute.SEARCH)
-                            MENU_SYNC -> navController.navigate(AppRoute.SYNC)
-                            MENU_SETTINGS -> navController.navigate(AppRoute.SETTINGS)
-                        }
-                    }
-                )
-            }
-
-            opaqueComposable(AppRoute.SYNC) {
-                SyncScreen(
-                    state = syncState,
-                    onSyncNow = appSyncViewModel::syncNow,
-                    onRetry = appSyncViewModel::refreshLocalStatus,
-                    onOpenSettings = { navController.navigate(AppRoute.SYNC_SETTINGS) }
-                )
-            }
-
-            opaqueComposable(AppRoute.SETTINGS) {
-                val vaultSettingsViewModel: VaultSettingsViewModel = viewModel(
-                    factory = VaultSettingsViewModel.factory(
-                        config = currentConfig,
-                        filesDir = filesDir,
-                        loadVaultSettings = loadVaultSettings,
-                        saveVaultSettings = saveVaultSettings,
-                        loadLocalSettings = loadLocalSettings,
-                        saveLocalSettings = saveLocalSettings,
-                        ensureDeviceInstanceId = ensureDeviceInstanceId
-                    )
-                )
-                val vaultSettingsState by vaultSettingsViewModel.uiState.collectAsState()
-                VaultSettingsScreen(
-                    state = vaultSettingsState,
-                    onR2EndpointChange = vaultSettingsViewModel::onR2EndpointChange,
-                    onR2JurisdictionChange = vaultSettingsViewModel::onR2JurisdictionChange,
-                    onR2BucketChange = vaultSettingsViewModel::onR2BucketChange,
-                    onR2AccessKeyIdChange = vaultSettingsViewModel::onR2AccessKeyIdChange,
-                    onR2SecretAccessKeyChange = vaultSettingsViewModel::onR2SecretAccessKeyChange,
-                    onDisplayNameChange = vaultSettingsViewModel::onDisplayNameChange,
-                    onDeviceNameChange = vaultSettingsViewModel::onDeviceNameChange,
-                    onSave = vaultSettingsViewModel::save
-                )
-            }
-
-            opaqueComposable(AppRoute.SYNC_SETTINGS) {
-                val settingsViewModel: SyncSettingsViewModel = viewModel(
-                    key = currentConfig.syncViewModelKey(),
-                    factory = SyncSettingsViewModel.factory(
-                        config = currentConfig,
-                        filesDir = filesDir,
-                        loadRemoteSyncSettings = loadRemoteSyncSettings,
-                        saveRemoteSyncSettings = saveRemoteSyncSettings,
-                        clearRemoteSyncSettings = clearRemoteSyncSettings,
-                        testRemoteConnection = testRemoteConnection,
-                        onConfigUpdated = { updated ->
-                            currentConfig = updated
-                            onConfigUpdated(updated)
-                        }
-                    )
-                )
-                val settingsState by settingsViewModel.uiState.collectAsState()
-
-                SyncSettingsScreen(
-                    state = settingsState,
-                    onRemoteUriChange = settingsViewModel::onRemoteUriChange,
-                    onBranchChange = settingsViewModel::onBranchChange,
-                    onReplacementTokenChange = settingsViewModel::onReplacementTokenChange,
-                    onSave = settingsViewModel::saveSettings,
-                    onTestConnection = settingsViewModel::testConnection,
-                    onClear = settingsViewModel::clearSettings
-                )
-            }
-
-            opaqueComposable(
-                route = AppRoute.NOTE_PATTERN,
-                arguments = listOf(
-                    navArgument(AppRoute.NOTE_ARG) { type = NavType.StringType }
-                )
-            ) { entry ->
-                val raw = entry.arguments?.getString(AppRoute.NOTE_ARG).orEmpty()
-                val noteId = AppRoute.decodeNoteId(raw)
-                val noteReaderViewModel: NoteReaderViewModel = viewModel(
-                    factory = NoteReaderViewModel.factory(
-                        config = currentConfig,
-                        filesDir = filesDir,
-                        noteId = noteId,
-                        loadNoteForReading = loadNoteForReading,
-                        prefetchLinkedNotes = prefetchLinkedNotes
-                    )
-                )
-                val readerState by noteReaderViewModel.uiState.collectAsState()
-
-                LaunchedEffect(currentRoute) {
-                    if (consumeNoteReaderChanged(currentRoute, noteId, entry.savedStateHandle)) {
-                        noteReaderViewModel.retry()
-                    }
-                }
-
-                val noteReaderContext = LocalContext.current
-                var ambiguousCandidates by remember { mutableStateOf<List<NoteId>?>(null) }
-
-                NoteScreen(
-                    state = readerState,
-                    onRetry = noteReaderViewModel::retry,
-                    onBack = { navController.popBackStack() },
-                    onEdit = { navController.navigate(AppRoute.editor(noteId)) },
-                    onOpenInternalNote = { targetId: NoteId ->
-                        navController.navigate(AppRoute.note(targetId))
-                    },
-                    onOpenExternalUrl = { url: String ->
-                        openExternalUrl(noteReaderContext, url)
-                    },
-                    onAmbiguousWikiLink = { candidates: List<NoteId>, _: String ->
-                        ambiguousCandidates = candidates
-                    },
-                    onNoteNotFound = { message: String ->
-                        showNoteNotFoundToast(noteReaderContext, message)
-                    },
-                    workspaceRoot = workspaceRoot
-                )
-
-                val registry = (readerState as? NoteReaderUiState.Content)?.document?.registry
-                if (ambiguousCandidates != null && registry != null) {
-                    AmbiguousWikiLinkSheet(
-                        candidates = ambiguousCandidates!!,
-                        registry = registry,
-                        onPickNote = { picked ->
-                            ambiguousCandidates = null
-                            navController.navigate(AppRoute.note(picked))
-                        },
-                        onDismiss = { ambiguousCandidates = null }
-                    )
-                }
-            }
-
-            opaqueComposable(
-                route = AppRoute.EDITOR_PATTERN,
-                arguments = listOf(
-                    navArgument(AppRoute.EDITOR_ARG) { type = NavType.StringType }
-                )
-            ) { entry ->
-                val raw = entry.arguments?.getString(AppRoute.EDITOR_ARG).orEmpty()
-                val noteId = AppRoute.decodeEditorNoteId(raw)
-                val editorViewModel: NoteEditorViewModel = viewModel(
-                    factory = NoteEditorViewModel.factory(
-                        config = currentConfig,
-                        filesDir = filesDir,
-                        noteId = noteId,
-                        loadEditableNote = loadEditableNote,
-                        saveNote = saveNote,
-                        loadGitStatusSummary = loadGitStatusSummary
-                    )
-                )
-                val editorState by editorViewModel.uiState.collectAsState()
-
-                LaunchedEffect(editorViewModel) {
-                    editorViewModel.noteSavedEvents.collect {
-                        markInboxNotesChanged()
-                        appSyncViewModel.refreshLocalStatusQuietly()
-                        scope.touchVaultSearchPathsAsync(
-                            touchVaultSearchPaths,
-                            currentConfig,
-                            filesDir,
-                            listOf(noteId.value)
-                        )
-                        navController.markNoteReaderChanged(noteId)
-                        navController.navigate(AppRoute.note(noteId)) {
-                            popUpTo(AppRoute.editor(noteId)) { inclusive = true }
-                            launchSingleTop = true
-                        }
-                    }
-                }
-
-                NoteEditorScreen(
-                    state = editorState,
-                    onBack = { navController.popBackStack() },
-                    onDraftChange = editorViewModel::updateDraft,
-                    onSave = editorViewModel::save,
-                    onRetry = editorViewModel::retry
-                )
-            }
+            homeGraph(navGraphContext)
+            podcastsGraph(navGraphContext)
+            sharedDestinations(navGraphContext)
         }
     }
-}
 
-/** ViewModel key for sync screens; includes branch so branch-only updates recreate VMs. */
-private fun WorkspaceConfig.syncViewModelKey(): String = "${remoteUri.orEmpty()}:$branch"
+    if (menuOpen) {
+        AppMenuSheet(
+            onDismiss = { menuOpen = false },
+            onItemClick = { item ->
+                when (item) {
+                    MENU_SEARCH -> navController.navigate(AppRoute.SEARCH)
+                    MENU_SYNC -> navController.navigate(AppRoute.SYNC)
+                    MENU_SETTINGS -> navController.navigate(AppRoute.SETTINGS)
+                }
+            }
+        )
+    }
+}

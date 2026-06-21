@@ -172,8 +172,8 @@ class FilePodcastArtworkRepository(
     }
 
     companion object {
-        const val LOCAL_FILE_TTL_MS = 30L * 24L * 60L * 60L * 1_000L
-        const val REMOTE_FALLBACK_TTL_MS = 60L * 60L * 1_000L
+        const val LOCAL_FILE_TTL_MS = 90L * 24L * 60L * 60L * 1_000L
+        const val REMOTE_FALLBACK_TTL_MS = 24L * 60L * 60L * 1_000L
         const val DOWNLOAD_TIMEOUT_MS = 10_000L
     }
 }

@@ -9,12 +9,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.navigation.NavDestination
 import androidx.navigation.NavHostController
 import com.eskerra.go.core.model.PodcastPlaybackPhase
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.playlist.RESUMABLE_PODCAST_MIN_PROGRESS_MS
 import com.eskerra.go.core.playlist.toPersistedSnapshot
 import com.eskerra.go.core.repository.PodcastPlayerDriver
+import com.eskerra.go.core.usecase.LoadPodcastArtwork
 import com.eskerra.go.core.usecase.PodcastPlaylistSync
 import com.eskerra.go.feature.podcasts.PlaylistR2PollingHost
 import java.io.File
@@ -30,8 +32,10 @@ internal fun AppPodcastBootstrap(
     podcastPlayerDriver: PodcastPlayerDriver,
     podcastShellStateWiring: PodcastShellStateWiring,
     podcastPlaylistSync: PodcastPlaylistSync,
+    loadPodcastArtwork: LoadPodcastArtwork,
     playlistPollingHost: PlaylistR2PollingHost?,
     bridge: PodcastShellBridge,
+    currentDestination: NavDestination?,
     onPodcastFirstLaunchChanged: (Boolean) -> Unit
 ) {
     AppPodcastPlaylistEffects(
@@ -41,6 +45,10 @@ internal fun AppPodcastBootstrap(
     val scope = rememberCoroutineScope()
     var initialNavigationDone by remember(currentConfig) { mutableStateOf(false) }
     val playerState by podcastPlayerDriver.state.collectAsState()
+
+    LaunchedEffect(currentConfig, filesDir) {
+        loadPodcastArtwork.primeFromDisk(currentConfig, filesDir)
+    }
 
     LaunchedEffect(currentConfig, workspaceRoot) {
         val restore = podcastShellStateWiring.restorePodcastPlayback(
@@ -61,8 +69,10 @@ internal fun AppPodcastBootstrap(
         }
     }
 
-    LaunchedEffect(currentRoute) {
-        shellModeForRoute(currentRoute)?.let { podcastShellStateWiring.persistAppShellMode(it) }
+    LaunchedEffect(currentDestination) {
+        shellModeForDestination(currentDestination)?.let {
+            podcastShellStateWiring.persistAppShellMode(it)
+        }
     }
 
     LaunchedEffect(playerState) {

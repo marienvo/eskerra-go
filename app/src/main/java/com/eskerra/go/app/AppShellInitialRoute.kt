@@ -1,23 +1,39 @@
 package com.eskerra.go.app
 
+import androidx.navigation.NavDestination
+import androidx.navigation.NavDestination.Companion.hierarchy
 import com.eskerra.go.core.model.AppShellMode
 
 internal fun resolveInitialShellRoute(
     preferredShellMode: AppShellMode,
     hasResumablePlayback: Boolean
 ): String = when {
-    hasResumablePlayback -> AppRoute.PODCASTS
-    preferredShellMode == AppShellMode.PODCASTS -> AppRoute.PODCASTS
-    else -> AppRoute.INBOX
+    hasResumablePlayback -> AppRoute.PODCASTS_GRAPH
+    preferredShellMode == AppShellMode.PODCASTS -> AppRoute.PODCASTS_GRAPH
+    else -> AppRoute.HOME_GRAPH
 }
 
-internal fun shellModeForRoute(route: String?): AppShellMode? = when (route) {
-    AppRoute.PODCASTS -> AppShellMode.PODCASTS
-    AppRoute.INBOX,
-    AppRoute.NOTE_PATTERN,
-    AppRoute.EDITOR_PATTERN -> AppShellMode.HOME
-    else -> null
+internal fun shellModeForDestination(destination: NavDestination?): AppShellMode? =
+    shellModeForRouteHierarchy(destination?.hierarchy?.map { it.route }.orEmpty())
+
+internal fun topLevelGraphRouteForDestination(destination: NavDestination?): String? =
+    topLevelGraphRouteForHierarchy(destination?.hierarchy?.map { it.route }.orEmpty())
+
+internal fun shellModeForRouteHierarchy(routeHierarchy: Sequence<String?>): AppShellMode? =
+    when (topLevelGraphRouteForHierarchy(routeHierarchy)) {
+        AppRoute.PODCASTS_GRAPH -> AppShellMode.PODCASTS
+        AppRoute.HOME_GRAPH -> AppShellMode.HOME
+        else -> null
+    }
+
+internal fun topLevelGraphRouteForHierarchy(routeHierarchy: Sequence<String?>): String? {
+    val routes = routeHierarchy.toSet()
+    return when {
+        AppRoute.PODCASTS_GRAPH in routes -> AppRoute.PODCASTS_GRAPH
+        AppRoute.HOME_GRAPH in routes -> AppRoute.HOME_GRAPH
+        else -> null
+    }
 }
 
 internal fun shouldDismissSplashWithoutInbox(initialRoute: String): Boolean =
-    initialRoute == AppRoute.PODCASTS
+    initialRoute == AppRoute.PODCASTS_GRAPH

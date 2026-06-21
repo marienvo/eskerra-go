@@ -11,7 +11,7 @@ class AppShellInitialRouteTest {
     @Test
     fun resumablePlayback_opensPodcasts() {
         assertEquals(
-            AppRoute.PODCASTS,
+            AppRoute.PODCASTS_GRAPH,
             resolveInitialShellRoute(
                 preferredShellMode = AppShellMode.HOME,
                 hasResumablePlayback = true
@@ -22,7 +22,7 @@ class AppShellInitialRouteTest {
     @Test
     fun lastPodcastMode_opensPodcastsWithoutResumablePlayback() {
         assertEquals(
-            AppRoute.PODCASTS,
+            AppRoute.PODCASTS_GRAPH,
             resolveInitialShellRoute(
                 preferredShellMode = AppShellMode.PODCASTS,
                 hasResumablePlayback = false
@@ -33,7 +33,7 @@ class AppShellInitialRouteTest {
     @Test
     fun defaultHome_opensInbox() {
         assertEquals(
-            AppRoute.INBOX,
+            AppRoute.HOME_GRAPH,
             resolveInitialShellRoute(
                 preferredShellMode = AppShellMode.HOME,
                 hasResumablePlayback = false
@@ -42,15 +42,35 @@ class AppShellInitialRouteTest {
     }
 
     @Test
-    fun shellModeForRoute_mapsTopLevelRoutes() {
-        assertEquals(AppShellMode.PODCASTS, shellModeForRoute(AppRoute.PODCASTS))
-        assertEquals(AppShellMode.HOME, shellModeForRoute(AppRoute.INBOX))
-        assertEquals(AppShellMode.HOME, shellModeForRoute(AppRoute.NOTE_PATTERN))
+    fun shellModeForRouteHierarchy_mapsNestedGraphDestinations() {
+        assertEquals(
+            AppShellMode.PODCASTS,
+            shellModeForRouteHierarchy(
+                sequenceOf(AppRoute.PODCASTS, AppRoute.PODCASTS_GRAPH)
+            )
+        )
+        assertEquals(
+            AppShellMode.HOME,
+            shellModeForRouteHierarchy(sequenceOf(AppRoute.INBOX, AppRoute.HOME_GRAPH))
+        )
+        assertEquals(AppShellMode.HOME, shellModeForRouteHierarchy(sequenceOf(AppRoute.HOME_GRAPH)))
     }
 
     @Test
-    fun shouldDismissSplashWithoutInbox_onlyForPodcastsRoute() {
-        assertTrue(shouldDismissSplashWithoutInbox(AppRoute.PODCASTS))
-        assertFalse(shouldDismissSplashWithoutInbox(AppRoute.INBOX))
+    fun topLevelGraphRouteForHierarchy_mapsNestedGraphDestinations() {
+        assertEquals(
+            AppRoute.PODCASTS_GRAPH,
+            topLevelGraphRouteForHierarchy(sequenceOf(AppRoute.PODCASTS, AppRoute.PODCASTS_GRAPH))
+        )
+        assertEquals(
+            AppRoute.HOME_GRAPH,
+            topLevelGraphRouteForHierarchy(sequenceOf(AppRoute.INBOX, AppRoute.HOME_GRAPH))
+        )
+    }
+
+    @Test
+    fun shouldDismissSplashWithoutInbox_onlyForPodcastsGraph() {
+        assertTrue(shouldDismissSplashWithoutInbox(AppRoute.PODCASTS_GRAPH))
+        assertFalse(shouldDismissSplashWithoutInbox(AppRoute.HOME_GRAPH))
     }
 }
