@@ -57,13 +57,9 @@ class JGitRemoteSyncRepository(
     override fun stagePaths(workingDir: File, relativePaths: Set<String>): Result<Unit> =
         runCatching {
             if (relativePaths.isEmpty()) return@runCatching
+            GitIndexLockRecovery.clearStaleLock(workingDir).getOrThrow()
             Git.open(workingDir).use { git ->
-                for (path in relativePaths) {
-                    val pattern = path.replace('\\', '/').trimStart('/')
-                    if (pattern.isBlank()) continue
-                    git.add().addFilepattern(pattern).call()
-                    git.add().addFilepattern(pattern).setUpdate(true).call()
-                }
+                GitChangeStager.stagePaths(git, workingDir, relativePaths)
             }
         }
 
