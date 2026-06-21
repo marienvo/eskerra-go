@@ -77,8 +77,8 @@ fun mapCloneFailure(error: Throwable, branch: String): WorkspaceSetupException {
         when {
             isBranchRefError(text, branch) -> WorkspaceSetupError.BranchNotFound(branch)
             isAuthenticationError(text) -> WorkspaceSetupError.AuthenticationFailed
-            isRemoteUnavailableError(text) -> WorkspaceSetupError.RemoteUnavailable
             isInvalidRepositoryError(text) -> WorkspaceSetupError.InvalidRepository
+            isRemoteUnavailableError(text) -> WorkspaceSetupError.RemoteUnavailable
             isRemoteBranchNotFoundError(text) -> WorkspaceSetupError.BranchNotFound(
                 branchNameFromRemoteError(text, branch)
             )

@@ -38,7 +38,7 @@ object AppRoute {
 
     /** Whether [route] is a concrete note-reader destination (not the nav graph pattern). */
     internal fun isConcreteNoteRoute(route: String?): Boolean {
-        if (route == null) return false
+        if (route == null || route == NOTE_PATTERN) return false
         val prefix = NOTE_PATTERN.substringBefore("{")
         return route.startsWith(prefix)
     }

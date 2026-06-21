@@ -58,6 +58,7 @@ class AppRouteTest {
         val noteId = NoteId("Inbox/First.md")
 
         assertTrue(AppRoute.isConcreteNoteRoute(AppRoute.note(noteId)))
+        assertFalse(AppRoute.isConcreteNoteRoute(AppRoute.NOTE_PATTERN))
         assertFalse(AppRoute.isConcreteNoteRoute(AppRoute.EDITOR_PATTERN))
         assertFalse(AppRoute.isConcreteNoteRoute(AppRoute.INBOX))
         assertFalse(AppRoute.isConcreteNoteRoute(null))
