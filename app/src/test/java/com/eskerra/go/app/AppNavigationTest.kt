@@ -188,6 +188,35 @@ class AppNavigationTest {
     }
 
     @Test
+    fun podcasts_fromCreateInboxOnPodcasts_popsTransientFirst() {
+        // Podcasts -> + (New note) -> Podcasts. The transient sits on the podcasts stack, so the
+        // remembered top-level still reads as PODCASTS_GRAPH; re-tapping Podcasts must pop the
+        // transient rather than no-op and leave "New note" stuck on screen.
+        assertEquals(
+            TopLevelNavAction.PopTransientThenNavigateTab,
+            resolveTopLevelNavigation(
+                currentRoute = AppRoute.CREATE_INBOX,
+                targetRoute = AppRoute.PODCASTS_GRAPH,
+                currentTopLevelRoute = AppRoute.PODCASTS_GRAPH
+            )
+        )
+    }
+
+    @Test
+    fun createInbox_whileOnCreateInbox_isPush() {
+        // Re-tapping Add while the transient is already on top stays a single-top push (a no-op),
+        // not a transient pop-and-renavigate.
+        assertEquals(
+            TopLevelNavAction.Push,
+            resolveTopLevelNavigation(
+                currentRoute = AppRoute.CREATE_INBOX,
+                targetRoute = AppRoute.CREATE_INBOX,
+                currentTopLevelRoute = AppRoute.PODCASTS_GRAPH
+            )
+        )
+    }
+
+    @Test
     fun note_savedInHomeStack_survivesTabRoundTrip() {
         // A note is a drill-down, not a transient: switching to Podcasts saves the home stack (note
         // included) rather than popping it, and Home later restores it.

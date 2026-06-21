@@ -113,11 +113,18 @@ internal fun resolveTopLevelNavigation(
         isTransientRoute(currentRoute) -> TopLevelNavAction.PopTransientThenNavigateTab
         else -> TopLevelNavAction.NavigateTab
     }
+    // Re-tapping the Add button while it is already on top: a single-top push is a no-op, so this
+    // must win over the transient-pop branch below (which would otherwise pop and re-navigate).
+    targetRoute == AppRoute.CREATE_INBOX -> TopLevelNavAction.Push
+    // A transient (create-inbox) on top must be popped before any "already on this tab" decision —
+    // even when it sits on the target tab's own stack. The transient is a shared destination with no
+    // top-level graph in its hierarchy, so `currentTopLevelRoute` still reads as the underlying tab;
+    // without this branch re-tapping that tab resolves to NoOp and the transient never leaves (the
+    // "stuck on New note" bug).
+    isTransientRoute(currentRoute) -> TopLevelNavAction.PopTransientThenNavigateTab
     isPodcastsRoute(targetRoute) && currentTopLevelRoute == AppRoute.PODCASTS_GRAPH ->
         TopLevelNavAction.NoOp
     currentRoute == targetRoute -> TopLevelNavAction.NoOp
-    targetRoute == AppRoute.CREATE_INBOX -> TopLevelNavAction.Push
-    isTransientRoute(currentRoute) -> TopLevelNavAction.PopTransientThenNavigateTab
     else -> TopLevelNavAction.NavigateTab
 }
 
