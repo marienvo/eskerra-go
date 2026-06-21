@@ -1,10 +1,32 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ktlint)
+    alias(libs.plugins.sentry.android)
 }
+
+fun localProperty(name: String): String? {
+    val file = rootProject.file("local.properties")
+    if (!file.isFile) return null
+    val properties = Properties()
+    file.inputStream().use(properties::load)
+    return properties.getProperty(name)
+}
+
+fun stringBuildConfigField(value: String): String =
+    "\"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\""
+
+val sentryDsn = providers.environmentVariable("SENTRY_DSN")
+    .orElse(providers.gradleProperty("sentry.dsn"))
+    .orElse(localProperty("sentry.dsn") ?: "")
+val sentryAuthToken = providers.environmentVariable("SENTRY_AUTH_TOKEN")
+    .orElse(providers.gradleProperty("sentry.auth.token"))
+    .orElse("")
+val shouldUploadSentryMappings = sentryAuthToken.get().isNotBlank()
 
 android {
     namespace = "com.eskerra.go"
@@ -18,6 +40,7 @@ android {
         versionName = "0.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "SENTRY_DSN", stringBuildConfigField(sentryDsn.get()))
     }
 
     buildTypes {
@@ -41,6 +64,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     lint {
@@ -60,6 +84,19 @@ android {
             excludes += "META-INF/NOTICE"
             excludes += "META-INF/LICENSE"
         }
+    }
+}
+
+sentry {
+    org.set("personal-133")
+    projectName.set("react-native")
+    url.set("https://sentry.io/")
+    authToken.set(sentryAuthToken)
+    includeProguardMapping.set(shouldUploadSentryMappings)
+    autoUploadProguardMapping.set(shouldUploadSentryMappings)
+    ignoredBuildTypes.set(setOf("debug"))
+    tracingInstrumentation {
+        enabled.set(false)
     }
 }
 
@@ -111,6 +148,7 @@ dependencies {
     // Bundled SQLite includes FTS5; stock Android SQLite often omits the fts5 module.
     implementation(libs.androidx.sqlite)
     implementation(libs.androidx.sqlite.bundled)
+    implementation(libs.sentry.android)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
