@@ -2,6 +2,7 @@ package com.eskerra.go.data.player
 
 import android.content.ComponentName
 import android.content.Context
+import android.net.Uri
 import androidx.core.content.ContextCompat
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -19,6 +20,7 @@ import com.eskerra.go.core.player.PodcastPlayerMachine
 import com.eskerra.go.core.repository.PodcastPlayerDriver
 import com.google.common.util.concurrent.ListenableFuture
 import java.util.concurrent.Executor
+import kotlin.coroutines.resume
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -28,6 +30,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeoutOrNull
 
 class Media3PodcastPlayerDriver(context: Context) : PodcastPlayerDriver {
 
@@ -41,6 +45,10 @@ class Media3PodcastPlayerDriver(context: Context) : PodcastPlayerDriver {
     private var controller: MediaController? = null
     private var pendingAction: ((MediaController) -> Unit)? = null
     private var progressJob: Job? = null
+    private var artworkJob: Job? = null
+    private var playRequestGeneration = 0
+    private var peekArtworkUri: (PodcastEpisode) -> String? = { null }
+    private var resolveArtworkUri: suspend (PodcastEpisode) -> String? = { null }
 
     private val listener = object : Player.Listener {
         override fun onPlaybackStateChanged(playbackState: Int) {
@@ -65,18 +73,13 @@ class Media3PodcastPlayerDriver(context: Context) : PodcastPlayerDriver {
     }
 
     override fun play(episode: PodcastEpisode, startPositionMs: Long) {
+        playRequestGeneration += 1
+        val generation = playRequestGeneration
+        artworkJob?.cancel()
         reduce(PodcastPlayerEvent.EpisodePlayRequested(episode))
+        val cachedArtworkUri = peekArtworkUri(episode)
         withController { mediaController ->
-            val item = MediaItem.Builder()
-                .setMediaId(episode.id)
-                .setUri(episode.mp3Url)
-                .setMediaMetadata(
-                    MediaMetadata.Builder()
-                        .setTitle(episode.title)
-                        .setArtist(episode.seriesName)
-                        .build()
-                )
-                .build()
+            val item = mediaItemForEpisode(episode, cachedArtworkUri)
             mediaController.setMediaItem(item)
             mediaController.prepare()
             if (startPositionMs > 0L) {
@@ -85,6 +88,25 @@ class Media3PodcastPlayerDriver(context: Context) : PodcastPlayerDriver {
             mediaController.play()
             publishNativeSnapshot(mediaController)
         }
+        artworkJob = scope.launch {
+            val resolvedArtworkUri = resolveArtworkUri(episode) ?: return@launch
+            if (generation != playRequestGeneration) return@launch
+            withController { mediaController ->
+                updateCurrentMediaItemArtwork(
+                    mediaController = mediaController,
+                    episode = episode,
+                    artworkUri = resolvedArtworkUri
+                )
+            }
+        }
+    }
+
+    override fun configureArtworkResolver(
+        peekArtworkUri: (PodcastEpisode) -> String?,
+        resolveArtworkUri: suspend (PodcastEpisode) -> String?
+    ) {
+        this.peekArtworkUri = peekArtworkUri
+        this.resolveArtworkUri = resolveArtworkUri
     }
 
     override fun hydrate(episode: PodcastEpisode, positionMs: Long, durationMs: Long?) {
@@ -131,6 +153,42 @@ class Media3PodcastPlayerDriver(context: Context) : PodcastPlayerDriver {
         }
     }
 
+    override suspend fun awaitConnection() {
+        if (controller != null) return
+        val future = controllerFuture ?: return
+        withTimeoutOrNull(CONNECT_TIMEOUT_MS) {
+            suspendCancellableCoroutine { continuation ->
+                future.addListener(
+                    { if (continuation.isActive) continuation.resume(Unit) },
+                    mainExecutor
+                )
+            }
+        }
+    }
+
+    override fun adoptNativeSession(
+        episode: PodcastEpisode,
+        snapshot: PodcastNativeSessionSnapshot
+    ) {
+        reduce(
+            PodcastPlayerEvent.PlaylistHydrated(
+                episode = episode,
+                positionMs = snapshot.positionMs,
+                durationMs = snapshot.durationMs
+            )
+        )
+        val mediaController = controller
+        reduce(
+            PodcastPlayerEvent.NativeStateChanged(
+                nativeState = mediaController?.playbackState?.toNativeState()
+                    ?: PodcastNativePlaybackState.READY,
+                playWhenReady = mediaController?.playWhenReady ?: snapshot.isPlaying,
+                positionMs = snapshot.positionMs,
+                durationMs = snapshot.durationMs
+            )
+        )
+    }
+
     override fun currentNativeSession(): PodcastNativeSessionSnapshot? {
         val mediaController = controller ?: return null
         val mediaId = mediaController.currentMediaItem?.mediaId?.takeIf { it.isNotBlank() }
@@ -145,6 +203,7 @@ class Media3PodcastPlayerDriver(context: Context) : PodcastPlayerDriver {
 
     override fun release() {
         progressJob?.cancel()
+        artworkJob?.cancel()
         controller?.removeListener(listener)
         controller?.release()
         controllerFuture?.let(MediaController::releaseFuture)
@@ -152,6 +211,38 @@ class Media3PodcastPlayerDriver(context: Context) : PodcastPlayerDriver {
         controllerFuture = null
         pendingAction = null
         reduce(PodcastPlayerEvent.AppClosed)
+    }
+
+    private fun mediaItemForEpisode(episode: PodcastEpisode, artworkUri: String?): MediaItem =
+        MediaItem.Builder()
+            .setMediaId(episode.id)
+            .setUri(episode.mp3Url)
+            .setMediaMetadata(mediaMetadataFor(podcastMediaMetadataSpec(episode, artworkUri)))
+            .build()
+
+    private fun mediaMetadataFor(spec: PodcastMediaMetadataSpec): MediaMetadata =
+        MediaMetadata.Builder()
+            .setTitle(spec.title)
+            .setArtist(spec.artist)
+            .setAlbumTitle(spec.artist)
+            .setMediaType(MediaMetadata.MEDIA_TYPE_PODCAST_EPISODE)
+            .apply {
+                spec.artworkUri?.let { setArtworkUri(Uri.parse(it)) }
+            }
+            .build()
+
+    private fun updateCurrentMediaItemArtwork(
+        mediaController: MediaController,
+        episode: PodcastEpisode,
+        artworkUri: String
+    ) {
+        val current = mediaController.currentMediaItem ?: return
+        if (current.mediaId != episode.id) return
+        val updated = current.buildUpon()
+            .setMediaMetadata(mediaMetadataFor(podcastMediaMetadataSpec(episode, artworkUri)))
+            .build()
+        mediaController.replaceMediaItem(mediaController.currentMediaItemIndex, updated)
+        publishNativeSnapshot(mediaController)
     }
 
     private fun connect() {
@@ -235,5 +326,6 @@ class Media3PodcastPlayerDriver(context: Context) : PodcastPlayerDriver {
 
     private companion object {
         const val PROGRESS_TICK_MS = 1_000L
+        const val CONNECT_TIMEOUT_MS = 2_000L
     }
 }

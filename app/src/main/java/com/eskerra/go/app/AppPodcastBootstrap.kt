@@ -13,7 +13,6 @@ import androidx.navigation.NavDestination
 import androidx.navigation.NavHostController
 import com.eskerra.go.core.model.PodcastPlaybackPhase
 import com.eskerra.go.core.model.WorkspaceConfig
-import com.eskerra.go.core.playlist.RESUMABLE_PODCAST_MIN_PROGRESS_MS
 import com.eskerra.go.core.playlist.toPersistedSnapshot
 import com.eskerra.go.core.repository.PodcastPlayerDriver
 import com.eskerra.go.core.usecase.LoadPodcastArtwork
@@ -47,6 +46,19 @@ internal fun AppPodcastBootstrap(
     val playerState by podcastPlayerDriver.state.collectAsState()
 
     LaunchedEffect(currentConfig, filesDir) {
+        podcastPlayerDriver.configureArtworkResolver(
+            peekArtworkUri = { episode ->
+                loadPodcastArtwork.peek(currentConfig, filesDir, episode.rssFeedUrl)
+            },
+            resolveArtworkUri = { episode ->
+                loadPodcastArtwork.resolve(
+                    config = currentConfig,
+                    filesDir = filesDir,
+                    rssFeedUrl = episode.rssFeedUrl,
+                    allowNetwork = true
+                )
+            }
+        )
         loadPodcastArtwork.primeFromDisk(currentConfig, filesDir)
     }
 
@@ -169,7 +181,9 @@ private suspend fun persistSnapshotAfterUserAction(
     val snapshot = state.toPersistedSnapshot()
     if (snapshot != null) {
         podcastShellStateWiring.persistPodcastPlaybackSnapshot(snapshot)
-    } else if (state.positionMs < RESUMABLE_PODCAST_MIN_PROGRESS_MS) {
+    } else if (!state.hasActiveEpisode) {
+        // Only a torn-down session clears the playlist. An active (e.g. paused before 10s)
+        // episode stays resumable so the foreground poller can't observe a clear and stop it.
         podcastShellStateWiring.clearPodcastPlaybackSnapshot()
         workspaceRoot?.let { podcastPlaylistSync.clear(it) }
     }

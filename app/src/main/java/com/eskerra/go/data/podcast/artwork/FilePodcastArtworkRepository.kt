@@ -21,8 +21,13 @@ class FilePodcastArtworkRepository(
 ) : PodcastArtworkRepository {
 
     private val memoryUris = ConcurrentHashMap<String, String?>()
+
+    // Inner maps must be ConcurrentHashMap, not LinkedHashMap: artwork resolution fans out
+    // across coroutines (catalog priming + the playing episode's artwork job + visible rows),
+    // so a single workspace map is mutated and serialized concurrently. A plain LinkedHashMap
+    // throws ConcurrentModificationException when encode() iterates it mid-write.
     private val metadataByWorkspace =
-        ConcurrentHashMap<String, MutableMap<String, PodcastArtworkMeta>>()
+        ConcurrentHashMap<String, ConcurrentHashMap<String, PodcastArtworkMeta>>()
 
     override fun peekMemoryUri(workspaceKey: String, rssFeedUrl: String): String? {
         val memoryKey = podcastArtworkMemoryKey(workspaceKey, rssFeedUrl)
@@ -33,7 +38,10 @@ class FilePodcastArtworkRepository(
 
     override suspend fun loadMetadataFromDisk(workspaceKey: String) {
         val loaded = metadataStore.read(workspaceKey).orEmpty()
-        metadataByWorkspace[workspaceKey] = loaded.toMutableMap()
+        // Merge into the existing map rather than swapping the reference, so a concurrent
+        // resolveUri holding the current map doesn't overwrite freshly-loaded entries.
+        val target = metadataByWorkspace.getOrPut(workspaceKey) { ConcurrentHashMap() }
+        target.putAll(loaded)
         loaded.values.forEach { meta ->
             renderableUri(meta)?.let { uri ->
                 memoryUris["$workspaceKey::${meta.cacheKey}"] = uri
@@ -53,7 +61,7 @@ class FilePodcastArtworkRepository(
 
         val cacheKey = podcastImageCacheKey(trimmed)
         val memoryKey = podcastArtworkMemoryKey(workspaceKey, trimmed)
-        val metaMap = metadataByWorkspace.getOrPut(workspaceKey) { mutableMapOf() }
+        val metaMap = metadataByWorkspace.getOrPut(workspaceKey) { ConcurrentHashMap() }
         val existing = metaMap[cacheKey]
         renderableUri(existing)?.let { uri ->
             memoryUris[memoryKey] = uri
@@ -102,7 +110,7 @@ class FilePodcastArtworkRepository(
             )
         }
         metaMap[cacheKey] = updated
-        metadataStore.write(workspaceKey, metaMap)
+        metadataStore.write(workspaceKey, metaMap.toMap())
         val uri = renderableUri(updated)
         uri?.let { memoryUris[memoryKey] = it }
         return uri
@@ -143,7 +151,7 @@ class FilePodcastArtworkRepository(
             remoteUpdatedAtMs = now
         )
         metaMap[cacheKey] = updated
-        metadataStore.write(workspaceKey, metaMap)
+        metadataStore.write(workspaceKey, metaMap.toMap())
         val uri = renderableUri(updated)
         uri?.let { memoryUris[memoryKey] = it }
         return uri

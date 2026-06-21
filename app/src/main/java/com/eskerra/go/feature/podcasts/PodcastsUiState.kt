@@ -29,3 +29,7 @@ data class PodcastRefreshState(
     val percent: Int? = null,
     val error: String? = null
 )
+
+sealed interface PodcastsUiEvent {
+    data object PauseToSwitchEpisode : PodcastsUiEvent
+}

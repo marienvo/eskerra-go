@@ -3,10 +3,16 @@ package com.eskerra.go.data.podcast.artwork
 import com.eskerra.go.core.model.PodcastArtworkMeta
 import com.eskerra.go.core.podcast.podcastImageCacheKey
 import java.io.File
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import okhttp3.OkHttpClient
+import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import okhttp3.mockwebserver.RecordedRequest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -72,6 +78,48 @@ class FilePodcastArtworkRepositoryTest {
         val imageFile = PodcastArtworkMetadataStore(filesDir)
             .artworkFile("vault-a", cacheKey, "png")
         assertTrue(imageFile.isFile)
+    }
+
+    @Test
+    fun resolveUri_underConcurrentLoad_doesNotThrowConcurrentModification() {
+        // Refresh-while-playing fans out artwork resolution across coroutines that all share
+        // one workspace metadata map. Before the fix the inner map was a LinkedHashMap, so a
+        // write() iterating it while another resolve mutated it crashed with
+        // ConcurrentModificationException (PodcastArtworkMetaCodec.encode). Hammer that race.
+        val png = byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47)
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse = MockResponse()
+                .setResponseCode(200)
+                .setHeader("Content-Type", "image/png")
+                .setBody(okio.Buffer().write(png))
+        }
+
+        runBlocking {
+            (0 until 64).map { i ->
+                async(Dispatchers.Default) {
+                    val feedUrl = server.url("/feed$i.xml").toString()
+                    val rssXml = """
+                        <?xml version="1.0"?>
+                        <rss xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd" version="2.0">
+                          <channel>
+                            <title>Demo $i</title>
+                            <itunes:image href="${server.url("/cover$i.png")}"/>
+                          </channel>
+                        </rss>
+                    """.trimIndent()
+                    repeat(4) {
+                        repository.resolveUri(
+                            workspaceKey = "vault-a",
+                            rssFeedUrl = feedUrl,
+                            fetchRssXml = { rssXml },
+                            allowNetwork = true
+                        )
+                        // Concurrent disk reload merges into the same shared map.
+                        repository.loadMetadataFromDisk("vault-a")
+                    }
+                }
+            }.awaitAll()
+        }
     }
 
     @Test
