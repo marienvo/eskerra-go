@@ -37,6 +37,7 @@ import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
@@ -80,6 +81,7 @@ fun PodcastsScreen(
     config: WorkspaceConfig,
     filesDir: File,
     loadPodcastArtwork: LoadPodcastArtwork,
+    hintMessage: String? = null,
     onRetry: () -> Unit,
     onRefresh: () -> Unit,
     onEpisodeClick: (PodcastEpisode) -> Unit,
@@ -94,6 +96,17 @@ fun PodcastsScreen(
             .background(PodcastUiTokens.ListBackground)
     ) {
         RefreshStrip(refreshState)
+        hintMessage?.let { message ->
+            Text(
+                text = message,
+                color = PodcastUiTokens.Accent,
+                fontSize = 13.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            )
+        }
         val chrome = LocalShellChromeInsets.current
         val pullRefreshState = rememberPullToRefreshState()
         val listState = rememberLazyListState()
@@ -390,8 +403,20 @@ private fun EpisodeRow(
 ) {
     val dateLabel = RelativeCalendarLabel.formatFromIsoDate(episode.date)
     val artworkFeedUrl = episode.rssFeedUrl ?: sectionRssFeedUrl
-    val rowEnabled = !playerState.transportBusy && !markInFlight && !selectionActive
-    Column(modifier = Modifier.fillMaxWidth()) {
+    val isActiveEpisode = playerState.isActiveEpisode(episode)
+    val switchBlocked = playerState.locksEpisodeSwitch && !isActiveEpisode
+    val rowEnabled = episodeRowEnabled(
+        markInFlight = markInFlight,
+        selectionActive = selectionActive,
+        switchBlocked = switchBlocked,
+        transportBusy = playerState.transportBusy
+    )
+    val rowAlpha = if (switchBlocked) 0.45f else 1f
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .alpha(rowAlpha)
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -451,7 +476,7 @@ private fun EpisodeRow(
                 )
                 Text(
                     text = rowStatusText(episode, playerState),
-                    color = if (playerState.isActiveEpisode(episode)) {
+                    color = if (isActiveEpisode) {
                         PodcastUiTokens.Accent
                     } else {
                         PodcastUiTokens.StatusMuted
@@ -467,8 +492,21 @@ private fun EpisodeRow(
     }
 }
 
+private fun episodeRowEnabled(
+    markInFlight: Boolean,
+    selectionActive: Boolean,
+    switchBlocked: Boolean,
+    transportBusy: Boolean
+): Boolean = !markInFlight && !selectionActive && (switchBlocked || !transportBusy)
+
 private fun rowStatusText(episode: PodcastEpisode, playerState: PodcastPlaybackState): String {
-    if (!playerState.isActiveEpisode(episode)) return "Tap to play"
+    if (!playerState.isActiveEpisode(episode)) {
+        return if (playerState.locksEpisodeSwitch) {
+            "Pause current episode to switch"
+        } else {
+            "Tap to play"
+        }
+    }
     return playerStatusText(playerState)
 }
 

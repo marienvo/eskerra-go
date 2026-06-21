@@ -28,9 +28,11 @@ import com.eskerra.go.data.workspace.WorkspacePaths
 import java.io.File
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 
 class PodcastsViewModel(
@@ -54,6 +56,9 @@ class PodcastsViewModel(
 
     private val _refreshState = MutableStateFlow(PodcastRefreshState())
     val refreshState: StateFlow<PodcastRefreshState> = _refreshState.asStateFlow()
+
+    private val _uiEvents = Channel<PodcastsUiEvent>(Channel.BUFFERED)
+    val uiEvents = _uiEvents.receiveAsFlow()
 
     private val workspaceRoot: File? =
         WorkspacePaths.resolve(filesDir, config.relativePath).getOrNull()
@@ -193,7 +198,11 @@ class PodcastsViewModel(
         val current = _uiState.value as? PodcastsUiState.Content ?: return
         if (current.selectedEpisodeIds.isNotEmpty() || current.markInFlight) return
         val playback = podcastPlayerDriver.state.value
-        if (playback.isPlaying && playback.isActiveEpisode(episode)) return
+        if (playback.isActiveEpisode(episode) && playback.locksEpisodeSwitch) return
+        if (playback.locksEpisodeSwitch && !playback.isActiveEpisode(episode)) {
+            _uiEvents.trySend(PodcastsUiEvent.PauseToSwitchEpisode)
+            return
+        }
         launchUserAction {
             podcastPlayerDriver.play(episode, startPositionForEpisode(episode))
             queuePersist(podcastPlayerDriver.state.value)
@@ -214,9 +223,6 @@ class PodcastsViewModel(
 
     fun pausePlayback() = launchUserAction {
         podcastPlayerDriver.pause()
-        // An explicit pause keeps the session resumable regardless of progress; only an
-        // explicit stop/archive clears the playlist. Clearing here let the foreground poller
-        // observe the change and tear the paused session down (closing the mini player).
         queuePersist(podcastPlayerDriver.state.value)
     }
 
@@ -370,10 +376,8 @@ class PodcastsViewModel(
     }
 
     /**
-     * Tears down only a disposable resume hint — a hydrated-but-never-played [PRIMED] session or
-     * an already-[STOPPED] one. A live, user-facing session (PLAYING/PAUSED/LOADING) is
-     * authoritative and must never be dropped by remote sync; that is what closed the mini player
-     * after an early pause.
+     * Tears down only a disposable resume hint ([PRIMED] or [STOPPED]). Live user sessions must
+     * not be dropped by remote sync.
      */
     private fun resetPlaybackIfIdle() {
         val current = podcastPlayerDriver.state.value
@@ -385,11 +389,7 @@ class PodcastsViewModel(
         }
     }
 
-    /**
-     * A live, user-facing session: an active episode the user is playing, has paused, or is
-     * loading. Remote playlist sync must defer to it rather than re-hydrating or tearing it down.
-     * A [PRIMED] hint (which itself came from sync) is not "active" and may be updated remotely.
-     */
+    /** Remote playlist sync defers to a live user-facing session (not a [PRIMED] hint). */
     private fun hasActiveLocalSession(): Boolean {
         val current = podcastPlayerDriver.state.value
         if (!current.hasActiveEpisode) return false
@@ -462,6 +462,7 @@ class PodcastsViewModel(
         const val LOAD_ERROR_MESSAGE = "Could not load podcast episodes."
         const val REFRESH_ERROR_MESSAGE = "Could not refresh podcast episodes."
         const val MARK_SELECTED_ERROR_MESSAGE = "Could not archive selected episodes."
+        const val PAUSE_TO_SWITCH_MESSAGE = "Pause to play another episode."
 
         fun factory(
             config: WorkspaceConfig,

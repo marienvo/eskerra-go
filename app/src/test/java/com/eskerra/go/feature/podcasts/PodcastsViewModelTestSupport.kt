@@ -51,6 +51,19 @@ internal fun samplePodcastEpisode() = PodcastEpisode(
     title = "Episode title"
 )
 
+internal fun samplePodcastEpisodeTwo() = PodcastEpisode(
+    articleUrl = null,
+    date = "2026-03-16",
+    id = "https://cdn/episode-two.mp3",
+    isListened = false,
+    mp3Url = "https://cdn/episode-two.mp3",
+    rssFeedUrl = null,
+    sectionTitle = "News",
+    seriesName = "Daily News",
+    sourceFile = "2026 News - podcasts.md",
+    title = "Episode two"
+)
+
 internal fun noopMarkPodcastEpisodesPlayed() = MarkPodcastEpisodesPlayed(
     podcastFileRepository = InMemoryPodcastFileRepository(mutableMapOf()),
     syncPodcastChange = { _, _ -> Result.success(PodcastSyncResult.NOTHING_TO_COMMIT) }

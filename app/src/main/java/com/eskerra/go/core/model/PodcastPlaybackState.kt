@@ -33,5 +33,11 @@ data class PodcastPlaybackState(
         phase == PodcastPlaybackPhase.NEAR_END_PLAYING ||
             phase == PodcastPlaybackPhase.NEAR_END_PAUSED
 
+    /** True while playback is in-flight and another episode must not be started. */
+    val locksEpisodeSwitch: Boolean get() =
+        phase == PodcastPlaybackPhase.LOADING ||
+            phase == PodcastPlaybackPhase.PLAYING ||
+            phase == PodcastPlaybackPhase.NEAR_END_PLAYING
+
     fun isActiveEpisode(episode: PodcastEpisode): Boolean = activeEpisode?.id == episode.id
 }
