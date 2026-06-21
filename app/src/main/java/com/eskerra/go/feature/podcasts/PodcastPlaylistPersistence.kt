@@ -1,7 +1,9 @@
 package com.eskerra.go.feature.podcasts
 
+import com.eskerra.go.core.model.PlaylistEntry
 import com.eskerra.go.core.model.PlaylistWriteResult
 import com.eskerra.go.core.model.PodcastCatalog
+import com.eskerra.go.core.model.PodcastEpisode
 import com.eskerra.go.core.model.PodcastPlaybackPhase
 import com.eskerra.go.core.model.PodcastPlaybackSnapshot
 import com.eskerra.go.core.model.PodcastPlaybackState
@@ -23,7 +25,7 @@ internal class PodcastPlaylistPersistence(
     private val clearPodcastPlaybackSnapshot: ClearPodcastPlaybackSnapshot
 ) {
     private var persistJob: Job? = null
-    var knownPlaylistEntry: com.eskerra.go.core.model.PlaylistEntry? = null
+    var knownPlaylistEntry: PlaylistEntry? = null
 
     fun queuePersist(playerState: PodcastPlaybackState) {
         val episode = playerState.activeEpisode ?: return
@@ -49,9 +51,9 @@ internal class PodcastPlaylistPersistence(
                 knownEntry = knownPlaylistEntry
             )
             knownPlaylistEntry = when (result) {
-                is com.eskerra.go.core.model.PlaylistWriteResult.Saved -> result.entry
-                is com.eskerra.go.core.model.PlaylistWriteResult.Superseded -> result.entry
-                com.eskerra.go.core.model.PlaylistWriteResult.Skipped -> knownPlaylistEntry
+                is PlaylistWriteResult.Saved -> result.entry
+                is PlaylistWriteResult.Superseded -> result.entry
+                PlaylistWriteResult.Skipped -> knownPlaylistEntry
             }
         }
     }
@@ -94,7 +96,7 @@ internal class PodcastPlaylistPersistence(
         return true
     }
 
-    fun startPositionForEpisode(episode: com.eskerra.go.core.model.PodcastEpisode): Long {
+    fun startPositionForEpisode(episode: PodcastEpisode): Long {
         val entry = knownPlaylistEntry ?: return 0L
         return if (entry.episodeId == episode.id) entry.positionMs.coerceAtLeast(0L) else 0L
     }

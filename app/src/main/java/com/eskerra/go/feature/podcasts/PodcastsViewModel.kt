@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import com.eskerra.go.core.model.PlaylistEntry
 import com.eskerra.go.core.model.PlaylistReadOutcome
 import com.eskerra.go.core.model.PodcastCatalog
+import com.eskerra.go.core.model.PodcastCatalogError
+import com.eskerra.go.core.model.PodcastCatalogException
 import com.eskerra.go.core.model.PodcastEpisode
 import com.eskerra.go.core.model.PodcastPlaybackPhase
 import com.eskerra.go.core.model.PodcastPlaybackState
@@ -141,13 +143,13 @@ class PodcastsViewModel(
                 _refreshState.value = if (result.isSuccess) {
                     PodcastRefreshState()
                 } else {
-                    PodcastRefreshState(error = REFRESH_ERROR_MESSAGE)
+                    PodcastRefreshState(error = PodcastsActionError.RefreshFailed)
                 }
             } catch (e: CancellationException) {
                 _refreshState.value = PodcastRefreshState()
                 throw e
             } catch (_: Exception) {
-                _refreshState.value = PodcastRefreshState(error = REFRESH_ERROR_MESSAGE)
+                _refreshState.value = PodcastRefreshState(error = PodcastsActionError.RefreshFailed)
             }
         }
     }
@@ -182,7 +184,9 @@ class PodcastsViewModel(
                 }
             }
             .onFailure { error ->
-                _uiState.value = PodcastsUiState.Error(podcastCatalogErrorMessage(error))
+                val catalogError = (error as? PodcastCatalogException)?.error
+                    ?: PodcastCatalogError.LoadFailed(error.message)
+                _uiState.value = PodcastsUiState.Error(catalogError)
             }
     }
 
@@ -449,13 +453,6 @@ class PodcastsViewModel(
 
     companion object {
         const val MIN_PROGRESS_MS = 10_000L
-
-        const val WORKSPACE_UNAVAILABLE_MESSAGE = "Workspace is not available."
-        const val WORKSPACE_MISSING_MESSAGE = "Workspace files are missing."
-        const val LOAD_ERROR_MESSAGE = "Could not load podcast episodes."
-        const val REFRESH_ERROR_MESSAGE = "Could not refresh podcast episodes."
-        const val MARK_SELECTED_ERROR_MESSAGE = "Could not archive selected episodes."
-        const val PAUSE_TO_SWITCH_MESSAGE = "Pause to play another episode."
 
         fun factory(
             config: WorkspaceConfig,

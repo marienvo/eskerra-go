@@ -65,7 +65,7 @@ internal class PodcastsSelectionController(
                     updateContent(
                         current.copy(
                             markInFlight = false,
-                            markError = PodcastsViewModel.MARK_SELECTED_ERROR_MESSAGE
+                            markError = PodcastsActionError.MarkSelectedFailed
                         )
                     )
                 }
