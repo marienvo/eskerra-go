@@ -76,6 +76,31 @@ class ReconcilePodcastPlaybackSourcesTest {
     }
 
     @Test
+    fun localSnapshot_winsOverStaleLowPositionRemote() {
+        // The per-device resume point must beat a stale remote entry (e.g. an R2 write that
+        // landed near the start), so a paused episode restores where it was, not at 0.
+        val hydration = reconcilePodcastPlaybackSources(
+            catalog = catalog,
+            localSnapshot = PodcastPlaybackSnapshot(
+                episodeId = episode.id,
+                mp3Url = episode.mp3Url,
+                positionMs = 100_000L,
+                durationMs = 120_000L,
+                updatedAtMs = 5L
+            ),
+            remoteEntry = PlaylistEntry(
+                episodeId = episode.id,
+                mp3Url = episode.mp3Url,
+                positionMs = 0L,
+                durationMs = 120_000L
+            ),
+            nativeSession = null
+        )
+
+        assertEquals(100_000L, hydration?.positionMs)
+    }
+
+    @Test
     fun remoteEntry_usedWhenLocalMissing() {
         val hydration = reconcilePodcastPlaybackSources(
             catalog = catalog,

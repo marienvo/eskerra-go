@@ -87,15 +87,14 @@ internal fun AppPodcastBootstrap(
         }
     }
 
+    // Persist-only. Never clear the snapshot reactively: on launch this effect first runs against
+    // the initial IDLE state, and clearing there would wipe the saved resume point before
+    // RestorePodcastPlayback (which suspends on awaitConnection) can read it — resetting a paused
+    // episode to 0 on next launch. Explicit teardown (stop/dismiss/archive/ended) clears the
+    // snapshot through its own paths; AppClosed deliberately keeps it for restore.
     LaunchedEffect(playerState) {
-        val snapshot = playerState.toPersistedSnapshot()
-        if (snapshot != null) {
+        playerState.toPersistedSnapshot()?.let { snapshot ->
             podcastShellStateWiring.persistPodcastPlaybackSnapshot(snapshot)
-        } else if (
-            !playerState.hasActiveEpisode ||
-            playerState.phase == PodcastPlaybackPhase.STOPPED
-        ) {
-            podcastShellStateWiring.clearPodcastPlaybackSnapshot()
         }
     }
 
