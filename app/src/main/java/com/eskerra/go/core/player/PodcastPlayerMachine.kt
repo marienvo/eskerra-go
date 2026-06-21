@@ -157,7 +157,10 @@ object PodcastPlayerMachine {
                     state
                 } else {
                     val positionMs = sanitizedPosition(event.positionMs)
-                    val durationMs = event.durationMs?.takeIf { it > 0L }
+                    // Keep the known duration when a tick reports it as unknown (C.TIME_UNSET)
+                    // while the item is (re)loading on resume — an episode's length doesn't
+                    // change, and dropping it to null flashes the progress bar to 0%.
+                    val durationMs = event.durationMs?.takeIf { it > 0L } ?: state.durationMs
                     state.copy(
                         phase = progressPhase(state.phase, positionMs, durationMs),
                         positionMs = positionMs,

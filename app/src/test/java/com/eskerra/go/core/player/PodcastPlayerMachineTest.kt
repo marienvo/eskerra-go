@@ -101,6 +101,24 @@ class PodcastPlayerMachineTest {
     }
 
     @Test
+    fun progressTickWithUnknownDuration_keepsKnownDuration() {
+        val state = PodcastPlaybackState(
+            activeEpisode = sampleEpisode(),
+            phase = PodcastPlaybackPhase.LOADING,
+            positionMs = 100_000L,
+            durationMs = 120_000L
+        )
+
+        val next = PodcastPlayerMachine.reduce(
+            state,
+            PodcastPlayerEvent.ProgressChanged(positionMs = 100_000L, durationMs = null)
+        )
+
+        assertEquals(120_000L, next.durationMs)
+        assertEquals(100_000L, next.positionMs)
+    }
+
+    @Test
     fun nativeBufferingWithPlayWhenReady_mapsToLoading() {
         val state = primedState()
 
