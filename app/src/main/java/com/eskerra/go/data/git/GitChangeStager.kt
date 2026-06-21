@@ -8,13 +8,16 @@ import org.eclipse.jgit.api.Git
 object GitChangeStager {
 
     fun stagePaths(workingDir: File, relativePaths: Iterable<String>) {
+        Git.open(workingDir).use { git ->
+            stagePaths(git, workingDir, relativePaths)
+        }
+    }
+
+    fun stagePaths(git: Git, workingDir: File, relativePaths: Iterable<String>) {
         for (rawPath in relativePaths) {
             val pattern = rawPath.replace('\\', '/').trimStart('/')
             if (pattern.isBlank()) continue
-            GitIndexLockRecovery.clearStaleLock(workingDir).getOrThrow()
-            Git.open(workingDir).use { git ->
-                stageSinglePath(git, workingDir, pattern)
-            }
+            stageSinglePath(git, workingDir, pattern)
         }
     }
 
