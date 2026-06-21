@@ -69,6 +69,39 @@ internal fun noopSyncPodcastVaultRefresh() = SyncPodcastVaultRefresh(
 
 internal fun noopPodcastPlaylistSync() = podcastPlaylistSyncForTest()
 
+internal fun recordingPodcastPlaylistSyncForTest(
+    initialEntry: PlaylistEntry? = null
+): Pair<PodcastPlaylistSync, RecordingPlaylistSyncRepository> {
+    val repo = RecordingPlaylistSyncRepository(initialEntry)
+    val vaultRepo = object : VaultSettingsRepository {
+        override suspend fun loadShared(workspaceRoot: File): Result<EskerraSettings> =
+            Result.success(
+                EskerraSettings(
+                    r2 = R2Config(
+                        endpoint = "https://example.r2.cloudflarestorage.com",
+                        bucket = "bucket",
+                        accessKeyId = "key",
+                        secretAccessKey = "secret"
+                    )
+                )
+            )
+
+        override suspend fun saveShared(workspaceRoot: File, settings: EskerraSettings) =
+            Result.success(Unit)
+    }
+    val localStore = object : LocalSettingsStore {
+        override suspend fun load() = EskerraLocalSettings(deviceInstanceId = "device-1")
+        override suspend fun save(settings: EskerraLocalSettings) = Unit
+    }
+    return PodcastPlaylistSync(
+        readPlaylist = ReadPlaylist(repo),
+        writePlaylist = WritePlaylist(repo),
+        clearPlaylist = ClearPlaylist(repo),
+        loadVaultSettings = LoadVaultSettings(vaultRepo),
+        ensureDeviceInstanceId = EnsureDeviceInstanceId(localStore)
+    ) to repo
+}
+
 internal fun noopLoadPodcastArtwork() = LoadPodcastArtwork(
     repository = object : PodcastArtworkRepository {
         override fun peekMemoryUri(workspaceKey: String, rssFeedUrl: String): String? = null
@@ -132,6 +165,31 @@ internal class FakePodcastCatalogRepository(private val result: Result<PodcastCa
     PodcastCatalogRepository {
     override suspend fun load(config: WorkspaceConfig, filesDir: File): Result<PodcastCatalog> =
         result
+}
+
+internal class RecordingPlaylistSyncRepository(initialEntry: PlaylistEntry?) :
+    PlaylistSyncRepository {
+    var entry: PlaylistEntry? = initialEntry
+        private set
+    var clearCalls = 0
+        private set
+
+    override suspend fun readPlaylist(workspaceRoot: File): PlaylistEntry? = entry
+
+    override suspend fun writePlaylist(
+        workspaceRoot: File,
+        entry: PlaylistEntry
+    ): PlaylistWriteResult {
+        this.entry = entry
+        return PlaylistWriteResult.Saved(entry)
+    }
+
+    override suspend fun clearPlaylist(workspaceRoot: File) {
+        clearCalls += 1
+        entry = null
+    }
+
+    override fun invalidateReadCache(workspaceRoot: File) = Unit
 }
 
 internal class SwitchingPodcastCatalogRepository(

@@ -146,6 +146,52 @@ class PodcastPlayerMachineTest {
         assertEquals(15_000L, next.positionMs)
     }
 
+    @Test
+    fun nativeIdle_doesNotDropPausedActiveEpisode() {
+        val state = primedState().copy(
+            phase = PodcastPlaybackPhase.PAUSED,
+            positionMs = 15_000L,
+            durationMs = 60_000L
+        )
+
+        val next = PodcastPlayerMachine.reduce(
+            state,
+            PodcastPlayerEvent.NativeStateChanged(
+                nativeState = PodcastNativePlaybackState.IDLE,
+                playWhenReady = false,
+                positionMs = 0L,
+                durationMs = null
+            )
+        )
+
+        assertEquals(PodcastPlaybackPhase.PAUSED, next.phase)
+        assertEquals(15_000L, next.positionMs)
+        assertEquals(sampleEpisode().id, next.activeEpisode?.id)
+    }
+
+    @Test
+    fun nativeIdle_doesNotDropNearEndPausedActiveEpisode() {
+        val state = primedState().copy(
+            phase = PodcastPlaybackPhase.NEAR_END_PAUSED,
+            positionMs = 55_000L,
+            durationMs = 60_000L
+        )
+
+        val next = PodcastPlayerMachine.reduce(
+            state,
+            PodcastPlayerEvent.NativeStateChanged(
+                nativeState = PodcastNativePlaybackState.IDLE,
+                playWhenReady = false,
+                positionMs = 0L,
+                durationMs = null
+            )
+        )
+
+        assertEquals(PodcastPlaybackPhase.NEAR_END_PAUSED, next.phase)
+        assertEquals(55_000L, next.positionMs)
+        assertEquals(sampleEpisode().id, next.activeEpisode?.id)
+    }
+
     private fun primedState(): PodcastPlaybackState =
         PodcastPlaybackState(activeEpisode = sampleEpisode())
 
