@@ -26,7 +26,8 @@ class CreateInboxNote(
     suspend operator fun invoke(
         config: WorkspaceConfig,
         filesDir: File,
-        draft: String
+        draft: String,
+        hubFolder: String = ""
     ): Result<CreateInboxNoteResult> {
         if (!InboxNoteDraft.hasNonBlankTitle(draft)) {
             return Result.failure(
@@ -36,7 +37,7 @@ class CreateInboxNote(
 
         val markdown = InboxNoteDraft.toMarkdown(draft)
         val stem = InboxNoteDraft.toFilenameStem(InboxNoteDraft.extractTitleLine(draft))
-        val notePath = allocateInboxPathFromStem(config, filesDir, stem)
+        val notePath = allocateInboxPathFromStem(config, filesDir, stem, hubFolder)
             .getOrElse { return Result.failure(it) }
 
         writeRepository.write(config, filesDir, notePath, markdown).getOrElse { error ->
@@ -80,15 +81,17 @@ class CreateInboxNote(
     private suspend fun allocateInboxPathFromStem(
         config: WorkspaceConfig,
         filesDir: File,
-        stem: String
+        stem: String,
+        hubFolder: String
     ): Result<NotePath> {
-        val basePath = "$INBOX_PREFIX$stem$MARKDOWN_SUFFIX"
+        val inboxPrefix = InboxNotePath.inboxPrefixFor(hubFolder)
+        val basePath = "$inboxPrefix$stem$MARKDOWN_SUFFIX"
 
         for (attempt in 1..maxCollisionAttempts) {
             val candidatePath = if (attempt == 1) {
                 basePath
             } else {
-                "$INBOX_PREFIX$stem-$attempt$MARKDOWN_SUFFIX"
+                "$inboxPrefix$stem-$attempt$MARKDOWN_SUFFIX"
             }
 
             val notePath = NotePath.fromRelativePath(candidatePath).getOrElse {
@@ -97,9 +100,11 @@ class CreateInboxNote(
                 )
             }
 
-            if (!notePath.value.startsWith(INBOX_PREFIX)) {
+            if (!notePath.value.startsWith(inboxPrefix)) {
                 return Result.failure(
-                    CreateNoteException(CreateNoteError.WriteFailed("Path must start with Inbox/"))
+                    CreateNoteException(
+                        CreateNoteError.WriteFailed("Path must start with $inboxPrefix")
+                    )
                 )
             }
 
@@ -120,7 +125,6 @@ class CreateInboxNote(
     }
 
     internal companion object {
-        const val INBOX_PREFIX = "${InboxNotePath.INBOX_DIRECTORY}/"
         const val MARKDOWN_SUFFIX = ".md"
 
         private fun mapWriteFailure(error: Throwable): CreateNoteException {

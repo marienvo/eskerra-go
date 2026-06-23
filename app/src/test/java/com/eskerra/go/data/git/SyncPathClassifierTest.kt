@@ -18,6 +18,19 @@ class SyncPathClassifierTest {
     }
 
     @Test
+    fun partition_hubInboxPaths() {
+        val partition = SyncPathClassifier.partition(
+            setOf("Daily/Inbox/note.md", "Weekly/Inbox/other.md", "Daily/Inbox")
+        )
+        assertEquals(
+            setOf("Daily/Inbox/note.md", "Weekly/Inbox/other.md", "Daily/Inbox"),
+            partition.inboxPaths
+        )
+        assertTrue(partition.nonInboxPaths.isEmpty())
+        assertTrue(partition.unsafePaths.isEmpty())
+    }
+
+    @Test
     fun partition_nonInboxPaths() {
         val partition = SyncPathClassifier.partition(setOf("Projects/read.md"))
         assertTrue(partition.inboxPaths.isEmpty())

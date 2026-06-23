@@ -46,7 +46,8 @@ internal fun AppInboxRoute(
     touchVaultSearchPaths: TouchVaultSearchPaths,
     onInboxUiStateChanged: (InboxUiState) -> Unit,
     onTodayHubUiStateChanged: (TodayHubUiState) -> Unit,
-    homeReselectSignal: Int
+    homeReselectSignal: Int,
+    inboxRefreshSignal: Int
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -103,6 +104,12 @@ internal fun AppInboxRoute(
             inboxViewModel.refresh()
             todayHubViewModel.retry()
             appSyncViewModel.refreshLocalStatusQuietly()
+        }
+    }
+
+    LaunchedEffect(inboxRefreshSignal) {
+        if (inboxRefreshSignal > 0) {
+            inboxViewModel.refresh()
         }
     }
 

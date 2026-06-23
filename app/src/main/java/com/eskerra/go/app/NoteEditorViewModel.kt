@@ -12,6 +12,8 @@ import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.SaveNoteError
 import com.eskerra.go.core.model.SaveNoteException
 import com.eskerra.go.core.model.WorkspaceConfig
+import com.eskerra.go.core.repository.ActiveTodayHubStore
+import com.eskerra.go.core.todayhub.TodayHubDiscovery
 import com.eskerra.go.core.usecase.CreateInboxNote
 import com.eskerra.go.core.usecase.LoadEditableNote
 import com.eskerra.go.core.usecase.LoadGitStatusSummary
@@ -191,7 +193,8 @@ class NoteEditorViewModel(
 class CreateInboxNoteViewModel(
     private val config: WorkspaceConfig,
     private val filesDir: File,
-    private val createInboxNote: CreateInboxNote
+    private val createInboxNote: CreateInboxNote,
+    private val activeTodayHubStore: ActiveTodayHubStore? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<CreateInboxUiState>(
@@ -230,7 +233,10 @@ class CreateInboxNoteViewModel(
         saveJob?.cancel()
         saveJob = viewModelScope.launch {
             _uiState.value = current.copy(isSaving = true, errorMessage = null)
-            createInboxNote(config, filesDir, current.draft).fold(
+            val hubFolder = activeTodayHubStore?.read()
+                ?.let { TodayHubDiscovery.directoryOf(it) }
+                ?: ""
+            createInboxNote(config, filesDir, current.draft, hubFolder).fold(
                 onSuccess = { result ->
                     _uiState.value = CreateInboxUiState.Content(
                         draft = "",
@@ -269,11 +275,16 @@ class CreateInboxNoteViewModel(
         fun factory(
             config: WorkspaceConfig,
             filesDir: File,
-            createInboxNote: CreateInboxNote
+            createInboxNote: CreateInboxNote,
+            activeTodayHubStore: ActiveTodayHubStore? = null
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
-            override fun <T : ViewModel> create(modelClass: Class<T>): T =
-                CreateInboxNoteViewModel(config, filesDir, createInboxNote) as T
+            override fun <T : ViewModel> create(modelClass: Class<T>): T = CreateInboxNoteViewModel(
+                config,
+                filesDir,
+                createInboxNote,
+                activeTodayHubStore
+            ) as T
         }
     }
 }

@@ -1,6 +1,6 @@
 package com.eskerra.go.data.git
 
-import com.eskerra.go.data.notes.MarkdownNoteScanner
+import com.eskerra.go.core.inbox.InboxNotePath
 import com.eskerra.go.data.workspace.WorkspacePaths
 import java.io.File
 import org.eclipse.jgit.api.Git
@@ -47,7 +47,7 @@ class GitIndexInspectorTest {
         val filesDir = temp.newFolder("files")
         val workspace = File(filesDir, WorkspacePaths.DEFAULT_RELATIVE_PATH)
         gitRepo.cloneFrom(TestGitRepos.fileUri(bare), workspace).getOrThrow()
-        gitRepo.writeFile(workspace, "${MarkdownNoteScanner.INBOX_DIRECTORY}/seed.md", "# Seed\n")
+        gitRepo.writeFile(workspace, "${InboxNotePath.INBOX_DIRECTORY}/seed.md", "# Seed\n")
             .getOrThrow()
         gitRepo.stageAll(workspace).getOrThrow()
         gitRepo.commit(workspace, "Seed").getOrThrow()

@@ -1,5 +1,6 @@
 package com.eskerra.go.core.usecase
 
+import com.eskerra.go.core.inbox.InboxNotePath
 import com.eskerra.go.core.model.SyncError
 import com.eskerra.go.core.model.SyncException
 import com.eskerra.go.core.model.SyncStatusState
@@ -9,7 +10,6 @@ import com.eskerra.go.data.git.JGitRemoteSyncRepository
 import com.eskerra.go.data.git.JGitWorkspaceRepository
 import com.eskerra.go.data.git.TestGitRepos
 import com.eskerra.go.data.notes.FileNoteRegistryRepository
-import com.eskerra.go.data.notes.MarkdownNoteScanner
 import com.eskerra.go.data.notes.NoteRegistryCache
 import com.eskerra.go.data.workspace.WorkspacePaths
 import java.io.File
@@ -535,7 +535,7 @@ class ManualSyncNowTest {
     private fun seedRemote(remoteUri: String): String {
         val producer = temp.newFolder("seed")
         gitRepo.cloneFrom(remoteUri, producer).getOrThrow()
-        gitRepo.writeFile(producer, "${MarkdownNoteScanner.INBOX_DIRECTORY}/seed.md", "# Seed\n")
+        gitRepo.writeFile(producer, "${InboxNotePath.INBOX_DIRECTORY}/seed.md", "# Seed\n")
             .getOrThrow()
         gitRepo.writeFile(producer, "Projects/read.md", "# Read\n").getOrThrow()
         gitRepo.stageAll(producer).getOrThrow()
