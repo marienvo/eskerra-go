@@ -121,6 +121,7 @@ class Media3PodcastPlayerDriver(context: Context) : PodcastPlayerDriver {
     }
 
     override fun pause() {
+        resumeTargetMs = null
         reduce(PodcastPlayerEvent.PauseRequested)
         withController { mediaController ->
             mediaController.pause()

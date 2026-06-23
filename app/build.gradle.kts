@@ -1,5 +1,3 @@
-import java.util.Properties
-
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -9,20 +7,36 @@ plugins {
     alias(libs.plugins.sentry.android)
 }
 
-fun localProperty(name: String): String? {
-    val file = rootProject.file("local.properties")
-    if (!file.isFile) return null
-    val properties = Properties()
-    file.inputStream().use(properties::load)
-    return properties.getProperty(name)
+// Reads a single key from local.properties as a tracked ValueSource so that
+// changes to the file invalidate the configuration cache entry.
+abstract class LocalPropertySource : ValueSource<String, LocalPropertySource.Params> {
+    interface Params : ValueSourceParameters {
+        val file: RegularFileProperty
+        val key: Property<String>
+    }
+
+    override fun obtain(): String? {
+        val f = parameters.file.asFile.get()
+        if (!f.isFile) return null
+        return java.util.Properties()
+            .apply { f.inputStream().use(::load) }
+            .getProperty(parameters.key.get())
+    }
 }
+
+fun localProperty(name: String): Provider<String> =
+    providers.of(LocalPropertySource::class.java) {
+        parameters.file.set(rootProject.layout.projectDirectory.file("local.properties"))
+        parameters.key.set(name)
+    }
 
 fun stringBuildConfigField(value: String): String =
     "\"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\""
 
 val sentryDsn = providers.environmentVariable("SENTRY_DSN")
     .orElse(providers.gradleProperty("sentry.dsn"))
-    .orElse(localProperty("sentry.dsn") ?: "")
+    .orElse(localProperty("sentry.dsn"))
+    .orElse("")
 val sentryAuthToken = providers.environmentVariable("SENTRY_AUTH_TOKEN")
     .orElse(providers.gradleProperty("sentry.auth.token"))
     .orElse("")
@@ -89,7 +103,7 @@ android {
 
 sentry {
     org.set("personal-133")
-    projectName.set("react-native")
+    projectName.set("eskerra-go")
     url.set("https://sentry.io/")
     authToken.set(sentryAuthToken)
     includeProguardMapping.set(shouldUploadSentryMappings)
