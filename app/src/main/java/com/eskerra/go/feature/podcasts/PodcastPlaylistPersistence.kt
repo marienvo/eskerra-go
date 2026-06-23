@@ -50,11 +50,7 @@ internal class PodcastPlaylistPersistence(
                 durationMs = playerState.durationMs,
                 knownEntry = knownPlaylistEntry
             )
-            knownPlaylistEntry = when (result) {
-                is PlaylistWriteResult.Saved -> result.entry
-                is PlaylistWriteResult.Superseded -> result.entry
-                PlaylistWriteResult.Skipped -> knownPlaylistEntry
-            }
+            applyWriteResult(result)
         }
     }
 
@@ -88,12 +84,16 @@ internal class PodcastPlaylistPersistence(
             durationMs = state.durationMs,
             knownEntry = null
         )
+        applyWriteResult(result)
+        return true
+    }
+
+    private fun applyWriteResult(result: PlaylistWriteResult) {
         knownPlaylistEntry = when (result) {
             is PlaylistWriteResult.Saved -> result.entry
             is PlaylistWriteResult.Superseded -> result.entry
             PlaylistWriteResult.Skipped -> knownPlaylistEntry
         }
-        return true
     }
 
     fun startPositionForEpisode(episode: PodcastEpisode): Long {
