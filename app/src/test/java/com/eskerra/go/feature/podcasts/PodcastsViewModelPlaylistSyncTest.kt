@@ -222,6 +222,31 @@ class PodcastsViewModelPlaylistSyncTest {
         assertEquals(0, playlistRepo.clearCalls)
     }
 
+    @Test
+    fun emptyRemote_withPriorKnownWrite_tearsDownSessionAsDeliberateClear() = runTest {
+        // hadPriorKnownWrite=true means the watermark was set before this read, so another device
+        // cleared the playlist deliberately. This device must not re-publish its local session.
+        val episode = samplePodcastEpisode()
+        val playerDriver = FakePodcastPlayerDriver()
+        val (playlistSync, playlistRepo) = recordingPodcastPlaylistSyncForTest(
+            forcedReadOutcome = PlaylistReadOutcome.Empty(hadPriorKnownWrite = true)
+        )
+        val persistence = podcastsViewModelPersistenceDefaults(snapshotStoreFor(episode))
+        val viewModel = buildViewModel(episode, playerDriver, playlistSync, persistence)
+        advanceUntilIdle()
+
+        playerDriver.hydrate(episode = episode, positionMs = 30_000L, durationMs = 60_000L)
+        runCurrent()
+
+        viewModel.onPlaylistSyncGenerationChanged(1)
+        advanceUntilIdle()
+
+        val content = viewModel.uiState.value as PodcastsUiState.Content
+        assertEquals(PodcastPlaybackPhase.STOPPED, content.playerState.phase)
+        assertNull(playlistRepo.entry)
+        assertEquals(0, playlistRepo.clearCalls)
+    }
+
     private fun snapshotStoreFor(
         episode: com.eskerra.go.core.model.PodcastEpisode
     ): RecordingLocalSettingsStore = RecordingLocalSettingsStore().apply {

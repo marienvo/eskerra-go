@@ -300,11 +300,13 @@ class PodcastsViewModel(
             // session backed by its own local snapshot, the remote was lost (a write that never
             // landed before the app closed) rather than deliberately cleared elsewhere — keep the
             // session and re-publish it so the paused position survives on R2.
-            PlaylistReadOutcome.Empty -> {
+            // hadPriorKnownWrite=true means another device cleared deliberately; don't re-publish.
+            is PlaylistReadOutcome.Empty -> {
                 val kept = playlistPersistence.republishResumableLocalSession(
                     state = podcastPlayerDriver.state.value,
                     snapshot = loadLocalSettings().playbackSnapshot(),
-                    catalog = catalog
+                    catalog = catalog,
+                    hadPriorKnownWrite = outcome.hadPriorKnownWrite
                 )
                 if (!kept) {
                     playlistPersistence.knownPlaylistEntry = null
