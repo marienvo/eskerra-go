@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.eskerra.go.core.model.PlaylistEntry
+import com.eskerra.go.core.model.PlaylistReadOutcome
 import com.eskerra.go.core.model.PodcastCatalog
 import com.eskerra.go.core.model.PodcastCatalogError
 import com.eskerra.go.core.model.PodcastCatalogException
@@ -142,13 +143,13 @@ class PodcastsViewModel(
                 _refreshState.value = if (result.isSuccess) {
                     PodcastRefreshState()
                 } else {
-                    PodcastRefreshState(error = REFRESH_ERROR_MESSAGE)
+                    PodcastRefreshState(error = PodcastsActionError.RefreshFailed)
                 }
             } catch (e: CancellationException) {
                 _refreshState.value = PodcastRefreshState()
                 throw e
             } catch (_: Exception) {
-                _refreshState.value = PodcastRefreshState(error = REFRESH_ERROR_MESSAGE)
+                _refreshState.value = PodcastRefreshState(error = PodcastsActionError.RefreshFailed)
             }
         }
     }
@@ -183,7 +184,9 @@ class PodcastsViewModel(
                 }
             }
             .onFailure { error ->
-                _uiState.value = PodcastsUiState.Error(mapFailure(error))
+                val catalogError = (error as? PodcastCatalogException)?.error
+                    ?: PodcastCatalogError.LoadFailed(error.message)
+                _uiState.value = PodcastsUiState.Error(catalogError)
             }
     }
 
@@ -204,7 +207,7 @@ class PodcastsViewModel(
             return
         }
         launchUserAction {
-            podcastPlayerDriver.play(episode, startPositionForEpisode(episode))
+            podcastPlayerDriver.play(episode, playlistPersistence.startPositionForEpisode(episode))
             queuePersist(podcastPlayerDriver.state.value)
         }
     }
@@ -228,18 +231,8 @@ class PodcastsViewModel(
 
     fun resumePlayback() {
         val state = podcastPlayerDriver.state.value
-        val episode = state.activeEpisode ?: return
-        if (state.isPlaying) return
         launchUserAction {
-            when (state.phase) {
-                PodcastPlaybackPhase.PRIMED,
-                PodcastPlaybackPhase.PAUSED,
-                PodcastPlaybackPhase.NEAR_END_PAUSED,
-                PodcastPlaybackPhase.STOPPED ->
-                    podcastPlayerDriver.play(episode, state.positionMs)
-
-                else -> podcastPlayerDriver.resume()
-            }
+            podcastPlayerDriver.resumeFromState(state)
             queuePersist(podcastPlayerDriver.state.value)
         }
     }
@@ -298,13 +291,31 @@ class PodcastsViewModel(
         if (hasActiveLocalSession()) return
         if (userActionInFlight) return
         val catalog = lastCatalog ?: return
-        val entry = podcastPlaylistSync.read(root)
-        playlistPersistence.knownPlaylistEntry = entry
-        if (entry == null) {
-            resetPlaybackIfIdle()
-            return
+        when (val outcome = podcastPlaylistSync.readOutcome(root)) {
+            is PlaylistReadOutcome.Present -> {
+                playlistPersistence.knownPlaylistEntry = outcome.entry
+                hydrateOrReset(catalog, outcome.entry)
+            }
+            // R2 confirmed there is no playlist object. If this device still holds a resumable
+            // session backed by its own local snapshot, the remote was lost (a write that never
+            // landed before the app closed) rather than deliberately cleared elsewhere — keep the
+            // session and re-publish it so the paused position survives on R2.
+            // hadPriorKnownWrite=true means another device cleared deliberately; don't re-publish.
+            is PlaylistReadOutcome.Empty -> {
+                val kept = playlistPersistence.republishResumableLocalSession(
+                    state = podcastPlayerDriver.state.value,
+                    snapshot = loadLocalSettings().playbackSnapshot(),
+                    catalog = catalog,
+                    hadPriorKnownWrite = outcome.hadPriorKnownWrite
+                )
+                if (!kept) {
+                    playlistPersistence.knownPlaylistEntry = null
+                    resetPlaybackIfIdle()
+                }
+            }
+            // Not configured or a transient failure: never destroy local state on an unknown remote.
+            PlaylistReadOutcome.Unavailable -> Unit
         }
-        hydrateOrReset(catalog, entry)
     }
 
     private suspend fun hydrateOrReset(catalog: PodcastCatalog, entry: PlaylistEntry) {
@@ -404,18 +415,6 @@ class PodcastsViewModel(
         }
     }
 
-    private fun startPositionForEpisode(episode: PodcastEpisode): Long {
-        val entry = playlistPersistence.knownPlaylistEntry ?: return 0L
-        return if (entry.episodeId == episode.id) entry.positionMs.coerceAtLeast(0L) else 0L
-    }
-
-    private fun updateContent(block: (PodcastsUiState.Content) -> PodcastsUiState.Content) {
-        val current = _uiState.value
-        if (current is PodcastsUiState.Content) {
-            _uiState.value = block(current)
-        }
-    }
-
     private fun updatePlayerState(playerState: PodcastPlaybackState) {
         val current = _uiState.value
         if (current is PodcastsUiState.Content) {
@@ -444,25 +443,8 @@ class PodcastsViewModel(
         }
     }
 
-    private fun mapFailure(error: Throwable): String {
-        val catalogError = (error as? PodcastCatalogException)?.error
-        return when (catalogError) {
-            PodcastCatalogError.InvalidWorkspacePath -> WORKSPACE_UNAVAILABLE_MESSAGE
-            PodcastCatalogError.WorkspaceMissing -> WORKSPACE_MISSING_MESSAGE
-            is PodcastCatalogError.LoadFailed -> LOAD_ERROR_MESSAGE
-            null -> LOAD_ERROR_MESSAGE
-        }
-    }
-
     companion object {
         const val MIN_PROGRESS_MS = 10_000L
-
-        const val WORKSPACE_UNAVAILABLE_MESSAGE = "Workspace is not available."
-        const val WORKSPACE_MISSING_MESSAGE = "Workspace files are missing."
-        const val LOAD_ERROR_MESSAGE = "Could not load podcast episodes."
-        const val REFRESH_ERROR_MESSAGE = "Could not refresh podcast episodes."
-        const val MARK_SELECTED_ERROR_MESSAGE = "Could not archive selected episodes."
-        const val PAUSE_TO_SWITCH_MESSAGE = "Pause to play another episode."
 
         fun factory(
             config: WorkspaceConfig,

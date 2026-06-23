@@ -74,19 +74,19 @@ internal fun AppPodcastsRoute(
     }
     val podcastsState by podcastsViewModel.uiState.collectAsState()
     val refreshState by podcastsViewModel.refreshState.collectAsState()
-    var hintMessage by remember { mutableStateOf<String?>(null) }
+    var showPauseToSwitchHint by remember { mutableStateOf(false) }
     LaunchedEffect(podcastsViewModel) {
         podcastsViewModel.uiEvents.collect { event ->
             when (event) {
                 PodcastsUiEvent.PauseToSwitchEpisode ->
-                    hintMessage = PodcastsViewModel.PAUSE_TO_SWITCH_MESSAGE
+                    showPauseToSwitchHint = true
             }
         }
     }
-    LaunchedEffect(hintMessage) {
-        if (hintMessage != null) {
+    LaunchedEffect(showPauseToSwitchHint) {
+        if (showPauseToSwitchHint) {
             delay(3_000)
-            hintMessage = null
+            showPauseToSwitchHint = false
         }
     }
     val playlistGeneration = playlistPollingHost?.playlistSyncGeneration
@@ -102,7 +102,7 @@ internal fun AppPodcastsRoute(
         config = currentConfig,
         filesDir = filesDir,
         loadPodcastArtwork = loadPodcastArtwork,
-        hintMessage = hintMessage,
+        showPauseToSwitchHint = showPauseToSwitchHint,
         onRetry = podcastsViewModel::refresh,
         onRefresh = podcastsViewModel::runVaultRefresh,
         onEpisodeClick = podcastsViewModel::onEpisodeClick,

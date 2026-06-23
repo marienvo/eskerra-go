@@ -1,6 +1,11 @@
 package com.eskerra.go.feature.podcasts
 
+import com.eskerra.go.core.model.PlaylistEntry
+import com.eskerra.go.core.model.PlaylistWriteResult
+import com.eskerra.go.core.model.PodcastCatalog
+import com.eskerra.go.core.model.PodcastEpisode
 import com.eskerra.go.core.model.PodcastPlaybackPhase
+import com.eskerra.go.core.model.PodcastPlaybackSnapshot
 import com.eskerra.go.core.model.PodcastPlaybackState
 import com.eskerra.go.core.playlist.toPersistedSnapshot
 import com.eskerra.go.core.usecase.ClearPodcastPlaybackSnapshot
@@ -20,7 +25,7 @@ internal class PodcastPlaylistPersistence(
     private val clearPodcastPlaybackSnapshot: ClearPodcastPlaybackSnapshot
 ) {
     private var persistJob: Job? = null
-    var knownPlaylistEntry: com.eskerra.go.core.model.PlaylistEntry? = null
+    var knownPlaylistEntry: PlaylistEntry? = null
 
     fun queuePersist(playerState: PodcastPlaybackState) {
         val episode = playerState.activeEpisode ?: return
@@ -45,12 +50,61 @@ internal class PodcastPlaylistPersistence(
                 durationMs = playerState.durationMs,
                 knownEntry = knownPlaylistEntry
             )
-            knownPlaylistEntry = when (result) {
-                is com.eskerra.go.core.model.PlaylistWriteResult.Saved -> result.entry
-                is com.eskerra.go.core.model.PlaylistWriteResult.Superseded -> result.entry
-                com.eskerra.go.core.model.PlaylistWriteResult.Skipped -> knownPlaylistEntry
-            }
+            applyWriteResult(result)
         }
+    }
+
+    /**
+     * Re-publishes the active session to R2 when the remote is empty but a matching local snapshot
+     * proves this device owns a still-resumable session — the remote was lost (a write that never
+     * landed before the app closed) rather than deliberately cleared elsewhere. Returns true when
+     * the session was kept (and a re-publish attempted), false when there is nothing to preserve.
+     *
+     * Pass [hadPriorKnownWrite] = true when the R2 repository confirmed a prior successful write
+     * before the empty result. In that case another device cleared the playlist deliberately, so
+     * this device must not re-publish and undo the remote stop.
+     */
+    suspend fun republishResumableLocalSession(
+        state: PodcastPlaybackState,
+        snapshot: PodcastPlaybackSnapshot?,
+        catalog: PodcastCatalog,
+        hadPriorKnownWrite: Boolean = false
+    ): Boolean {
+        if (hadPriorKnownWrite) return false
+        val root = workspaceRoot ?: return false
+        snapshot ?: return false
+        val active = state.activeEpisode ?: return false
+        if (active.id != snapshot.episodeId) return false
+        if (
+            state.phase == PodcastPlaybackPhase.IDLE ||
+            state.phase == PodcastPlaybackPhase.STOPPED
+        ) {
+            return false
+        }
+        val episode = catalog.allEpisodes.firstOrNull { it.id == active.id } ?: return false
+        if (episode.isListened) return false
+        val result = podcastPlaylistSync.persist(
+            workspaceRoot = root,
+            episode = episode,
+            positionMs = state.positionMs,
+            durationMs = state.durationMs,
+            knownEntry = null
+        )
+        applyWriteResult(result)
+        return true
+    }
+
+    private fun applyWriteResult(result: PlaylistWriteResult) {
+        knownPlaylistEntry = when (result) {
+            is PlaylistWriteResult.Saved -> result.entry
+            is PlaylistWriteResult.Superseded -> result.entry
+            PlaylistWriteResult.Skipped -> knownPlaylistEntry
+        }
+    }
+
+    fun startPositionForEpisode(episode: PodcastEpisode): Long {
+        val entry = knownPlaylistEntry ?: return 0L
+        return if (entry.episodeId == episode.id) entry.positionMs.coerceAtLeast(0L) else 0L
     }
 
     suspend fun clearRemotePlaylist() {

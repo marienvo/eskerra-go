@@ -1,4 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Eskerra Go</string>
+    <string name="podcasts_error_workspace_unavailable">Workspace is not available.</string>
+    <string name="podcasts_error_workspace_missing">Workspace files are missing.</string>
+    <string name="podcasts_error_load_failed">Could not load podcast episodes.</string>
+    <string name="podcasts_error_refresh_failed">Could not refresh podcast episodes.</string>
+    <string name="podcasts_error_mark_selected_failed">Could not archive selected episodes.</string>
+    <string name="podcasts_hint_pause_to_switch">Pause to play another episode.</string>
 </resources>

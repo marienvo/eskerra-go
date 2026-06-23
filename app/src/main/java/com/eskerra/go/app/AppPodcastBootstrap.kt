@@ -11,7 +11,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.navigation.NavDestination
 import androidx.navigation.NavHostController
-import com.eskerra.go.core.model.PodcastPlaybackPhase
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.playlist.toPersistedSnapshot
 import com.eskerra.go.core.repository.PodcastPlayerDriver
@@ -87,15 +86,14 @@ internal fun AppPodcastBootstrap(
         }
     }
 
+    // Persist-only. Never clear the snapshot reactively: on launch this effect first runs against
+    // the initial IDLE state, and clearing there would wipe the saved resume point before
+    // RestorePodcastPlayback (which suspends on awaitConnection) can read it — resetting a paused
+    // episode to 0 on next launch. Explicit teardown (stop/dismiss/archive/ended) clears the
+    // snapshot through its own paths; AppClosed deliberately keeps it for restore.
     LaunchedEffect(playerState) {
-        val snapshot = playerState.toPersistedSnapshot()
-        if (snapshot != null) {
+        playerState.toPersistedSnapshot()?.let { snapshot ->
             podcastShellStateWiring.persistPodcastPlaybackSnapshot(snapshot)
-        } else if (
-            !playerState.hasActiveEpisode ||
-            playerState.phase == PodcastPlaybackPhase.STOPPED
-        ) {
-            podcastShellStateWiring.clearPodcastPlaybackSnapshot()
         }
     }
 
@@ -114,16 +112,7 @@ internal fun AppPodcastBootstrap(
         bridge.resumePlayback = {
             scope.launch {
                 val state = podcastPlayerDriver.state.value
-                val episode = state.activeEpisode ?: return@launch
-                if (state.isPlaying) return@launch
-                when (state.phase) {
-                    PodcastPlaybackPhase.PRIMED,
-                    PodcastPlaybackPhase.PAUSED,
-                    PodcastPlaybackPhase.NEAR_END_PAUSED,
-                    PodcastPlaybackPhase.STOPPED ->
-                        podcastPlayerDriver.play(episode, state.positionMs)
-                    else -> podcastPlayerDriver.resume()
-                }
+                podcastPlayerDriver.resumeFromState(state)
                 persistSnapshotAfterUserAction(
                     podcastPlayerDriver,
                     podcastShellStateWiring,

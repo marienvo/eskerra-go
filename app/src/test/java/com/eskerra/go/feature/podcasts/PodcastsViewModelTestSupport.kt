@@ -3,6 +3,7 @@ package com.eskerra.go.feature.podcasts
 import com.eskerra.go.core.model.EskerraLocalSettings
 import com.eskerra.go.core.model.EskerraSettings
 import com.eskerra.go.core.model.PlaylistEntry
+import com.eskerra.go.core.model.PlaylistReadOutcome
 import com.eskerra.go.core.model.PlaylistWriteResult
 import com.eskerra.go.core.model.PodcastCatalog
 import com.eskerra.go.core.model.PodcastEpisode
@@ -83,9 +84,10 @@ internal fun noopSyncPodcastVaultRefresh() = SyncPodcastVaultRefresh(
 internal fun noopPodcastPlaylistSync() = podcastPlaylistSyncForTest()
 
 internal fun recordingPodcastPlaylistSyncForTest(
-    initialEntry: PlaylistEntry? = null
+    initialEntry: PlaylistEntry? = null,
+    forcedReadOutcome: PlaylistReadOutcome? = null
 ): Pair<PodcastPlaylistSync, RecordingPlaylistSyncRepository> {
-    val repo = RecordingPlaylistSyncRepository(initialEntry)
+    val repo = RecordingPlaylistSyncRepository(initialEntry, forcedReadOutcome)
     val vaultRepo = object : VaultSettingsRepository {
         override suspend fun loadShared(workspaceRoot: File): Result<EskerraSettings> =
             Result.success(
@@ -180,14 +182,19 @@ internal class FakePodcastCatalogRepository(private val result: Result<PodcastCa
         result
 }
 
-internal class RecordingPlaylistSyncRepository(initialEntry: PlaylistEntry?) :
-    PlaylistSyncRepository {
+internal class RecordingPlaylistSyncRepository(
+    initialEntry: PlaylistEntry?,
+    private val forcedReadOutcome: PlaylistReadOutcome? = null
+) : PlaylistSyncRepository {
     var entry: PlaylistEntry? = initialEntry
         private set
     var clearCalls = 0
         private set
 
     override suspend fun readPlaylist(workspaceRoot: File): PlaylistEntry? = entry
+
+    override suspend fun readPlaylistOutcome(workspaceRoot: File): PlaylistReadOutcome =
+        forcedReadOutcome ?: super.readPlaylistOutcome(workspaceRoot)
 
     override suspend fun writePlaylist(
         workspaceRoot: File,

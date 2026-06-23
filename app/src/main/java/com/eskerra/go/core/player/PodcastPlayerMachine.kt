@@ -20,7 +20,8 @@ sealed interface PodcastPlayerEvent {
         val durationMs: Long?
     ) : PodcastPlayerEvent
 
-    data class EpisodePlayRequested(val episode: PodcastEpisode) : PodcastPlayerEvent
+    data class EpisodePlayRequested(val episode: PodcastEpisode, val startPositionMs: Long = 0L) :
+        PodcastPlayerEvent
     data object PauseRequested : PodcastPlayerEvent
     data object ResumeRequested : PodcastPlayerEvent
     data object StopRequested : PodcastPlayerEvent
@@ -53,6 +54,15 @@ object PodcastPlayerMachine {
             is PodcastPlayerEvent.EpisodePlayRequested -> PodcastPlaybackState(
                 activeEpisode = event.episode,
                 phase = PodcastPlaybackPhase.LOADING,
+                // Carry the resume position so LOADING ("Resuming…") shows where playback will
+                // continue instead of flashing 0%. Keep the duration when re-playing the same
+                // episode so the progress bar denominator is stable across the resume.
+                positionMs = sanitizedPosition(event.startPositionMs),
+                durationMs = if (state.activeEpisode?.id == event.episode.id) {
+                    state.durationMs
+                } else {
+                    null
+                },
                 transportBusy = true
             )
 
@@ -79,30 +89,31 @@ object PodcastPlayerMachine {
             )
 
             is PodcastPlayerEvent.NativeStateChanged -> {
+                val transientZeroPosition = isTransientZeroPosition(
+                    reportedPositionMs = event.positionMs,
+                    state = state,
+                    isEnded = event.nativeState == PodcastNativePlaybackState.ENDED
+                )
                 val nativeIdleWithoutLoadedMedia =
-                    event.nativeState == PodcastNativePlaybackState.IDLE &&
-                        event.positionMs == 0L &&
-                        state.hasActiveEpisode &&
-                        state.positionMs > 0L
-                if (
-                    nativeIdleWithoutLoadedMedia &&
-                    (
-                        state.phase == PodcastPlaybackPhase.PRIMED ||
-                            state.phase == PodcastPlaybackPhase.PAUSED ||
-                            state.phase == PodcastPlaybackPhase.NEAR_END_PAUSED
-                        )
-                ) {
+                    transientZeroPosition &&
+                        event.nativeState == PodcastNativePlaybackState.IDLE &&
+                        state.phase != PodcastPlaybackPhase.LOADING
+                if (nativeIdleWithoutLoadedMedia) {
                     state
                 } else {
                     state.copy(
                         phase = phaseFromNative(
                             nativeState = event.nativeState,
                             playWhenReady = event.playWhenReady,
-                            positionMs = event.positionMs,
+                            positionMs = if (transientZeroPosition) {
+                                state.positionMs
+                            } else {
+                                event.positionMs
+                            },
                             durationMs = event.durationMs,
                             hasActiveEpisode = state.activeEpisode != null
                         ),
-                        positionMs = if (nativeIdleWithoutLoadedMedia) {
+                        positionMs = if (transientZeroPosition) {
                             state.positionMs
                         } else {
                             sanitizedPosition(event.positionMs)
@@ -119,13 +130,24 @@ object PodcastPlayerMachine {
             }
 
             is PodcastPlayerEvent.ProgressChanged -> {
-                val positionMs = sanitizedPosition(event.positionMs)
-                val durationMs = event.durationMs?.takeIf { it > 0L }
-                state.copy(
-                    phase = progressPhase(state.phase, positionMs, durationMs),
-                    positionMs = positionMs,
-                    durationMs = durationMs
-                )
+                // The progress ticker keeps running for a primed/paused session whose native media
+                // item is not loaded yet (e.g. after launch restore), reporting position 0. Ignore
+                // it so it can't reset the restored resume point (and null out the duration).
+                val transientZeroPosition = isTransientZeroPosition(event.positionMs, state)
+                if (transientZeroPosition) {
+                    state
+                } else {
+                    val positionMs = sanitizedPosition(event.positionMs)
+                    // Keep the known duration when a tick reports it as unknown (C.TIME_UNSET)
+                    // while the item is (re)loading on resume — an episode's length doesn't
+                    // change, and dropping it to null flashes the progress bar to 0%.
+                    val durationMs = event.durationMs?.takeIf { it > 0L } ?: state.durationMs
+                    state.copy(
+                        phase = progressPhase(state.phase, positionMs, durationMs),
+                        positionMs = positionMs,
+                        durationMs = durationMs
+                    )
+                }
             }
 
             is PodcastPlayerEvent.PlaybackError -> state.copy(
@@ -186,6 +208,28 @@ object PodcastPlayerMachine {
         val remaining = duration - max(0L, positionMs)
         return remaining in 0L..NEAR_END_REMAINING_MS
     }
+
+    // A zero position reported while we already hold a known position is a transient artifact of
+    // (re)loading a media item before a pending seek lands. Never let it reset a primed/paused/
+    // loading session — that is what flashes 0% on resume. ENDED is excluded: position 0 there
+    // is real (the stream finished). isEnded is always false for ProgressChanged callers since
+    // the ticker doesn't run for ended items.
+    private fun isTransientZeroPosition(
+        reportedPositionMs: Long,
+        state: PodcastPlaybackState,
+        isEnded: Boolean = false
+    ): Boolean = reportedPositionMs == 0L &&
+        state.positionMs > 0L &&
+        state.hasActiveEpisode &&
+        !isEnded &&
+        state.phase in RESUMABLE_PHASES
+
+    private val RESUMABLE_PHASES = setOf(
+        PodcastPlaybackPhase.PRIMED,
+        PodcastPlaybackPhase.LOADING,
+        PodcastPlaybackPhase.PAUSED,
+        PodcastPlaybackPhase.NEAR_END_PAUSED
+    )
 
     private fun sanitizedPosition(positionMs: Long): Long = max(0L, positionMs)
 }

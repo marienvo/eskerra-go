@@ -1,6 +1,7 @@
 package com.eskerra.go.core.repository
 
 import com.eskerra.go.core.model.PlaylistEntry
+import com.eskerra.go.core.model.PlaylistReadOutcome
 import com.eskerra.go.core.model.PlaylistWriteResult
 import java.io.File
 
@@ -16,6 +17,17 @@ interface PlaylistSyncRepository {
      * Configured → signed GET, watermarks updated; on error → `null` + cleared.
      */
     suspend fun readPlaylist(workspaceRoot: File): PlaylistEntry?
+
+    /**
+     * Like [readPlaylist] but distinguishes a confirmed-empty remote ([PlaylistReadOutcome.Empty])
+     * from a read that could not be completed ([PlaylistReadOutcome.Unavailable]). The default
+     * delegates to [readPlaylist] and so can only ever report `Present`/`Empty`; the R2-backed
+     * implementation overrides it to surface `Unavailable` on a transient failure.
+     */
+    suspend fun readPlaylistOutcome(workspaceRoot: File): PlaylistReadOutcome =
+        readPlaylist(workspaceRoot)
+            ?.let { PlaylistReadOutcome.Present(it) }
+            ?: PlaylistReadOutcome.Empty() // hadPriorKnownWrite=false: no watermark context here
 
     /**
      * No R2 → [PlaylistWriteResult.Skipped]; remote strictly newer than known →

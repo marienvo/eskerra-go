@@ -13,6 +13,7 @@ import com.eskerra.go.core.repository.PodcastPlayerDriver
 import com.eskerra.go.core.usecase.LoadPodcastArtwork
 import com.eskerra.go.core.usecase.MarkPodcastEpisodesPlayed
 import com.eskerra.go.feature.podcasts.PodcastMiniPlayer
+import com.eskerra.go.feature.podcasts.PodcastsActionError
 import java.io.File
 import kotlinx.coroutines.launch
 
@@ -29,7 +30,7 @@ internal fun AppPodcastMiniPlayerHost(
     val scope = rememberCoroutineScope()
     var artworkSelectionMode by remember { mutableStateOf(false) }
     var markInFlight by remember { mutableStateOf(false) }
-    var markError by remember { mutableStateOf<String?>(null) }
+    var markError by remember { mutableStateOf<PodcastsActionError?>(null) }
 
     SideEffect {
         bridge.onExitMiniPlayerArtworkMode = { artworkSelectionMode = false }
@@ -63,7 +64,7 @@ internal fun AppPodcastMiniPlayerHost(
                         artworkSelectionMode = false
                     }
                     .onFailure {
-                        markError = MINI_PLAYER_MARK_ERROR
+                        markError = PodcastsActionError.MarkSelectedFailed
                     }
                 markInFlight = false
             }
@@ -80,5 +81,3 @@ internal fun AppPodcastMiniPlayerHost(
         markError = markError
     )
 }
-
-private const val MINI_PLAYER_MARK_ERROR = "Could not archive episode."

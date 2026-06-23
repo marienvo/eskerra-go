@@ -1,6 +1,7 @@
 package com.eskerra.go.core.usecase
 
 import com.eskerra.go.core.model.PlaylistEntry
+import com.eskerra.go.core.model.PlaylistReadOutcome
 import com.eskerra.go.core.model.PlaylistWriteResult
 import com.eskerra.go.core.model.PodcastEpisode
 import com.eskerra.go.core.playlist.buildPlaylistEntryForWrite
@@ -20,6 +21,9 @@ class PodcastPlaylistSync(
             ?.let(R2Settings::isVaultR2PlaylistConfigured) == true
 
     suspend fun read(workspaceRoot: File): PlaylistEntry? = readPlaylist(workspaceRoot)
+
+    suspend fun readOutcome(workspaceRoot: File): PlaylistReadOutcome =
+        readPlaylist.outcome(workspaceRoot)
 
     suspend fun clear(workspaceRoot: File) {
         clearPlaylist(workspaceRoot)

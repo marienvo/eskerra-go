@@ -47,6 +47,11 @@ class Media3PodcastPlayerDriver(context: Context) : PodcastPlayerDriver {
     private var progressJob: Job? = null
     private var artworkJob: Job? = null
     private var playRequestGeneration = 0
+
+    // While resuming, the controller briefly reports position 0 until setMediaItem's start
+    // position is applied. Hold the resume target so published positions never dip below it
+    // during that window; cleared once the real position catches up.
+    private var resumeTargetMs: Long? = null
     private var peekArtworkUri: (PodcastEpisode) -> String? = { null }
     private var resolveArtworkUri: suspend (PodcastEpisode) -> String? = { null }
 
@@ -76,15 +81,17 @@ class Media3PodcastPlayerDriver(context: Context) : PodcastPlayerDriver {
         playRequestGeneration += 1
         val generation = playRequestGeneration
         artworkJob?.cancel()
-        reduce(PodcastPlayerEvent.EpisodePlayRequested(episode))
+        resumeTargetMs = startPositionMs.takeIf { it > 0L }
+        reduce(PodcastPlayerEvent.EpisodePlayRequested(episode, startPositionMs))
         val cachedArtworkUri = peekArtworkUri(episode)
         withController { mediaController ->
             val item = mediaItemForEpisode(episode, cachedArtworkUri)
-            mediaController.setMediaItem(item)
+            // Set the start position atomically with the item. A separate seekTo() issued right
+            // after setMediaItem()/prepare() over the MediaController IPC is unreliable for a
+            // freshly loaded item and can be dropped, so resuming a restored session would start
+            // at 0 instead of the saved position.
+            mediaController.setMediaItem(item, startPositionMs.coerceAtLeast(0L))
             mediaController.prepare()
-            if (startPositionMs > 0L) {
-                mediaController.seekTo(startPositionMs)
-            }
             mediaController.play()
             publishNativeSnapshot(mediaController)
         }
@@ -130,6 +137,7 @@ class Media3PodcastPlayerDriver(context: Context) : PodcastPlayerDriver {
     }
 
     override fun stop() {
+        resumeTargetMs = null
         reduce(PodcastPlayerEvent.StopRequested)
         withController { mediaController ->
             mediaController.stop()
@@ -286,7 +294,7 @@ class Media3PodcastPlayerDriver(context: Context) : PodcastPlayerDriver {
             PodcastPlayerEvent.NativeStateChanged(
                 nativeState = current.playbackState.toNativeState(),
                 playWhenReady = current.playWhenReady,
-                positionMs = current.currentPosition,
+                positionMs = effectivePosition(current.currentPosition),
                 durationMs = current.duration.takeIf { it != C.TIME_UNSET && it > 0L }
             )
         )
@@ -294,12 +302,38 @@ class Media3PodcastPlayerDriver(context: Context) : PodcastPlayerDriver {
 
     private fun publishProgress(mediaController: MediaController? = controller) {
         val current = mediaController ?: return
+        // No media item loaded (e.g. a primed/restored session before play): the controller
+        // reports position 0, which must not overwrite the restored resume point.
+        if (current.currentMediaItem == null) return
         reduce(
             PodcastPlayerEvent.ProgressChanged(
-                positionMs = current.currentPosition,
+                positionMs = effectivePosition(current.currentPosition),
                 durationMs = current.duration.takeIf { it != C.TIME_UNSET && it > 0L }
             )
         )
+    }
+
+    /**
+     * During a resume, report the resume target instead of a not-yet-applied lower position so the
+     * UI never dips toward 0 while [androidx.media3.session.MediaController.setMediaItem]'s start
+     * position settles — including across the buffering→playing transition, where a stray 0 can
+     * still arrive. Only release the clamp once playback is actually running and the real position
+     * has reached the target; until then always clamp up to it.
+     *
+     * This is the driver-side layer of 0%-flash protection. The second layer lives in
+     * [com.eskerra.go.core.player.PodcastPlayerMachine.isTransientZeroPosition], which drops any
+     * zero position that reaches the state machine while the session is PRIMED/LOADING/PAUSED.
+     * Both layers are intentional: the clamp here covers the buffering→playing window where the
+     * machine's phase may have already advanced to PLAYING, but the native position hasn't caught
+     * up yet.
+     */
+    private fun effectivePosition(rawPositionMs: Long): Long {
+        val target = resumeTargetMs ?: return rawPositionMs
+        if (controller?.isPlaying == true && rawPositionMs >= target) {
+            resumeTargetMs = null
+            return rawPositionMs
+        }
+        return maxOf(rawPositionMs, target)
     }
 
     private fun startProgressTicker() {

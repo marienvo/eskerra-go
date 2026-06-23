@@ -1,7 +1,13 @@
 package com.eskerra.go.feature.podcasts
 
+import com.eskerra.go.core.model.PodcastCatalogError
 import com.eskerra.go.core.model.PodcastPlaybackState
 import com.eskerra.go.core.model.PodcastSection
+
+sealed interface PodcastsActionError {
+    data object RefreshFailed : PodcastsActionError
+    data object MarkSelectedFailed : PodcastsActionError
+}
 
 sealed interface PodcastsUiState {
     data object Loading : PodcastsUiState
@@ -11,12 +17,12 @@ sealed interface PodcastsUiState {
         val playerState: PodcastPlaybackState = PodcastPlaybackState(),
         val selectedEpisodeIds: Set<String> = emptySet(),
         val markInFlight: Boolean = false,
-        val markError: String? = null
+        val markError: PodcastsActionError? = null
     ) : PodcastsUiState
 
     data object Empty : PodcastsUiState
 
-    data class Error(val message: String) : PodcastsUiState
+    data class Error(val error: PodcastCatalogError) : PodcastsUiState
 }
 
 /**
@@ -27,7 +33,7 @@ sealed interface PodcastsUiState {
 data class PodcastRefreshState(
     val active: Boolean = false,
     val percent: Int? = null,
-    val error: String? = null
+    val error: PodcastsActionError? = null
 )
 
 sealed interface PodcastsUiEvent {
