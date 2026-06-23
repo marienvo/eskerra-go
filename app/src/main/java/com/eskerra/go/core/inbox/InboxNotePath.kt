@@ -25,6 +25,15 @@ object InboxNotePath {
         }
     }
 
+    /**
+     * The hub folder that owns an inbox note: `""` for the root `Inbox/`, or `"<hub>"` for a
+     * hub inbox `<hub>/Inbox/<file>.md`. Only meaningful for paths satisfying [isInboxRelativePath].
+     */
+    fun inboxHubFolderOf(relativePath: String): String {
+        val parts = relativePath.split('/')
+        return if (parts.size == 3 && parts[1] == INBOX_DIRECTORY) parts[0] else ""
+    }
+
     fun resolveCanonicalDeleteNote(
         inputId: NoteId,
         availableNotes: List<NoteSummary>

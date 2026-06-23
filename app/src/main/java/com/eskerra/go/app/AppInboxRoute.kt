@@ -17,6 +17,7 @@ import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.ActiveTodayHubStore
 import com.eskerra.go.core.repository.TodayHubSnapshotStore
+import com.eskerra.go.core.todayhub.TodayHubDiscovery
 import com.eskerra.go.core.usecase.DeleteInboxNotes
 import com.eskerra.go.core.usecase.LoadInboxSummariesCached
 import com.eskerra.go.core.usecase.LoadTodayHub
@@ -61,6 +62,7 @@ internal fun AppInboxRoute(
             filesDir = filesDir,
             loadInboxSummaries = loadInboxSummaries,
             deleteInboxNotes = deleteInboxNotes,
+            activeTodayHubStore = activeTodayHubStore,
             onInboxMutated = { paths ->
                 entry.savedStateHandle[NOTES_CHANGED_KEY] = true
                 appSyncViewModel.refreshLocalStatusQuietly()
@@ -96,6 +98,16 @@ internal fun AppInboxRoute(
     }
     LaunchedEffect(todayHubState) {
         onTodayHubUiStateChanged(todayHubState)
+    }
+
+    // Keep the inbox scoped to the hub currently shown below it: switching hubs via the picker
+    // re-filters the inbox to that hub's own Inbox/ folder instead of merging every hub's inbox.
+    val activeHubFolder = (todayHubState as? TodayHubUiState.Content)
+        ?.let { TodayHubDiscovery.directoryOf(it.activeHubId.value) }
+    LaunchedEffect(activeHubFolder) {
+        if (activeHubFolder != null) {
+            inboxViewModel.setActiveHubFolder(activeHubFolder)
+        }
     }
 
     LaunchedEffect(currentRoute) {

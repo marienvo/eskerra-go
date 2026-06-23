@@ -32,6 +32,13 @@ class InboxNotePathTest {
     }
 
     @Test
+    fun inboxHubFolderOf_rootAndHub() {
+        assertEquals("", InboxNotePath.inboxHubFolderOf("Inbox/foo.md"))
+        assertEquals("Daily", InboxNotePath.inboxHubFolderOf("Daily/Inbox/foo.md"))
+        assertEquals("Weekly", InboxNotePath.inboxHubFolderOf("Weekly/Inbox/bar.md"))
+    }
+
+    @Test
     fun resolveCanonicalDeleteNote_matchesExactId() {
         val note = summary("Inbox/foo.md")
         assertEquals(
