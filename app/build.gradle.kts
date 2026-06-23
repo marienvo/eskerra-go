@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -18,17 +20,16 @@ abstract class LocalPropertySource : ValueSource<String, LocalPropertySource.Par
     override fun obtain(): String? {
         val f = parameters.file.asFile.get()
         if (!f.isFile) return null
-        return java.util.Properties()
-            .apply { f.inputStream().use(::load) }
+        return Properties()
+            .apply { f.inputStream().use { load(it) } }
             .getProperty(parameters.key.get())
     }
 }
 
-fun localProperty(name: String): Provider<String> =
-    providers.of(LocalPropertySource::class.java) {
-        parameters.file.set(rootProject.layout.projectDirectory.file("local.properties"))
-        parameters.key.set(name)
-    }
+fun localProperty(name: String): Provider<String> = providers.of(LocalPropertySource::class.java) {
+    parameters.file.set(rootProject.layout.projectDirectory.file("local.properties"))
+    parameters.key.set(name)
+}
 
 fun stringBuildConfigField(value: String): String =
     "\"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\""
