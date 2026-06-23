@@ -1,12 +1,12 @@
 package com.eskerra.go.data.git
 
+import com.eskerra.go.core.inbox.InboxNotePath
 import com.eskerra.go.core.model.SyncChangePartition
-import com.eskerra.go.data.notes.MarkdownNoteScanner
 
 /** Classifies repo-relative paths for manual sync write boundaries. */
 object SyncPathClassifier {
 
-    private val inboxPrefix = "${MarkdownNoteScanner.INBOX_DIRECTORY}/"
+    private val inboxDirectory = InboxNotePath.INBOX_DIRECTORY
     private const val GENERAL_PREFIX = "General/"
     private const val PODCAST_STUB_SUFFIX = "- podcasts.md"
     private val rssCachePrefix = String(Character.toChars(0x1F4FB))
@@ -32,8 +32,15 @@ object SyncPathClassifier {
         )
     }
 
-    private fun isInboxPath(path: String): Boolean = path == MarkdownNoteScanner.INBOX_DIRECTORY ||
-        path.startsWith(inboxPrefix)
+    private fun isInboxPath(path: String): Boolean {
+        if (InboxNotePath.isInboxRelativePath(path)) return true
+        val segments = path.split('/')
+        return when (segments.size) {
+            1 -> segments[0] == inboxDirectory
+            2 -> segments[1] == inboxDirectory
+            else -> false
+        }
+    }
 
     /**
      * True when [rawPath] is an auto-managed podcast markdown file that the podcast

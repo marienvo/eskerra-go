@@ -4,6 +4,7 @@ import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NoteIndexError
 import com.eskerra.go.core.model.NoteSummary
 import com.eskerra.go.core.model.WorkspaceConfig
+import com.eskerra.go.core.repository.ActiveTodayHubStore
 import com.eskerra.go.core.usecase.DeleteInboxNotes
 import com.eskerra.go.core.usecase.LoadGitStatusSummary
 import com.eskerra.go.core.usecase.LoadInboxSummaries
@@ -370,10 +371,65 @@ class InboxViewModelTest {
         assertEquals(listOf(freshNote), state.notes)
     }
 
+    @Test
+    fun init_showsOnlyActiveHubInbox() = runTest {
+        val filesDir = temp.newFolder("files")
+        val rootNote = NoteSummary(NoteId("Inbox/root.md"), "Root", "", isInbox = true)
+        val dailyNote = NoteSummary(NoteId("Daily/Inbox/daily.md"), "Daily", "", isInbox = true)
+        val weeklyNote = NoteSummary(NoteId("Weekly/Inbox/weekly.md"), "Weekly", "", isInbox = true)
+        val repository = FakeNoteRegistryRepository.withInboxNotes(rootNote, dailyNote, weeklyNote)
+        val viewModel = inboxViewModel(
+            filesDir = filesDir,
+            repository = repository,
+            activeTodayHubStore = FakeActiveTodayHubStore("Daily/Today.md")
+        )
+
+        val state = viewModel.uiState.value as InboxUiState.Content
+        assertEquals(listOf(dailyNote), state.notes)
+    }
+
+    @Test
+    fun rootHub_showsOnlyRootInbox() = runTest {
+        val filesDir = temp.newFolder("files")
+        val rootNote = NoteSummary(NoteId("Inbox/root.md"), "Root", "", isInbox = true)
+        val dailyNote = NoteSummary(NoteId("Daily/Inbox/daily.md"), "Daily", "", isInbox = true)
+        val repository = FakeNoteRegistryRepository.withInboxNotes(rootNote, dailyNote)
+        val viewModel = inboxViewModel(
+            filesDir = filesDir,
+            repository = repository,
+            activeTodayHubStore = FakeActiveTodayHubStore("Today.md")
+        )
+
+        val state = viewModel.uiState.value as InboxUiState.Content
+        assertEquals(listOf(rootNote), state.notes)
+    }
+
+    @Test
+    fun setActiveHubFolder_reFiltersWithoutRescan() = runTest {
+        val filesDir = temp.newFolder("files")
+        val dailyNote = NoteSummary(NoteId("Daily/Inbox/daily.md"), "Daily", "", isInbox = true)
+        val weeklyNote = NoteSummary(NoteId("Weekly/Inbox/weekly.md"), "Weekly", "", isInbox = true)
+        val repository = FakeNoteRegistryRepository.withInboxNotes(dailyNote, weeklyNote)
+        val viewModel = inboxViewModel(
+            filesDir = filesDir,
+            repository = repository,
+            activeTodayHubStore = FakeActiveTodayHubStore("Daily/Today.md")
+        )
+        assertEquals(1, repository.refreshCount)
+        assertEquals(listOf(dailyNote), (viewModel.uiState.value as InboxUiState.Content).notes)
+
+        viewModel.setActiveHubFolder("Weekly")
+
+        // Re-filter happens in memory; no extra scan.
+        assertEquals(1, repository.refreshCount)
+        assertEquals(listOf(weeklyNote), (viewModel.uiState.value as InboxUiState.Content).notes)
+    }
+
     private fun inboxViewModel(
         filesDir: File,
         repository: FakeNoteRegistryRepository,
-        snapshotStore: FakeInboxSnapshotStore = FakeInboxSnapshotStore()
+        snapshotStore: FakeInboxSnapshotStore = FakeInboxSnapshotStore(),
+        activeTodayHubStore: ActiveTodayHubStore? = null
     ): InboxViewModel {
         val cache = NoteRegistryCache(repository)
         return InboxViewModel(
@@ -387,7 +443,15 @@ class InboxViewModelTest {
                 writeRepository = FakeNoteWriteRepository(),
                 registryCache = cache,
                 loadGitStatusSummary = LoadGitStatusSummary(JGitWorkspaceRepository())
-            )
+            ),
+            activeTodayHubStore = activeTodayHubStore
         )
+    }
+
+    private class FakeActiveTodayHubStore(private var stored: String?) : ActiveTodayHubStore {
+        override suspend fun read(): String? = stored
+        override suspend fun save(noteId: String) {
+            stored = noteId
+        }
     }
 }

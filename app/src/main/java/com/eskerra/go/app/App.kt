@@ -145,11 +145,13 @@ fun App(
     // Hub state and decides whether to snap to the current week). A route change can't carry this
     // because re-tapping Home does not navigate.
     var homeReselectSignal by remember { mutableIntStateOf(0) }
+    var inboxRefreshSignal by remember { mutableIntStateOf(0) }
     // The hamburger menu is an overlay, not a NavHost destination: opening it must not navigate, so
     // the underlying route (wherever you were) stays put and closing it cannot jump back to Home.
     var menuOpen by remember { mutableStateOf(false) }
-    val markInboxNotesChanged = {
+    val markInboxNotesChanged: () -> Unit = {
         navController.markInboxNotesChanged()
+        inboxRefreshSignal++
     }
     val appSyncViewModel: AppSyncViewModel = viewModel(
         key = currentConfig.syncViewModelKey(),
@@ -205,6 +207,7 @@ fun App(
         currentConfig = currentConfig,
         filesDir = filesDir,
         createInboxNote = createInboxNote,
+        activeTodayHubStore = activeTodayHubStore,
         touchVaultSearchPaths = touchVaultSearchPaths,
         appSyncViewModel = appSyncViewModel,
         scope = scope,
@@ -271,6 +274,7 @@ fun App(
             appSyncViewModel = appSyncViewModel,
             syncState = syncState,
             homeReselectSignal = homeReselectSignal,
+            inboxRefreshSignal = inboxRefreshSignal,
             loadInboxSummaries = loadInboxSummaries,
             loadNoteForReading = loadNoteForReading,
             prefetchLinkedNotes = prefetchLinkedNotes,

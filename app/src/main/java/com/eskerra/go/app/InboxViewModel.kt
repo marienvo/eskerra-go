@@ -3,12 +3,16 @@ package com.eskerra.go.app
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.eskerra.go.core.inbox.InboxNotePath
 import com.eskerra.go.core.model.DeleteInboxNoteError
 import com.eskerra.go.core.model.DeleteInboxNoteException
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NoteIndexError
 import com.eskerra.go.core.model.NoteIndexException
+import com.eskerra.go.core.model.NoteSummary
 import com.eskerra.go.core.model.WorkspaceConfig
+import com.eskerra.go.core.repository.ActiveTodayHubStore
+import com.eskerra.go.core.todayhub.TodayHubDiscovery
 import com.eskerra.go.core.usecase.DeleteInboxNotes
 import com.eskerra.go.core.usecase.LoadInboxSummariesCached
 import com.eskerra.go.feature.inbox.InboxUiState
@@ -24,6 +28,7 @@ class InboxViewModel(
     private val filesDir: File,
     private val loadInboxSummaries: LoadInboxSummariesCached,
     private val deleteInboxNotes: DeleteInboxNotes,
+    private val activeTodayHubStore: ActiveTodayHubStore? = null,
     private val onInboxMutated: (List<String>) -> Unit = {}
 ) : ViewModel() {
 
@@ -42,15 +47,41 @@ class InboxViewModel(
     private var refreshJob: Job? = null
     private var deleteJob: Job? = null
 
+    /** All inbox notes across hubs from the last load; the UI shows only [activeHubFolder]'s slice. */
+    private var rawSummaries: List<NoteSummary> = emptyList()
+
+    /** Hub folder whose inbox is currently shown: `""` for the root hub. */
+    private var activeHubFolder: String = ""
+
     init {
         viewModelScope.launch {
+            activeHubFolder = activeTodayHubStore?.read()
+                ?.let { TodayHubDiscovery.directoryOf(it) }
+                ?: ""
             val cached = loadInboxSummaries.readCached(config, filesDir)
             if (cached != null) {
-                _uiState.value = cached.toInboxUiState(isRefreshing = true)
+                rawSummaries = cached
+                _uiState.value = visibleSummaries().toInboxUiState(isRefreshing = true)
             }
             refresh(showFullScreenLoading = cached == null)
         }
     }
+
+    /**
+     * Switches the inbox to show [hubFolder]'s slice (driven by the Today Hub picker). Re-filters
+     * the already-loaded notes without rescanning and drops any selection from the previous hub.
+     */
+    fun setActiveHubFolder(hubFolder: String) {
+        if (hubFolder == activeHubFolder) return
+        activeHubFolder = hubFolder
+        _selectedNoteIds.value = emptySet()
+        _deleteError.value = null
+        val isRefreshing = (_uiState.value as? InboxUiState.Content)?.isRefreshing ?: false
+        _uiState.value = visibleSummaries().toInboxUiState(isRefreshing = isRefreshing)
+    }
+
+    private fun visibleSummaries(): List<NoteSummary> =
+        rawSummaries.filter { InboxNotePath.inboxHubFolderOf(it.id.value) == activeHubFolder }
 
     fun refresh() {
         refresh(showFullScreenLoading = _uiState.value !is InboxUiState.Content)
@@ -112,11 +143,13 @@ class InboxViewModel(
 
             loadInboxSummaries(config, filesDir).fold(
                 onSuccess = { notes ->
+                    rawSummaries = notes
+                    val visible = visibleSummaries()
                     val currentNotes = (_uiState.value as? InboxUiState.Content)?.notes
-                    if (notes == currentNotes) {
+                    if (visible == currentNotes) {
                         markRefreshing(isRefreshing = false)
                     } else {
-                        _uiState.value = notes.toInboxUiState(isRefreshing = false)
+                        _uiState.value = visible.toInboxUiState(isRefreshing = false)
                     }
                 },
                 onFailure = { error ->
@@ -181,6 +214,7 @@ class InboxViewModel(
             filesDir: File,
             loadInboxSummaries: LoadInboxSummariesCached,
             deleteInboxNotes: DeleteInboxNotes,
+            activeTodayHubStore: ActiveTodayHubStore? = null,
             onInboxMutated: (List<String>) -> Unit = {}
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
@@ -189,6 +223,7 @@ class InboxViewModel(
                 filesDir,
                 loadInboxSummaries,
                 deleteInboxNotes,
+                activeTodayHubStore,
                 onInboxMutated
             ) as T
         }

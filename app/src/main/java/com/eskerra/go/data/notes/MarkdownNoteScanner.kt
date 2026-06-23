@@ -1,5 +1,6 @@
 package com.eskerra.go.data.notes
 
+import com.eskerra.go.core.inbox.InboxNotePath
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NoteIndexError
 import com.eskerra.go.core.model.NoteIndexException
@@ -115,8 +116,12 @@ class MarkdownNoteScanner : NoteWorkspaceScanner {
     }
 
     private fun isInboxNote(relativePath: String): Boolean {
-        val firstSegment = relativePath.substringBefore('/')
-        return firstSegment == INBOX_DIRECTORY
+        val parts = relativePath.split('/')
+        return when (parts.size) {
+            2 -> parts[0] == InboxNotePath.INBOX_DIRECTORY
+            3 -> parts[1] == InboxNotePath.INBOX_DIRECTORY
+            else -> false
+        }
     }
 
     private fun extractTitleAndSnippet(file: File): Pair<String, String> {
@@ -149,7 +154,6 @@ class MarkdownNoteScanner : NoteWorkspaceScanner {
     }
 
     companion object {
-        const val INBOX_DIRECTORY = "Inbox"
         private const val MARKDOWN_EXTENSION = "md"
         private const val MARKDOWN_ALT_EXTENSION = "markdown"
         private const val H1_PREFIX = "# "

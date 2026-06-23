@@ -64,13 +64,33 @@ class MarkdownNoteScannerTest {
     }
 
     @Test
-    fun scan_marksNestedInboxDirectoryNotesAsInbox() {
+    fun scan_marksHubInboxNotesAsInbox() {
+        val workspace = temp.newFolder("workspace")
+        write(workspace, "Daily/Inbox/example.md", "# Example")
+
+        val note = scanner.scan(workspace).getOrThrow().notes.single()
+
+        assertTrue(note.isInbox)
+    }
+
+    @Test
+    fun scan_doesNotMarkDeepNestedInboxAsInbox() {
         val workspace = temp.newFolder("workspace")
         write(workspace, "Inbox/sub/example.md", "# Example")
 
         val note = scanner.scan(workspace).getOrThrow().notes.single()
 
-        assertTrue(note.isInbox)
+        assertFalse(note.isInbox)
+    }
+
+    @Test
+    fun scan_doesNotMarkDeepHubInboxAsInbox() {
+        val workspace = temp.newFolder("workspace")
+        write(workspace, "Daily/Inbox/sub/example.md", "# Example")
+
+        val note = scanner.scan(workspace).getOrThrow().notes.single()
+
+        assertFalse(note.isInbox)
     }
 
     @Test

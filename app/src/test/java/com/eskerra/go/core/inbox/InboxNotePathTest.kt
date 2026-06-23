@@ -11,10 +11,31 @@ import org.junit.Test
 class InboxNotePathTest {
 
     @Test
-    fun isInboxRelativePath_acceptsDirectInboxChildrenOnly() {
+    fun isInboxRelativePath_acceptsRootInboxChildren() {
         assertTrue(InboxNotePath.isInboxRelativePath("Inbox/foo.md"))
         assertFalse(InboxNotePath.isInboxRelativePath("General/foo.md"))
         assertFalse(InboxNotePath.isInboxRelativePath("Inbox/nested/foo.md"))
+    }
+
+    @Test
+    fun isInboxRelativePath_acceptsHubInboxChildren() {
+        assertTrue(InboxNotePath.isInboxRelativePath("Daily/Inbox/foo.md"))
+        assertTrue(InboxNotePath.isInboxRelativePath("Weekly/Inbox/bar.md"))
+        assertFalse(InboxNotePath.isInboxRelativePath("Daily/Notes/foo.md"))
+        assertFalse(InboxNotePath.isInboxRelativePath("Daily/Inbox/nested/foo.md"))
+    }
+
+    @Test
+    fun inboxPrefixFor_rootAndHub() {
+        assertEquals("Inbox/", InboxNotePath.inboxPrefixFor(""))
+        assertEquals("Daily/Inbox/", InboxNotePath.inboxPrefixFor("Daily"))
+    }
+
+    @Test
+    fun inboxHubFolderOf_rootAndHub() {
+        assertEquals("", InboxNotePath.inboxHubFolderOf("Inbox/foo.md"))
+        assertEquals("Daily", InboxNotePath.inboxHubFolderOf("Daily/Inbox/foo.md"))
+        assertEquals("Weekly", InboxNotePath.inboxHubFolderOf("Weekly/Inbox/bar.md"))
     }
 
     @Test

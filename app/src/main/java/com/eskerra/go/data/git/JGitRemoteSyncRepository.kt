@@ -7,7 +7,6 @@ import com.eskerra.go.core.model.SyncChangePartition
 import com.eskerra.go.core.model.SyncStatusState
 import com.eskerra.go.core.model.SyncStatusSummary
 import com.eskerra.go.core.repository.RemoteSyncRepository
-import com.eskerra.go.data.notes.MarkdownNoteScanner
 import java.io.File
 import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.api.MergeCommand
@@ -48,9 +47,10 @@ class JGitRemoteSyncRepository(
 
     override fun stageInboxChanges(workingDir: File): Result<Unit> = runCatching {
         Git.open(workingDir).use { git ->
-            val inboxPattern = "${MarkdownNoteScanner.INBOX_DIRECTORY}/"
-            git.add().addFilepattern(inboxPattern).call()
-            git.add().addFilepattern(inboxPattern).setUpdate(true).call()
+            for (pattern in InboxStagingPatterns.discover(workingDir)) {
+                git.add().addFilepattern(pattern).call()
+                git.add().addFilepattern(pattern).setUpdate(true).call()
+            }
         }
     }
 

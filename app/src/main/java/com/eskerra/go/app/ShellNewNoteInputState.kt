@@ -9,6 +9,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.eskerra.go.core.model.AppShellMode
 import com.eskerra.go.core.model.WorkspaceConfig
+import com.eskerra.go.core.repository.ActiveTodayHubStore
 import com.eskerra.go.core.usecase.CreateInboxNote
 import com.eskerra.go.core.usecase.TouchVaultSearchPaths
 import com.eskerra.go.feature.editor.CreateInboxUiState
@@ -30,6 +31,7 @@ internal fun rememberShellNewNoteInputState(
     currentConfig: WorkspaceConfig,
     filesDir: File,
     createInboxNote: CreateInboxNote,
+    activeTodayHubStore: ActiveTodayHubStore,
     touchVaultSearchPaths: TouchVaultSearchPaths,
     appSyncViewModel: AppSyncViewModel,
     scope: CoroutineScope,
@@ -43,7 +45,8 @@ internal fun rememberShellNewNoteInputState(
         factory = CreateInboxNoteViewModel.factory(
             config = currentConfig,
             filesDir = filesDir,
-            createInboxNote = createInboxNote
+            createInboxNote = createInboxNote,
+            activeTodayHubStore = activeTodayHubStore
         )
     )
     val createInboxState by createInboxNoteViewModel.uiState.collectAsState()

@@ -73,6 +73,7 @@ internal data class AppNavGraphContext(
     val appSyncViewModel: AppSyncViewModel,
     val syncState: SyncUiState,
     val homeReselectSignal: Int,
+    val inboxRefreshSignal: Int,
     val loadInboxSummaries: LoadInboxSummariesCached,
     val loadNoteForReading: LoadNoteForReading,
     val prefetchLinkedNotes: PrefetchLinkedNotes,
@@ -134,7 +135,8 @@ internal fun NavGraphBuilder.homeGraph(ctx: AppNavGraphContext) {
                 touchVaultSearchPaths = ctx.touchVaultSearchPaths,
                 onInboxUiStateChanged = ctx.onInboxUiStateChanged,
                 onTodayHubUiStateChanged = ctx.onTodayHubUiStateChanged,
-                homeReselectSignal = ctx.homeReselectSignal
+                homeReselectSignal = ctx.homeReselectSignal,
+                inboxRefreshSignal = ctx.inboxRefreshSignal
             )
         }
     }

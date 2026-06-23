@@ -57,6 +57,28 @@ class CreateInboxNoteTest {
     }
 
     @Test
+    fun createsNewInboxNoteUnderHubInboxDirectory() = runTest {
+        val filesDir = temp.newFolder("files")
+        val workspaceDir = gitWorkspace(filesDir)
+        val gitRepository = JGitWorkspaceRepository()
+        val writeRepository = FileNoteWriteRepository(gitRepository)
+        val useCase = CreateInboxNote(
+            writeRepository = writeRepository,
+            registryCache = NoteRegistryCache(FileNoteRegistryRepository()),
+            loadGitStatusSummary = LoadGitStatusSummary(gitRepository)
+        )
+
+        val result = useCase(config, filesDir, "My idea\nBody text", hubFolder = "Daily")
+
+        assertTrue(result.isSuccess)
+        val note = result.getOrThrow().note
+        assertTrue(note.path.value.startsWith("Daily/Inbox/"))
+        assertTrue(note.isInbox)
+        assertTrue(note.canEdit)
+        assertTrue(File(workspaceDir, note.path.value).exists())
+    }
+
+    @Test
     fun writesMarkdownWithH1FromFirstLine() = runTest {
         val filesDir = temp.newFolder("files")
         gitWorkspace(filesDir)
