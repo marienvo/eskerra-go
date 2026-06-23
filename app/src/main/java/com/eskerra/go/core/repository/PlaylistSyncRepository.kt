@@ -27,7 +27,7 @@ interface PlaylistSyncRepository {
     suspend fun readPlaylistOutcome(workspaceRoot: File): PlaylistReadOutcome =
         readPlaylist(workspaceRoot)
             ?.let { PlaylistReadOutcome.Present(it) }
-            ?: PlaylistReadOutcome.Empty
+            ?: PlaylistReadOutcome.Empty() // hadPriorKnownWrite=false: no watermark context here
 
     /**
      * No R2 → [PlaylistWriteResult.Skipped]; remote strictly newer than known →

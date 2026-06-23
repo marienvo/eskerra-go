@@ -81,8 +81,17 @@ class R2PlaylistSyncRepository(
         }
         return try {
             val remote = withContext(ioDispatcher) { r2Client.get(r2) }
-            persistKnown(remote?.updatedAt, remote?.controlRevision)
-            remote?.let { PlaylistReadOutcome.Present(it) } ?: PlaylistReadOutcome.Empty
+            if (remote != null) {
+                persistKnown(remote.updatedAt, remote.controlRevision)
+                PlaylistReadOutcome.Present(remote)
+            } else {
+                // Read watermark before wiping: a non-null value means this device previously
+                // wrote to R2 successfully, so an empty result indicates another device cleared
+                // it rather than this device's write never landing.
+                val hadPriorKnownWrite = localSettingsStore.load().playlistKnownUpdatedAtMs != null
+                persistKnown(null, null)
+                PlaylistReadOutcome.Empty(hadPriorKnownWrite)
+            }
         } catch (e: CancellationException) {
             throw e
         } catch (_: Throwable) {
@@ -134,7 +143,7 @@ class R2PlaylistSyncRepository(
         if (legacy.isFile) {
             withContext(ioDispatcher) { legacy.delete() }
         }
-        cacheResolved(workspaceRoot.path, PlaylistReadOutcome.Empty)
+        cacheResolved(workspaceRoot.path, PlaylistReadOutcome.Empty())
     }
 
     override fun invalidateReadCache(workspaceRoot: File) {

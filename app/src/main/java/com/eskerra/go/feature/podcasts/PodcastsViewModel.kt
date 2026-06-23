@@ -231,18 +231,8 @@ class PodcastsViewModel(
 
     fun resumePlayback() {
         val state = podcastPlayerDriver.state.value
-        val episode = state.activeEpisode ?: return
-        if (state.isPlaying) return
         launchUserAction {
-            when (state.phase) {
-                PodcastPlaybackPhase.PRIMED,
-                PodcastPlaybackPhase.PAUSED,
-                PodcastPlaybackPhase.NEAR_END_PAUSED,
-                PodcastPlaybackPhase.STOPPED ->
-                    podcastPlayerDriver.play(episode, state.positionMs)
-
-                else -> podcastPlayerDriver.resume()
-            }
+            podcastPlayerDriver.resumeFromState(state)
             queuePersist(podcastPlayerDriver.state.value)
         }
     }
@@ -310,11 +300,13 @@ class PodcastsViewModel(
             // session backed by its own local snapshot, the remote was lost (a write that never
             // landed before the app closed) rather than deliberately cleared elsewhere — keep the
             // session and re-publish it so the paused position survives on R2.
-            PlaylistReadOutcome.Empty -> {
+            // hadPriorKnownWrite=true means another device cleared deliberately; don't re-publish.
+            is PlaylistReadOutcome.Empty -> {
                 val kept = playlistPersistence.republishResumableLocalSession(
                     state = podcastPlayerDriver.state.value,
                     snapshot = loadLocalSettings().playbackSnapshot(),
-                    catalog = catalog
+                    catalog = catalog,
+                    hadPriorKnownWrite = outcome.hadPriorKnownWrite
                 )
                 if (!kept) {
                     playlistPersistence.knownPlaylistEntry = null

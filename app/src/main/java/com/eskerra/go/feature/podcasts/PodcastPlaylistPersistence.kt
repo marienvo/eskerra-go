@@ -50,11 +50,7 @@ internal class PodcastPlaylistPersistence(
                 durationMs = playerState.durationMs,
                 knownEntry = knownPlaylistEntry
             )
-            knownPlaylistEntry = when (result) {
-                is PlaylistWriteResult.Saved -> result.entry
-                is PlaylistWriteResult.Superseded -> result.entry
-                PlaylistWriteResult.Skipped -> knownPlaylistEntry
-            }
+            applyWriteResult(result)
         }
     }
 
@@ -63,12 +59,18 @@ internal class PodcastPlaylistPersistence(
      * proves this device owns a still-resumable session — the remote was lost (a write that never
      * landed before the app closed) rather than deliberately cleared elsewhere. Returns true when
      * the session was kept (and a re-publish attempted), false when there is nothing to preserve.
+     *
+     * Pass [hadPriorKnownWrite] = true when the R2 repository confirmed a prior successful write
+     * before the empty result. In that case another device cleared the playlist deliberately, so
+     * this device must not re-publish and undo the remote stop.
      */
     suspend fun republishResumableLocalSession(
         state: PodcastPlaybackState,
         snapshot: PodcastPlaybackSnapshot?,
-        catalog: PodcastCatalog
+        catalog: PodcastCatalog,
+        hadPriorKnownWrite: Boolean = false
     ): Boolean {
+        if (hadPriorKnownWrite) return false
         val root = workspaceRoot ?: return false
         snapshot ?: return false
         val active = state.activeEpisode ?: return false
@@ -88,12 +90,16 @@ internal class PodcastPlaylistPersistence(
             durationMs = state.durationMs,
             knownEntry = null
         )
+        applyWriteResult(result)
+        return true
+    }
+
+    private fun applyWriteResult(result: PlaylistWriteResult) {
         knownPlaylistEntry = when (result) {
             is PlaylistWriteResult.Saved -> result.entry
             is PlaylistWriteResult.Superseded -> result.entry
             PlaylistWriteResult.Skipped -> knownPlaylistEntry
         }
-        return true
     }
 
     fun startPositionForEpisode(episode: PodcastEpisode): Long {

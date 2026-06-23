@@ -2,6 +2,7 @@ package com.eskerra.go.core.repository
 
 import com.eskerra.go.core.model.PodcastEpisode
 import com.eskerra.go.core.model.PodcastNativeSessionSnapshot
+import com.eskerra.go.core.model.PodcastPlaybackPhase
 import com.eskerra.go.core.model.PodcastPlaybackState
 import kotlinx.coroutines.flow.StateFlow
 
@@ -50,4 +51,22 @@ interface PodcastPlayerDriver {
     fun adoptNativeSession(episode: PodcastEpisode, snapshot: PodcastNativeSessionSnapshot) {}
 
     fun release()
+
+    /**
+     * Resumes or replays depending on the current phase. PRIMED/PAUSED/NEAR_END_PAUSED/STOPPED
+     * all need a full [play] call with the saved position (native session not loaded); other
+     * in-progress states use a lightweight [resume]. Callers share this logic so the phase
+     * check doesn't diverge across UI entry points.
+     */
+    fun resumeFromState(state: PodcastPlaybackState) {
+        val episode = state.activeEpisode ?: return
+        if (state.isPlaying) return
+        when (state.phase) {
+            PodcastPlaybackPhase.PRIMED,
+            PodcastPlaybackPhase.PAUSED,
+            PodcastPlaybackPhase.NEAR_END_PAUSED,
+            PodcastPlaybackPhase.STOPPED -> play(episode, state.positionMs)
+            else -> resume()
+        }
+    }
 }

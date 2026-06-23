@@ -193,7 +193,7 @@ class R2PlaylistSyncRepositoryTest {
         val client = FakeR2Client(getResult = null)
         val repo = repo(EskerraSettings(r2 = r2Config), FakeLocalSettingsStore(), client)
 
-        assertEquals(PlaylistReadOutcome.Empty, repo.readPlaylistOutcome(tempFolder.root))
+        assertEquals(PlaylistReadOutcome.Empty(), repo.readPlaylistOutcome(tempFolder.root))
     }
 
     @Test

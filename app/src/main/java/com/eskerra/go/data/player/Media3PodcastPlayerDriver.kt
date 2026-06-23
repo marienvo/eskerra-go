@@ -319,6 +319,13 @@ class Media3PodcastPlayerDriver(context: Context) : PodcastPlayerDriver {
      * position settles — including across the buffering→playing transition, where a stray 0 can
      * still arrive. Only release the clamp once playback is actually running and the real position
      * has reached the target; until then always clamp up to it.
+     *
+     * This is the driver-side layer of 0%-flash protection. The second layer lives in
+     * [com.eskerra.go.core.player.PodcastPlayerMachine.isTransientZeroPosition], which drops any
+     * zero position that reaches the state machine while the session is PRIMED/LOADING/PAUSED.
+     * Both layers are intentional: the clamp here covers the buffering→playing window where the
+     * machine's phase may have already advanced to PLAYING, but the native position hasn't caught
+     * up yet.
      */
     private fun effectivePosition(rawPositionMs: Long): Long {
         val target = resumeTargetMs ?: return rawPositionMs

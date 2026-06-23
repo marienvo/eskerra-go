@@ -89,21 +89,11 @@ object PodcastPlayerMachine {
             )
 
             is PodcastPlayerEvent.NativeStateChanged -> {
-                // A zero position reported while we already hold a known position is a transient
-                // artifact of (re)loading a media item before a pending seek lands. Never let it
-                // reset the displayed position of a primed/paused/loading session — that is what
-                // flashes 0% on resume.
-                val transientZeroPosition =
-                    event.positionMs == 0L &&
-                        state.positionMs > 0L &&
-                        state.hasActiveEpisode &&
-                        event.nativeState != PodcastNativePlaybackState.ENDED &&
-                        (
-                            state.phase == PodcastPlaybackPhase.PRIMED ||
-                                state.phase == PodcastPlaybackPhase.LOADING ||
-                                state.phase == PodcastPlaybackPhase.PAUSED ||
-                                state.phase == PodcastPlaybackPhase.NEAR_END_PAUSED
-                            )
+                val transientZeroPosition = isTransientZeroPosition(
+                    reportedPositionMs = event.positionMs,
+                    state = state,
+                    isEnded = event.nativeState == PodcastNativePlaybackState.ENDED
+                )
                 val nativeIdleWithoutLoadedMedia =
                     transientZeroPosition &&
                         event.nativeState == PodcastNativePlaybackState.IDLE &&
@@ -143,16 +133,7 @@ object PodcastPlayerMachine {
                 // The progress ticker keeps running for a primed/paused session whose native media
                 // item is not loaded yet (e.g. after launch restore), reporting position 0. Ignore
                 // it so it can't reset the restored resume point (and null out the duration).
-                val transientZeroPosition =
-                    event.positionMs == 0L &&
-                        state.positionMs > 0L &&
-                        state.hasActiveEpisode &&
-                        (
-                            state.phase == PodcastPlaybackPhase.PRIMED ||
-                                state.phase == PodcastPlaybackPhase.LOADING ||
-                                state.phase == PodcastPlaybackPhase.PAUSED ||
-                                state.phase == PodcastPlaybackPhase.NEAR_END_PAUSED
-                            )
+                val transientZeroPosition = isTransientZeroPosition(event.positionMs, state)
                 if (transientZeroPosition) {
                     state
                 } else {
@@ -227,6 +208,28 @@ object PodcastPlayerMachine {
         val remaining = duration - max(0L, positionMs)
         return remaining in 0L..NEAR_END_REMAINING_MS
     }
+
+    // A zero position reported while we already hold a known position is a transient artifact of
+    // (re)loading a media item before a pending seek lands. Never let it reset a primed/paused/
+    // loading session — that is what flashes 0% on resume. ENDED is excluded: position 0 there
+    // is real (the stream finished). isEnded is always false for ProgressChanged callers since
+    // the ticker doesn't run for ended items.
+    private fun isTransientZeroPosition(
+        reportedPositionMs: Long,
+        state: PodcastPlaybackState,
+        isEnded: Boolean = false
+    ): Boolean = reportedPositionMs == 0L &&
+        state.positionMs > 0L &&
+        state.hasActiveEpisode &&
+        !isEnded &&
+        state.phase in RESUMABLE_PHASES
+
+    private val RESUMABLE_PHASES = setOf(
+        PodcastPlaybackPhase.PRIMED,
+        PodcastPlaybackPhase.LOADING,
+        PodcastPlaybackPhase.PAUSED,
+        PodcastPlaybackPhase.NEAR_END_PAUSED
+    )
 
     private fun sanitizedPosition(positionMs: Long): Long = max(0L, positionMs)
 }
