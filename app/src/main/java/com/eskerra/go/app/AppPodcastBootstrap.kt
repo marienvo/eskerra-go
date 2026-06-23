@@ -11,7 +11,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.navigation.NavDestination
 import androidx.navigation.NavHostController
-import com.eskerra.go.core.model.PodcastPlaybackPhase
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.playlist.toPersistedSnapshot
 import com.eskerra.go.core.repository.PodcastPlayerDriver
@@ -113,16 +112,7 @@ internal fun AppPodcastBootstrap(
         bridge.resumePlayback = {
             scope.launch {
                 val state = podcastPlayerDriver.state.value
-                val episode = state.activeEpisode ?: return@launch
-                if (state.isPlaying) return@launch
-                when (state.phase) {
-                    PodcastPlaybackPhase.PRIMED,
-                    PodcastPlaybackPhase.PAUSED,
-                    PodcastPlaybackPhase.NEAR_END_PAUSED,
-                    PodcastPlaybackPhase.STOPPED ->
-                        podcastPlayerDriver.play(episode, state.positionMs)
-                    else -> podcastPlayerDriver.resume()
-                }
+                podcastPlayerDriver.resumeFromState(state)
                 persistSnapshotAfterUserAction(
                     podcastPlayerDriver,
                     podcastShellStateWiring,

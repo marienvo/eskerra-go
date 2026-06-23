@@ -231,18 +231,8 @@ class PodcastsViewModel(
 
     fun resumePlayback() {
         val state = podcastPlayerDriver.state.value
-        val episode = state.activeEpisode ?: return
-        if (state.isPlaying) return
         launchUserAction {
-            when (state.phase) {
-                PodcastPlaybackPhase.PRIMED,
-                PodcastPlaybackPhase.PAUSED,
-                PodcastPlaybackPhase.NEAR_END_PAUSED,
-                PodcastPlaybackPhase.STOPPED ->
-                    podcastPlayerDriver.play(episode, state.positionMs)
-
-                else -> podcastPlayerDriver.resume()
-            }
+            podcastPlayerDriver.resumeFromState(state)
             queuePersist(podcastPlayerDriver.state.value)
         }
     }
