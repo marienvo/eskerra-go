@@ -12,9 +12,18 @@ class SyncPathClassifierTest {
         val partition = SyncPathClassifier.partition(
             setOf("Inbox/note.md", "Inbox/nested/other.md")
         )
-        assertEquals(setOf("Inbox/note.md", "Inbox/nested/other.md"), partition.inboxPaths)
-        assertTrue(partition.nonInboxPaths.isEmpty())
+        assertEquals(setOf("Inbox/note.md"), partition.inboxPaths)
+        assertEquals(setOf("Inbox/nested/other.md"), partition.nonInboxPaths)
         assertTrue(partition.unsafePaths.isEmpty())
+    }
+
+    @Test
+    fun partition_rejectsDeepHubInboxPaths() {
+        val partition = SyncPathClassifier.partition(
+            setOf("Daily/Inbox/note.md", "Daily/Inbox/nested/other.md")
+        )
+        assertEquals(setOf("Daily/Inbox/note.md"), partition.inboxPaths)
+        assertEquals(setOf("Daily/Inbox/nested/other.md"), partition.nonInboxPaths)
     }
 
     @Test

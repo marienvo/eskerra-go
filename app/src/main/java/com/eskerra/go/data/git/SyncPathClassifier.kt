@@ -33,11 +33,12 @@ object SyncPathClassifier {
     }
 
     private fun isInboxPath(path: String): Boolean {
+        if (InboxNotePath.isInboxRelativePath(path)) return true
         val segments = path.split('/')
         return when (segments.size) {
             1 -> segments[0] == inboxDirectory
-            2 -> segments[0] == inboxDirectory || segments[1] == inboxDirectory
-            else -> segments[0] == inboxDirectory || segments[1] == inboxDirectory
+            2 -> segments[1] == inboxDirectory
+            else -> false
         }
     }
 

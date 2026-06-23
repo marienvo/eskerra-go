@@ -102,12 +102,16 @@ internal fun AppInboxRoute(
 
     // Keep the inbox scoped to the hub currently shown below it: switching hubs via the picker
     // re-filters the inbox to that hub's own Inbox/ folder instead of merging every hub's inbox.
-    val activeHubFolder = (todayHubState as? TodayHubUiState.Content)
-        ?.let { TodayHubDiscovery.directoryOf(it.activeHubId.value) }
-    LaunchedEffect(activeHubFolder) {
-        if (activeHubFolder != null) {
-            inboxViewModel.setActiveHubFolder(activeHubFolder)
+    LaunchedEffect(todayHubState) {
+        val hubFolder = when (val state = todayHubState) {
+            is TodayHubUiState.Content ->
+                TodayHubDiscovery.directoryOf(state.activeHubId.value)
+            else ->
+                activeTodayHubStore.read()
+                    ?.let { TodayHubDiscovery.directoryOf(it) }
+                    ?: return@LaunchedEffect
         }
+        inboxViewModel.setActiveHubFolder(hubFolder)
     }
 
     LaunchedEffect(currentRoute) {

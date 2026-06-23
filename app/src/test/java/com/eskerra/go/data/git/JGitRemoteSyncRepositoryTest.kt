@@ -43,6 +43,7 @@ class JGitRemoteSyncRepositoryTest {
     fun stageInboxChanges_stagesHubInboxPaths() {
         val dir = temp.newFolder("workspace")
         gitRepo.initOrOpen(dir).getOrThrow()
+        gitRepo.writeFile(dir, "Daily/Today.md", "# Today").getOrThrow()
         gitRepo.writeFile(dir, "Daily/Inbox/note.md", "inbox").getOrThrow()
         gitRepo.writeFile(dir, "Daily/Notes/other.md", "other").getOrThrow()
 
@@ -52,6 +53,21 @@ class JGitRemoteSyncRepositoryTest {
             val staged = git.status().call().added
             assertEquals(setOf("Daily/Inbox/note.md"), staged.toSet())
             assertFalse(staged.contains("Daily/Notes/other.md"))
+        }
+    }
+
+    @Test
+    fun stageInboxChanges_doesNotStageNonHubInboxPaths() {
+        val dir = temp.newFolder("workspace")
+        gitRepo.initOrOpen(dir).getOrThrow()
+        gitRepo.writeFile(dir, "Projects/Inbox/note.md", "inbox").getOrThrow()
+        gitRepo.writeFile(dir, "Projects/other.md", "other").getOrThrow()
+
+        remoteSync.stageInboxChanges(dir).getOrThrow()
+
+        Git.open(dir).use { git ->
+            val staged = git.status().call().added
+            assertTrue(staged.isEmpty())
         }
     }
 

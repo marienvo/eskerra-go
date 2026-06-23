@@ -1,6 +1,5 @@
 package com.eskerra.go.data.git
 
-import com.eskerra.go.core.inbox.InboxNotePath
 import com.eskerra.go.core.model.GitWorkspaceStatus
 import com.eskerra.go.core.model.MergeOutcome
 import com.eskerra.go.core.model.RemoteBranchComparison
@@ -48,10 +47,7 @@ class JGitRemoteSyncRepository(
 
     override fun stageInboxChanges(workingDir: File): Result<Unit> = runCatching {
         Git.open(workingDir).use { git ->
-            val patterns = mutableListOf(InboxNotePath.inboxPrefixFor(""))
-            workingDir.listFiles { f -> f.isDirectory && !f.name.startsWith(".") }
-                ?.mapTo(patterns) { InboxNotePath.inboxPrefixFor(it.name) }
-            for (pattern in patterns) {
+            for (pattern in InboxStagingPatterns.discover(workingDir)) {
                 git.add().addFilepattern(pattern).call()
                 git.add().addFilepattern(pattern).setUpdate(true).call()
             }
