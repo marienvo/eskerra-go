@@ -150,7 +150,11 @@ fun ShellNewNoteInput(
                     text = it,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(start = HorizontalInset + 8.dp, end = HorizontalInset, bottom = 8.dp)
+                    modifier = Modifier.padding(
+                        start = HorizontalInset + 8.dp,
+                        end = HorizontalInset,
+                        bottom = 8.dp
+                    )
                 )
             }
         }
@@ -158,10 +162,7 @@ fun ShellNewNoteInput(
 }
 
 @Composable
-private fun SearchModeToggle(
-    searchMode: Boolean,
-    onToggle: (Boolean) -> Unit
-) {
+private fun SearchModeToggle(searchMode: Boolean, onToggle: (Boolean) -> Unit) {
     IconToggleButton(
         checked = searchMode,
         onCheckedChange = onToggle,

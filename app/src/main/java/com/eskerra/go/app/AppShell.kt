@@ -42,22 +42,14 @@ fun AppShell(
     syncIndicator: ShellSyncIndicatorState?,
     miniPlayerVisible: Boolean = false,
     miniPlayer: (@Composable () -> Unit)? = null,
-    newNoteInputVisible: Boolean = false,
-    newNoteSearchMode: Boolean = false,
-    onNewNoteSearchModeChange: (Boolean) -> Unit = {},
-    newNoteValue: String = "",
-    onNewNoteValueChange: (String) -> Unit = {},
-    onNewNoteSubmit: () -> Unit = {},
-    newNoteSubmitEnabled: Boolean = false,
-    newNoteIsSaving: Boolean = false,
-    newNoteErrorMessage: String? = null,
+    shellInput: ShellInputPresentation? = null,
     onMenuClick: () -> Unit,
     onNavigate: (route: String) -> Unit,
     content: @Composable (contentModifier: Modifier) -> Unit
 ) {
     val chromeInsets = rememberShellChromeInsets(
         miniPlayerVisible = miniPlayerVisible,
-        newNoteInputVisible = newNoteInputVisible
+        newNoteInputVisible = shellInput?.visible == true
     )
 
     CompositionLocalProvider(LocalShellChromeInsets provides chromeInsets) {
@@ -112,16 +104,16 @@ fun AppShell(
                 }
             }
 
-            if (newNoteInputVisible) {
+            if (shellInput?.visible == true) {
                 ShellNewNoteInput(
-                    searchMode = newNoteSearchMode,
-                    onSearchModeChange = onNewNoteSearchModeChange,
-                    value = newNoteValue,
-                    onValueChange = onNewNoteValueChange,
-                    onSubmit = onNewNoteSubmit,
-                    submitEnabled = newNoteSubmitEnabled,
-                    isSaving = newNoteIsSaving,
-                    errorMessage = newNoteErrorMessage,
+                    searchMode = shellInput.searchMode,
+                    onSearchModeChange = shellInput.onSearchModeChange,
+                    value = shellInput.value,
+                    onValueChange = shellInput.onValueChange,
+                    onSubmit = shellInput.onSubmit,
+                    submitEnabled = shellInput.submitEnabled,
+                    isSaving = shellInput.isSaving,
+                    errorMessage = shellInput.errorMessage,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .navigationBarsPadding()

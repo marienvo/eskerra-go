@@ -35,7 +35,10 @@ internal fun ShellChromeButton(
 ) {
     Surface(
         onClick = onClick,
-        modifier = modifier.defaultMinSize(minWidth = ShellChromeButtonSize, minHeight = ShellChromeButtonSize),
+        modifier = modifier.defaultMinSize(
+            minWidth = ShellChromeButtonSize,
+            minHeight = ShellChromeButtonSize
+        ),
         shape = RoundedCornerShape(percent = 50),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,

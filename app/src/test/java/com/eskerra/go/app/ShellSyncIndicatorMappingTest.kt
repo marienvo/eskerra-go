@@ -6,9 +6,7 @@ import com.eskerra.go.core.model.SyncStatusState
 import com.eskerra.go.core.model.SyncStatusSummary
 import com.eskerra.go.feature.sync.SyncUiState
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ShellSyncIndicatorMappingTest {
@@ -24,18 +22,17 @@ class ShellSyncIndicatorMappingTest {
     }
 
     @Test
-    fun cleanReadyState_isDisabledWithoutAttention() {
+    fun cleanReadyState_hasNoBadgeOrCount() {
         val state = readyStatus(SyncStatusState.Clean)
 
         val indicator = shellSyncIndicatorState(state, remoteConfigured = true)!!
 
-        assertFalse(indicator.needsAttention)
-        assertFalse(indicator.isEnabled)
         assertNull(indicator.badgeText)
+        assertNull(indicator.changeCount)
     }
 
     @Test
-    fun dirtyReadyState_isEnabledWithAttention() {
+    fun dirtyReadyState_exposesBadgeAndCount() {
         val status = SyncStatusSummary(
             state = SyncStatusState.DirtyLocalChanges,
             branch = "main",
@@ -54,13 +51,12 @@ class ShellSyncIndicatorMappingTest {
 
         val indicator = shellSyncIndicatorState(state, remoteConfigured = true)!!
 
-        assertTrue(indicator.needsAttention)
-        assertTrue(indicator.isEnabled)
         assertEquals("2", indicator.badgeText)
+        assertEquals(2, indicator.changeCount)
     }
 
     @Test
-    fun syncingState_isDisabledWhileBusy() {
+    fun syncingState_usesCurrentStatusBadgeAndCount() {
         val state = SyncUiState.Syncing(
             status = dirtyStatus(),
             step = com.eskerra.go.core.model.SyncProgressStep.FetchingRemote
@@ -68,8 +64,8 @@ class ShellSyncIndicatorMappingTest {
 
         val indicator = shellSyncIndicatorState(state, remoteConfigured = true)!!
 
-        assertTrue(indicator.isSyncing)
-        assertFalse(indicator.isEnabled)
+        assertEquals("1", indicator.badgeText)
+        assertEquals(1, indicator.changeCount)
     }
 
     private fun readyStatus(syncState: SyncStatusState): SyncUiState.Ready = SyncUiState.Ready(

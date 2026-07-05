@@ -23,7 +23,11 @@ data class MenuEntry(val id: String, val label: String)
  * bottom sheet.
  */
 @Composable
-fun MenuScreen(items: List<MenuEntry>, onItemClick: (String) -> Unit, modifier: Modifier = Modifier) {
+fun MenuScreen(
+    items: List<MenuEntry>,
+    onItemClick: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
     LazyColumn(
         modifier = modifier
             .fillMaxWidth()

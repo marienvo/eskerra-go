@@ -80,8 +80,8 @@ class TodayHubViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun note(path: String): NoteSummary =
-        NoteSummary(id = NoteId(path), title = path, snippet = "", isInbox = false)
+    private fun note(path: String, title: String = path): NoteSummary =
+        NoteSummary(id = NoteId(path), title = title, snippet = "", isInbox = false)
 
     private fun viewModel(
         content: NoteContentRepository,
@@ -114,7 +114,7 @@ class TodayHubViewModelTest {
     @Test
     fun contentExposesHeadersWeekAndIntro() = runTest {
         val registry = FakeNoteRegistryRepository.withInboxNotes(
-            note("Daily/Today.md"),
+            note("Daily/Today.md", "Daily hub"),
             note("Daily/2026-03-30.md"),
             note("Daily/2026-04-06.md")
         )
@@ -126,10 +126,10 @@ class TodayHubViewModelTest {
         advanceUntilIdle()
 
         val state = vm.uiState.value as TodayHubUiState.Content
-        assertEquals("Daily", state.folderLabel)
+        assertEquals("Daily hub", state.folderLabel)
         assertEquals("2026-04-06", state.selectedWeekStem)
         assertEquals(listOf("Monday, April 6, 2026", "Tasks"), state.columnHeaders)
-        assertTrue(state.introMarkdown.contains("Intro body here."))
+        assertEquals("Intro body here.", state.introMarkdown)
         assertTrue(state.canGoPrev)
         assertFalse(state.canGoNext)
         assertFalse(state.rowLoading)
@@ -146,13 +146,16 @@ class TodayHubViewModelTest {
         val registry = FakeNoteRegistryRepository(
             result = Result.success(
                 com.eskerra.go.core.model.NoteRegistry.fromNotes(
-                    listOf(note("Daily/Today.md"), note("Daily/2026-04-06.md"))
+                    listOf(
+                        note("Daily/Today.md", "Daily hub"),
+                        note("Daily/2026-04-06.md")
+                    )
                 )
             ),
             refreshDelayMs = 1_000L
         )
         val cachedRegistry = com.eskerra.go.core.model.NoteRegistry.fromNotes(
-            listOf(note("Daily/Today.md"), note("Daily/2026-04-06.md"))
+            listOf(note("Daily/Today.md", "Daily hub"), note("Daily/2026-04-06.md"))
         )
         val snapshotStore = FakeTodayHubSnapshotStore()
         snapshotStore.save(config, filesDir, snapshot(rowBody = "cached row"))
@@ -170,7 +173,7 @@ class TodayHubViewModelTest {
         dispatcher.scheduler.runCurrent()
 
         val state = vm.uiState.value as TodayHubUiState.Content
-        assertEquals("Daily", state.folderLabel)
+        assertEquals("Daily hub", state.folderLabel)
         assertEquals(listOf("cached row", ""), state.row?.columns)
         assertFalse(state.rowLoading)
     }
@@ -182,7 +185,10 @@ class TodayHubViewModelTest {
 
         val filesDir = temp.newFolder("files")
         prepareWorkspace(filesDir)
-        val notes = listOf(note("Daily/Today.md"), note("Daily/2026-04-06.md"))
+        val notes = listOf(
+            note("Daily/Today.md", "Daily hub"),
+            note("Daily/2026-04-06.md")
+        )
         val cachedRegistry = com.eskerra.go.core.model.NoteRegistry.fromNotes(notes)
         val registry = FakeNoteRegistryRepository(
             result = Result.success(com.eskerra.go.core.model.NoteRegistry.fromNotes(notes)),
@@ -215,7 +221,10 @@ class TodayHubViewModelTest {
 
         val filesDir = temp.newFolder("files")
         prepareWorkspace(filesDir)
-        val notes = listOf(note("Daily/Today.md"), note("Daily/2026-04-06.md"))
+        val notes = listOf(
+            note("Daily/Today.md", "Daily hub"),
+            note("Daily/2026-04-06.md")
+        )
         val cachedRegistry = com.eskerra.go.core.model.NoteRegistry.fromNotes(notes)
         val registry = FakeNoteRegistryRepository(
             result = Result.success(com.eskerra.go.core.model.NoteRegistry.fromNotes(notes)),
@@ -250,7 +259,7 @@ class TodayHubViewModelTest {
     @Test
     fun previousWeekNavigatesToEarlierStem() = runTest {
         val registry = FakeNoteRegistryRepository.withInboxNotes(
-            note("Daily/Today.md"),
+            note("Daily/Today.md", "Daily hub"),
             note("Daily/2026-03-30.md"),
             note("Daily/2026-04-06.md")
         )
@@ -270,7 +279,7 @@ class TodayHubViewModelTest {
     @Test
     fun resetToCurrentWeekReturnsFromEarlierStem() = runTest {
         val registry = FakeNoteRegistryRepository.withInboxNotes(
-            note("Daily/Today.md"),
+            note("Daily/Today.md", "Daily hub"),
             note("Daily/2026-03-30.md"),
             note("Daily/2026-04-06.md")
         )
@@ -298,7 +307,9 @@ class TodayHubViewModelTest {
 
     @Test
     fun persistsActiveHubId() = runTest {
-        val registry = FakeNoteRegistryRepository.withInboxNotes(note("Daily/Today.md"))
+        val registry = FakeNoteRegistryRepository.withInboxNotes(
+            note("Daily/Today.md", "Daily hub")
+        )
         val store = FakeActiveTodayHubStore()
         val vm =
             viewModel(
@@ -314,7 +325,9 @@ class TodayHubViewModelTest {
 
     @Test
     fun errorWhenHubReadFails() = runTest {
-        val registry = FakeNoteRegistryRepository.withInboxNotes(note("Daily/Today.md"))
+        val registry = FakeNoteRegistryRepository.withInboxNotes(
+            note("Daily/Today.md", "Daily hub")
+        )
         val content = MapContentRepository().apply {
             failWith(NoteContentError.ReadFailed("io"))
         }
@@ -358,13 +371,13 @@ class TodayHubViewModelTest {
     }
 
     private fun snapshot(rowBody: String): TodayHubSnapshot = TodayHubSnapshot(
-        hubs = listOf(TodayHubRef(NoteId("Daily/Today.md"), "Daily")),
+        hubs = listOf(TodayHubRef(NoteId("Daily/Today.md"), "Daily hub")),
         activeHubId = NoteId("Daily/Today.md"),
         settings = TodayHubFrontmatter.Settings(
             columns = listOf("Tasks"),
             start = TodayHubFrontmatter.StartDay.MONDAY
         ),
-        introMarkdown = "# Daily hub\n\nIntro body here.",
+        introMarkdown = "Intro body here.",
         availableWeekStems = listOf("2026-04-06"),
         selectedWeekStem = "2026-04-06",
         row = TodayHubRow(

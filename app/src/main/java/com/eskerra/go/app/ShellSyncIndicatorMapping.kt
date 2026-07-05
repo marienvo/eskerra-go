@@ -18,8 +18,9 @@ internal fun shellSyncIndicatorState(
         is SyncUiState.Ready -> syncState.status
         is SyncUiState.Syncing -> syncState.status
         is SyncUiState.Success -> syncState.status
-        is SyncUiState.Error -> syncState.status
-            ?: return ShellSyncIndicatorState(badgeText = "!", changeCount = null)
+        is SyncUiState.Error ->
+            syncState.status
+                ?: return ShellSyncIndicatorState(badgeText = "!", changeCount = null)
     }
     return ShellSyncIndicatorState(
         badgeText = badgeTextFor(status),

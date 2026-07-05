@@ -3,7 +3,6 @@ package com.eskerra.go.app
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -11,11 +10,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -188,18 +183,7 @@ fun App(
         filesDir = filesDir,
         maintainVaultSearchIndex = maintainVaultSearchIndex
     )
-
-    DisposableEffect(appSyncViewModel) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_START) {
-                appSyncViewModel.refreshShellStatusQuietly(forceRemote = false)
-            }
-        }
-        ProcessLifecycleOwner.get().lifecycle.addObserver(observer)
-        onDispose {
-            ProcessLifecycleOwner.get().lifecycle.removeObserver(observer)
-        }
-    }
+    AppForegroundSyncEffect(appSyncViewModel)
 
     val syncIndicator = shellSyncIndicatorState(syncState, remoteConfigured)
     val selectedTopLevelRoute = destinationTopLevelRoute ?: currentTopLevelRoute
@@ -216,21 +200,16 @@ fun App(
         selectedTopLevelRoute = selectedTopLevelRoute,
         markInboxNotesChanged = markInboxNotesChanged
     )
-    // One search view model shared by the results page and the bottom pill's live search input, so
-    // typing in the pill updates results directly. Search vs. add-note mode is remembered here so it
-    // survives navigation/recomposition instead of springing back to add-note.
-    val searchViewModel: SearchViewModel = viewModel(
-        key = "search:${currentConfig.remoteUri.orEmpty()}",
-        factory = SearchViewModel.factory(
-            config = currentConfig,
-            filesDir = filesDir,
-            searchVault = searchVault,
-            maintainVaultSearchIndex = maintainVaultSearchIndex,
-            repairVaultSearchIndex = repairVaultSearchIndex
-        )
+    val shellInputState = rememberAppShellInputState(
+        currentConfig = currentConfig,
+        filesDir = filesDir,
+        searchVault = searchVault,
+        maintainVaultSearchIndex = maintainVaultSearchIndex,
+        repairVaultSearchIndex = repairVaultSearchIndex,
+        navController = navController,
+        currentRoute = currentRoute,
+        newNoteInputState = newNoteInputState
     )
-    val searchQuery by searchViewModel.query.collectAsState()
-    var searchMode by rememberSaveable { mutableStateOf(false) }
     val podcastShellBridge = remember { PodcastShellBridge() }
     val miniPlayerMount = rememberAppShellMiniPlayerMount(
         currentConfig = currentConfig,
@@ -261,30 +240,7 @@ fun App(
         syncIndicator = syncIndicator,
         miniPlayerVisible = miniPlayerMount.visible,
         miniPlayer = miniPlayerMount.content,
-        newNoteInputVisible = newNoteInputState.visible,
-        newNoteSearchMode = searchMode,
-        onNewNoteSearchModeChange = { enabled ->
-            searchMode = enabled
-            if (enabled) {
-                navController.navigate(AppRoute.SEARCH) { launchSingleTop = true }
-            } else if (currentRoute == AppRoute.SEARCH_PATTERN) {
-                navController.popBackStack()
-            }
-        },
-        newNoteValue = if (searchMode) searchQuery else newNoteInputState.draft,
-        onNewNoteValueChange =
-            if (searchMode) searchViewModel::onQueryChange else newNoteInputState.onDraftChange,
-        onNewNoteSubmit =
-            if (searchMode) {
-                { navController.navigate(AppRoute.SEARCH) { launchSingleTop = true } }
-            } else {
-                newNoteInputState.onSave
-            },
-        newNoteSubmitEnabled =
-            if (searchMode) searchQuery.isNotBlank()
-            else newNoteInputState.canSave && !newNoteInputState.isSaving,
-        newNoteIsSaving = !searchMode && newNoteInputState.isSaving,
-        newNoteErrorMessage = if (searchMode) null else newNoteInputState.errorMessage,
+        shellInput = shellInputState.presentation,
         onMenuClick = { menuOpen = true },
         onNavigate = { route ->
             navController.navigateTab(
@@ -330,7 +286,7 @@ fun App(
             searchVault = searchVault,
             maintainVaultSearchIndex = maintainVaultSearchIndex,
             repairVaultSearchIndex = repairVaultSearchIndex,
-            searchViewModel = searchViewModel,
+            searchViewModel = shellInputState.searchViewModel,
             touchVaultSearchPaths = touchVaultSearchPaths,
             loadPodcastCatalog = loadPodcastCatalog,
             markPodcastEpisodesPlayed = markPodcastEpisodesPlayed,

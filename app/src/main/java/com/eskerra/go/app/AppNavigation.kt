@@ -125,8 +125,11 @@ internal fun onMenuSyncClick(
 ) {
     when (syncState) {
         is SyncUiState.Ready ->
-            if (syncState.preflight.canSync) appSyncViewModel.syncNow()
-            else navController.openSyncScreen()
+            if (syncState.preflight.canSync) {
+                appSyncViewModel.syncNow()
+            } else {
+                navController.openSyncScreen()
+            }
         SyncUiState.Loading,
         is SyncUiState.Success -> appSyncViewModel.syncNow()
         is SyncUiState.Syncing -> Unit
