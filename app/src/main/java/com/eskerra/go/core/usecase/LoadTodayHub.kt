@@ -1,5 +1,6 @@
 package com.eskerra.go.core.usecase
 
+import com.eskerra.go.core.markdown.TodayHubIntroStrip
 import com.eskerra.go.core.markdown.VaultMarkdownPreprocess
 import com.eskerra.go.core.model.NoteContentError
 import com.eskerra.go.core.model.NoteContentException
@@ -54,15 +55,17 @@ class LoadTodayHub(
         val markdown = contentResult.getOrThrow().markdown
 
         val settings = TodayHubFrontmatter.parse(markdown)
+        val titleById = registry.notes.associate { it.id to it.title }
+        val hubTitle = titleById[activeHubId]?.takeIf { it.isNotBlank() }
         // The hub note's H1 already shows as the "Switch hub" title, so drop it from the intro body
         // to keep a single H1 on the today-hub page (spec §11). Other notes render their H1 as usual.
-        val introMarkdown = stripLeadingH1(
-            VaultMarkdownPreprocess.splitYamlFrontmatter(markdown).body
+        val introMarkdown = TodayHubIntroStrip.stripLeadingAtxH1ForTitle(
+            VaultMarkdownPreprocess.splitYamlFrontmatter(markdown).body,
+            hubTitle
         )
         val availableWeekStems = TodayHubDiscovery.availableWeekStems(activeHubId.value, registry)
         // Label each hub by its note's H1 (the registry title), falling back to the folder name when
         // the hub has no heading, so the "Switch hub" title/picker read the hub's own title.
-        val titleById = registry.notes.associate { it.id to it.title }
         val hubs = hubIds.map { id ->
             val h1 = titleById[id]?.takeIf { it.isNotBlank() }
             TodayHubRef(id, h1 ?: TodayHubDiscovery.folderLabel(id.value))
@@ -78,49 +81,6 @@ class LoadTodayHub(
                 registry = registry
             )
         )
-    }
-
-    /**
-     * Removes the leading level-1 heading (the note title) from [markdown], along with a single
-     * blank line left in its place. Only strips when nothing but blank lines precede the heading,
-     * so a body that opens with prose is left untouched.
-     */
-    internal fun stripLeadingH1(markdown: String): String {
-        val lines = markdown.lines()
-        var activeFenceMarker: String? = null
-        for (i in lines.indices) {
-            val trimmed = lines[i].trimStart()
-            val fenceMarker = when {
-                trimmed.startsWith("```") -> "```"
-                trimmed.startsWith("~~~") -> "~~~"
-                else -> null
-            }
-            if (fenceMarker != null) {
-                if (activeFenceMarker == null) {
-                    activeFenceMarker = fenceMarker
-                } else if (activeFenceMarker == fenceMarker) {
-                    activeFenceMarker = null
-                }
-                continue
-            }
-            if (activeFenceMarker != null) {
-                continue
-            }
-            if (trimmed.startsWith("# ")) {
-                if (lines.take(i).any { it.isNotBlank() }) {
-                    return markdown
-                }
-                val remaining = lines.toMutableList().apply { removeAt(i) }
-                if (i < remaining.size && remaining[i].isBlank()) {
-                    remaining.removeAt(i)
-                }
-                return remaining.joinToString("\n").trimStart('\n')
-            }
-            if (trimmed.isNotEmpty()) {
-                return markdown
-            }
-        }
-        return markdown
     }
 
     private fun registryFailure(cause: Throwable?): NoteContentException {
