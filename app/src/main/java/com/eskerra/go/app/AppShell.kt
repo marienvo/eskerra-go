@@ -70,7 +70,7 @@ fun AppShell(
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .statusBarsPadding()
-                    .padding(start = 16.dp, end = 16.dp, top = 11.dp, bottom = 16.dp),
+                    .padding(start = 16.dp, end = 16.dp, top = 9.dp, bottom = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -92,7 +92,7 @@ fun AppShell(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .statusBarsPadding()
-                    .padding(start = 16.dp, end = 16.dp, top = 11.dp, bottom = 16.dp),
+                    .padding(start = 16.dp, end = 16.dp, top = 9.dp, bottom = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -119,7 +119,7 @@ fun AppShell(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .navigationBarsPadding()
-                        .padding(16.dp)
+                        .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 11.dp)
                 )
             }
 
