@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.UnfoldMore
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -34,21 +33,52 @@ import com.eskerra.go.ui.markdown.VaultMarkdownView
 import java.io.File
 
 /**
- * Embeddable Today Hub block for the home screen (spec §11). Renders inline loading/empty/error
- * states or the active hub intro and selected week's columns. Parent owns scroll and top chrome.
+ * Top chrome row for the home screen (spec §11): hub folder title and hub switcher.
  */
 @Composable
-fun TodayHubSection(
+fun TodayHubHeader(
+    state: TodayHubUiState,
+    onSelectHub: (NoteId) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val content = state as? TodayHubUiState.Content
+    var pickerVisible by remember { mutableStateOf(false) }
+
+    HubHeader(
+        folderLabel = content?.folderLabel.orEmpty(),
+        showPicker = content?.showHubPicker == true,
+        onOpenPicker = { pickerVisible = true },
+        modifier = modifier
+    )
+
+    if (pickerVisible && content != null) {
+        TodayHubPickerSheet(
+            hubs = content.hubs,
+            activeHubId = content.activeHubId,
+            onPickHub = { picked ->
+                pickerVisible = false
+                onSelectHub(picked)
+            },
+            onDismiss = { pickerVisible = false }
+        )
+    }
+}
+
+/**
+ * Home screen body below the inbox list (spec §11): week selector, hub intro, and week columns.
+ * Renders inline loading/empty/error states when the hub isn't ready. Top chrome lives in
+ * [TodayHubHeader]; parent owns scroll.
+ */
+@Composable
+fun TodayHubBody(
     state: TodayHubUiState,
     onPreviousWeek: () -> Unit,
     onNextWeek: () -> Unit,
-    onSelectHub: (NoteId) -> Unit,
     onRetry: () -> Unit,
     onOpenInternalNote: (NoteId) -> Unit,
     onOpenExternalUrl: (String) -> Unit,
     onAmbiguousWikiLink: (List<NoteId>, String) -> Unit,
     onNoteNotFound: (String) -> Unit = {},
-    onOpenSearch: () -> Unit = {},
     workspaceRoot: File? = null,
     modifier: Modifier = Modifier
 ) {
@@ -69,16 +99,14 @@ fun TodayHubSection(
             onRetry = onRetry,
             modifier = modifier
         )
-        is TodayHubUiState.Content -> TodayHubSectionContent(
+        is TodayHubUiState.Content -> TodayHubBodyContent(
             state = state,
             onPreviousWeek = onPreviousWeek,
             onNextWeek = onNextWeek,
-            onSelectHub = onSelectHub,
             onOpenInternalNote = onOpenInternalNote,
             onOpenExternalUrl = onOpenExternalUrl,
             onAmbiguousWikiLink = onAmbiguousWikiLink,
             onNoteNotFound = onNoteNotFound,
-            onOpenSearch = onOpenSearch,
             workspaceRoot = workspaceRoot,
             modifier = modifier
         )
@@ -86,28 +114,18 @@ fun TodayHubSection(
 }
 
 @Composable
-private fun TodayHubSectionContent(
+private fun TodayHubBodyContent(
     state: TodayHubUiState.Content,
     onPreviousWeek: () -> Unit,
     onNextWeek: () -> Unit,
-    onSelectHub: (NoteId) -> Unit,
     onOpenInternalNote: (NoteId) -> Unit,
     onOpenExternalUrl: (String) -> Unit,
     onAmbiguousWikiLink: (List<NoteId>, String) -> Unit,
     onNoteNotFound: (String) -> Unit,
-    onOpenSearch: () -> Unit,
     workspaceRoot: File?,
     modifier: Modifier = Modifier
 ) {
-    var pickerVisible by remember { mutableStateOf(false) }
-
     Column(modifier = modifier.fillMaxWidth()) {
-        HubHeader(
-            folderLabel = state.folderLabel,
-            showPicker = state.showHubPicker,
-            onOpenPicker = { pickerVisible = true },
-            onOpenSearch = onOpenSearch
-        )
         WeekNavBar(
             label = state.weekRangeLabel,
             canGoPrev = state.canGoPrev,
@@ -155,18 +173,6 @@ private fun TodayHubSectionContent(
             )
         }
     }
-
-    if (pickerVisible) {
-        TodayHubPickerSheet(
-            hubs = state.hubs,
-            activeHubId = state.activeHubId,
-            onPickHub = { picked ->
-                pickerVisible = false
-                onSelectHub(picked)
-            },
-            onDismiss = { pickerVisible = false }
-        )
-    }
 }
 
 @Composable
@@ -203,10 +209,10 @@ private fun HubHeader(
     folderLabel: String,
     showPicker: Boolean,
     onOpenPicker: () -> Unit,
-    onOpenSearch: () -> Unit
+    modifier: Modifier = Modifier
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+        modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
@@ -215,13 +221,6 @@ private fun HubHeader(
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f)
         )
-        IconButton(onClick = onOpenSearch) {
-            Icon(
-                imageVector = Icons.Filled.Search,
-                contentDescription = "Search vault",
-                tint = com.eskerra.go.ui.theme.EskerraChromeTokens.HeaderText
-            )
-        }
         if (showPicker) {
             TextButton(onClick = onOpenPicker) {
                 Icon(
