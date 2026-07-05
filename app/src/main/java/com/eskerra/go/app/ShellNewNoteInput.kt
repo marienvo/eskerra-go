@@ -50,19 +50,24 @@ private val ControlSpacing = 8.dp
 private val HorizontalInset = 12.dp
 private val FieldMaxHeight = 180.dp
 
+/**
+ * Bottom pill that doubles as the inbox-note composer and the live vault-search input. [searchMode]
+ * (owned by the shell so it survives navigation) picks which: the caller wires [value]/[onValueChange]
+ * to the inbox-note draft or the shared search query, and [onSubmit] to save-note or open results.
+ */
 @Composable
 fun ShellNewNoteInput(
-    draft: String,
-    canSave: Boolean,
+    searchMode: Boolean,
+    onSearchModeChange: (Boolean) -> Unit,
+    value: String,
+    onValueChange: (String) -> Unit,
+    onSubmit: () -> Unit,
+    submitEnabled: Boolean,
     isSaving: Boolean,
     errorMessage: String?,
-    onDraftChange: (String) -> Unit,
-    onSave: () -> Unit,
-    onSearch: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var isMultiline by remember { mutableStateOf(false) }
-    var searchMode by remember { mutableStateOf(false) }
 
     // Horizontal space the toggle + action button (and the gaps around them) claim from the field
     // in single-line mode. In multi-line mode the field is full width, so this is exactly how much
@@ -81,8 +86,6 @@ fun ShellNewNoteInput(
     }
 
     val placeholder = if (searchMode) "Search in vault..." else "Write a new inbox note..."
-    val actionEnabled = if (searchMode) draft.isNotBlank() else (canSave && !isSaving)
-    val onAction: () -> Unit = { if (searchMode) onSearch(draft) else onSave() }
 
     Surface(
         modifier = modifier
@@ -106,11 +109,11 @@ fun ShellNewNoteInput(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 if (!isMultiline) {
-                    SearchModeToggle(searchMode = searchMode, onToggle = { searchMode = it })
+                    SearchModeToggle(searchMode = searchMode, onToggle = onSearchModeChange)
                 }
                 NewNoteField(
-                    value = draft,
-                    onValueChange = onDraftChange,
+                    value = value,
+                    onValueChange = onValueChange,
                     readOnly = isSaving,
                     placeholder = placeholder,
                     onTextLayout = onTextLayout,
@@ -120,8 +123,8 @@ fun ShellNewNoteInput(
                     ShellNewNoteActionButton(
                         searchMode = searchMode,
                         isSaving = isSaving,
-                        enabled = actionEnabled,
-                        onClick = onAction
+                        enabled = submitEnabled,
+                        onClick = onSubmit
                     )
                 }
             }
@@ -132,13 +135,13 @@ fun ShellNewNoteInput(
                         .padding(horizontal = HorizontalInset, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    SearchModeToggle(searchMode = searchMode, onToggle = { searchMode = it })
+                    SearchModeToggle(searchMode = searchMode, onToggle = onSearchModeChange)
                     Spacer(modifier = Modifier.weight(1f))
                     ShellNewNoteActionButton(
                         searchMode = searchMode,
                         isSaving = isSaving,
-                        enabled = actionEnabled,
-                        onClick = onAction
+                        enabled = submitEnabled,
+                        onClick = onSubmit
                     )
                 }
             }

@@ -11,6 +11,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -215,6 +216,21 @@ fun App(
         selectedTopLevelRoute = selectedTopLevelRoute,
         markInboxNotesChanged = markInboxNotesChanged
     )
+    // One search view model shared by the results page and the bottom pill's live search input, so
+    // typing in the pill updates results directly. Search vs. add-note mode is remembered here so it
+    // survives navigation/recomposition instead of springing back to add-note.
+    val searchViewModel: SearchViewModel = viewModel(
+        key = "search:${currentConfig.remoteUri.orEmpty()}",
+        factory = SearchViewModel.factory(
+            config = currentConfig,
+            filesDir = filesDir,
+            searchVault = searchVault,
+            maintainVaultSearchIndex = maintainVaultSearchIndex,
+            repairVaultSearchIndex = repairVaultSearchIndex
+        )
+    )
+    val searchQuery by searchViewModel.query.collectAsState()
+    var searchMode by rememberSaveable { mutableStateOf(false) }
     val podcastShellBridge = remember { PodcastShellBridge() }
     val miniPlayerMount = rememberAppShellMiniPlayerMount(
         currentConfig = currentConfig,
@@ -246,13 +262,29 @@ fun App(
         miniPlayerVisible = miniPlayerMount.visible,
         miniPlayer = miniPlayerMount.content,
         newNoteInputVisible = newNoteInputState.visible,
-        newNoteDraft = newNoteInputState.draft,
-        newNoteCanSave = newNoteInputState.canSave,
-        newNoteIsSaving = newNoteInputState.isSaving,
-        newNoteErrorMessage = newNoteInputState.errorMessage,
-        onNewNoteDraftChange = newNoteInputState.onDraftChange,
-        onNewNoteSave = newNoteInputState.onSave,
-        onNewNoteSearch = { query -> navController.navigate(AppRoute.search(query)) },
+        newNoteSearchMode = searchMode,
+        onNewNoteSearchModeChange = { enabled ->
+            searchMode = enabled
+            if (enabled) {
+                navController.navigate(AppRoute.SEARCH) { launchSingleTop = true }
+            } else if (currentRoute == AppRoute.SEARCH_PATTERN) {
+                navController.popBackStack()
+            }
+        },
+        newNoteValue = if (searchMode) searchQuery else newNoteInputState.draft,
+        onNewNoteValueChange =
+            if (searchMode) searchViewModel::onQueryChange else newNoteInputState.onDraftChange,
+        onNewNoteSubmit =
+            if (searchMode) {
+                { navController.navigate(AppRoute.SEARCH) { launchSingleTop = true } }
+            } else {
+                newNoteInputState.onSave
+            },
+        newNoteSubmitEnabled =
+            if (searchMode) searchQuery.isNotBlank()
+            else newNoteInputState.canSave && !newNoteInputState.isSaving,
+        newNoteIsSaving = !searchMode && newNoteInputState.isSaving,
+        newNoteErrorMessage = if (searchMode) null else newNoteInputState.errorMessage,
         onMenuClick = { menuOpen = true },
         onNavigate = { route ->
             navController.navigateTab(
@@ -298,6 +330,7 @@ fun App(
             searchVault = searchVault,
             maintainVaultSearchIndex = maintainVaultSearchIndex,
             repairVaultSearchIndex = repairVaultSearchIndex,
+            searchViewModel = searchViewModel,
             touchVaultSearchPaths = touchVaultSearchPaths,
             loadPodcastCatalog = loadPodcastCatalog,
             markPodcastEpisodesPlayed = markPodcastEpisodesPlayed,

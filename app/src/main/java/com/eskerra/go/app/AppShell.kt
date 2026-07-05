@@ -43,13 +43,14 @@ fun AppShell(
     miniPlayerVisible: Boolean = false,
     miniPlayer: (@Composable () -> Unit)? = null,
     newNoteInputVisible: Boolean = false,
-    newNoteDraft: String = "",
-    newNoteCanSave: Boolean = false,
+    newNoteSearchMode: Boolean = false,
+    onNewNoteSearchModeChange: (Boolean) -> Unit = {},
+    newNoteValue: String = "",
+    onNewNoteValueChange: (String) -> Unit = {},
+    onNewNoteSubmit: () -> Unit = {},
+    newNoteSubmitEnabled: Boolean = false,
     newNoteIsSaving: Boolean = false,
     newNoteErrorMessage: String? = null,
-    onNewNoteDraftChange: (String) -> Unit = {},
-    onNewNoteSave: () -> Unit = {},
-    onNewNoteSearch: (String) -> Unit = {},
     onMenuClick: () -> Unit,
     onNavigate: (route: String) -> Unit,
     content: @Composable (contentModifier: Modifier) -> Unit
@@ -113,13 +114,14 @@ fun AppShell(
 
             if (newNoteInputVisible) {
                 ShellNewNoteInput(
-                    draft = newNoteDraft,
-                    canSave = newNoteCanSave,
+                    searchMode = newNoteSearchMode,
+                    onSearchModeChange = onNewNoteSearchModeChange,
+                    value = newNoteValue,
+                    onValueChange = onNewNoteValueChange,
+                    onSubmit = onNewNoteSubmit,
+                    submitEnabled = newNoteSubmitEnabled,
                     isSaving = newNoteIsSaving,
                     errorMessage = newNoteErrorMessage,
-                    onDraftChange = onNewNoteDraftChange,
-                    onSave = onNewNoteSave,
-                    onSearch = onNewNoteSearch,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .navigationBarsPadding()

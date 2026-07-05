@@ -97,6 +97,7 @@ internal data class AppNavGraphContext(
     val searchVault: SearchVault,
     val maintainVaultSearchIndex: MaintainVaultSearchIndex,
     val repairVaultSearchIndex: RepairVaultSearchIndex,
+    val searchViewModel: SearchViewModel,
     val touchVaultSearchPaths: TouchVaultSearchPaths,
     val loadPodcastCatalog: LoadPodcastCatalog,
     val markPodcastEpisodesPlayed: MarkPodcastEpisodesPlayed,
@@ -174,19 +175,12 @@ internal fun NavGraphBuilder.sharedDestinations(ctx: AppNavGraphContext) {
                 defaultValue = ""
             }
         )
-    ) { entry ->
-        val initialQuery = entry.arguments
-            ?.getString(AppRoute.SEARCH_QUERY_ARG)
-            ?.let { AppRoute.decodeSearchQuery(it) }
-            .orEmpty()
+    ) {
+        // The query lives in the shared search view model (driven by the bottom pill), so the route
+        // just renders results — no per-route view model or initial-query seeding.
         AppSearchRoute(
-            currentConfig = ctx.currentConfig,
-            filesDir = ctx.filesDir,
-            searchVault = ctx.searchVault,
-            maintainVaultSearchIndex = ctx.maintainVaultSearchIndex,
-            repairVaultSearchIndex = ctx.repairVaultSearchIndex,
-            navController = ctx.navController,
-            initialQuery = initialQuery
+            searchViewModel = ctx.searchViewModel,
+            navController = ctx.navController
         )
     }
 
