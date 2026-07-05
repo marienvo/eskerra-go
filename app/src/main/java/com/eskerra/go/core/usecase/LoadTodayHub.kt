@@ -87,14 +87,23 @@ class LoadTodayHub(
      */
     internal fun stripLeadingH1(markdown: String): String {
         val lines = markdown.lines()
-        var inFence = false
+        var activeFenceMarker: String? = null
         for (i in lines.indices) {
             val trimmed = lines[i].trimStart()
-            if (trimmed.startsWith("```") || trimmed.startsWith("~~~")) {
-                inFence = !inFence
+            val fenceMarker = when {
+                trimmed.startsWith("```") -> "```"
+                trimmed.startsWith("~~~") -> "~~~"
+                else -> null
+            }
+            if (fenceMarker != null) {
+                if (activeFenceMarker == null) {
+                    activeFenceMarker = fenceMarker
+                } else if (activeFenceMarker == fenceMarker) {
+                    activeFenceMarker = null
+                }
                 continue
             }
-            if (inFence) {
+            if (activeFenceMarker != null) {
                 continue
             }
             if (trimmed.startsWith("# ")) {
