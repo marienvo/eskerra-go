@@ -1,7 +1,8 @@
-package com.eskerra.go.feature.settings
+package com.eskerra.go.feature.sync
 
 import com.eskerra.go.core.model.R2Jurisdiction
 
+/** State for the vault R2 + this-device fields on the merged Sync settings screen. */
 sealed interface VaultSettingsUiState {
     data object Loading : VaultSettingsUiState
 

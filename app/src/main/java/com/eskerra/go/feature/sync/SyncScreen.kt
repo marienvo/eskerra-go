@@ -93,7 +93,7 @@ fun SyncScreen(
                     onClick = onOpenSettings,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Remote sync settings")
+                    Text("Sync settings")
                 }
                 Button(
                     onClick = onRetry,

@@ -18,8 +18,8 @@ internal fun buildMenuEntries(syncChangeCount: Int?, remoteConfigured: Boolean):
         if (remoteConfigured) {
             add(MenuEntry(MENU_SYNC_NOW, syncNowLabel(syncChangeCount)))
         }
-        add(MenuEntry(MENU_SYNC_SETTINGS, "Sync settings"))
-        add(MenuEntry(MENU_SETTINGS, "Settings"))
+        add(MenuEntry(MENU_SYNC_SETTINGS, "Sync"))
+        add(MenuEntry(MENU_SETTINGS, "Sync settings"))
     }
 
 private fun syncNowLabel(changeCount: Int?): String = when {

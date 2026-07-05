@@ -12,6 +12,9 @@ object VaultLayout {
     const val LEGACY_SETTINGS_FILE = "settings.json"
     const val PLAYLIST_FILE = "playlist.json"
 
+    /** R2 object-key prefix whose root mirrors the vault root (device-only binaries). */
+    const val BINARIES_PREFIX = "binaries/"
+
     const val SHARED_SETTINGS_PATH = "$ESKERRA_DIR/$SHARED_SETTINGS_FILE"
     const val LEGACY_SETTINGS_PATH = "$ESKERRA_DIR/$LEGACY_SETTINGS_FILE"
     const val PLAYLIST_PATH = "$ESKERRA_DIR/$PLAYLIST_FILE"

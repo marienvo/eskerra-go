@@ -23,6 +23,7 @@ import com.eskerra.go.core.usecase.ClearPodcastPlaybackSnapshot
 import com.eskerra.go.core.usecase.ClearRemoteSyncSettings
 import com.eskerra.go.core.usecase.DeleteInboxNotes
 import com.eskerra.go.core.usecase.EnsureDeviceInstanceId
+import com.eskerra.go.core.usecase.LoadDownloadedBinaries
 import com.eskerra.go.core.usecase.LoadEditableNote
 import com.eskerra.go.core.usecase.LoadGitStatusSummary
 import com.eskerra.go.core.usecase.LoadInboxSummariesCached
@@ -45,6 +46,7 @@ import com.eskerra.go.core.usecase.SaveNote
 import com.eskerra.go.core.usecase.SaveRemoteSyncSettings
 import com.eskerra.go.core.usecase.SaveVaultSettings
 import com.eskerra.go.core.usecase.SearchVault
+import com.eskerra.go.core.usecase.SyncBinaries
 import com.eskerra.go.core.usecase.SyncPodcastVaultRefresh
 import com.eskerra.go.core.usecase.TestRemoteConnection
 import com.eskerra.go.core.usecase.TouchVaultSearchPaths
@@ -53,7 +55,6 @@ import com.eskerra.go.feature.inbox.InboxUiState
 import com.eskerra.go.feature.note.NoteReaderUiState
 import com.eskerra.go.feature.note.NoteScreen
 import com.eskerra.go.feature.podcasts.PlaylistR2PollingHost
-import com.eskerra.go.feature.settings.VaultSettingsScreen
 import com.eskerra.go.feature.sync.SyncScreen
 import com.eskerra.go.feature.sync.SyncSettingsScreen
 import com.eskerra.go.feature.sync.SyncUiState
@@ -94,6 +95,8 @@ internal data class AppNavGraphContext(
     val loadLocalSettings: LoadLocalSettings,
     val saveLocalSettings: SaveLocalSettings,
     val ensureDeviceInstanceId: EnsureDeviceInstanceId,
+    val syncBinaries: SyncBinaries,
+    val loadDownloadedBinaries: LoadDownloadedBinaries,
     val searchVault: SearchVault,
     val maintainVaultSearchIndex: MaintainVaultSearchIndex,
     val repairVaultSearchIndex: RepairVaultSearchIndex,
@@ -193,32 +196,6 @@ internal fun NavGraphBuilder.sharedDestinations(ctx: AppNavGraphContext) {
         )
     }
 
-    opaqueComposable(AppRoute.SETTINGS) {
-        val vaultSettingsViewModel: VaultSettingsViewModel = viewModel(
-            factory = VaultSettingsViewModel.factory(
-                config = ctx.currentConfig,
-                filesDir = ctx.filesDir,
-                loadVaultSettings = ctx.loadVaultSettings,
-                saveVaultSettings = ctx.saveVaultSettings,
-                loadLocalSettings = ctx.loadLocalSettings,
-                saveLocalSettings = ctx.saveLocalSettings,
-                ensureDeviceInstanceId = ctx.ensureDeviceInstanceId
-            )
-        )
-        val vaultSettingsState by vaultSettingsViewModel.uiState.collectAsState()
-        VaultSettingsScreen(
-            state = vaultSettingsState,
-            onR2EndpointChange = vaultSettingsViewModel::onR2EndpointChange,
-            onR2JurisdictionChange = vaultSettingsViewModel::onR2JurisdictionChange,
-            onR2BucketChange = vaultSettingsViewModel::onR2BucketChange,
-            onR2AccessKeyIdChange = vaultSettingsViewModel::onR2AccessKeyIdChange,
-            onR2SecretAccessKeyChange = vaultSettingsViewModel::onR2SecretAccessKeyChange,
-            onDisplayNameChange = vaultSettingsViewModel::onDisplayNameChange,
-            onDeviceNameChange = vaultSettingsViewModel::onDeviceNameChange,
-            onSave = vaultSettingsViewModel::save
-        )
-    }
-
     opaqueComposable(AppRoute.SYNC_SETTINGS) {
         val settingsViewModel: SyncSettingsViewModel = viewModel(
             key = ctx.currentConfig.syncViewModelKey(),
@@ -234,16 +211,48 @@ internal fun NavGraphBuilder.sharedDestinations(ctx: AppNavGraphContext) {
                 }
             )
         )
+        val vaultSettingsViewModel: VaultSettingsViewModel = viewModel(
+            factory = VaultSettingsViewModel.factory(
+                config = ctx.currentConfig,
+                filesDir = ctx.filesDir,
+                loadVaultSettings = ctx.loadVaultSettings,
+                saveVaultSettings = ctx.saveVaultSettings,
+                loadLocalSettings = ctx.loadLocalSettings,
+                saveLocalSettings = ctx.saveLocalSettings,
+                ensureDeviceInstanceId = ctx.ensureDeviceInstanceId
+            )
+        )
+        val binariesViewModel: BinariesViewModel = viewModel(
+            factory = BinariesViewModel.factory(
+                config = ctx.currentConfig,
+                filesDir = ctx.filesDir,
+                syncBinaries = ctx.syncBinaries,
+                loadDownloadedBinaries = ctx.loadDownloadedBinaries
+            )
+        )
         val settingsState by settingsViewModel.uiState.collectAsState()
+        val vaultSettingsState by vaultSettingsViewModel.uiState.collectAsState()
+        val binariesState by binariesViewModel.uiState.collectAsState()
 
         SyncSettingsScreen(
-            state = settingsState,
+            remoteState = settingsState,
             onRemoteUriChange = settingsViewModel::onRemoteUriChange,
             onBranchChange = settingsViewModel::onBranchChange,
             onReplacementTokenChange = settingsViewModel::onReplacementTokenChange,
-            onSave = settingsViewModel::saveSettings,
+            onSaveRemote = settingsViewModel::saveSettings,
             onTestConnection = settingsViewModel::testConnection,
-            onClear = settingsViewModel::clearSettings
+            onClearRemote = settingsViewModel::clearSettings,
+            vaultState = vaultSettingsState,
+            onR2EndpointChange = vaultSettingsViewModel::onR2EndpointChange,
+            onR2JurisdictionChange = vaultSettingsViewModel::onR2JurisdictionChange,
+            onR2BucketChange = vaultSettingsViewModel::onR2BucketChange,
+            onR2AccessKeyIdChange = vaultSettingsViewModel::onR2AccessKeyIdChange,
+            onR2SecretAccessKeyChange = vaultSettingsViewModel::onR2SecretAccessKeyChange,
+            onDisplayNameChange = vaultSettingsViewModel::onDisplayNameChange,
+            onDeviceNameChange = vaultSettingsViewModel::onDeviceNameChange,
+            onSaveVault = vaultSettingsViewModel::save,
+            binariesState = binariesState,
+            onSyncBinaries = binariesViewModel::syncNow
         )
     }
 

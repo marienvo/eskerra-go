@@ -12,7 +12,7 @@ import com.eskerra.go.core.usecase.SaveLocalSettings
 import com.eskerra.go.core.usecase.SaveVaultSettings
 import com.eskerra.go.core.vault.buildEskerraSettingsFromForm
 import com.eskerra.go.data.workspace.WorkspacePaths
-import com.eskerra.go.feature.settings.VaultSettingsUiState
+import com.eskerra.go.feature.sync.VaultSettingsUiState
 import java.io.File
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

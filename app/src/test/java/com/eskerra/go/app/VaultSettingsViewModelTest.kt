@@ -12,7 +12,7 @@ import com.eskerra.go.core.usecase.LoadLocalSettings
 import com.eskerra.go.core.usecase.LoadVaultSettings
 import com.eskerra.go.core.usecase.SaveLocalSettings
 import com.eskerra.go.core.usecase.SaveVaultSettings
-import com.eskerra.go.feature.settings.VaultSettingsUiState
+import com.eskerra.go.feature.sync.VaultSettingsUiState
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
