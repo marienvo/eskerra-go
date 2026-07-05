@@ -18,6 +18,8 @@ import com.mikepenz.markdown.compose.Markdown
 import com.mikepenz.markdown.model.MarkdownColors
 import com.mikepenz.markdown.model.MarkdownTypography
 import com.mikepenz.markdown.model.State
+import com.mikepenz.markdown.model.markdownAnnotator
+import com.mikepenz.markdown.model.markdownAnnotatorConfig
 import java.io.File
 
 /**
@@ -35,7 +37,8 @@ fun CalloutCard(
     typography: MarkdownTypography,
     modifier: Modifier = Modifier,
     workspaceRoot: File? = null,
-    sourceNoteId: NoteId? = null
+    sourceNoteId: NoteId? = null,
+    preserveLineBreaks: Boolean = false
 ) {
     val accent = VaultMarkdownTokens.calloutAccent(resolved.color)
     Box(
@@ -58,6 +61,9 @@ fun CalloutCard(
                     body,
                     colors = colors,
                     typography = typography,
+                    annotator = markdownAnnotator(
+                        config = markdownAnnotatorConfig(eolAsNewLine = preserveLineBreaks)
+                    ),
                     components = vaultMarkdownComponents(workspaceRoot, sourceNoteId),
                     modifier = Modifier.fillMaxWidth()
                 )

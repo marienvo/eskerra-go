@@ -12,6 +12,7 @@ import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NoteRegistry
 import com.mikepenz.markdown.model.MarkdownAnnotator
 import com.mikepenz.markdown.model.markdownAnnotator
+import com.mikepenz.markdown.model.markdownAnnotatorConfig
 import java.time.LocalDateTime
 import org.intellij.markdown.MarkdownElementTypes
 import org.intellij.markdown.MarkdownTokenTypes
@@ -29,7 +30,8 @@ object VaultMarkdownAnnotator {
         status: VaultReadonlyLink.IndexStatus,
         now: LocalDateTime,
         onLinkTap: (String) -> Unit,
-        sourceNoteId: NoteId? = null
+        sourceNoteId: NoteId? = null,
+        preserveLineBreaks: Boolean = false
     ): MarkdownAnnotator = markdownAnnotator(
         annotate = { content, node ->
             when (node.type) {
@@ -39,7 +41,8 @@ object VaultMarkdownAnnotator {
                     appendTextWithPills(this, textOf(content, node), now)
                 else -> false
             }
-        }
+        },
+        config = markdownAnnotatorConfig(eolAsNewLine = preserveLineBreaks)
     )
 
     private fun textOf(content: String, node: ASTNode): String =

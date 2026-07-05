@@ -322,6 +322,7 @@ private fun HubColumn(
                 onAmbiguousWikiLink = onAmbiguousWikiLink,
                 workspaceRoot = workspaceRoot,
                 sourceNoteId = rowNoteId,
+                preserveLineBreaks = true,
                 onNoteNotFound = onNoteNotFound,
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
             )
