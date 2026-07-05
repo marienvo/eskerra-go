@@ -117,6 +117,26 @@ class LoadTodayHubTest {
     }
 
     @Test
+    fun stripLeadingH1_ignoresHeadingInsideTildeFence() {
+        val useCase = LoadTodayHub(
+            NoteRegistryCache(FakeNoteRegistryRepository()),
+            FakeNoteContentRepository()
+        )
+        val markdown = """
+            ~~~
+            # Example
+            ~~~
+
+            Body text.
+        """.trimIndent()
+
+        val stripped = useCase.stripLeadingH1(markdown)
+
+        assertTrue(stripped.contains("# Example"))
+        assertTrue(stripped.contains("Body text."))
+    }
+
+    @Test
     fun stripLeadingH1_removesLeadingTitleBeforeBody() {
         val useCase = LoadTodayHub(
             NoteRegistryCache(FakeNoteRegistryRepository()),

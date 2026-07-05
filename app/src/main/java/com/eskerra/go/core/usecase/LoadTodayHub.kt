@@ -90,7 +90,7 @@ class LoadTodayHub(
         var inFence = false
         for (i in lines.indices) {
             val trimmed = lines[i].trimStart()
-            if (trimmed.startsWith("```")) {
+            if (trimmed.startsWith("```") || trimmed.startsWith("~~~")) {
                 inFence = !inFence
                 continue
             }
