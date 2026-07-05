@@ -45,6 +45,13 @@ class SearchViewModel(
         scheduleSearch()
     }
 
+    /** Seeds the shared query from a navigation route argument when it differs from the pill state. */
+    fun applyRouteQuery(query: String) {
+        if (_query.value != query) {
+            onQueryChange(query)
+        }
+    }
+
     fun warmIndex() {
         viewModelScope.launch {
             _uiState.value = if (_query.value.isBlank()) {

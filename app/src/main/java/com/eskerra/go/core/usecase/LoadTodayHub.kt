@@ -87,15 +87,31 @@ class LoadTodayHub(
      */
     internal fun stripLeadingH1(markdown: String): String {
         val lines = markdown.lines()
-        val idx = lines.indexOfFirst { it.trimStart().startsWith("# ") }
-        if (idx == -1 || lines.take(idx).any { it.isNotBlank() }) {
-            return markdown
+        var inFence = false
+        for (i in lines.indices) {
+            val trimmed = lines[i].trimStart()
+            if (trimmed.startsWith("```")) {
+                inFence = !inFence
+                continue
+            }
+            if (inFence) {
+                continue
+            }
+            if (trimmed.startsWith("# ")) {
+                if (lines.take(i).any { it.isNotBlank() }) {
+                    return markdown
+                }
+                val remaining = lines.toMutableList().apply { removeAt(i) }
+                if (i < remaining.size && remaining[i].isBlank()) {
+                    remaining.removeAt(i)
+                }
+                return remaining.joinToString("\n").trimStart('\n')
+            }
+            if (trimmed.isNotEmpty()) {
+                return markdown
+            }
         }
-        val remaining = lines.toMutableList().apply { removeAt(idx) }
-        if (idx < remaining.size && remaining[idx].isBlank()) {
-            remaining.removeAt(idx)
-        }
-        return remaining.joinToString("\n").trimStart('\n')
+        return markdown
     }
 
     private fun registryFailure(cause: Throwable?): NoteContentException {

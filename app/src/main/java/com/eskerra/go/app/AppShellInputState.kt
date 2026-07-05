@@ -62,14 +62,18 @@ internal fun rememberAppShellInputState(
         onSearchModeChange = { enabled ->
             searchMode = enabled
             if (enabled) {
-                navController.navigate(AppRoute.SEARCH) { launchSingleTop = true }
+                navController.navigate(
+                    if (searchQuery.isNotBlank()) AppRoute.search(searchQuery) else AppRoute.SEARCH
+                ) { launchSingleTop = true }
             } else if (currentRoute == AppRoute.SEARCH_PATTERN) {
                 navController.popBackStack()
             }
         },
         onSearchQueryChange = searchViewModel::onQueryChange,
         onSearchSubmit = {
-            navController.navigate(AppRoute.SEARCH) { launchSingleTop = true }
+            navController.navigate(
+                if (searchQuery.isNotBlank()) AppRoute.search(searchQuery) else AppRoute.SEARCH
+            ) { launchSingleTop = true }
         }
     )
     return AppShellInputState(presentation, searchViewModel)

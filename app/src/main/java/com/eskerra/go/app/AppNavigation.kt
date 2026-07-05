@@ -118,22 +118,32 @@ private fun NavHostController.navigateTopLevel(targetRoute: String) = navigate(t
  * conflicts/errors can be resolved. Never gated on pending work — a clean repo still syncs to pull
  * remote changes we may not know about yet.
  */
+internal enum class MenuSyncAction {
+    SyncNow,
+    OpenSyncScreen,
+    RefreshLocalStatus,
+    NoOp
+}
+
+internal fun menuSyncAction(syncState: SyncUiState): MenuSyncAction = when (syncState) {
+    is SyncUiState.Ready ->
+        if (syncState.preflight.canSync) MenuSyncAction.SyncNow else MenuSyncAction.OpenSyncScreen
+    SyncUiState.Loading,
+    is SyncUiState.Syncing -> MenuSyncAction.NoOp
+    is SyncUiState.Success -> MenuSyncAction.RefreshLocalStatus
+    is SyncUiState.Error -> MenuSyncAction.OpenSyncScreen
+}
+
 internal fun onMenuSyncClick(
     syncState: SyncUiState,
     appSyncViewModel: AppSyncViewModel,
     navController: NavHostController
 ) {
-    when (syncState) {
-        is SyncUiState.Ready ->
-            if (syncState.preflight.canSync) {
-                appSyncViewModel.syncNow()
-            } else {
-                navController.openSyncScreen()
-            }
-        SyncUiState.Loading,
-        is SyncUiState.Success -> appSyncViewModel.syncNow()
-        is SyncUiState.Syncing -> Unit
-        is SyncUiState.Error -> navController.openSyncScreen()
+    when (menuSyncAction(syncState)) {
+        MenuSyncAction.SyncNow -> appSyncViewModel.syncNow()
+        MenuSyncAction.OpenSyncScreen -> navController.openSyncScreen()
+        MenuSyncAction.RefreshLocalStatus -> appSyncViewModel.refreshLocalStatus()
+        MenuSyncAction.NoOp -> Unit
     }
 }
 

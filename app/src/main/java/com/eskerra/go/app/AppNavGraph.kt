@@ -175,12 +175,12 @@ internal fun NavGraphBuilder.sharedDestinations(ctx: AppNavGraphContext) {
                 defaultValue = ""
             }
         )
-    ) {
-        // The query lives in the shared search view model (driven by the bottom pill), so the route
-        // just renders results — no per-route view model or initial-query seeding.
+    ) { entry ->
+        // Seed the shared view model when the route carries a pre-filled query (deep links, back stack).
         AppSearchRoute(
             searchViewModel = ctx.searchViewModel,
-            navController = ctx.navController
+            navController = ctx.navController,
+            entry = entry
         )
     }
 

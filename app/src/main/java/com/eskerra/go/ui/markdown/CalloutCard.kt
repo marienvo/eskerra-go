@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.dp
 import com.eskerra.go.core.markdown.CalloutHeader
 import com.eskerra.go.core.model.NoteId
 import com.mikepenz.markdown.compose.Markdown
+import com.mikepenz.markdown.model.MarkdownAnnotator
 import com.mikepenz.markdown.model.MarkdownColors
 import com.mikepenz.markdown.model.MarkdownTypography
 import com.mikepenz.markdown.model.State
@@ -38,6 +39,7 @@ fun CalloutCard(
     modifier: Modifier = Modifier,
     workspaceRoot: File? = null,
     sourceNoteId: NoteId? = null,
+    annotator: MarkdownAnnotator? = null,
     preserveLineBreaks: Boolean = false
 ) {
     val accent = VaultMarkdownTokens.calloutAccent(resolved.color)
@@ -61,7 +63,7 @@ fun CalloutCard(
                     body,
                     colors = colors,
                     typography = typography,
-                    annotator = markdownAnnotator(
+                    annotator = annotator ?: markdownAnnotator(
                         config = markdownAnnotatorConfig(eolAsNewLine = preserveLineBreaks)
                     ),
                     components = vaultMarkdownComponents(workspaceRoot, sourceNoteId),

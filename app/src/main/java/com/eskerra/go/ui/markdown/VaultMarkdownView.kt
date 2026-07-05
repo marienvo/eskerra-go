@@ -108,7 +108,7 @@ fun VaultMarkdownView(
                     typography = typography,
                     workspaceRoot = workspaceRoot,
                     sourceNoteId = sourceNoteId,
-                    preserveLineBreaks = preserveLineBreaks
+                    annotator = annotator
                 )
             }
         }

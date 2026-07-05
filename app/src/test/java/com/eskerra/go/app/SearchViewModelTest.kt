@@ -56,6 +56,39 @@ class SearchViewModelTest {
     }
 
     @Test
+    fun applyRouteQuery_seedsSearchWhenDifferent() = runTest(dispatcher) {
+        val repository = FakeVaultSearchRepository()
+        val viewModel = viewModel(repository)
+
+        viewModel.applyRouteQuery("vault term")
+        advanceTimeBy(400)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals("vault term", viewModel.query.value)
+        assertTrue(
+            viewModel.uiState.value is SearchUiState.Results ||
+                viewModel.uiState.value is SearchUiState.NoMatches
+        )
+    }
+
+    @Test
+    fun applyRouteQuery_isNoOpWhenQueryUnchanged() = runTest(dispatcher) {
+        val repository = FakeVaultSearchRepository()
+        val viewModel = viewModel(repository)
+
+        viewModel.onQueryChange("same")
+        advanceTimeBy(400)
+        dispatcher.scheduler.advanceUntilIdle()
+        val stateAfterFirstSearch = viewModel.uiState.value
+
+        viewModel.applyRouteQuery("same")
+        advanceTimeBy(400)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(stateAfterFirstSearch, viewModel.uiState.value)
+    }
+
+    @Test
     fun debouncesQueryBeforeSearching() = runTest(dispatcher) {
         val repository = FakeVaultSearchRepository()
         val viewModel = viewModel(repository)
