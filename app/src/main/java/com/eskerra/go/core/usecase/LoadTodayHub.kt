@@ -54,7 +54,11 @@ class LoadTodayHub(
         val markdown = contentResult.getOrThrow().markdown
 
         val settings = TodayHubFrontmatter.parse(markdown)
-        val introMarkdown = VaultMarkdownPreprocess.splitYamlFrontmatter(markdown).body
+        // The hub note's H1 already shows as the "Switch hub" title, so drop it from the intro body
+        // to keep a single H1 on the today-hub page (spec §11). Other notes render their H1 as usual.
+        val introMarkdown = stripLeadingH1(
+            VaultMarkdownPreprocess.splitYamlFrontmatter(markdown).body
+        )
         val availableWeekStems = TodayHubDiscovery.availableWeekStems(activeHubId.value, registry)
         // Label each hub by its note's H1 (the registry title), falling back to the folder name when
         // the hub has no heading, so the "Switch hub" title/picker read the hub's own title.
@@ -74,6 +78,24 @@ class LoadTodayHub(
                 registry = registry
             )
         )
+    }
+
+    /**
+     * Removes the leading level-1 heading (the note title) from [markdown], along with a single
+     * blank line left in its place. Only strips when nothing but blank lines precede the heading,
+     * so a body that opens with prose is left untouched.
+     */
+    internal fun stripLeadingH1(markdown: String): String {
+        val lines = markdown.lines()
+        val idx = lines.indexOfFirst { it.trimStart().startsWith("# ") }
+        if (idx == -1 || lines.take(idx).any { it.isNotBlank() }) {
+            return markdown
+        }
+        val remaining = lines.toMutableList().apply { removeAt(idx) }
+        if (idx < remaining.size && remaining[idx].isBlank()) {
+            remaining.removeAt(idx)
+        }
+        return remaining.joinToString("\n").trimStart('\n')
     }
 
     private fun registryFailure(cause: Throwable?): NoteContentException {

@@ -7,8 +7,6 @@ import com.eskerra.go.feature.menu.MenuEntry
 internal const val MENU_SYNC_NOW = "sync_now"
 internal const val MENU_SYNC_SETTINGS = "sync_settings"
 internal const val MENU_SETTINGS = "settings"
-internal const val MENU_WORKSPACES = "workspaces"
-internal const val MENU_ABOUT = "about"
 
 /**
  * Builds the hamburger menu. The "Sync …" trigger only appears when a remote is configured; its
@@ -22,8 +20,6 @@ internal fun buildMenuEntries(syncChangeCount: Int?, remoteConfigured: Boolean):
         }
         add(MenuEntry(MENU_SYNC_SETTINGS, "Sync settings"))
         add(MenuEntry(MENU_SETTINGS, "Settings"))
-        add(MenuEntry(MENU_WORKSPACES, "Workspaces"))
-        add(MenuEntry(MENU_ABOUT, "About"))
     }
 
 private fun syncNowLabel(changeCount: Int?): String = when {
