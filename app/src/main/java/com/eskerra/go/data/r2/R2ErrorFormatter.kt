@@ -32,10 +32,11 @@ object R2ErrorFormatter {
 
     private val codePattern = Regex("<Code>(.*?)</Code>", RegexOption.DOT_MATCHES_ALL)
 
-    fun format(verb: R2Verb, status: Int, body: String): String {
+    fun format(verb: R2Verb, status: Int, body: String, subject: String = "playlist.json"): String {
         val code = extractCode(body)
         val base = buildString {
-            append("R2 ").append(verb.label).append(" playlist.json failed: HTTP ").append(status)
+            append("R2 ").append(verb.label).append(' ').append(subject)
+                .append(" failed: HTTP ").append(status)
             if (code != null) append(" (").append(code).append(')')
         }
         return if (code == "AccessDenied") "$base. ${verb.accessDeniedHint()}" else base

@@ -28,6 +28,7 @@ import com.eskerra.go.core.usecase.ClearRemoteSyncSettings
 import com.eskerra.go.core.usecase.CreateInboxNote
 import com.eskerra.go.core.usecase.DeleteInboxNotes
 import com.eskerra.go.core.usecase.EnsureDeviceInstanceId
+import com.eskerra.go.core.usecase.LoadDownloadedBinaries
 import com.eskerra.go.core.usecase.LoadEditableNote
 import com.eskerra.go.core.usecase.LoadGitStatusSummary
 import com.eskerra.go.core.usecase.LoadInboxSummariesCached
@@ -53,6 +54,7 @@ import com.eskerra.go.core.usecase.SaveNote
 import com.eskerra.go.core.usecase.SaveRemoteSyncSettings
 import com.eskerra.go.core.usecase.SaveVaultSettings
 import com.eskerra.go.core.usecase.SearchVault
+import com.eskerra.go.core.usecase.SyncBinaries
 import com.eskerra.go.core.usecase.SyncPodcastVaultRefresh
 import com.eskerra.go.core.usecase.TestRemoteConnection
 import com.eskerra.go.core.usecase.TouchVaultSearchPaths
@@ -107,6 +109,8 @@ fun AppRoot(
     loadLocalSettings: LoadLocalSettings,
     saveLocalSettings: SaveLocalSettings,
     ensureDeviceInstanceId: EnsureDeviceInstanceId,
+    syncBinaries: SyncBinaries,
+    loadDownloadedBinaries: LoadDownloadedBinaries,
     searchVault: SearchVault,
     maintainVaultSearchIndex: MaintainVaultSearchIndex,
     repairVaultSearchIndex: RepairVaultSearchIndex,
@@ -218,6 +222,8 @@ fun AppRoot(
                         loadLocalSettings = loadLocalSettings,
                         saveLocalSettings = saveLocalSettings,
                         ensureDeviceInstanceId = ensureDeviceInstanceId,
+                        syncBinaries = syncBinaries,
+                        loadDownloadedBinaries = loadDownloadedBinaries,
                         searchVault = searchVault,
                         maintainVaultSearchIndex = maintainVaultSearchIndex,
                         repairVaultSearchIndex = repairVaultSearchIndex,

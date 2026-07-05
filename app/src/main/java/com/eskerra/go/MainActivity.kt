@@ -26,6 +26,7 @@ import com.eskerra.go.core.usecase.ClearRemoteSyncSettings
 import com.eskerra.go.core.usecase.CreateInboxNote
 import com.eskerra.go.core.usecase.DeleteInboxNotes
 import com.eskerra.go.core.usecase.EnsureDeviceInstanceId
+import com.eskerra.go.core.usecase.LoadDownloadedBinaries
 import com.eskerra.go.core.usecase.LoadEditableNote
 import com.eskerra.go.core.usecase.LoadGitStatusSummary
 import com.eskerra.go.core.usecase.LoadInboxSummaries
@@ -57,6 +58,7 @@ import com.eskerra.go.core.usecase.SaveNote
 import com.eskerra.go.core.usecase.SaveRemoteSyncSettings
 import com.eskerra.go.core.usecase.SaveVaultSettings
 import com.eskerra.go.core.usecase.SearchVault
+import com.eskerra.go.core.usecase.SyncBinaries
 import com.eskerra.go.core.usecase.SyncPodcastChange
 import com.eskerra.go.core.usecase.SyncPodcastChangesViaVaultSync
 import com.eskerra.go.core.usecase.SyncPodcastVaultRefresh
@@ -85,7 +87,10 @@ import com.eskerra.go.data.podcast.FilePodcastFileRepository
 import com.eskerra.go.data.podcast.artwork.FilePodcastArtworkRepository
 import com.eskerra.go.data.podcast.rss.FilePodcastRssVaultSync
 import com.eskerra.go.data.podcast.rss.OkHttpRssFeedFetcher
+import com.eskerra.go.data.r2.BinaryManifestStore
+import com.eskerra.go.data.r2.DefaultBinarySyncRepository
 import com.eskerra.go.data.r2.PlaylistR2ConditionalFetch
+import com.eskerra.go.data.r2.R2BinaryObjectClient
 import com.eskerra.go.data.r2.R2PlaylistConditionalClient
 import com.eskerra.go.data.r2.R2PlaylistObjectClient
 import com.eskerra.go.data.r2.R2PlaylistSyncRepository
@@ -279,6 +284,12 @@ class MainActivity : ComponentActivity() {
 
         val r2HttpClient = okHttpClient
         val r2PlaylistObjectClient = R2PlaylistObjectClient(r2HttpClient)
+        val binarySyncRepository = DefaultBinarySyncRepository(
+            objectClient = R2BinaryObjectClient(r2HttpClient),
+            manifestStore = BinaryManifestStore(filesDir)
+        )
+        val syncBinaries = SyncBinaries(binarySyncRepository, loadVaultSettings)
+        val loadDownloadedBinaries = LoadDownloadedBinaries(binarySyncRepository)
         val playlistSyncRepository = R2PlaylistSyncRepository(
             settingsRepository = vaultSettingsRepository,
             localSettingsStore = localSettingsStore,
@@ -357,6 +368,8 @@ class MainActivity : ComponentActivity() {
                 loadLocalSettings = loadLocalSettings,
                 saveLocalSettings = saveLocalSettings,
                 ensureDeviceInstanceId = ensureDeviceInstanceId,
+                syncBinaries = syncBinaries,
+                loadDownloadedBinaries = loadDownloadedBinaries,
                 searchVault = searchVault,
                 maintainVaultSearchIndex = maintainVaultSearchIndex,
                 repairVaultSearchIndex = repairVaultSearchIndex,
