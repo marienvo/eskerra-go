@@ -4,24 +4,51 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.dp
+
+/** Resting height of the compact single-line pill; its 50% radius drives [PillCorner]. */
+private val SingleLineHeight = 56.dp
+
+/** Absolute corner radius: 50% of [SingleLineHeight]. Kept fixed so the shape stays identical
+ *  once the input grows into multi-line mode (a taller card with the same rounded corners). */
+private val PillCorner = 28.dp
+
+private val ControlSize = 40.dp
+private val ControlSpacing = 8.dp
+private val HorizontalInset = 12.dp
+private val FieldMaxHeight = 180.dp
 
 @Composable
 fun ShellNewNoteInput(
@@ -31,55 +58,163 @@ fun ShellNewNoteInput(
     errorMessage: String?,
     onDraftChange: (String) -> Unit,
     onSave: () -> Unit,
+    onSearch: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var isMultiline by remember { mutableStateOf(false) }
+    var searchMode by remember { mutableStateOf(false) }
+
+    // Horizontal space the toggle + action button (and the gaps around them) claim from the field
+    // in single-line mode. In multi-line mode the field is full width, so this is exactly how much
+    // narrower the field becomes when collapsing back — used to keep the mode switch stable.
+    val reservedPx = with(LocalDensity.current) { (ControlSize * 2 + ControlSpacing * 2).toPx() }
+    val onTextLayout: (TextLayoutResult) -> Unit = { result ->
+        isMultiline = when {
+            result.lineCount > 1 -> true
+            // Currently single-line and still one line at the narrow width: stay single-line.
+            !isMultiline -> false
+            // Currently multi-line and now one line at full width: collapse only if the text also
+            // fits the narrower single-line row. getLineRight(0) is the intrinsic text width, so
+            // this comparison is stable and does not oscillate at the wrap boundary.
+            else -> result.getLineRight(0) + reservedPx > result.size.width
+        }
+    }
+
+    val placeholder = if (searchMode) "Search in vault..." else "Write a new inbox note..."
+    val actionEnabled = if (searchMode) draft.isNotBlank() else (canSave && !isSaving)
+    val onAction: () -> Unit = { if (searchMode) onSearch(draft) else onSave() }
+
     Surface(
         modifier = modifier
             .fillMaxWidth()
             .imePadding(),
+        shape = RoundedCornerShape(PillCorner),
         tonalElevation = 3.dp,
         shadowElevation = 8.dp
     ) {
-        Column(
-            modifier = Modifier.padding(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 12.dp)
-        ) {
-            GrowingNewNoteField(
-                value = draft,
-                onValueChange = onDraftChange,
-                readOnly = isSaving,
-                modifier = Modifier.fillMaxWidth()
-            )
+        Column {
+            if (isMultiline) {
+                Column(modifier = Modifier.padding(horizontal = HorizontalInset, vertical = 12.dp)) {
+                    NewNoteField(
+                        value = draft,
+                        onValueChange = onDraftChange,
+                        readOnly = isSaving,
+                        placeholder = placeholder,
+                        onTextLayout = onTextLayout,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        SearchModeToggle(searchMode = searchMode, onToggle = { searchMode = it })
+                        Spacer(modifier = Modifier.weight(1f))
+                        ShellNewNoteActionButton(
+                            searchMode = searchMode,
+                            isSaving = isSaving,
+                            enabled = actionEnabled,
+                            onClick = onAction
+                        )
+                    }
+                }
+            } else {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = SingleLineHeight)
+                        .padding(horizontal = HorizontalInset),
+                    horizontalArrangement = Arrangement.spacedBy(ControlSpacing),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    SearchModeToggle(searchMode = searchMode, onToggle = { searchMode = it })
+                    NewNoteField(
+                        value = draft,
+                        onValueChange = onDraftChange,
+                        readOnly = isSaving,
+                        placeholder = placeholder,
+                        onTextLayout = onTextLayout,
+                        modifier = Modifier.weight(1f)
+                    )
+                    ShellNewNoteActionButton(
+                        searchMode = searchMode,
+                        isSaving = isSaving,
+                        enabled = actionEnabled,
+                        onClick = onAction
+                    )
+                }
+            }
             errorMessage?.let {
                 Text(
                     text = it,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(top = 8.dp)
+                    modifier = Modifier.padding(start = HorizontalInset + 8.dp, end = HorizontalInset, bottom = 8.dp)
                 )
-            }
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp),
-                horizontalArrangement = Arrangement.End
-            ) {
-                Button(
-                    onClick = onSave,
-                    enabled = canSave && !isSaving,
-                    modifier = Modifier.widthIn(min = 96.dp)
-                ) {
-                    Text(if (isSaving) "Saving..." else "Save")
-                }
             }
         }
     }
 }
 
 @Composable
-private fun GrowingNewNoteField(
+private fun SearchModeToggle(
+    searchMode: Boolean,
+    onToggle: (Boolean) -> Unit
+) {
+    IconToggleButton(
+        checked = searchMode,
+        onCheckedChange = onToggle,
+        modifier = Modifier.size(ControlSize)
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Search,
+            contentDescription = if (searchMode) "Switch to note mode" else "Switch to search mode",
+            tint = if (searchMode) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            }
+        )
+    }
+}
+
+@Composable
+private fun ShellNewNoteActionButton(
+    searchMode: Boolean,
+    isSaving: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    FilledIconButton(
+        onClick = onClick,
+        enabled = enabled,
+        shape = CircleShape,
+        modifier = Modifier.size(ControlSize),
+        colors = IconButtonDefaults.filledIconButtonColors(
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary
+        )
+    ) {
+        when {
+            isSaving -> CircularProgressIndicator(
+                modifier = Modifier.size(20.dp),
+                strokeWidth = 2.dp,
+                color = MaterialTheme.colorScheme.onPrimary
+            )
+            searchMode -> Icon(Icons.Filled.Search, contentDescription = "Search")
+            else -> Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Save note")
+        }
+    }
+}
+
+@Composable
+private fun NewNoteField(
     value: String,
     onValueChange: (String) -> Unit,
     readOnly: Boolean,
+    placeholder: String,
+    onTextLayout: (TextLayoutResult) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
@@ -92,23 +227,23 @@ private fun GrowingNewNoteField(
         value = value,
         onValueChange = onValueChange,
         modifier = modifier
-            .heightIn(min = 48.dp, max = 180.dp)
+            .heightIn(max = FieldMaxHeight)
             .verticalScroll(scrollState),
         readOnly = readOnly,
-        minLines = 1,
         maxLines = Int.MAX_VALUE,
         textStyle = textStyle,
         cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+        onTextLayout = onTextLayout,
         decorationBox = { innerTextField ->
             Box(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 12.dp, vertical = 12.dp),
-                contentAlignment = Alignment.TopStart
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
+                contentAlignment = Alignment.CenterStart
             ) {
                 if (value.isEmpty()) {
                     Text(
-                        text = "Write a new inbox note...",
+                        text = placeholder,
                         style = textStyle,
                         color = placeholderColor
                     )

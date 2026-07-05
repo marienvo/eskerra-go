@@ -166,14 +166,27 @@ internal fun NavGraphBuilder.podcastsGraph(ctx: AppNavGraphContext) {
 }
 
 internal fun NavGraphBuilder.sharedDestinations(ctx: AppNavGraphContext) {
-    opaqueComposable(AppRoute.SEARCH) {
+    opaqueComposable(
+        route = AppRoute.SEARCH_PATTERN,
+        arguments = listOf(
+            navArgument(AppRoute.SEARCH_QUERY_ARG) {
+                type = NavType.StringType
+                defaultValue = ""
+            }
+        )
+    ) { entry ->
+        val initialQuery = entry.arguments
+            ?.getString(AppRoute.SEARCH_QUERY_ARG)
+            ?.let { AppRoute.decodeSearchQuery(it) }
+            .orEmpty()
         AppSearchRoute(
             currentConfig = ctx.currentConfig,
             filesDir = ctx.filesDir,
             searchVault = ctx.searchVault,
             maintainVaultSearchIndex = ctx.maintainVaultSearchIndex,
             repairVaultSearchIndex = ctx.repairVaultSearchIndex,
-            navController = ctx.navController
+            navController = ctx.navController,
+            initialQuery = initialQuery
         )
     }
 

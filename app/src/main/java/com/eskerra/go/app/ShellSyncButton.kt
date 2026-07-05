@@ -8,13 +8,11 @@ import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SmallFloatingActionButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -24,36 +22,23 @@ fun ShellSyncButton(
     modifier: Modifier = Modifier
 ) {
     val busy = state.isChecking || state.isSyncing
-    val containerColor = when {
-        busy -> MaterialTheme.colorScheme.surfaceContainerHigh
-        state.needsAttention -> MaterialTheme.colorScheme.errorContainer
-        else -> MaterialTheme.colorScheme.surfaceContainerHigh
-    }
-    val contentColor = when {
-        busy -> MaterialTheme.colorScheme.onSurfaceVariant
-        state.needsAttention -> MaterialTheme.colorScheme.onErrorContainer
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
-    }
+    val enabled = state.isEnabled && !busy
 
     BadgedBox(
-        modifier = modifier.alpha(if (state.isEnabled && !busy) 1f else 0.38f),
+        modifier = modifier,
         badge = {
             if (state.badgeText != null && !busy) {
                 Badge { Text(state.badgeText) }
             }
         }
     ) {
-        SmallFloatingActionButton(
-            onClick = { if (state.isEnabled && !busy) onClick() },
-            containerColor = containerColor,
-            contentColor = contentColor
-        ) {
+        ShellChromeButton(onClick = { if (enabled) onClick() }) {
             Box(contentAlignment = Alignment.Center) {
                 if (busy) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(20.dp),
                         strokeWidth = 2.dp,
-                        color = contentColor
+                        color = LocalContentColor.current
                     )
                 } else {
                     Icon(Icons.Filled.Sync, contentDescription = "Sync")

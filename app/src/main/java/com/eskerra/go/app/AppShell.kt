@@ -13,9 +13,7 @@ import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Podcasts
 import androidx.compose.material3.Icon
-import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
@@ -49,6 +47,7 @@ fun AppShell(
     newNoteErrorMessage: String? = null,
     onNewNoteDraftChange: (String) -> Unit = {},
     onNewNoteSave: () -> Unit = {},
+    onNewNoteSearch: (String) -> Unit = {},
     onSyncClick: () -> Unit,
     onMenuClick: () -> Unit,
     onNavigate: (route: String) -> Unit,
@@ -103,7 +102,7 @@ fun AppShell(
                         onClick = onSyncClick
                     )
                 }
-                SmallFloatingActionButton(onClick = onMenuClick) {
+                ShellChromeButton(onClick = onMenuClick) {
                     Icon(Icons.Filled.Menu, contentDescription = "Menu")
                 }
             }
@@ -116,6 +115,7 @@ fun AppShell(
                     errorMessage = newNoteErrorMessage,
                     onDraftChange = onNewNoteDraftChange,
                     onSave = onNewNoteSave,
+                    onSearch = onNewNoteSearch,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .navigationBarsPadding()
@@ -149,13 +149,13 @@ private fun TopLevelTabButton(
     } else {
         EskerraChromeTokens.HeaderInactive
     }
-    TextButton(onClick = onClick) {
+    ShellChromeButton(onClick = onClick, horizontalContentPadding = 14.dp) {
         Icon(
             imageVector = icon,
             contentDescription = null,
             tint = tint,
             modifier = Modifier
-                .padding(end = 4.dp)
+                .padding(end = 6.dp)
                 .size(20.dp)
         )
         Text(text = label, color = tint)

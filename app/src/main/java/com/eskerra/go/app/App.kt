@@ -252,6 +252,7 @@ fun App(
         newNoteErrorMessage = newNoteInputState.errorMessage,
         onNewNoteDraftChange = newNoteInputState.onDraftChange,
         onNewNoteSave = newNoteInputState.onSave,
+        onNewNoteSearch = { query -> navController.navigate(AppRoute.search(query)) },
         onSyncClick = { onShellSyncClick(syncState, appSyncViewModel, navController) },
         onMenuClick = { menuOpen = true },
         onNavigate = { route ->
