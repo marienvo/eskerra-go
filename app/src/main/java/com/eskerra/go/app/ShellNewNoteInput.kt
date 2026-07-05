@@ -92,51 +92,48 @@ fun ShellNewNoteInput(
         tonalElevation = 3.dp,
         shadowElevation = 8.dp
     ) {
-        Column {
-            if (isMultiline) {
-                Column(modifier = Modifier.padding(horizontal = HorizontalInset, vertical = 12.dp)) {
-                    NewNoteField(
-                        value = draft,
-                        onValueChange = onDraftChange,
-                        readOnly = isSaving,
-                        placeholder = placeholder,
-                        onTextLayout = onTextLayout,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        SearchModeToggle(searchMode = searchMode, onToggle = { searchMode = it })
-                        Spacer(modifier = Modifier.weight(1f))
-                        ShellNewNoteActionButton(
-                            searchMode = searchMode,
-                            isSaving = isSaving,
-                            enabled = actionEnabled,
-                            onClick = onAction
-                        )
-                    }
+        // The text field stays at one unconditional call site inside this persistent Row so its
+        // composition identity (and keyboard focus) survives the single-line <-> multi-line switch.
+        // Only the toggle and action button move: inline beside the field in single-line mode, or
+        // down into a separate action row in multi-line mode.
+        Column(modifier = Modifier.padding(vertical = if (isMultiline) 12.dp else 0.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(if (isMultiline) Modifier else Modifier.heightIn(min = SingleLineHeight))
+                    .padding(horizontal = HorizontalInset),
+                horizontalArrangement = Arrangement.spacedBy(ControlSpacing),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (!isMultiline) {
+                    SearchModeToggle(searchMode = searchMode, onToggle = { searchMode = it })
                 }
-            } else {
+                NewNoteField(
+                    value = draft,
+                    onValueChange = onDraftChange,
+                    readOnly = isSaving,
+                    placeholder = placeholder,
+                    onTextLayout = onTextLayout,
+                    modifier = Modifier.weight(1f)
+                )
+                if (!isMultiline) {
+                    ShellNewNoteActionButton(
+                        searchMode = searchMode,
+                        isSaving = isSaving,
+                        enabled = actionEnabled,
+                        onClick = onAction
+                    )
+                }
+            }
+            if (isMultiline) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(min = SingleLineHeight)
-                        .padding(horizontal = HorizontalInset),
-                    horizontalArrangement = Arrangement.spacedBy(ControlSpacing),
+                        .padding(horizontal = HorizontalInset, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     SearchModeToggle(searchMode = searchMode, onToggle = { searchMode = it })
-                    NewNoteField(
-                        value = draft,
-                        onValueChange = onDraftChange,
-                        readOnly = isSaving,
-                        placeholder = placeholder,
-                        onTextLayout = onTextLayout,
-                        modifier = Modifier.weight(1f)
-                    )
+                    Spacer(modifier = Modifier.weight(1f))
                     ShellNewNoteActionButton(
                         searchMode = searchMode,
                         isSaving = isSaving,
