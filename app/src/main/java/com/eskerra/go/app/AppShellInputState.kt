@@ -3,9 +3,6 @@ package com.eskerra.go.app
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.eskerra.go.core.model.WorkspaceConfig
@@ -53,19 +50,18 @@ internal fun rememberAppShellInputState(
         )
     )
     val searchQuery by searchViewModel.query.collectAsState()
-    var searchMode by rememberSaveable { mutableStateOf(false) }
+    val searchMode = AppRoute.isSearchRoute(currentRoute)
 
     val presentation = buildShellInputPresentation(
         searchMode = searchMode,
         searchQuery = searchQuery,
         newNoteInputState = newNoteInputState,
         onSearchModeChange = { enabled ->
-            searchMode = enabled
             if (enabled) {
                 navController.navigate(
                     if (searchQuery.isNotBlank()) AppRoute.search(searchQuery) else AppRoute.SEARCH
                 ) { launchSingleTop = true }
-            } else if (currentRoute == AppRoute.SEARCH_PATTERN) {
+            } else if (AppRoute.isSearchRoute(currentRoute)) {
                 navController.popBackStack()
             }
         },

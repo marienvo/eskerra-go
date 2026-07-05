@@ -10,7 +10,7 @@ internal fun shouldShowNewNoteInput(currentRoute: String?, shellMode: AppShellMo
     // match it explicitly alongside concrete note routes to keep the pill visible while reading. The
     // search route also shows the pill: in search mode it is the live search input for the results.
     return currentRoute == AppRoute.INBOX ||
-        currentRoute == AppRoute.SEARCH_PATTERN ||
+        AppRoute.isSearchRoute(currentRoute) ||
         currentRoute == AppRoute.NOTE_PATTERN ||
         AppRoute.isConcreteNoteRoute(currentRoute)
 }

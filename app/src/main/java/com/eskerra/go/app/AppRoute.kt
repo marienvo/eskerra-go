@@ -49,6 +49,17 @@ object AppRoute {
     /** Decodes the raw editor route argument back into a [NoteId]. */
     fun decodeEditorNoteId(raw: String): NoteId = NoteId(NoteRouteCodec.decode(raw))
 
+    /** Whether [route] is the vault search destination (graph pattern or concrete query route). */
+    internal fun isSearchRoute(route: String?): Boolean {
+        if (route == null) {
+            return false
+        }
+        if (route == SEARCH || route == SEARCH_PATTERN) {
+            return true
+        }
+        return route.startsWith("$SEARCH?$SEARCH_QUERY_ARG=")
+    }
+
     /** Whether [route] is a concrete note-reader destination (not the nav graph pattern). */
     internal fun isConcreteNoteRoute(route: String?): Boolean {
         if (route == null || route == NOTE_PATTERN) return false
