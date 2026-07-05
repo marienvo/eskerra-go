@@ -253,7 +253,6 @@ fun App(
         onNewNoteDraftChange = newNoteInputState.onDraftChange,
         onNewNoteSave = newNoteInputState.onSave,
         onNewNoteSearch = { query -> navController.navigate(AppRoute.search(query)) },
-        onSyncClick = { onShellSyncClick(syncState, appSyncViewModel, navController) },
         onMenuClick = { menuOpen = true },
         onNavigate = { route ->
             navController.navigateTab(
@@ -336,11 +335,12 @@ fun App(
 
     if (menuOpen) {
         AppMenuSheet(
+            items = buildMenuEntries(syncIndicator?.changeCount, remoteConfigured),
             onDismiss = { menuOpen = false },
-            onItemClick = { item ->
-                when (item) {
-                    MENU_SEARCH -> navController.navigate(AppRoute.SEARCH)
-                    MENU_SYNC -> navController.navigate(AppRoute.SYNC)
+            onItemClick = { id ->
+                when (id) {
+                    MENU_SYNC_NOW -> onMenuSyncClick(syncState, appSyncViewModel, navController)
+                    MENU_SYNC_SETTINGS -> navController.navigate(AppRoute.SYNC)
                     MENU_SETTINGS -> navController.navigate(AppRoute.SETTINGS)
                 }
             }

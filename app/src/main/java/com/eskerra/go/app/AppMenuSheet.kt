@@ -5,6 +5,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
+import com.eskerra.go.feature.menu.MenuEntry
 import com.eskerra.go.feature.menu.MenuScreen
 import kotlinx.coroutines.launch
 
@@ -15,7 +16,11 @@ import kotlinx.coroutines.launch
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun AppMenuSheet(onDismiss: () -> Unit, onItemClick: (String) -> Unit) {
+internal fun AppMenuSheet(
+    items: List<MenuEntry>,
+    onDismiss: () -> Unit,
+    onItemClick: (String) -> Unit
+) {
     val sheetState = rememberModalBottomSheetState()
     val scope = rememberCoroutineScope()
     ModalBottomSheet(
@@ -23,7 +28,7 @@ internal fun AppMenuSheet(onDismiss: () -> Unit, onItemClick: (String) -> Unit) 
         sheetState = sheetState
     ) {
         MenuScreen(
-            items = menuItems,
+            items = items,
             onItemClick = { item ->
                 scope.launch {
                     sheetState.hide()

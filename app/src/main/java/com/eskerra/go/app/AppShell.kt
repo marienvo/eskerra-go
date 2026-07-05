@@ -12,6 +12,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Podcasts
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -27,7 +29,7 @@ import com.eskerra.go.ui.theme.EskerraChromeTokens
  * - top and bottom edge scrims so content fades under the floating chrome
  * - top-left Notes and Podcasts tab buttons (icon + label)
  * - a bottom new-note input while reading the vault
- * - a top-right sync button (when remote is configured) and hamburger Menu button
+ * - a top-right hamburger Menu button carrying the sync count/attention badge
  *
  * The shell owns no app state. It reports navigation intents through [onNavigate], the menu overlay
  * through [onMenuClick], and renders the active screen edge-to-edge via [content]. Scrollable screens
@@ -48,7 +50,6 @@ fun AppShell(
     onNewNoteDraftChange: (String) -> Unit = {},
     onNewNoteSave: () -> Unit = {},
     onNewNoteSearch: (String) -> Unit = {},
-    onSyncClick: () -> Unit,
     onMenuClick: () -> Unit,
     onNavigate: (route: String) -> Unit,
     content: @Composable (contentModifier: Modifier) -> Unit
@@ -96,14 +97,17 @@ fun AppShell(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (syncIndicator != null) {
-                    ShellSyncButton(
-                        state = syncIndicator,
-                        onClick = onSyncClick
-                    )
-                }
-                ShellChromeButton(onClick = onMenuClick) {
-                    Icon(Icons.Filled.Menu, contentDescription = "Menu")
+                BadgedBox(
+                    badge = {
+                        val badgeText = syncIndicator?.badgeText
+                        if (badgeText != null) {
+                            Badge { Text(badgeText) }
+                        }
+                    }
+                ) {
+                    ShellChromeButton(onClick = onMenuClick) {
+                        Icon(Icons.Filled.Menu, contentDescription = "Menu")
+                    }
                 }
             }
 

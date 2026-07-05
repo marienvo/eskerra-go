@@ -1,10 +1,10 @@
 package com.eskerra.go.app
 
-/** Shell sync button presentation derived from app sync state. */
+/**
+ * Sync presentation derived from app sync state. [badgeText] drives the count/attention badge now
+ * shown on the hamburger; [changeCount] is the numeric pending count for the menu's sync entry.
+ */
 data class ShellSyncIndicatorState(
-    val needsAttention: Boolean,
-    val isEnabled: Boolean,
-    val isChecking: Boolean,
-    val isSyncing: Boolean,
-    val badgeText: String?
+    val badgeText: String?,
+    val changeCount: Int?
 )
