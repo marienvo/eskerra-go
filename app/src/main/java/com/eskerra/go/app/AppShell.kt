@@ -12,10 +12,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Podcasts
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
-import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
@@ -29,7 +29,7 @@ import com.eskerra.go.ui.theme.EskerraChromeTokens
  * - top and bottom edge scrims so content fades under the floating chrome
  * - top-left Notes and Podcasts tab buttons (icon + label)
  * - a bottom new-note input while reading the vault
- * - a top-right sync button (when remote is configured) and hamburger Menu button
+ * - a top-right hamburger Menu button carrying the sync count/attention badge
  *
  * The shell owns no app state. It reports navigation intents through [onNavigate], the menu overlay
  * through [onMenuClick], and renders the active screen edge-to-edge via [content]. Scrollable screens
@@ -42,21 +42,14 @@ fun AppShell(
     syncIndicator: ShellSyncIndicatorState?,
     miniPlayerVisible: Boolean = false,
     miniPlayer: (@Composable () -> Unit)? = null,
-    newNoteInputVisible: Boolean = false,
-    newNoteDraft: String = "",
-    newNoteCanSave: Boolean = false,
-    newNoteIsSaving: Boolean = false,
-    newNoteErrorMessage: String? = null,
-    onNewNoteDraftChange: (String) -> Unit = {},
-    onNewNoteSave: () -> Unit = {},
-    onSyncClick: () -> Unit,
+    shellInput: ShellInputPresentation? = null,
     onMenuClick: () -> Unit,
     onNavigate: (route: String) -> Unit,
     content: @Composable (contentModifier: Modifier) -> Unit
 ) {
     val chromeInsets = rememberShellChromeInsets(
         miniPlayerVisible = miniPlayerVisible,
-        newNoteInputVisible = newNoteInputVisible
+        newNoteInputVisible = shellInput?.visible == true
     )
 
     CompositionLocalProvider(LocalShellChromeInsets provides chromeInsets) {
@@ -71,7 +64,7 @@ fun AppShell(
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .statusBarsPadding()
-                    .padding(16.dp),
+                    .padding(start = 16.dp, end = 16.dp, top = 9.dp, bottom = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -93,33 +86,38 @@ fun AppShell(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .statusBarsPadding()
-                    .padding(16.dp),
+                    .padding(start = 16.dp, end = 16.dp, top = 9.dp, bottom = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (syncIndicator != null) {
-                    ShellSyncButton(
-                        state = syncIndicator,
-                        onClick = onSyncClick
-                    )
-                }
-                SmallFloatingActionButton(onClick = onMenuClick) {
-                    Icon(Icons.Filled.Menu, contentDescription = "Menu")
+                BadgedBox(
+                    badge = {
+                        val badgeText = syncIndicator?.badgeText
+                        if (badgeText != null) {
+                            Badge { Text(badgeText) }
+                        }
+                    }
+                ) {
+                    ShellChromeButton(onClick = onMenuClick) {
+                        Icon(Icons.Filled.Menu, contentDescription = "Menu")
+                    }
                 }
             }
 
-            if (newNoteInputVisible) {
+            if (shellInput?.visible == true) {
                 ShellNewNoteInput(
-                    draft = newNoteDraft,
-                    canSave = newNoteCanSave,
-                    isSaving = newNoteIsSaving,
-                    errorMessage = newNoteErrorMessage,
-                    onDraftChange = onNewNoteDraftChange,
-                    onSave = onNewNoteSave,
+                    searchMode = shellInput.searchMode,
+                    onSearchModeChange = shellInput.onSearchModeChange,
+                    value = shellInput.value,
+                    onValueChange = shellInput.onValueChange,
+                    onSubmit = shellInput.onSubmit,
+                    submitEnabled = shellInput.submitEnabled,
+                    isSaving = shellInput.isSaving,
+                    errorMessage = shellInput.errorMessage,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .navigationBarsPadding()
-                        .padding(16.dp)
+                        .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 11.dp)
                 )
             }
 
@@ -149,13 +147,13 @@ private fun TopLevelTabButton(
     } else {
         EskerraChromeTokens.HeaderInactive
     }
-    TextButton(onClick = onClick) {
+    ShellChromeButton(onClick = onClick, horizontalContentPadding = 14.dp) {
         Icon(
             imageVector = icon,
             contentDescription = null,
             tint = tint,
             modifier = Modifier
-                .padding(end = 4.dp)
+                .padding(end = 6.dp)
                 .size(20.dp)
         )
         Text(text = label, color = tint)

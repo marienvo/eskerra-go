@@ -79,7 +79,6 @@ class AppNavigationInstrumentedTest {
         AppShell(
             selectedTopLevelRoute = activeTopLevelRoute,
             syncIndicator = null,
-            onSyncClick = {},
             onMenuClick = {},
             onNavigate = { route ->
                 controller.navigateTab(

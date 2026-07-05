@@ -184,4 +184,15 @@ class AppNavigationTest {
         assertFalse(isInboxChildRoute(AppRoute.PODCASTS))
         assertFalse(isInboxChildRoute(null))
     }
+
+    // --- isSearchRoute ---------------------------------------------------------------------------
+
+    @Test
+    fun isSearchRoute_recognizesGraphPatternAndConcreteQueryRoutes() {
+        assertTrue(AppRoute.isSearchRoute(AppRoute.SEARCH_PATTERN))
+        assertTrue(AppRoute.isSearchRoute(AppRoute.SEARCH))
+        assertTrue(AppRoute.isSearchRoute(AppRoute.search("meeting notes")))
+        assertFalse(AppRoute.isSearchRoute(AppRoute.INBOX))
+        assertFalse(AppRoute.isSearchRoute(null))
+    }
 }

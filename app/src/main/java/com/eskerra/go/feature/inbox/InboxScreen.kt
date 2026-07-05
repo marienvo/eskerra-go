@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -36,11 +37,16 @@ import com.eskerra.go.core.datetime.RelativeCalendarLabel
 import com.eskerra.go.core.inbox.InboxTileColor
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NoteSummary
-import com.eskerra.go.feature.todayhub.TodayHubSection
+import com.eskerra.go.feature.todayhub.TodayHubBody
+import com.eskerra.go.feature.todayhub.TodayHubHeader
 import com.eskerra.go.feature.todayhub.TodayHubUiState
 import com.eskerra.go.ui.markdown.VaultMarkdownTokens
 import com.eskerra.go.ui.theme.EskerraChromeTokens
+import com.eskerra.go.ui.theme.EskerraHeadingH1
 import java.io.File
+
+/** Fixed height for the shared top row so switching in/out of selection never shifts the list. */
+private val InboxTopBarHeight = 56.dp
 
 /**
  * Stateless home screen: inbox list (or empty/error) with Today Hub below.
@@ -66,7 +72,6 @@ fun InboxScreen(
     onOpenExternalUrl: (String) -> Unit,
     onAmbiguousWikiLink: (List<NoteId>, String) -> Unit,
     onNoteNotFound: (String) -> Unit = {},
-    onOpenSearch: () -> Unit = {},
     workspaceRoot: File? = null,
     scrollToTopSignal: Int = 0,
     modifier: Modifier = Modifier
@@ -90,7 +95,6 @@ fun InboxScreen(
         onOpenExternalUrl = onOpenExternalUrl,
         onAmbiguousWikiLink = onAmbiguousWikiLink,
         onNoteNotFound = onNoteNotFound,
-        onOpenSearch = onOpenSearch,
         workspaceRoot = workspaceRoot,
         scrollToTopSignal = scrollToTopSignal,
         modifier = modifier
@@ -117,7 +121,6 @@ private fun InboxScrollBody(
     onOpenExternalUrl: (String) -> Unit,
     onAmbiguousWikiLink: (List<NoteId>, String) -> Unit,
     onNoteNotFound: (String) -> Unit,
-    onOpenSearch: () -> Unit,
     workspaceRoot: File?,
     scrollToTopSignal: Int = 0,
     modifier: Modifier = Modifier
@@ -137,14 +140,26 @@ private fun InboxScrollBody(
         modifier = modifier.fillMaxSize(),
         contentPadding = shellScrollContentPadding()
     ) {
+        // Top row shares one slot: selection actions while notes are selected, otherwise the hub
+        // chrome (title, hub switcher). Both branches share InboxTopBarHeight so toggling selection
+        // never shifts the list below.
         item {
-            InboxHeaderBar(
-                hasSelection = hasSelection,
-                selectedCount = selectedNoteIds.size,
-                isDeleting = isDeleting,
-                onClearSelection = onClearSelection,
-                onDeleteSelected = onDeleteSelected
-            )
+            if (hasSelection) {
+                InboxSelectionBar(
+                    selectedCount = selectedNoteIds.size,
+                    isDeleting = isDeleting,
+                    onClearSelection = onClearSelection,
+                    onDeleteSelected = onDeleteSelected
+                )
+            } else {
+                TodayHubHeader(
+                    state = todayHubState,
+                    onSelectHub = onSelectHub,
+                    modifier = Modifier
+                        .height(InboxTopBarHeight)
+                        .padding(horizontal = 16.dp)
+                )
+            }
         }
 
         deleteError?.let { message ->
@@ -220,26 +235,17 @@ private fun InboxScrollBody(
             }
         }
 
-        item {
-            HorizontalDivider(
-                color = EskerraChromeTokens.ListDivider,
-                modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
-            )
-        }
-
         if (state !is InboxUiState.Loading || todayHubState is TodayHubUiState.Content) {
             item {
-                TodayHubSection(
+                TodayHubBody(
                     state = todayHubState,
                     onPreviousWeek = onPreviousWeek,
                     onNextWeek = onNextWeek,
-                    onSelectHub = onSelectHub,
                     onRetry = onRetryTodayHub,
                     onOpenInternalNote = onOpenInternalNote,
                     onOpenExternalUrl = onOpenExternalUrl,
                     onAmbiguousWikiLink = onAmbiguousWikiLink,
                     onNoteNotFound = onNoteNotFound,
-                    onOpenSearch = onOpenSearch,
                     workspaceRoot = workspaceRoot,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                 )
@@ -249,8 +255,7 @@ private fun InboxScrollBody(
 }
 
 @Composable
-private fun InboxHeaderBar(
-    hasSelection: Boolean,
+private fun InboxSelectionBar(
     selectedCount: Int,
     isDeleting: Boolean,
     onClearSelection: () -> Unit,
@@ -259,46 +264,36 @@ private fun InboxHeaderBar(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 8.dp, end = 8.dp, bottom = 8.dp),
+            .height(InboxTopBarHeight)
+            .padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        if (hasSelection) {
-            IconButton(onClick = onClearSelection, enabled = !isDeleting) {
+        IconButton(onClick = onClearSelection, enabled = !isDeleting) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Clear selection",
+                tint = Color.White
+            )
+        }
+        Text(
+            text = "$selectedCount selected",
+            style = EskerraHeadingH1,
+            color = Color.White,
+            modifier = Modifier.weight(1f)
+        )
+        IconButton(onClick = onDeleteSelected, enabled = !isDeleting) {
+            if (isDeleting) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    strokeWidth = 2.dp
+                )
+            } else {
                 Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Clear selection",
+                    imageVector = Icons.Filled.DeleteOutline,
+                    contentDescription = "Delete selected",
                     tint = Color.White
                 )
             }
-            Text(
-                text = "$selectedCount selected",
-                style = MaterialTheme.typography.titleLarge,
-                color = Color.White,
-                modifier = Modifier.weight(1f)
-            )
-            IconButton(onClick = onDeleteSelected, enabled = !isDeleting) {
-                if (isDeleting) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Filled.DeleteOutline,
-                        contentDescription = "Delete selected",
-                        tint = Color.White
-                    )
-                }
-            }
-        } else {
-            Text(
-                text = "Inbox",
-                style = MaterialTheme.typography.headlineMedium,
-                color = Color.White,
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(start = 8.dp)
-            )
         }
     }
 }

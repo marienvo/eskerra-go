@@ -163,7 +163,6 @@ internal fun AppInboxRoute(
         onOpenExternalUrl = { url -> openExternalUrl(context, url) },
         onAmbiguousWikiLink = { candidates, _ -> ambiguousCandidates = candidates },
         onNoteNotFound = { message -> showNoteNotFoundToast(context, message) },
-        onOpenSearch = { navController.navigate(AppRoute.SEARCH) },
         workspaceRoot = workspaceRoot,
         scrollToTopSignal = scrollResetSignal
     )

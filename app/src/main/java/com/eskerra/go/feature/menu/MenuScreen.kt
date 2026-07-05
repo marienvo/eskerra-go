@@ -14,12 +14,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
+/** A hamburger menu entry: a stable [id] for click routing and a (possibly dynamic) [label]. */
+data class MenuEntry(val id: String, val label: String)
+
 /**
- * Stateless menu content for the hamburger overlay. Receives entries and reports taps through
- * [onItemClick]. It wraps its height (no [fillMaxSize]) so it sits naturally inside a bottom sheet.
+ * Stateless menu content for the hamburger overlay. Receives entries and reports the tapped entry's
+ * id through [onItemClick]. It wraps its height (no [fillMaxSize]) so it sits naturally inside a
+ * bottom sheet.
  */
 @Composable
-fun MenuScreen(items: List<String>, onItemClick: (String) -> Unit, modifier: Modifier = Modifier) {
+fun MenuScreen(
+    items: List<MenuEntry>,
+    onItemClick: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
     LazyColumn(
         modifier = modifier
             .fillMaxWidth()
@@ -33,12 +41,12 @@ fun MenuScreen(items: List<String>, onItemClick: (String) -> Unit, modifier: Mod
                 modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp)
             )
         }
-        items(items) { item ->
+        items(items) { entry ->
             ListItem(
-                headlineContent = { Text(item) },
+                headlineContent = { Text(entry.label) },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { onItemClick(item) }
+                    .clickable { onItemClick(entry.id) }
             )
         }
     }

@@ -3,7 +3,6 @@ package com.eskerra.go.app
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -12,9 +11,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -187,18 +183,7 @@ fun App(
         filesDir = filesDir,
         maintainVaultSearchIndex = maintainVaultSearchIndex
     )
-
-    DisposableEffect(appSyncViewModel) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_START) {
-                appSyncViewModel.refreshShellStatusQuietly(forceRemote = false)
-            }
-        }
-        ProcessLifecycleOwner.get().lifecycle.addObserver(observer)
-        onDispose {
-            ProcessLifecycleOwner.get().lifecycle.removeObserver(observer)
-        }
-    }
+    AppForegroundSyncEffect(appSyncViewModel)
 
     val syncIndicator = shellSyncIndicatorState(syncState, remoteConfigured)
     val selectedTopLevelRoute = destinationTopLevelRoute ?: currentTopLevelRoute
@@ -214,6 +199,16 @@ fun App(
         currentRoute = currentRoute,
         selectedTopLevelRoute = selectedTopLevelRoute,
         markInboxNotesChanged = markInboxNotesChanged
+    )
+    val shellInputState = rememberAppShellInputState(
+        currentConfig = currentConfig,
+        filesDir = filesDir,
+        searchVault = searchVault,
+        maintainVaultSearchIndex = maintainVaultSearchIndex,
+        repairVaultSearchIndex = repairVaultSearchIndex,
+        navController = navController,
+        currentRoute = currentRoute,
+        newNoteInputState = newNoteInputState
     )
     val podcastShellBridge = remember { PodcastShellBridge() }
     val miniPlayerMount = rememberAppShellMiniPlayerMount(
@@ -245,14 +240,7 @@ fun App(
         syncIndicator = syncIndicator,
         miniPlayerVisible = miniPlayerMount.visible,
         miniPlayer = miniPlayerMount.content,
-        newNoteInputVisible = newNoteInputState.visible,
-        newNoteDraft = newNoteInputState.draft,
-        newNoteCanSave = newNoteInputState.canSave,
-        newNoteIsSaving = newNoteInputState.isSaving,
-        newNoteErrorMessage = newNoteInputState.errorMessage,
-        onNewNoteDraftChange = newNoteInputState.onDraftChange,
-        onNewNoteSave = newNoteInputState.onSave,
-        onSyncClick = { onShellSyncClick(syncState, appSyncViewModel, navController) },
+        shellInput = shellInputState.presentation,
         onMenuClick = { menuOpen = true },
         onNavigate = { route ->
             navController.navigateTab(
@@ -298,6 +286,7 @@ fun App(
             searchVault = searchVault,
             maintainVaultSearchIndex = maintainVaultSearchIndex,
             repairVaultSearchIndex = repairVaultSearchIndex,
+            searchViewModel = shellInputState.searchViewModel,
             touchVaultSearchPaths = touchVaultSearchPaths,
             loadPodcastCatalog = loadPodcastCatalog,
             markPodcastEpisodesPlayed = markPodcastEpisodesPlayed,
@@ -335,11 +324,12 @@ fun App(
 
     if (menuOpen) {
         AppMenuSheet(
+            items = buildMenuEntries(syncIndicator?.changeCount, remoteConfigured),
             onDismiss = { menuOpen = false },
-            onItemClick = { item ->
-                when (item) {
-                    MENU_SEARCH -> navController.navigate(AppRoute.SEARCH)
-                    MENU_SYNC -> navController.navigate(AppRoute.SYNC)
+            onItemClick = { id ->
+                when (id) {
+                    MENU_SYNC_NOW -> onMenuSyncClick(syncState, appSyncViewModel, navController)
+                    MENU_SYNC_SETTINGS -> navController.navigate(AppRoute.SYNC)
                     MENU_SETTINGS -> navController.navigate(AppRoute.SETTINGS)
                 }
             }

@@ -83,7 +83,9 @@ class AppShellInitialRouteTest {
         assertTrue(shouldShowNewNoteInput(noteRoute, AppShellMode.HOME))
 
         assertFalse(shouldShowNewNoteInput(AppRoute.EDITOR_PATTERN, AppShellMode.HOME))
-        assertFalse(shouldShowNewNoteInput(AppRoute.SEARCH, AppShellMode.HOME))
+        assertTrue(shouldShowNewNoteInput(AppRoute.SEARCH, AppShellMode.HOME))
+        assertTrue(shouldShowNewNoteInput(AppRoute.SEARCH_PATTERN, AppShellMode.HOME))
+        assertTrue(shouldShowNewNoteInput(AppRoute.search("vault"), AppShellMode.HOME))
         assertFalse(shouldShowNewNoteInput(AppRoute.INBOX, AppShellMode.PODCASTS))
         assertFalse(shouldShowNewNoteInput(null, AppShellMode.HOME))
     }

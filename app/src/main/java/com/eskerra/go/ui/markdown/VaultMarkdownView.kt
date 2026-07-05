@@ -16,7 +16,6 @@ import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NoteRegistry
 import com.mikepenz.markdown.compose.Markdown
 import com.mikepenz.markdown.m3.markdownColor
-import com.mikepenz.markdown.m3.markdownTypography
 import java.io.File
 import java.time.LocalDateTime
 
@@ -33,6 +32,8 @@ import java.time.LocalDateTime
  * @param workspaceRoot vault working-tree root on disk; required for local attachment `file://` loads.
  * @param sourceNoteId vault-relative path of the open note; enables relative link/image resolution
  *   (spec §9.3, §13). Pass `null` when the source context is unknown (links show as muted).
+ * @param preserveLineBreaks renders Markdown soft breaks as visible newlines. Intended for Today Hub
+ *   cells, whose read-only representation mirrors the source's line-based editor.
  * @param onNoteNotFound called when a tapped link cannot be resolved; message reflects [indexStatus]
  *   ("Note not found", "Still indexing vault", "Vault index unavailable").
  */
@@ -47,6 +48,7 @@ fun VaultMarkdownView(
     modifier: Modifier = Modifier,
     workspaceRoot: File? = null,
     sourceNoteId: NoteId? = null,
+    preserveLineBreaks: Boolean = false,
     onNoteNotFound: (String) -> Unit = {}
 ) {
     val now = remember { LocalDateTime.now() }
@@ -59,7 +61,7 @@ fun VaultMarkdownView(
     }
 
     val colors = markdownColor()
-    val typography = markdownTypography()
+    val typography = vaultMarkdownTypography()
 
     val onLinkTap: (String) -> Unit = { href ->
         when (val target = VaultReadonlyLink.targetFor(href, registry, sourceNoteId)) {
@@ -81,7 +83,8 @@ fun VaultMarkdownView(
         indexStatus,
         now,
         onLinkTap,
-        sourceNoteId
+        sourceNoteId,
+        preserveLineBreaks
     )
     val components = vaultMarkdownComponents(workspaceRoot, sourceNoteId)
 
@@ -104,7 +107,8 @@ fun VaultMarkdownView(
                     colors = colors,
                     typography = typography,
                     workspaceRoot = workspaceRoot,
-                    sourceNoteId = sourceNoteId
+                    sourceNoteId = sourceNoteId,
+                    annotator = annotator
                 )
             }
         }

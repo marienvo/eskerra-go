@@ -33,8 +33,8 @@ class LoadTodayHubTest {
 
     private val filesDir get() = temp.newFolder("files")
 
-    private fun note(path: String): NoteSummary =
-        NoteSummary(id = NoteId(path), title = path, snippet = "", isInbox = false)
+    private fun note(path: String, title: String = path): NoteSummary =
+        NoteSummary(id = NoteId(path), title = title, snippet = "", isInbox = false)
 
     private val hubMarkdown = """
         ---
@@ -60,8 +60,8 @@ class LoadTodayHubTest {
     @Test
     fun loadsActiveHubSettingsAndIntro() = runTest {
         val registry = FakeNoteRegistryRepository.withInboxNotes(
-            note("Work/Today.md"),
-            note("Daily/Today.md"),
+            note("Work/Today.md", "Work hub"),
+            note("Daily/Today.md", "Daily hub"),
             note("Daily/2026-04-06.md"),
             note("Daily/2026-03-30.md")
         )
@@ -75,18 +75,17 @@ class LoadTodayHubTest {
         assertEquals(listOf("Tasks"), data.settings.columns)
         assertEquals(TodayHubFrontmatter.StartDay.MONDAY, data.settings.start)
         assertEquals(2, data.columnCount)
-        assertEquals("Daily", data.folderLabel)
+        assertEquals("Daily hub", data.folderLabel)
         assertEquals(2, data.hubs.size)
         assertEquals(listOf("2026-03-30", "2026-04-06"), data.availableWeekStems)
-        assertTrue(data.introMarkdown.contains("Intro body here."))
-        assertTrue(!data.introMarkdown.contains("perpetualType"))
+        assertEquals("Intro body here.", data.introMarkdown)
     }
 
     @Test
     fun honoursPreferredHubWhenPresent() = runTest {
         val registry = FakeNoteRegistryRepository.withInboxNotes(
-            note("Work/Today.md"),
-            note("Daily/Today.md")
+            note("Work/Today.md", "Work hub"),
+            note("Daily/Today.md", "Daily hub")
         )
         val content = FakeNoteContentRepository.withContent(NoteId("Work/Today.md"), hubMarkdown)
 
@@ -94,7 +93,7 @@ class LoadTodayHubTest {
         val data = useCase(config, filesDir, NoteId("Work/Today.md")).getOrThrow()!!
 
         assertEquals(NoteId("Work/Today.md"), data.activeHubId)
-        assertEquals("Work", data.folderLabel)
+        assertEquals("Work hub", data.folderLabel)
     }
 
     @Test

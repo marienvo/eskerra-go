@@ -3,8 +3,6 @@ package com.eskerra.go.app
 import com.eskerra.go.core.model.SyncStatusState
 import com.eskerra.go.core.model.SyncStatusSummary
 import com.eskerra.go.core.model.displayLabel
-import com.eskerra.go.core.model.hasSyncWork
-import com.eskerra.go.core.model.needsAttention
 import com.eskerra.go.feature.sync.SyncUiState
 
 internal fun shellSyncIndicatorState(
@@ -15,51 +13,18 @@ internal fun shellSyncIndicatorState(
         return null
     }
 
-    return when (syncState) {
-        SyncUiState.Loading -> null
-
-        is SyncUiState.Ready -> indicatorFromStatus(
-            syncState.status,
-            isChecking = false,
-            isSyncing = false
-        )
-
-        is SyncUiState.Syncing -> indicatorFromStatus(
-            syncState.status,
-            isChecking = false,
-            isSyncing = true
-        )
-
-        is SyncUiState.Success -> indicatorFromStatus(
-            syncState.status,
-            isChecking = false,
-            isSyncing = false
-        )
-
-        is SyncUiState.Error -> syncState.status?.let {
-            indicatorFromStatus(it, isChecking = false, isSyncing = false)
-        } ?: ShellSyncIndicatorState(
-            needsAttention = true,
-            isEnabled = true,
-            isChecking = false,
-            isSyncing = false,
-            badgeText = "!"
-        )
+    val status = when (syncState) {
+        SyncUiState.Loading -> return null
+        is SyncUiState.Ready -> syncState.status
+        is SyncUiState.Syncing -> syncState.status
+        is SyncUiState.Success -> syncState.status
+        is SyncUiState.Error ->
+            syncState.status
+                ?: return ShellSyncIndicatorState(badgeText = "!", changeCount = null)
     }
-}
-
-private fun indicatorFromStatus(
-    status: SyncStatusSummary,
-    isChecking: Boolean,
-    isSyncing: Boolean
-): ShellSyncIndicatorState {
-    val busy = isChecking || isSyncing
     return ShellSyncIndicatorState(
-        needsAttention = status.needsAttention,
-        isEnabled = status.hasSyncWork && !busy,
-        isChecking = isChecking,
-        isSyncing = isSyncing,
-        badgeText = badgeTextFor(status)
+        badgeText = badgeTextFor(status),
+        changeCount = changeCountFor(status)
     )
 }
 
@@ -72,6 +37,14 @@ private fun badgeTextFor(status: SyncStatusSummary): String? = when (status.stat
     SyncStatusState.Error -> "!"
     SyncStatusState.Clean,
     SyncStatusState.Unavailable -> null
+}
+
+/** Numeric pending count for the menu's sync entry (the badge's number, without the "!" fallback). */
+private fun changeCountFor(status: SyncStatusSummary): Int? = when (status.state) {
+    SyncStatusState.Behind -> status.behindCount.takeIf { it > 0 }
+    SyncStatusState.Ahead -> status.aheadCount.takeIf { it > 0 }
+    SyncStatusState.DirtyLocalChanges -> status.changedCount.takeIf { it > 0 }
+    else -> null
 }
 
 internal fun syncStatusLabel(syncState: SyncUiState): String = when (syncState) {

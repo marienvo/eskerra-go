@@ -1,17 +1,29 @@
 package com.eskerra.go.app
 
-/** Placeholder content for stub surfaces (overflow menu). Not vault data. */
+import com.eskerra.go.feature.menu.MenuEntry
 
-internal const val MENU_SEARCH = "Vault search"
-internal const val MENU_SYNC = "Sync"
-internal const val MENU_SETTINGS = "Settings"
-internal const val MENU_WORKSPACES = "Workspaces"
-internal const val MENU_ABOUT = "About"
+/** Hamburger overflow menu entry ids (routed in [App]) and the builder for the entry list. */
 
-internal val menuItems: List<String> = listOf(
-    MENU_SEARCH,
-    MENU_SYNC,
-    MENU_SETTINGS,
-    MENU_WORKSPACES,
-    MENU_ABOUT
-)
+internal const val MENU_SYNC_NOW = "sync_now"
+internal const val MENU_SYNC_SETTINGS = "sync_settings"
+internal const val MENU_SETTINGS = "settings"
+
+/**
+ * Builds the hamburger menu. The "Sync …" trigger only appears when a remote is configured; its
+ * label carries the pending change count (or "Sync now" when nothing is known — remote may still
+ * hold changes we haven't seen). It is never disabled.
+ */
+internal fun buildMenuEntries(syncChangeCount: Int?, remoteConfigured: Boolean): List<MenuEntry> =
+    buildList {
+        if (remoteConfigured) {
+            add(MenuEntry(MENU_SYNC_NOW, syncNowLabel(syncChangeCount)))
+        }
+        add(MenuEntry(MENU_SYNC_SETTINGS, "Sync settings"))
+        add(MenuEntry(MENU_SETTINGS, "Settings"))
+    }
+
+private fun syncNowLabel(changeCount: Int?): String = when {
+    changeCount == null || changeCount <= 0 -> "Sync now"
+    changeCount == 1 -> "Sync 1 change"
+    else -> "Sync $changeCount changes"
+}

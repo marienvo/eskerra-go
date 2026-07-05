@@ -10,7 +10,6 @@ import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
-import com.eskerra.go.core.model.hasSyncWork
 import com.eskerra.go.feature.sync.SyncUiState
 
 /**
@@ -114,22 +113,37 @@ private fun NavHostController.navigateTopLevel(targetRoute: String) = navigate(t
     restoreState = true
 }
 
-/** Handles a tap on the shell sync indicator: sync inline when safe, otherwise open the Sync screen. */
-internal fun onShellSyncClick(
+/**
+ * Handles the menu "Sync …" entry: sync inline when safe, otherwise open the Sync screen so
+ * conflicts/errors can be resolved. Never gated on pending work — a clean repo still syncs to pull
+ * remote changes we may not know about yet.
+ */
+internal enum class MenuSyncAction {
+    SyncNow,
+    OpenSyncScreen,
+    RefreshLocalStatus,
+    NoOp
+}
+
+internal fun menuSyncAction(syncState: SyncUiState): MenuSyncAction = when (syncState) {
+    is SyncUiState.Ready ->
+        if (syncState.preflight.canSync) MenuSyncAction.SyncNow else MenuSyncAction.OpenSyncScreen
+    SyncUiState.Loading,
+    is SyncUiState.Syncing -> MenuSyncAction.NoOp
+    is SyncUiState.Success -> MenuSyncAction.RefreshLocalStatus
+    is SyncUiState.Error -> MenuSyncAction.OpenSyncScreen
+}
+
+internal fun onMenuSyncClick(
     syncState: SyncUiState,
     appSyncViewModel: AppSyncViewModel,
     navController: NavHostController
 ) {
-    when (syncState) {
-        is SyncUiState.Ready -> when {
-            !syncState.status.hasSyncWork -> Unit
-            syncState.preflight.canSync -> appSyncViewModel.syncNow()
-            else -> navController.openSyncScreen()
-        }
-        SyncUiState.Loading,
-        is SyncUiState.Syncing,
-        is SyncUiState.Success -> Unit
-        is SyncUiState.Error -> navController.openSyncScreen()
+    when (menuSyncAction(syncState)) {
+        MenuSyncAction.SyncNow -> appSyncViewModel.syncNow()
+        MenuSyncAction.OpenSyncScreen -> navController.openSyncScreen()
+        MenuSyncAction.RefreshLocalStatus -> appSyncViewModel.refreshLocalStatus()
+        MenuSyncAction.NoOp -> Unit
     }
 }
 

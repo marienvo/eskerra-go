@@ -97,6 +97,7 @@ internal data class AppNavGraphContext(
     val searchVault: SearchVault,
     val maintainVaultSearchIndex: MaintainVaultSearchIndex,
     val repairVaultSearchIndex: RepairVaultSearchIndex,
+    val searchViewModel: SearchViewModel,
     val touchVaultSearchPaths: TouchVaultSearchPaths,
     val loadPodcastCatalog: LoadPodcastCatalog,
     val markPodcastEpisodesPlayed: MarkPodcastEpisodesPlayed,
@@ -166,14 +167,20 @@ internal fun NavGraphBuilder.podcastsGraph(ctx: AppNavGraphContext) {
 }
 
 internal fun NavGraphBuilder.sharedDestinations(ctx: AppNavGraphContext) {
-    opaqueComposable(AppRoute.SEARCH) {
+    opaqueComposable(
+        route = AppRoute.SEARCH_PATTERN,
+        arguments = listOf(
+            navArgument(AppRoute.SEARCH_QUERY_ARG) {
+                type = NavType.StringType
+                defaultValue = ""
+            }
+        )
+    ) { entry ->
+        // Seed the shared view model when the route carries a pre-filled query (deep links, back stack).
         AppSearchRoute(
-            currentConfig = ctx.currentConfig,
-            filesDir = ctx.filesDir,
-            searchVault = ctx.searchVault,
-            maintainVaultSearchIndex = ctx.maintainVaultSearchIndex,
-            repairVaultSearchIndex = ctx.repairVaultSearchIndex,
-            navController = ctx.navController
+            searchViewModel = ctx.searchViewModel,
+            navController = ctx.navController,
+            entry = entry
         )
     }
 

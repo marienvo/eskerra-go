@@ -12,7 +12,7 @@ import androidx.compose.ui.unit.dp
 
 /** Vertical space reserved for floating shell chrome. */
 internal val ShellTopChromeHeight = 56.dp
-internal val ShellNewNoteInputHeight = 112.dp
+internal val ShellNewNoteInputHeight = 88.dp
 internal val ShellMiniPlayerHeight = 168.dp
 
 private val ShellHorizontalContentPadding = 16.dp

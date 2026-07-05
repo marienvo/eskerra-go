@@ -1,5 +1,6 @@
 package com.eskerra.go.core.usecase
 
+import com.eskerra.go.core.markdown.TodayHubIntroStrip
 import com.eskerra.go.core.markdown.VaultMarkdownPreprocess
 import com.eskerra.go.core.model.NoteContentError
 import com.eskerra.go.core.model.NoteContentException
@@ -54,9 +55,21 @@ class LoadTodayHub(
         val markdown = contentResult.getOrThrow().markdown
 
         val settings = TodayHubFrontmatter.parse(markdown)
-        val introMarkdown = VaultMarkdownPreprocess.splitYamlFrontmatter(markdown).body
+        val titleById = registry.notes.associate { it.id to it.title }
+        val hubTitle = titleById[activeHubId]?.takeIf { it.isNotBlank() }
+        // The hub note's H1 already shows as the "Switch hub" title, so drop it from the intro body
+        // to keep a single H1 on the today-hub page (spec §11). Other notes render their H1 as usual.
+        val introMarkdown = TodayHubIntroStrip.stripLeadingAtxH1ForTitle(
+            VaultMarkdownPreprocess.splitYamlFrontmatter(markdown).body,
+            hubTitle
+        )
         val availableWeekStems = TodayHubDiscovery.availableWeekStems(activeHubId.value, registry)
-        val hubs = hubIds.map { TodayHubRef(it, TodayHubDiscovery.folderLabel(it.value)) }
+        // Label each hub by its note's H1 (the registry title), falling back to the folder name when
+        // the hub has no heading, so the "Switch hub" title/picker read the hub's own title.
+        val hubs = hubIds.map { id ->
+            val h1 = titleById[id]?.takeIf { it.isNotBlank() }
+            TodayHubRef(id, h1 ?: TodayHubDiscovery.folderLabel(id.value))
+        }
 
         return Result.success(
             TodayHubData(
