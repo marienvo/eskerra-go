@@ -58,9 +58,7 @@ internal fun buildSignedListRequest(
         .addQueryParameter("list-type", "2")
         .addQueryParameter("prefix", prefix)
         .apply {
-            if (continuationToken !=
-                null
-            ) {
+            if (continuationToken != null) {
                 addQueryParameter("continuation-token", continuationToken)
             }
         }

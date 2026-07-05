@@ -71,7 +71,7 @@ class BinariesViewModel(
             is BinarySyncSummary.Completed -> copy(
                 isSyncing = false,
                 statusMessage = "Downloaded ${summary.downloaded}, removed ${summary.deleted}, " +
-                    "skipped ${summary.skipped} (not gitignored)."
+                    "skipped ${summary.skipped} (tracked by git)."
             )
             is BinarySyncSummary.Failed -> copy(isSyncing = false, errorMessage = summary.message)
         }

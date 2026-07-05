@@ -33,6 +33,8 @@ class SyncBinaries(
         }
         val config = settings.r2 ?: return BinarySyncSummary.NotConfigured
 
+        var manifestDirty = false
+        val manifest = repository.readManifest().associateBy { it.relPath }.toMutableMap()
         return try {
             val remote = repository.listRemoteBinaries(config)
             val candidates = remote.mapNotNull { obj ->
@@ -51,8 +53,6 @@ class SyncBinaries(
             val kept = candidates.filter { it.first in ignored }
             val skipped = candidates.size - kept.size
 
-            val manifest = repository.readManifest().associateBy { it.relPath }.toMutableMap()
-
             var downloaded = 0
             for ((relPath, obj) in kept) {
                 val known = manifest[relPath]
@@ -65,6 +65,7 @@ class SyncBinaries(
                     repository.downloadBinary(config, obj.key, workspaceRoot, relPath)
                     manifest[relPath] =
                         BinaryManifestEntry(relPath, obj.key, obj.size, obj.etag)
+                    manifestDirty = true
                     downloaded++
                 }
             }
@@ -75,11 +76,11 @@ class SyncBinaries(
                 if (entry.key !in remoteKeys) {
                     repository.deleteLocalBinary(workspaceRoot, entry.relPath)
                     manifest.remove(entry.relPath)
+                    manifestDirty = true
                     deleted++
                 }
             }
 
-            repository.writeManifest(manifest.values.sortedBy { it.relPath })
             BinarySyncSummary.Completed(
                 downloaded = downloaded,
                 deleted = deleted,
@@ -89,6 +90,10 @@ class SyncBinaries(
             throw cancellation
         } catch (error: Exception) {
             BinarySyncSummary.Failed(error.message ?: "Binaries sync failed.")
+        } finally {
+            if (manifestDirty) {
+                repository.writeManifest(manifest.values.sortedBy { it.relPath })
+            }
         }
     }
 }

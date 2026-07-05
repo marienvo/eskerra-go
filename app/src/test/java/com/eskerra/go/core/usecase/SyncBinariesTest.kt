@@ -78,6 +78,23 @@ class SyncBinariesTest {
     }
 
     @Test
+    fun `persists manifest for successful downloads when a later download fails`() = runBlocking {
+        val repo = FakeBinaryRepo(
+            remote = mutableListOf(
+                R2BinaryObject("binaries/a.bin", 10, "e1"),
+                R2BinaryObject("binaries/b.bin", 20, "e2")
+            ),
+            ignored = mutableSetOf("a.bin", "b.bin"),
+            failDownloadFor = "b.bin"
+        )
+        val summary = useCase(repo, EskerraSettings(r2 = r2())).invoke(root)
+
+        assertTrue(summary is BinarySyncSummary.Failed)
+        assertEquals(listOf("a.bin"), repo.downloaded)
+        assertEquals(listOf("a.bin"), repo.written?.map { it.relPath })
+    }
+
+    @Test
     fun `re-downloads when etag changed`() = runBlocking {
         val repo = FakeBinaryRepo(
             remote = mutableListOf(R2BinaryObject("binaries/a.bin", 10, "e2")),
@@ -104,7 +121,8 @@ private class FakeBinaryRepo(
     private val remote: MutableList<R2BinaryObject> = mutableListOf(),
     private val ignored: MutableSet<String> = mutableSetOf(),
     private var manifest: MutableList<BinaryManifestEntry> = mutableListOf(),
-    private val localSizes: MutableMap<String, Long> = mutableMapOf()
+    private val localSizes: MutableMap<String, Long> = mutableMapOf(),
+    private val failDownloadFor: String? = null
 ) : BinarySyncRepository {
 
     val downloaded = mutableListOf<String>()
@@ -122,6 +140,9 @@ private class FakeBinaryRepo(
         workspaceRoot: File,
         relPath: String
     ) {
+        if (relPath == failDownloadFor) {
+            throw IllegalStateException("Download failed for $relPath")
+        }
         downloaded += relPath
         localSizes[relPath] = remote.first { it.key == key }.size
     }
