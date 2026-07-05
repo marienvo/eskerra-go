@@ -1,5 +1,6 @@
 package com.eskerra.go.feature.todayhub
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,7 +16,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -24,6 +24,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.eskerra.go.core.markdown.VaultReadonlyLink
 import com.eskerra.go.core.model.NoteId
@@ -215,20 +216,29 @@ private fun HubHeader(
         modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = folderLabel,
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f)
-        )
-        if (showPicker) {
-            TextButton(onClick = onOpenPicker) {
+        // The active hub name doubles as the title and the hub switcher: tapping it opens the
+        // picker. With a single hub there is nowhere to switch, so it stays a plain, static title.
+        Row(
+            modifier = Modifier
+                .weight(1f)
+                .clickable(enabled = showPicker, onClick = onOpenPicker),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = folderLabel,
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false)
+            )
+            if (showPicker) {
                 Icon(
                     imageVector = Icons.Filled.UnfoldMore,
-                    contentDescription = null,
-                    modifier = Modifier.padding(end = 4.dp)
+                    contentDescription = "Switch hub",
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(start = 4.dp)
                 )
-                Text("Switch hub")
             }
         }
     }

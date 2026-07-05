@@ -234,13 +234,6 @@ private fun InboxScrollBody(
             }
         }
 
-        item {
-            HorizontalDivider(
-                color = EskerraChromeTokens.ListDivider,
-                modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
-            )
-        }
-
         if (state !is InboxUiState.Loading || todayHubState is TodayHubUiState.Content) {
             item {
                 TodayHubBody(
