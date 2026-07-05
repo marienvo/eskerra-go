@@ -13,6 +13,7 @@ import com.eskerra.go.feature.sync.BinariesUiState
 import com.eskerra.go.feature.sync.DownloadedBinaryRow
 import com.eskerra.go.feature.sync.formatByteSize
 import java.io.File
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -44,9 +45,19 @@ class BinariesViewModel(
                 statusMessage = null,
                 errorMessage = null
             )
-            val summary = syncBinaries(workspaceRoot)
-            val binaries = loadDownloadedBinaries(workspaceRoot)
-            _uiState.value = binaries.toState().withSummary(summary)
+            try {
+                val summary = syncBinaries(workspaceRoot)
+                val binaries = loadDownloadedBinaries(workspaceRoot)
+                _uiState.value = binaries.toState().withSummary(summary)
+            } catch (cancellation: CancellationException) {
+                _uiState.value = _uiState.value.copy(isSyncing = false)
+                throw cancellation
+            } catch (error: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isSyncing = false,
+                    errorMessage = error.message ?: "Binaries sync failed."
+                )
+            }
         }
     }
 

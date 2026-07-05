@@ -95,6 +95,19 @@ class SyncBinariesTest {
     }
 
     @Test
+    fun `returns failed when manifest write throws after successful sync`() = runBlocking {
+        val repo = FakeBinaryRepo(
+            remote = mutableListOf(R2BinaryObject("binaries/a.bin", 10, "e1")),
+            ignored = mutableSetOf("a.bin"),
+            failWriteManifest = true
+        )
+        val summary = useCase(repo, EskerraSettings(r2 = r2())).invoke(root)
+
+        assertEquals(BinarySyncSummary.Failed("Manifest write failed"), summary)
+        assertEquals(listOf("a.bin"), repo.downloaded)
+    }
+
+    @Test
     fun `re-downloads when etag changed`() = runBlocking {
         val repo = FakeBinaryRepo(
             remote = mutableListOf(R2BinaryObject("binaries/a.bin", 10, "e2")),
@@ -122,7 +135,8 @@ private class FakeBinaryRepo(
     private val ignored: MutableSet<String> = mutableSetOf(),
     private var manifest: MutableList<BinaryManifestEntry> = mutableListOf(),
     private val localSizes: MutableMap<String, Long> = mutableMapOf(),
-    private val failDownloadFor: String? = null
+    private val failDownloadFor: String? = null,
+    private val failWriteManifest: Boolean = false
 ) : BinarySyncRepository {
 
     val downloaded = mutableListOf<String>()
@@ -155,6 +169,9 @@ private class FakeBinaryRepo(
     override suspend fun readManifest(): List<BinaryManifestEntry> = manifest.toList()
 
     override suspend fun writeManifest(entries: List<BinaryManifestEntry>) {
+        if (failWriteManifest) {
+            throw IllegalStateException("Manifest write failed")
+        }
         written = entries
         manifest = entries.toMutableList()
     }

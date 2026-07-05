@@ -35,7 +35,8 @@ class SyncBinaries(
 
         var manifestDirty = false
         val manifest = repository.readManifest().associateBy { it.relPath }.toMutableMap()
-        return try {
+        var summary: BinarySyncSummary = BinarySyncSummary.Failed("Binaries sync failed.")
+        try {
             val remote = repository.listRemoteBinaries(config)
             val candidates = remote.mapNotNull { obj ->
                 val relPath = obj.key.removePrefix(VaultLayout.BINARIES_PREFIX)
@@ -81,7 +82,7 @@ class SyncBinaries(
                 }
             }
 
-            BinarySyncSummary.Completed(
+            summary = BinarySyncSummary.Completed(
                 downloaded = downloaded,
                 deleted = deleted,
                 skipped = skipped
@@ -89,11 +90,20 @@ class SyncBinaries(
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (error: Exception) {
-            BinarySyncSummary.Failed(error.message ?: "Binaries sync failed.")
+            summary = BinarySyncSummary.Failed(error.message ?: "Binaries sync failed.")
         } finally {
             if (manifestDirty) {
-                repository.writeManifest(manifest.values.sortedBy { it.relPath })
+                runCatching {
+                    repository.writeManifest(manifest.values.sortedBy { it.relPath })
+                }.onFailure { writeError ->
+                    if (summary is BinarySyncSummary.Completed) {
+                        summary = BinarySyncSummary.Failed(
+                            writeError.message ?: "Failed to save binary manifest."
+                        )
+                    }
+                }
             }
         }
+        return summary
     }
 }
