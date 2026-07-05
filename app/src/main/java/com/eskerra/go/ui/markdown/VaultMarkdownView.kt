@@ -16,7 +16,6 @@ import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NoteRegistry
 import com.mikepenz.markdown.compose.Markdown
 import com.mikepenz.markdown.m3.markdownColor
-import com.mikepenz.markdown.m3.markdownTypography
 import java.io.File
 import java.time.LocalDateTime
 
@@ -59,7 +58,7 @@ fun VaultMarkdownView(
     }
 
     val colors = markdownColor()
-    val typography = markdownTypography()
+    val typography = vaultMarkdownTypography()
 
     val onLinkTap: (String) -> Unit = { href ->
         when (val target = VaultReadonlyLink.targetFor(href, registry, sourceNoteId)) {

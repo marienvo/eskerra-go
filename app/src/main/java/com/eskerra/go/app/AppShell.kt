@@ -70,7 +70,7 @@ fun AppShell(
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .statusBarsPadding()
-                    .padding(16.dp),
+                    .padding(start = 16.dp, end = 16.dp, top = 11.dp, bottom = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -92,7 +92,7 @@ fun AppShell(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .statusBarsPadding()
-                    .padding(16.dp),
+                    .padding(start = 16.dp, end = 16.dp, top = 11.dp, bottom = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {

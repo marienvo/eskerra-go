@@ -18,7 +18,6 @@ import com.eskerra.go.core.markdown.PreparedSegment
 import com.eskerra.go.core.markdown.prepareVaultMarkdown
 import com.mikepenz.markdown.compose.Markdown
 import com.mikepenz.markdown.m3.markdownColor
-import com.mikepenz.markdown.m3.markdownTypography
 
 /**
  * Inbox-detail renderer (spec §5.2): a deliberately limited renderer that strips frontmatter and
@@ -40,7 +39,7 @@ fun InboxDetailMarkdownView(markdown: String, modifier: Modifier = Modifier) {
     }
 
     val colors = markdownColor()
-    val typography = markdownTypography(
+    val typography = vaultMarkdownTypography(
         textLink = TextLinkStyles(style = SpanStyle(color = VaultMarkdownTokens.InboxDetailLink))
     )
 

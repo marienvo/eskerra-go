@@ -31,6 +31,7 @@ import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NoteRegistry
 import com.eskerra.go.core.todayhub.TodayHubWeeks
 import com.eskerra.go.ui.markdown.VaultMarkdownView
+import com.eskerra.go.ui.theme.EskerraHeadingH1
 import java.io.File
 
 /**
@@ -226,7 +227,7 @@ private fun HubHeader(
         ) {
             Text(
                 text = folderLabel,
-                style = MaterialTheme.typography.headlineMedium,
+                style = EskerraHeadingH1,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

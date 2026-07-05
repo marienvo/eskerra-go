@@ -42,6 +42,7 @@ import com.eskerra.go.feature.todayhub.TodayHubHeader
 import com.eskerra.go.feature.todayhub.TodayHubUiState
 import com.eskerra.go.ui.markdown.VaultMarkdownTokens
 import com.eskerra.go.ui.theme.EskerraChromeTokens
+import com.eskerra.go.ui.theme.EskerraHeadingH1
 import java.io.File
 
 /** Fixed height for the shared top row so switching in/out of selection never shifts the list. */
@@ -276,7 +277,7 @@ private fun InboxSelectionBar(
         }
         Text(
             text = "$selectedCount selected",
-            style = MaterialTheme.typography.titleLarge,
+            style = EskerraHeadingH1,
             color = Color.White,
             modifier = Modifier.weight(1f)
         )
