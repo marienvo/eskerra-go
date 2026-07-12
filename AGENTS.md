@@ -10,6 +10,8 @@ Shared conventions (language, quality, specs discipline, testing, skills, git gu
 
 Do not edit synced `.cursor/rules/{language,quality,specs,testing}.mdc`, `.cursor/skills/`, `.claude/settings.json`, or `.claude/hooks/` in this repo — change them in **notebox** and re-run the script.
 
+Exception: `.cursor/skills/plan-next-pr/` is **repo-local** (marked as such in its SKILL.md; the sync script only replaces the skills it names, so it survives re-syncs). Edit it here, not in notebox — the notebox repo has its own variant with notebox paths and gates.
+
 ## Project-specific rules
 
 Architecture style (hybrid layering + feature slices) and placement rules for new code: [`specs/adr/001-hybrid-layering-and-feature-slices.md`](specs/adr/001-hybrid-layering-and-feature-slices.md).
