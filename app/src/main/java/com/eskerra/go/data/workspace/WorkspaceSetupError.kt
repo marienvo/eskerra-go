@@ -148,9 +148,15 @@ internal fun isInvalidRepositoryError(message: String): Boolean {
 internal fun isAuthenticationError(message: String): Boolean =
     message.contains("authentication", ignoreCase = true) ||
         message.contains("not authorized", ignoreCase = true) ||
-        message.contains("401", ignoreCase = false) ||
-        message.contains("403", ignoreCase = false) ||
-        message.contains("credentials", ignoreCase = true)
+        message.contains("credentials", ignoreCase = true) ||
+        containsHttpStatusCode(message, 401) ||
+        containsHttpStatusCode(message, 403)
+
+/** Matches HTTP status codes in error text, not arbitrary digit runs in file paths. */
+internal fun containsHttpStatusCode(message: String, code: Int): Boolean {
+    val token = Regex.escape(code.toString())
+    return Regex("""(?:HTTP\s+|:|\s|\()$token(?:\s|\)|:|\$|,|/)""").containsMatchIn(message)
+}
 
 internal fun isRemoteUnavailableError(message: String): Boolean =
     message.contains("Connection refused", ignoreCase = true) ||

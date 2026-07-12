@@ -117,6 +117,31 @@ class WorkspaceSetupErrorTest {
     }
 
     @Test
+    fun isAuthenticationError_ignoresStatusCodeDigitsEmbeddedInPaths() {
+        val pathWith401 = "file:/tmp/junit14897644595840162951/missing.git: not found"
+        assertFalse(isAuthenticationError(pathWith401))
+        assertTrue(isInvalidRepositoryError(pathWith401))
+    }
+
+    @Test
+    fun mapCloneFailure_mapsPathWithEmbedded401ToInvalidRepository() {
+        val error = mapCloneFailure(
+            RuntimeException("file:/tmp/junit14897644595840162951/missing.git: not found"),
+            branch = "main"
+        )
+        assertTrue(
+            "expected InvalidRepository but was ${error.error}",
+            error.error is WorkspaceSetupError.InvalidRepository
+        )
+    }
+
+    @Test
+    fun isAuthenticationError_matchesExplicitHttpStatusCodes() {
+        assertTrue(isAuthenticationError("HTTP 401 Unauthorized"))
+        assertTrue(isAuthenticationError("R2 GET failed: HTTP 403 (AccessDenied)."))
+    }
+
+    @Test
     fun authenticationFailed_hasStableMessage() {
         val message = WorkspaceSetupError.AuthenticationFailed.message()
         assertTrue(message == "Authentication failed.")
