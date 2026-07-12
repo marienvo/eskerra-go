@@ -71,6 +71,12 @@ scope) and the delegated work-order + report format. Two repo-local review skill
 up: `review-markdown-integrity-data-loss-prevention` (any Markdown/vault write path) and
 `review-state-consistency-coroutine-safety` (ViewModels, `StateFlow`, coroutine races).
 
+## Observability
+
+Sentry conventions (what is actually sent today: SDK init, tags, the one breadcrumb) live
+in [`specs/observability/README.md`](specs/observability/README.md). Renaming a telemetry
+event, tag, or fingerprint updates that spec **in the same change**.
+
 ## Branding / launcher icons
 
 Launcher mipmaps live under `app/src/main/res/mipmap-*` (adaptive foreground PNGs + `mipmap-anydpi-v26` XML). Play Store / web exports are in [`branding/`](branding/) when present.
