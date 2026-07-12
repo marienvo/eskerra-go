@@ -26,6 +26,7 @@ This folder holds **active or intentionally parked planning documents** — noth
 |---|---|---|
 | `studio-feature-parity.md` | **Active now** | The stack's driver. Three-tier parity model (contract / product / deliberate divergence). Next step: **P0 verified inventory** (no code — correct the plan's own gap matrix against the running app). P1 (non-inbox editing + foreground-resume sync) is the headline product gap and gates the audiobook player's Go phase. |
 | `workspace-setup.md` | **Candidate for deletion** | A "what was built" log for the (long-shipped) setup flow — history, not a plan. Anything durable in it belongs in `app-contract.md` or an architecture doc; verify nothing is missing there, then delete. |
+| `spec-parity-guardrails.md` | **Active now** (process track) | Seeds quality guardrails from notebox (module-budget ratchet + touch-it-tidy-it, doc map + invariants, ArchUnit layer rules, change-safety rules + review skills, observability spec) as five sequenced commits. Orthogonal to the product order below — safe to interleave; commit 1 (ratchet fix) first, since every later slice relies on honest budgets. |
 
 Feature plans arriving later (e.g. the M4B audiobook player, whose cross-client contract lives in the notebox repo) enter this table as **Active later** with their gate stated in the row.
 
@@ -37,6 +38,10 @@ Feature plans arriving later (e.g. the M4B audiobook player, whose cross-client 
 4. **Parity P2 — contract adoption + small items** (settings document / `vaultLayout`, theme-preference read, attachments render, Today Hub depth per P0 findings). Independent small PRs.
 5. **Audiobook player Go phase** — unlocked by step 3; its own plan governs it.
 6. **Parity P3 long tail** — explicitly allowed to stay parked.
+
+The **process track** (`spec-parity-guardrails.md`) runs in parallel to this product
+order: its five commits are independent of the parity phases and may be interleaved
+whenever product work is not in flight on the same files.
 
 ## 5. Plan lifecycle rules
 

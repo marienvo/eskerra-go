@@ -1,0 +1,188 @@
+# SPEC-parity guardrails — seed quality standards from notebox
+
+Status: **active**. Agreed 2026-07-12 (analysis + Q&A in-session). One sequenced
+implementation plan in five commits, executed in the order below; each commit leaves
+`main` shippable and is reviewable as an individual diff in ~30 minutes.
+
+## Authority and provenance (binding for this whole plan)
+
+Every document, rule, and skill this plan introduces is **seeded** from the notebox repo
+and becomes **canonical in eskerra-go the moment it lands here**.
+
+- Seed source: `notebox` @ commit `c72b677a6334560c12441631189dec576ad771e4` (2026-07-12).
+  Each seeded file carries a one-line provenance note naming its notebox source path and
+  that commit.
+- After seeding, **notebox is provenance only** — not an ongoing authority source. If the
+  notebox original evolves, that has no effect here; if the eskerra-go copy evolves, do
+  not "correct" it back toward notebox.
+- **None of this material joins the sync-set.** `scripts/sync-shared-conventions.sh` (the
+  existing notebox→eskerra-go mechanism for `.cursor/rules/{language,quality,specs,testing}.mdc`,
+  the named `.cursor/skills/`, `.claude/settings.json`, hooks) keeps working exactly as
+  today for the files it already owns; nothing from this plan is added to its manifest.
+- Drift between the two repos' copies is accepted by design. If it ever hurts, the remedy
+  is a manual drift-check skill — a possible later addition, not part of this plan.
+
+New repo-local skills get the same "repo-local" marker `plan-next-pr` already uses, so a
+future sync run cannot clobber them (the sync script only replaces skills it names).
+
+---
+
+## Commit 1 — module-budget ratchet fix + touch-it-tidy-it
+
+The current guardrail has two gaps: (a) `update-module-budget-baseline.sh` rewrites caps
+to the *current* line count — also upward (`scripts/lib/module-budget-update-lib.sh`,
+`next["$rel"]="$current"`), silently legitimizing growth; (b) an existing file between
+401 and 799 lines with no baseline entry may grow freely (the growth stop only starts
+at ≥800).
+
+Changes:
+
+1. **One-way ratchet in the updater.** In `build_updated_max_lines_by_path`, an existing
+   cap may only be lowered or kept; never raised and no new entry added for a file that
+   grew. Raising a cap or adding an entry becomes a deliberate manual edit of
+   `scripts/module-budget-baseline.json`, justified in the commit message / work report.
+2. **Touch it, tidy it in the checker.** `check-module-budgets.sh` gains a rule for
+   changed files (vs. merge base, reusing the existing changed-file detection): a touched
+   `.kt` file must end at `max(400, line count at merge base)` — files at or under 400
+   may never cross 400; files already over 400 may only shrink or stay equal. Baseline
+   caps remain the ceiling for pinned files; untouched files are unaffected. The ≥800
+   growth stop becomes redundant and is removed.
+
+   Rename/new-file behavior:
+   - Pure renames/moves use the merge-base line count of the **old path** as the budget
+     for the new path.
+   - New `.kt` files (no merge-base counterpart) have a hard **400-line ceiling**.
+   - Deleted files are ignored.
+3. **Docs follow the mechanism.** Update `AGENTS.md` § quality gate and
+   `specs/team-scalability/README.md` to state the touch-it-tidy-it rule and the
+   downward-only baseline policy (wording seeded from notebox `AGENTS.md` § "Module size
+   budget").
+4. **Resolve the 250-vs-400 contradiction.** Drop the "New files over 250 lines need
+   justification" sentence from `.cursor/rules/project-conventions.mdc`; 400 with
+   mechanical enforcement is the single number.
+
+Tests: extend `scripts/check-module-budget-baseline.test.sh` (already in CI) with cases
+for cap-raise-rejected, cap-lower-applied, touched-file-grew-past-budget-fails,
+untouched-large-file-passes, rename-inherits-old-path-budget.
+
+## Commit 2 — doc map + AGENTS.md invariants
+
+Doc-only.
+
+1. **`specs/README.md`** (seed: notebox `specs/README.md`): what lives where, the
+   authority order when sources disagree (code and tests > ADRs > `specs/architecture/` >
+   `AGENTS.md` summaries > plans), and the lifecycle rule (a doc survives only while it is
+   the authoritative home of something; the commit/change that lands a fact's durable
+   home deletes the other copies). Table lists only the folders this repo has at that
+   point (`adr/`, `architecture/`, `plans/`, `rules/`, `team-scalability/`); do not
+   invent empty folders for notebox categories we don't use. `specs/observability/`
+   enters the doc map in commit 5, when that folder actually lands.
+2. **`AGENTS.md` § Key invariants** (new section):
+   - *Startup performance:* first screen render is the sacred path — defer vault scans,
+     git fetch, RSS refresh, markdown parsing, and indexing until after first frame; use
+     last-known cached state for first paint. (Consistent with
+     `specs/architecture/boot-optimization.md`, which stays authoritative.)
+   - *Playlist merge (shared vault contract, must match notebox verbatim):* higher
+     `controlRevision` wins; if tied, higher `updatedAt` wins; if tied, remote wins.
+3. **`AGENTS.md` § Proposing new work** (seed: notebox § same name): any proposed new
+   dependency, startup initialization, background process, persistent cache, or file scan
+   states why it is needed, whether it is on the startup path, whether it can be
+   deferred, the performance risk, and how to measure it.
+
+## Commit 3 — ArchUnit layer rules
+
+Turn the prose architecture rules into unit tests: add `com.tngtech.archunit:archunit-junit4`
+(matching the existing JUnit 4 test setup) as `testImplementation`, with rule classes
+under `app/src/test/.../architecture/`. Runs inside `:app:testDebugUnitTest`, so it is
+automatically part of the existing quality gate and CI — no new mechanism.
+
+Initial rule set, phrased in package/class terms (each maps to an existing AGENTS.md /
+project-conventions rule):
+
+1. Classes in `..feature..` packages do not depend on `java.io..`/`java.nio..` file APIs
+   or on `..data.git..`.
+2. `org.eclipse.jgit..` is accessed only from `..data.git..`.
+3. Classes assignable to `androidx.lifecycle.ViewModel` do not depend on
+   `android.content.Context`.
+4. Markdown parsing / wiki-link resolution classes (by their actual packages, e.g.
+   `..markdown..` / `..wikilink..` — verify the real package names before writing the
+   rule) do not reside in `..feature..` packages.
+
+Do not attempt a generic "composables receive state and callbacks only" rule: ArchUnit
+has no reliable detectable category for composables absent a dedicated package or naming
+convention. That rule stays prose (and review-skill territory) until such a convention
+exists.
+
+Procedure: verify each rule against the current codebase first; a rule that already
+passes lands as-is, a rule with a small number of violations is either fixed trivially in
+the same commit or landed frozen (ArchUnit `FreezingArchRule`, violation store committed —
+same ratchet philosophy as the module budgets: the store may only shrink). Rules that
+would need real refactoring to pass are noted in the work report and left out; they enter
+as frozen rules in a follow-up.
+
+## Commit 4 — change-safety rules + review skills
+
+Lightweight adaptation of notebox's ADR-005 model (seed: notebox
+`specs/rules/change-safety.md` + `specs/rules/agent-protocol.md`), sized for this repo.
+
+1. **`specs/rules/change-safety.md`** — binding. Small taxonomy (~5 types, one declared
+   per commit):
+   - **G1 mechanical move** (splits/`git mv`, zero content edits) — agent-ideal; full gate.
+   - **G2 local feature change** (one slice, no sync/vault-write surface) — slice unit
+     test required.
+   - **G3 sync / vault-write change** (`data/git`, `ManualSyncNow`, recovery, conflict
+     sidecars, the git mutex, any markdown write path, FTS reconcile) — **critical**:
+     tests in the same change, agent proposes / human applies.
+   - **G4 test-only change** — zero production diff.
+   - **G5 guardrail/meta change** (budgets, baseline JSON, ArchUnit rules, CI, hooks,
+     this file) — human decides the rule, agent may build the mechanism.
+2. **File-access tiers** in the same doc: green (default), yellow (edit only when the
+   task targets them: sync orchestration, `App.kt` navigation host), **red**: propose
+   only, *unless* the task explicitly targets that file or category and the human
+   approved that scope up front. Red covers: `data/git` engine internals, markdown save
+   paths, `scripts/module-budget-baseline.json`, ArchUnit violation stores,
+   `.github/workflows/`, `.claude/hooks/`, `scripts/githooks/`, this rules file.
+3. **Work-order + report format** (seed: agent-protocol): delegated tasks state type,
+   goal, read-first specs, file allowlist, done-tests, non-goals; work reports include
+   files-vs-allowlist, before/after LOC of budgeted files, test output, and an
+   invariant argument for G3. Standing rules: no drive-by improvements ("noticed, not
+   done" list instead); **ratchet tampering is the one instant-revert offense**; agents
+   never weaken or delete an assertion to make a suite pass.
+4. **Review skills** (repo-local, `.claude/skills/`):
+   - `review-markdown-integrity-data-loss-prevention` — seeded from the notebox skill,
+     made platform-neutral (fail closed: when correctness is uncertain, do not write to
+     disk, never partially transform user Markdown). Directly relevant: both apps write
+     the same vault.
+   - `review-state-consistency-coroutine-safety` — written fresh for Kotlin/Compose:
+     StateFlow vs. snapshot-state drift, `viewModelScope` races, mutable state captured
+     in composables, one-owner-per-state.
+5. `AGENTS.md` gets a short "Change process" pointer to the rules file.
+
+## Commit 5 — minimal observability spec
+
+1. **`specs/observability/README.md`**: the Sentry event/tag naming conventions this app
+   actually uses today (inventory the existing `captureMessage`/tag call sites first;
+   document what exists, don't design aspirationally).
+2. One binding rule, in that file and as a line in `AGENTS.md`: renaming a telemetry
+   event or changing its tags/fingerprint updates the observability spec **in the same
+   change**.
+3. Add the now-existing `specs/observability/` folder to the doc map in `specs/README.md`
+   (deferred from commit 2).
+
+---
+
+## Housekeeping note (separate from this plan's slices)
+
+The synced skill `.cursor/skills/ubiquitous-language/` is stale
+(`sync-shared-conventions.sh --check` fails on it). Fix by running the existing sync
+script from notebox — **this stays under the existing sync mechanism** and must not be
+mixed into any of the commits above, precisely because those introduce locally-canonical
+material and this file remains notebox-owned. One trivial standalone commit, its message
+naming the sync script.
+
+## Lifecycle
+
+Per `specs/plans/README.md`: each implementation commit deletes or shrinks its completed
+slice from this plan. Durable outcomes land in their homes — `specs/rules/`,
+`specs/README.md`, `AGENTS.md`, `specs/observability/`, the scripts and tests — and the
+final implementation commit deletes this file.
