@@ -59,7 +59,7 @@ Use this structure in `specs/ubiquitous-language.md`:
 
 ## Example dialogue
 
-> **Dev:** "When the user pauses on mobile, do we still bump **controlRevision** in **playlist** state?"
+> **Dev:** "When the user pauses in Eskerra Go, do we still bump **controlRevision** in **playlist** state?"
 > **Domain expert:** "Only if that device wins the merge — see higher **controlRevision**, then **updatedAt**; R2 is authoritative when configured."
 > **Dev:** "So two offline edits can conflict until sync?"
 > **Domain expert:** "Right. The **Vault** is always the same tree; the conflict is about who owns playback order, not the files on disk."
