@@ -66,43 +66,15 @@ Not landed, by design: no generic "composables receive state and callbacks only"
 ArchUnit has no reliable detectable category for composables absent a dedicated package
 or naming convention. Stays prose (and review-skill territory, commit 4).
 
-## Commit 4 — change-safety rules + review skills
+## Commit 4 — change-safety rules + review skills — DONE
 
-Lightweight adaptation of notebox's ADR-005 model (seed: notebox
-`specs/rules/change-safety.md` + `specs/rules/agent-protocol.md`), sized for this repo.
-
-1. **`specs/rules/change-safety.md`** — binding. Small taxonomy (~5 types, one declared
-   per commit):
-   - **G1 mechanical move** (splits/`git mv`, zero content edits) — agent-ideal; full gate.
-   - **G2 local feature change** (one slice, no sync/vault-write surface) — slice unit
-     test required.
-   - **G3 sync / vault-write change** (`data/git`, `ManualSyncNow`, recovery, conflict
-     sidecars, the git mutex, any markdown write path, FTS reconcile) — **critical**:
-     tests in the same change, agent proposes / human applies.
-   - **G4 test-only change** — zero production diff.
-   - **G5 guardrail/meta change** (budgets, baseline JSON, ArchUnit rules, CI, hooks,
-     this file) — human decides the rule, agent may build the mechanism.
-2. **File-access tiers** in the same doc: green (default), yellow (edit only when the
-   task targets them: sync orchestration, `App.kt` navigation host), **red**: propose
-   only, *unless* the task explicitly targets that file or category and the human
-   approved that scope up front. Red covers: `data/git` engine internals, markdown save
-   paths, `scripts/module-budget-baseline.json`, ArchUnit violation stores,
-   `.github/workflows/`, `.claude/hooks/`, `scripts/githooks/`, this rules file.
-3. **Work-order + report format** (seed: agent-protocol): delegated tasks state type,
-   goal, read-first specs, file allowlist, done-tests, non-goals; work reports include
-   files-vs-allowlist, before/after LOC of budgeted files, test output, and an
-   invariant argument for G3. Standing rules: no drive-by improvements ("noticed, not
-   done" list instead); **ratchet tampering is the one instant-revert offense**; agents
-   never weaken or delete an assertion to make a suite pass.
-4. **Review skills** (repo-local, `.claude/skills/`):
-   - `review-markdown-integrity-data-loss-prevention` — seeded from the notebox skill,
-     made platform-neutral (fail closed: when correctness is uncertain, do not write to
-     disk, never partially transform user Markdown). Directly relevant: both apps write
-     the same vault.
-   - `review-state-consistency-coroutine-safety` — written fresh for Kotlin/Compose:
-     StateFlow vs. snapshot-state drift, `viewModelScope` races, mutable state captured
-     in composables, one-owner-per-state.
-5. `AGENTS.md` gets a short "Change process" pointer to the rules file.
+Landed. Durable homes: `specs/rules/change-safety.md` (G1–G5 taxonomy, green/yellow/red
+file tiers grounded on real `data/git` / write-path / FTS files, work-order + report
+format, standing rules), the two repo-local review skills under `.cursor/skills/`
+(`review-markdown-integrity-data-loss-prevention`, seeded + platform-neutral;
+`review-state-consistency-coroutine-safety`, fresh for Kotlin/Compose), and `AGENTS.md`
+§ Change process. Both new skills carry the repo-local marker and are ignored by
+`sync-shared-conventions.sh --check` (verified).
 
 ## Commit 5 — minimal observability spec
 

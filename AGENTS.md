@@ -60,6 +60,17 @@ should be measured. Before adding work to the startup path, first consider: defe
 caching the result, doing less work, reducing frequency, limiting the data set, or lazy
 loading.
 
+## Change process
+
+Every change declares one change type (G1–G5) per
+[`specs/rules/change-safety.md`](specs/rules/change-safety.md) (binding) — the type sets the
+required context, tests, reviewer, and whether an agent may drive it. That file also holds
+the green/yellow/**red** file-access tiers (sync/vault-write internals, guardrail ratchets,
+CI, and hooks are red: propose-only unless the task explicitly targets them with approved
+scope) and the delegated work-order + report format. Two repo-local review skills back it
+up: `review-markdown-integrity-data-loss-prevention` (any Markdown/vault write path) and
+`review-state-consistency-coroutine-safety` (ViewModels, `StateFlow`, coroutine races).
+
 ## Branding / launcher icons
 
 Launcher mipmaps live under `app/src/main/res/mipmap-*` (adaptive foreground PNGs + `mipmap-anydpi-v26` XML). Play Store / web exports are in [`branding/`](branding/) when present.
