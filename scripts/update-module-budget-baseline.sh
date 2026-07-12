@@ -25,12 +25,10 @@ if [[ ! -f "$BASELINE_PATH" ]]; then
 fi
 
 baseline_tsv="$(jq -r '.maxLinesByPath // {} | to_entries[] | [.key, (.value|tostring)] | @tsv' "$BASELINE_PATH")"
-auto_additions="$(collect_auto_baseline_additions || true)"
 
-updated="$(build_updated_max_lines_by_path "$baseline_tsv" path_exists count_lines_for_path "$auto_additions")"
-
-jq -n \
-  --argjson baseline "$(jq '.' "$BASELINE_PATH")" \
-  --argjson updated "$updated" \
-  '$baseline * $updated' >"${BASELINE_PATH}.tmp"
+# build_updated_max_lines_by_path already emits the full ratcheted baseline
+# (every surviving entry, lowered where the file shrank, entries dropped where
+# the file fell to <=400 or vanished). Write it directly — a recursive merge
+# with the old baseline would resurrect the dropped entries.
+build_updated_max_lines_by_path "$baseline_tsv" path_exists count_lines_for_path >"${BASELINE_PATH}.tmp"
 mv "${BASELINE_PATH}.tmp" "$BASELINE_PATH"

@@ -27,43 +27,13 @@ future sync run cannot clobber them (the sync script only replaces skills it nam
 
 ---
 
-## Commit 1 — module-budget ratchet fix + touch-it-tidy-it
+## Commit 1 — module-budget ratchet fix + touch-it-tidy-it — DONE
 
-The current guardrail has two gaps: (a) `update-module-budget-baseline.sh` rewrites caps
-to the *current* line count — also upward (`scripts/lib/module-budget-update-lib.sh`,
-`next["$rel"]="$current"`), silently legitimizing growth; (b) an existing file between
-401 and 799 lines with no baseline entry may grow freely (the growth stop only starts
-at ≥800).
-
-Changes:
-
-1. **One-way ratchet in the updater.** In `build_updated_max_lines_by_path`, an existing
-   cap may only be lowered or kept; never raised and no new entry added for a file that
-   grew. Raising a cap or adding an entry becomes a deliberate manual edit of
-   `scripts/module-budget-baseline.json`, justified in the commit message / work report.
-2. **Touch it, tidy it in the checker.** `check-module-budgets.sh` gains a rule for
-   changed files (vs. merge base, reusing the existing changed-file detection): a touched
-   `.kt` file must end at `max(400, line count at merge base)` — files at or under 400
-   may never cross 400; files already over 400 may only shrink or stay equal. Baseline
-   caps remain the ceiling for pinned files; untouched files are unaffected. The ≥800
-   growth stop becomes redundant and is removed.
-
-   Rename/new-file behavior:
-   - Pure renames/moves use the merge-base line count of the **old path** as the budget
-     for the new path.
-   - New `.kt` files (no merge-base counterpart) have a hard **400-line ceiling**.
-   - Deleted files are ignored.
-3. **Docs follow the mechanism.** Update `AGENTS.md` § quality gate and
-   `specs/team-scalability/README.md` to state the touch-it-tidy-it rule and the
-   downward-only baseline policy (wording seeded from notebox `AGENTS.md` § "Module size
-   budget").
-4. **Resolve the 250-vs-400 contradiction.** Drop the "New files over 250 lines need
-   justification" sentence from `.cursor/rules/project-conventions.mdc`; 400 with
-   mechanical enforcement is the single number.
-
-Tests: extend `scripts/check-module-budget-baseline.test.sh` (already in CI) with cases
-for cap-raise-rejected, cap-lower-applied, touched-file-grew-past-budget-fails,
-untouched-large-file-passes, rename-inherits-old-path-budget.
+Landed. Durable homes: `scripts/lib/module-budget-common.sh` (touch-it-tidy-it +
+rename map), `scripts/lib/module-budget-update-lib.sh` (one-way ratchet),
+`scripts/check-module-budget-baseline.test.sh` (tests), `AGENTS.md` §
+Module size budget, `specs/team-scalability/README.md`,
+`.cursor/rules/project-conventions.mdc`.
 
 ## Commit 2 — doc map + AGENTS.md invariants
 
