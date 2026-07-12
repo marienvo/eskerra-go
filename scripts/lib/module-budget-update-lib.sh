@@ -6,16 +6,20 @@ _LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/module-budget-common.sh
 source "${_LIB_DIR}/module-budget-common.sh"
 
-# build_updated_max_lines_by_path baseline_tsv path_exists_fn count_lines_fn auto_additions_tsv
+# build_updated_max_lines_by_path baseline_tsv path_exists_fn count_lines_fn
 # Emits sorted JSON object: {"maxLinesByPath": {...}}
+#
+# One-way ratchet: an existing cap may only be lowered to the file's current
+# size or kept — never raised. Entries whose file dropped to <= NEW_FILE_MAX_LINES
+# or no longer exists are removed. New baseline entries are NEVER auto-added here;
+# pinning a new large file is a deliberate manual edit of the baseline JSON.
 build_updated_max_lines_by_path() {
   local baseline_tsv="$1"
   local path_exists_fn="$2"
   local count_lines_fn="$3"
-  local auto_additions_tsv="$4"
 
   local -A next=()
-  local rel cap current rel_add count_add
+  local rel cap current
 
   while IFS=$'\t' read -r rel cap; do
     [[ -z "$rel" ]] && continue
@@ -26,15 +30,13 @@ build_updated_max_lines_by_path() {
     if (( current <= NEW_FILE_MAX_LINES )); then
       continue
     fi
-    next["$rel"]="$current"
-  done <<<"$baseline_tsv"
-
-  while IFS=$'\t' read -r rel_add count_add; do
-    [[ -z "$rel_add" ]] && continue
-    if (( count_add > NEW_FILE_MAX_LINES )); then
-      next["$rel_add"]="$count_add"
+    # Ratchet down only: keep the cap when the file exceeds it, never raise it.
+    if (( current < cap )); then
+      next["$rel"]="$current"
+    else
+      next["$rel"]="$cap"
     fi
-  done <<<"$auto_additions_tsv"
+  done <<<"$baseline_tsv"
 
   if ((${#next[@]} == 0)); then
     echo '{"maxLinesByPath":{}}'

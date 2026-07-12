@@ -5,11 +5,16 @@ if [[ -z "${MODULE_BUDGET_COMMON_LOADED:-}" ]]; then
   MODULE_BUDGET_COMMON_LOADED=1
 
   _MODULE_BUDGET_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  REPO_ROOT="$(cd "${_MODULE_BUDGET_LIB_DIR}/../.." && pwd)"
-  BASELINE_PATH="${REPO_ROOT}/scripts/module-budget-baseline.json"
+  # REPO_ROOT / BASELINE_PATH may be pre-set by callers (tests point them at a
+  # throwaway git fixture); default to this repo when unset.
+  REPO_ROOT="${REPO_ROOT:-$(cd "${_MODULE_BUDGET_LIB_DIR}/../.." && pwd)}"
+  BASELINE_PATH="${BASELINE_PATH:-${REPO_ROOT}/scripts/module-budget-baseline.json}"
 
+  # "Touch it, tidy it": a changed .kt file must end no larger than
+  # max(NEW_FILE_MAX_LINES, its line count at the merge base). New files have a
+  # hard NEW_FILE_MAX_LINES ceiling; baseline-pinned files are governed by their
+  # explicit cap instead (ratchets downward only).
   NEW_FILE_MAX_LINES=400
-  GROWTH_TRACK_MIN_LINES=800
 fi
 
 require_jq() {
@@ -126,35 +131,18 @@ collect_changed_paths() {
   printf '%s\n' "${changed[@]}" | awk '!seen[$0]++'
 }
 
-collect_auto_baseline_additions() {
-  local merge_base
-  merge_base="$(resolve_merge_base 2>/dev/null || true)"
-  if [[ -z "$merge_base" ]]; then
-    return 0
-  fi
-
-  local rel abs current was_new prev
-  while IFS= read -r rel; do
-    [[ -z "$rel" ]] && continue
-    is_scoped_source "$rel" || continue
-
-    abs="${REPO_ROOT}/${rel}"
-    [[ -f "$abs" ]] || continue
-    baseline_has_path "$rel" && continue
-
-    current="$(count_lines "$abs")"
-    if ! exists_at_revision "$merge_base" "$rel"; then
-      if (( current > NEW_FILE_MAX_LINES )); then
-        printf '%s\t%s\n' "$rel" "$current"
-      fi
-      continue
+# Emits "newpath<TAB>oldpath" for every rename git can detect across the merge
+# base, the working tree, and the index. Lets a renamed/moved file inherit the
+# budget of the path it came from instead of being treated as brand new.
+build_rename_map() {
+  local merge_base="$1"
+  {
+    if [[ -n "$merge_base" ]]; then
+      git_out diff -M --diff-filter=R --name-status "${merge_base}...HEAD" 2>/dev/null || true
     fi
-
-    prev="$(count_lines_at_revision "$merge_base" "$rel")"
-    if (( prev >= GROWTH_TRACK_MIN_LINES && current > prev )); then
-      printf '%s\t%s\n' "$rel" "$current"
-    fi
-  done < <(collect_changed_paths "$merge_base")
+    git_out diff -M --diff-filter=R --name-status HEAD 2>/dev/null || true
+    git_out diff -M --diff-filter=R --cached --name-status HEAD 2>/dev/null || true
+  } | awk -F'\t' 'NF>=3 { print $3 "\t" $2 }' | awk '!seen[$0]++'
 }
 
 collect_baseline_cap_violations() {
@@ -173,34 +161,61 @@ collect_baseline_cap_violations() {
   done < <(jq -r '.maxLinesByPath // {} | to_entries[] | [.key, (.value|tostring)] | @tsv' "$BASELINE_PATH")
 }
 
+# Touch it, tidy it: every changed .kt file must end no larger than its budget.
+#   - baseline-pinned files: governed by their explicit cap (checked separately).
+#   - files present at the merge base: budget = max(400, merge-base line count),
+#     so a file at/under 400 may never cross 400 and a file over 400 may only
+#     shrink or stay equal.
+#   - renamed/moved files: inherit the old path's merge-base line count.
+#   - genuinely new files: hard 400-line ceiling.
+#   - deleted files: ignored.
 collect_git_budget_violations() {
   local merge_base
   merge_base="$(resolve_merge_base 2>/dev/null || true)"
   if [[ -z "$merge_base" ]]; then
-    echo "[check-module-budgets] No merge base (no origin/main or main). Skipping git-based new/growth checks." >&2
+    echo "[check-module-budgets] No merge base (no origin/main or main). Skipping git-based touch-it-tidy-it checks." >&2
     return 0
   fi
 
-  local rel abs current was_new prev
+  local -A rename_src=()
+  local new_path old_path
+  while IFS=$'\t' read -r new_path old_path; do
+    [[ -z "$new_path" ]] && continue
+    rename_src["$new_path"]="$old_path"
+  done < <(build_rename_map "$merge_base")
+
+  local rel abs current prev budget basis
   while IFS= read -r rel; do
     [[ -z "$rel" ]] && continue
     is_scoped_source "$rel" || continue
 
     abs="${REPO_ROOT}/${rel}"
-    [[ -f "$abs" ]] || continue
-    baseline_has_path "$rel" && continue
+    [[ -f "$abs" ]] || continue          # deleted (or moved-away) path: ignore
+    baseline_has_path "$rel" && continue # pinned: baseline cap governs
 
     current="$(count_lines "$abs")"
-    if ! exists_at_revision "$merge_base" "$rel"; then
-      if (( current > NEW_FILE_MAX_LINES )); then
-        echo "${rel}: new file has ${current} lines (max ${NEW_FILE_MAX_LINES} without baseline entry). Split or add an explicit baseline bump."
+
+    if exists_at_revision "$merge_base" "$rel"; then
+      prev="$(count_lines_at_revision "$merge_base" "$rel")"
+      budget=$(( prev > NEW_FILE_MAX_LINES ? prev : NEW_FILE_MAX_LINES ))
+      if (( current > budget )); then
+        echo "${rel}: grew from ${prev} to ${current} lines (touch-it-tidy-it budget ${budget}; a touched file may not exceed max(${NEW_FILE_MAX_LINES}, its merge-base size))."
       fi
       continue
     fi
 
-    prev="$(count_lines_at_revision "$merge_base" "$rel")"
-    if (( prev >= GROWTH_TRACK_MIN_LINES && current > prev )); then
-      echo "${rel}: grew from ${prev} to ${current} lines (files ≥${GROWTH_TRACK_MIN_LINES} lines may not grow without intentional refactor/split)."
+    basis="${rename_src[$rel]:-}"
+    if [[ -n "$basis" ]] && exists_at_revision "$merge_base" "$basis"; then
+      prev="$(count_lines_at_revision "$merge_base" "$basis")"
+      budget=$(( prev > NEW_FILE_MAX_LINES ? prev : NEW_FILE_MAX_LINES ))
+      if (( current > budget )); then
+        echo "${rel}: renamed from ${basis} (${prev} lines) and grew to ${current} lines (touch-it-tidy-it budget ${budget})."
+      fi
+      continue
+    fi
+
+    if (( current > NEW_FILE_MAX_LINES )); then
+      echo "${rel}: new file has ${current} lines (max ${NEW_FILE_MAX_LINES} without an explicit baseline entry). Split or add a deliberate baseline bump."
     fi
   done < <(collect_changed_paths "$merge_base")
 }

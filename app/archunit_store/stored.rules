@@ -1,0 +1,3 @@
+#
+#Sun Jul 12 18:07:42 CEST 2026
+no\ classes\ that\ reside\ in\ any\ package\ ['..feature..',\ '..ui..']\ should\ depend\ on\ classes\ that\ reside\ in\ any\ package\ ['java.nio.file..']\ or\ equivalent\ to\ java.io.File,\ because\ UI\ code\ must\ not\ read\ files\ directly;\ file\ access\ lives\ in\ data/=8510e99b-e386-4b43-a79c-3b3de300e9cd

@@ -31,8 +31,51 @@ Architecture style (hybrid layering + feature slices) and placement rules for ne
   - No WorkManager/AlarmManager scheduled sync; read-only remote `fetch` for the shell indicator is allowed on foreground.
 - Full-text search uses **Android's bundled SQLite FTS5** (`SQLiteOpenHelper`). See [`specs/plans/android-vault-notes-rebuild-plan.md`](specs/plans/android-vault-notes-rebuild-plan.md) (Phase 7) for the index schema, reconcile strategy, and ranker tiers.
 - No multi-workspace support.
-- Module budgets enforce file size in CI. New `.kt` files may not exceed **400** lines without a baseline entry; files **≥800** lines may not grow without an intentional baseline bump. See [`specs/team-scalability/README.md`](specs/team-scalability/README.md) and [`scripts/module-budget-baseline.json`](scripts/module-budget-baseline.json).
+- **Module size budget — touch it, tidy it.** Any `.kt` file under `app/src/{main,test,androidTest}/java/` that your change touches must end no larger than `max(400, the line count it had at the merge base)`: a file at or under 400 may never cross 400, and a file already over 400 may only shrink or stay equal. Renamed/moved files inherit the old path's merge-base size; brand-new files have a hard 400-line ceiling; untouched files are left alone. Pre-existing large files are pinned in [`scripts/module-budget-baseline.json`](scripts/module-budget-baseline.json) and that cap **only ratchets down** — `update-module-budget-baseline.sh` will never raise a cap or add an entry for a grown file. Pinning a new large file is a deliberate manual edit of the baseline JSON, justified in the commit message. `./scripts/check-module-budgets.sh` enforces this in CI. See [`specs/team-scalability/README.md`](specs/team-scalability/README.md).
 - Every feature slice must include at least one unit test for domain/data behavior.
+
+## Key invariants
+
+**Startup performance:** first screen render is the sacred path. Defer vault scans, git
+`fetch`, RSS refresh, markdown parsing, and indexing until after the first frame; use
+last-known cached state for first paint, then refresh in the background. Nothing expensive
+runs before launch is settled. Authoritative detail:
+[`specs/architecture/boot-optimization.md`](specs/architecture/boot-optimization.md)
+(app gate, note-registry cache, launch-settled conditions).
+
+**Playlist merge (shared vault contract — must match notebox verbatim):** higher
+`controlRevision` wins; if tied, higher `updatedAt` wins; if tied, remote wins. R2 is
+authoritative when configured; the vault-local playlist is the offline fallback. Both
+apps write the same playlist objects, so this ordering may not drift between them.
+Implemented in
+[`PlaylistMerge.kt`](app/src/main/java/com/eskerra/go/core/playlist/PlaylistMerge.kt)
+(`pickNewerPlaylistEntry`), mirroring `packages/eskerra-core/src/playlist.ts` in notebox.
+
+## Proposing new work
+
+When proposing a new dependency, provider, startup initialization, background process,
+persistent cache, or file/vault scan, state: (1) why it is needed, (2) whether it is on
+the startup path, (3) whether it can be deferred, (4) the performance risk, (5) how it
+should be measured. Before adding work to the startup path, first consider: deferring it,
+caching the result, doing less work, reducing frequency, limiting the data set, or lazy
+loading.
+
+## Change process
+
+Every change declares one change type (G1–G5) per
+[`specs/rules/change-safety.md`](specs/rules/change-safety.md) (binding) — the type sets the
+required context, tests, reviewer, and whether an agent may drive it. That file also holds
+the green/yellow/**red** file-access tiers (sync/vault-write internals, guardrail ratchets,
+CI, and hooks are red: propose-only unless the task explicitly targets them with approved
+scope) and the delegated work-order + report format. Two repo-local review skills back it
+up: `review-markdown-integrity-data-loss-prevention` (any Markdown/vault write path) and
+`review-state-consistency-coroutine-safety` (ViewModels, `StateFlow`, coroutine races).
+
+## Observability
+
+Sentry conventions (what is actually sent today: SDK init, tags, the one breadcrumb) live
+in [`specs/observability/README.md`](specs/observability/README.md). Renaming a telemetry
+event, tag, or fingerprint updates that spec **in the same change**.
 
 ## Branding / launcher icons
 

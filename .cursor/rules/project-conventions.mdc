@@ -19,7 +19,7 @@ Rules:
 - Manual vault sync (`ManualSyncNow`) commits all safe local changes with auto-merge on divergence; RSS refresh delegates to the same engine; mark-as-played uses a scoped podcast-only channel (shared git mutex; see sync-hardening spec).
 - No WorkManager/AlarmManager scheduled background sync.
 - No multi-workspace support.
-- Prefer small files. New files over 250 lines need justification.
+- Prefer small files. Module size is enforced mechanically at **400** lines (touch it, tidy it) — see AGENTS.md § Module size budget and `specs/team-scalability/README.md`.
 - Every feature slice must include at least one unit test for domain/data behavior.
 
 ## Quality gate

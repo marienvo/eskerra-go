@@ -38,6 +38,14 @@ Feature plans arriving later (e.g. the M4B audiobook player, whose cross-client 
 5. **Audiobook player Go phase** — unlocked by step 3; its own plan governs it.
 6. **Parity P3 long tail** — explicitly allowed to stay parked.
 
+The process track that seeded quality guardrails from notebox (module budgets,
+doc map, ArchUnit, change-safety rules, observability spec) is done — all five
+commits landed and `spec-parity-guardrails.md` is deleted per the lifecycle rule.
+Durable outcomes: `specs/rules/change-safety.md`, `specs/README.md`,
+`specs/observability/README.md`, `AGENTS.md` §§ Module size budget / Key
+invariants / Proposing new work / Change process / Observability, the ArchUnit
+suite, and the two repo-local review skills.
+
 ## 5. Plan lifecycle rules
 
 1. **Delete on absorption.** The PR that lands a phase's last artifact shrinks or deletes the plan text in the same change.
