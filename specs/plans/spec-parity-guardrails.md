@@ -41,36 +41,30 @@ Landed. Durable homes: `specs/README.md` (doc map + authority order + lifecycle 
 `AGENTS.md` § Key invariants (startup sacred path + playlist merge) and § Proposing new
 work. `specs/observability/` deferred to commit 5.
 
-## Commit 3 — ArchUnit layer rules
+## Commit 3 — ArchUnit layer rules — DONE
 
-Turn the prose architecture rules into unit tests: add `com.tngtech.archunit:archunit-junit4`
-(matching the existing JUnit 4 test setup) as `testImplementation`, with rule classes
-under `app/src/test/.../architecture/`. Runs inside `:app:testDebugUnitTest`, so it is
-automatically part of the existing quality gate and CI — no new mechanism.
+Landed. Durable homes: `app/src/test/java/com/eskerra/go/architecture/ArchitectureLayerRulesTest.kt`,
+`app/src/test/resources/archunit.properties` + committed `app/archunit_store/` (frozen-rule
+ratchet, may only shrink), `archunit-junit4` in `gradle/libs.versions.toml` +
+`app/build.gradle.kts`. Runs inside `:app:testDebugUnitTest`.
 
-Initial rule set, phrased in package/class terms (each maps to an existing AGENTS.md /
-project-conventions rule):
+Landed rule set (four active, one frozen):
 
-1. Classes in `..feature..` packages do not depend on `java.io..`/`java.nio..` file APIs
-   or on `..data.git..`.
-2. `org.eclipse.jgit..` is accessed only from `..data.git..`.
-3. Classes assignable to `androidx.lifecycle.ViewModel` do not depend on
-   `android.content.Context`.
-4. Markdown parsing / wiki-link resolution classes (by their actual packages, e.g.
-   `..markdown..` / `..wikilink..` — verify the real package names before writing the
-   rule) do not reside in `..feature..` packages.
+1. `jgitIsAccessedOnlyFromDataGit` — `org.eclipse.jgit..` accessed only from `..data.git..`. Active, clean.
+2. `uiDoesNotDependOnDataGit` — `..feature..`/`..ui..` do not depend on `..data.git..`. Active, clean.
+3. `viewModelsDoNotDependOnAndroidContext` — classes assignable to `androidx.lifecycle.ViewModel` do not depend on `android.content.Context`. Active, clean.
+4. `coreStaysBelowUiAndApp` — `..core..` does not depend on `..feature..`/`..ui..`/`..app..`. Active, clean. (Landed instead of a narrower markdown/wiki-link-only rule: the actual packages are `core.markdown` and `core.wikilink`, both already under `..core..`, so the general inward-dependency rule subsumes the planned one.)
+5. `uiDoesNotTouchFileApis` — `..feature..`/`..ui..` do not depend on `java.nio.file..` or `java.io.File`. **Frozen** (`FreezingArchRule`, 68 pre-existing violations, mostly image loading) — the store may only shrink.
 
-Do not attempt a generic "composables receive state and callbacks only" rule: ArchUnit
-has no reliable detectable category for composables absent a dedicated package or naming
-convention. That rule stays prose (and review-skill territory) until such a convention
-exists.
+Deviation from the original plan: `ImportOption.DoNotIncludeTests` does not exclude
+Android's unit-test/instrumentation-test compiled output directories, so rules 1 and 4
+initially flagged test code (e.g. tests driving JGit directly). Added a custom
+`ExcludeAndroidTestClasses : ImportOption` (excludes paths containing `UnitTest`,
+`AndroidTest`, `/test/`) instead.
 
-Procedure: verify each rule against the current codebase first; a rule that already
-passes lands as-is, a rule with a small number of violations is either fixed trivially in
-the same commit or landed frozen (ArchUnit `FreezingArchRule`, violation store committed —
-same ratchet philosophy as the module budgets: the store may only shrink). Rules that
-would need real refactoring to pass are noted in the work report and left out; they enter
-as frozen rules in a follow-up.
+Not landed, by design: no generic "composables receive state and callbacks only" rule —
+ArchUnit has no reliable detectable category for composables absent a dedicated package
+or naming convention. Stays prose (and review-skill territory, commit 4).
 
 ## Commit 4 — change-safety rules + review skills
 
