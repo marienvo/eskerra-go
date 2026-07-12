@@ -35,29 +35,11 @@ rename map), `scripts/lib/module-budget-update-lib.sh` (one-way ratchet),
 Module size budget, `specs/team-scalability/README.md`,
 `.cursor/rules/project-conventions.mdc`.
 
-## Commit 2 — doc map + AGENTS.md invariants
+## Commit 2 — doc map + AGENTS.md invariants — DONE
 
-Doc-only.
-
-1. **`specs/README.md`** (seed: notebox `specs/README.md`): what lives where, the
-   authority order when sources disagree (code and tests > ADRs > `specs/architecture/` >
-   `AGENTS.md` summaries > plans), and the lifecycle rule (a doc survives only while it is
-   the authoritative home of something; the commit/change that lands a fact's durable
-   home deletes the other copies). Table lists only the folders this repo has at that
-   point (`adr/`, `architecture/`, `plans/`, `rules/`, `team-scalability/`); do not
-   invent empty folders for notebox categories we don't use. `specs/observability/`
-   enters the doc map in commit 5, when that folder actually lands.
-2. **`AGENTS.md` § Key invariants** (new section):
-   - *Startup performance:* first screen render is the sacred path — defer vault scans,
-     git fetch, RSS refresh, markdown parsing, and indexing until after first frame; use
-     last-known cached state for first paint. (Consistent with
-     `specs/architecture/boot-optimization.md`, which stays authoritative.)
-   - *Playlist merge (shared vault contract, must match notebox verbatim):* higher
-     `controlRevision` wins; if tied, higher `updatedAt` wins; if tied, remote wins.
-3. **`AGENTS.md` § Proposing new work** (seed: notebox § same name): any proposed new
-   dependency, startup initialization, background process, persistent cache, or file scan
-   states why it is needed, whether it is on the startup path, whether it can be
-   deferred, the performance risk, and how to measure it.
+Landed. Durable homes: `specs/README.md` (doc map + authority order + lifecycle rule),
+`AGENTS.md` § Key invariants (startup sacred path + playlist merge) and § Proposing new
+work. `specs/observability/` deferred to commit 5.
 
 ## Commit 3 — ArchUnit layer rules
 
