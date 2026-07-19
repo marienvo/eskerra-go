@@ -10,7 +10,9 @@ Shared conventions (language, quality, specs discipline, testing, skills, git gu
 
 Do not edit synced `.cursor/rules/{language,quality,specs,testing}.mdc`, `.cursor/skills/`, `.claude/settings.json`, or `.claude/hooks/` in this repo — change them in **notebox** and re-run the script.
 
-Exception: `.cursor/skills/plan-next-pr/` is **repo-local** (marked as such in its SKILL.md; the sync script only replaces the skills it names, so it survives re-syncs). Edit it here, not in notebox — the notebox repo has its own variant with notebox paths and gates.
+`plan-next-pr` is now **synced from notebox** too (edit it there). Its notebox-only paths/gates are wrapped in `repo-specific` marker blocks that the sync strips, leaving eskerra-go's gradle/G-taxonomy fallbacks — so re-syncs keep it in step with notebox.
+
+The genuinely **repo-local** skills (not in the sync manifest, so they survive re-syncs and must be edited here) are the review skills — `review-markdown-integrity-data-loss-prevention`, `review-state-consistency-coroutine-safety`, `review-architecture-drift-responsibility-boundaries` — and `android-performance-debug-loop`.
 
 ## Project-specific rules
 
@@ -67,9 +69,10 @@ Every change declares one change type (G1–G5) per
 required context, tests, reviewer, and whether an agent may drive it. That file also holds
 the green/yellow/**red** file-access tiers (sync/vault-write internals, guardrail ratchets,
 CI, and hooks are red: propose-only unless the task explicitly targets them with approved
-scope) and the delegated work-order + report format. Two repo-local review skills back it
-up: `review-markdown-integrity-data-loss-prevention` (any Markdown/vault write path) and
-`review-state-consistency-coroutine-safety` (ViewModels, `StateFlow`, coroutine races).
+scope) and the delegated work-order + report format. Three repo-local review skills back it
+up: `review-markdown-integrity-data-loss-prevention` (any Markdown/vault write path),
+`review-state-consistency-coroutine-safety` (ViewModels, `StateFlow`, coroutine races), and
+`review-architecture-drift-responsibility-boundaries` (layer seams, god modules, ownership).
 
 ## Observability
 

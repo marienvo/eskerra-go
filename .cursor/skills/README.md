@@ -17,12 +17,13 @@ Re-sync from notebox:
 - `git-guardrails-claude-code`
 - `grill-me`
 - `improve-codebase-architecture`
+- `plan-next-pr`
 - `request-refactor-plan`
 - `tdd`
 - `to-prd`
 - `ubiquitous-language`
 - `zoom-out`
 
-Imported from [mattpocock/skills](https://github.com/mattpocock/skills/tree/main); see `mattpocock-skills-LICENSE`.
+Most skills are imported from [mattpocock/skills](https://github.com/mattpocock/skills/tree/main); see `mattpocock-skills-LICENSE`. `plan-next-pr` is authored in notebox.
 
 Repo-specific paragraphs in the canonical notebox skills are stripped on sync; generic fallbacks remain where defined.
