@@ -56,7 +56,8 @@ Stop conditions: <the specific mismatches that mean pause + report, from Step 2>
 1. <action> — **Model: <one name>** — check: <exact test/lint command>   <!-- append " — high: <one-clause reason>" only when the step needs high/xhigh; no suffix = medium -->
 2. …
 N-1. Plan hygiene: update/shrink/delete the source plan section + its
-     specs/plans/README.md row to reflect what this PR completed.
+     specs/plans/README.md row to reflect what this PR completed; update
+     specs/architecture/app-contract.md if a product boundary changed.
 N.   Delete this file. Verify with `git status` that it was never staged.
 ```
 
