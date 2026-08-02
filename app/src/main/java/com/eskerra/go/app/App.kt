@@ -189,7 +189,7 @@ fun App(
     )
     AppForegroundSyncEffect(appSyncViewModel)
 
-    val syncIndicator = shellSyncIndicatorState(syncState, remoteConfigured)
+    val syncIndicator = rememberShellSyncIndicator(appSyncViewModel, remoteConfigured)
     val selectedTopLevelRoute = destinationTopLevelRoute ?: currentTopLevelRoute
     val inPodcastMode = selectedTopLevelRoute == AppRoute.PODCASTS_GRAPH
     val newNoteInputState = rememberShellNewNoteInputState(

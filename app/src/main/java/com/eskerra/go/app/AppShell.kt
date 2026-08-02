@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import com.eskerra.go.feature.sync.SyncSpinner
 import com.eskerra.go.ui.theme.EskerraChromeTokens
 
 /**
@@ -93,7 +94,9 @@ fun AppShell(
                 BadgedBox(
                     badge = {
                         val badgeText = syncIndicator?.badgeText
-                        if (badgeText != null) {
+                        if (syncIndicator?.spinning == true) {
+                            Badge { SyncSpinner(modifier = Modifier.size(8.dp)) }
+                        } else if (badgeText != null) {
                             Badge { Text(badgeText) }
                         }
                     }

@@ -66,6 +66,46 @@ class ShellSyncIndicatorMappingTest {
 
         assertEquals("1", indicator.badgeText)
         assertEquals(1, indicator.changeCount)
+        assertEquals(false, indicator.spinning)
+    }
+
+    @Test
+    fun spinningDefaultsToFalse_whenNotPassed() {
+        val indicator = shellSyncIndicatorState(
+            readyStatus(SyncStatusState.Clean),
+            remoteConfigured = true
+        )!!
+
+        assertEquals(false, indicator.spinning)
+    }
+
+    @Test
+    fun spinningTrue_isCarriedThrough_alongsideBadgeAndCount() {
+        val state = SyncUiState.Syncing(
+            status = dirtyStatus(),
+            step = com.eskerra.go.core.model.SyncProgressStep.FetchingRemote
+        )
+
+        val indicator = shellSyncIndicatorState(state, remoteConfigured = true, spinning = true)!!
+
+        assertEquals(true, indicator.spinning)
+        assertEquals("1", indicator.badgeText)
+        assertEquals(1, indicator.changeCount)
+    }
+
+    @Test
+    fun spinningTrue_isCarriedThrough_onErrorWithoutStatus() {
+        val state = SyncUiState.Error(
+            status = null,
+            message = "Sync failed.",
+            recoveryAction = com.eskerra.go.core.model.SyncRecoveryAction(hint = "Retry sync.")
+        )
+
+        val indicator = shellSyncIndicatorState(state, remoteConfigured = true, spinning = true)!!
+
+        assertEquals(true, indicator.spinning)
+        assertEquals("!", indicator.badgeText)
+        assertNull(indicator.changeCount)
     }
 
     private fun readyStatus(syncState: SyncStatusState): SyncUiState.Ready = SyncUiState.Ready(

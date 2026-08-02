@@ -14,11 +14,13 @@ import com.eskerra.go.core.usecase.ManualSyncNow
 import com.eskerra.go.core.usecase.RecordLastSyncAttempt
 import com.eskerra.go.core.usecase.RefreshRemoteSyncStatus
 import com.eskerra.go.feature.sync.SyncUiState
+import com.eskerra.go.feature.sync.holdTrueAtLeast
 import java.io.File
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /** App-scoped sync state for the shell indicator and sync screen. */
@@ -40,9 +42,22 @@ class AppSyncViewModel(
     private val _uiState = MutableStateFlow<SyncUiState>(SyncUiState.Loading)
     val uiState: StateFlow<SyncUiState> = _uiState.asStateFlow()
 
+    /** True while a sync is running, held true for [SYNC_SPINNER_HOLD_MS] after it ends so a fast
+     * sync does not flash the shell's sync spinner on and off. */
+    private val _syncSpinnerVisible = MutableStateFlow(false)
+    val syncSpinnerVisible: StateFlow<Boolean> = _syncSpinnerVisible.asStateFlow()
+
     private var loadJob: Job? = null
     private var syncJob: Job? = null
     private var lastRemoteRefreshAtMs: Long = -1L
+
+    init {
+        viewModelScope.launch {
+            uiState.map { it is SyncUiState.Syncing }
+                .holdTrueAtLeast(SYNC_SPINNER_HOLD_MS)
+                .collect { _syncSpinnerVisible.value = it }
+        }
+    }
 
     fun refreshRemoteStatus(force: Boolean = false) {
         if (_uiState.value is SyncUiState.Syncing) {
@@ -221,6 +236,7 @@ class AppSyncViewModel(
     companion object {
         const val GENERIC_ERROR_MESSAGE = "Sync failed. Local notes are still available."
         const val DEFAULT_REFRESH_DEBOUNCE_MS = 30_000L
+        const val SYNC_SPINNER_HOLD_MS = 450L
 
         fun factory(
             config: WorkspaceConfig,
