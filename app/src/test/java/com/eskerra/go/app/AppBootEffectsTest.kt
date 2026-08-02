@@ -8,21 +8,21 @@ import org.junit.Test
 class AppBootEffectsTest {
 
     @Test
-    fun firstOnStart_doesNotAutoSync() {
+    fun onStart_beforeAccepting_doesNotAutoSync() {
         assertFalse(
             shouldAutoSyncOnLifecycleEvent(
                 event = Lifecycle.Event.ON_START,
-                isFirstStart = true
+                accepting = false
             )
         )
     }
 
     @Test
-    fun laterOnStart_autoSyncs() {
+    fun onStart_afterAccepting_autoSyncs() {
         assertTrue(
             shouldAutoSyncOnLifecycleEvent(
                 event = Lifecycle.Event.ON_START,
-                isFirstStart = false
+                accepting = true
             )
         )
     }
@@ -32,7 +32,7 @@ class AppBootEffectsTest {
         assertFalse(
             shouldAutoSyncOnLifecycleEvent(
                 event = Lifecycle.Event.ON_RESUME,
-                isFirstStart = false
+                accepting = true
             )
         )
     }

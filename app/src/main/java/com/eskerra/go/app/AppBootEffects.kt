@@ -51,27 +51,28 @@ internal fun AppBootEffects(
 @Composable
 internal fun AppForegroundSyncEffect(appSyncViewModel: AppSyncViewModel) {
     DisposableEffect(appSyncViewModel) {
-        var firstStart = true
+        // LifecycleRegistry may synchronously replay ON_START while addObserver runs to bring a
+        // late subscriber up to the current state. That replay is not a real resume — boot sync
+        // already covers cold start — so ignore events until addObserver returns.
+        var accepting = false
         val observer = LifecycleEventObserver { _, event ->
-            val shouldAutoSync = shouldAutoSyncOnLifecycleEvent(event, firstStart)
-            if (event == Lifecycle.Event.ON_START) {
-                firstStart = false
-            }
-            if (shouldAutoSync) {
+            if (shouldAutoSyncOnLifecycleEvent(event, accepting)) {
                 appSyncViewModel.requestAutoSync()
             }
         }
         ProcessLifecycleOwner.get().lifecycle.addObserver(observer)
+        accepting = true
         onDispose {
             ProcessLifecycleOwner.get().lifecycle.removeObserver(observer)
         }
     }
 }
 
+/** Auto-sync on ON_START only after the observer is fully registered ([accepting]). */
 internal fun shouldAutoSyncOnLifecycleEvent(
     event: Lifecycle.Event,
-    isFirstStart: Boolean
-): Boolean = event == Lifecycle.Event.ON_START && !isFirstStart
+    accepting: Boolean
+): Boolean = accepting && event == Lifecycle.Event.ON_START
 
 /** Boot fires the auto-sync exactly once, and only once launch has settled. */
 internal fun shouldTriggerBootSync(launchSettled: Boolean, alreadyRequested: Boolean): Boolean =
