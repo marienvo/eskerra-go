@@ -1,5 +1,16 @@
 # Step 3: Workspace Setup
 
+> **DISPOSAL PENDING (2026-08-02).** This is a "what was built" log for the long-shipped
+> setup flow — history, not a plan. Salvage check done: two things below are in **no**
+> architecture doc and must move to `app-contract.md` before deletion:
+> (1) the persistence-failure rollback rule (`DefaultWorkspaceSetupCompletion` removes the
+> workspace directory and any saved credential when metadata/credential persistence fails
+> after Git setup, so retry needs no app-data clear); (2) the setup-mode boundaries
+> (init-local / clone with `file://` or sanitized `https://` / open-existing only — no
+> picker; one fixed `workspace/` path; no secrets in DataStore). Everything else is already
+> covered by `app-contract.md` and `sync-hardening-and-recovery.md` or superseded.
+> **One small PR:** add those two items to `app-contract.md`, delete this file.
+
 Step 3 adds the first real workspace setup flow on top of the Step 1 UI skeleton
 and Step 2 Git spike.
 
