@@ -109,12 +109,14 @@ Each blocking `SyncError` maps to a short recovery hint via `SyncRecoveryGuidanc
 ## Foreground sync-status refresh
 
 Since 2026-08-02 app start and foreground return run a **full auto-sync**, not a read-only remote check
-(see below). What remains of the status-refresh path:
+(see [Automatic vault sync triggers](#automatic-vault-sync-triggers)). What remains of the
+status-refresh path:
 
-- **Local-only reads** (`refreshLocalStatus`, `refreshLocalStatusQuietly`) still serve the shell badge and the sync screen wherever a sync must not or cannot run: no remote configured, blocked preflight, opening the sync screen.
-- Quiet refreshes must not force `SyncUiState.Loading`, so the sync button stays usable. Use a single status `loadJob` so a local emit completes before any remote step starts (no cancel between the two steps).
-- Any refresh that reaches the network is startup-path work if it can run before launch settles — see [boot-optimization.md](boot-optimization.md#boot-sync-is-gated-on-launch-settlement) for the regression this caused.
-- Remote status reads stay debounced (30 s) to avoid redundant network calls; `SyncUiState.Syncing` short-circuits every refresh, which is why auto-sync must never leave that state stuck.
+- **Local-only reads** (`refreshLocalStatus`, `refreshLocalStatusQuietly`) still serve the shell badge and the sync screen wherever a sync must not or cannot run: no remote configured, blocked preflight, opening the sync screen after Success.
+- Quiet local refreshes must not force `SyncUiState.Loading`, so the sync button stays usable.
+- `refreshRemoteStatus` (debounced, 30 s) remains for an explicit remote status read; there is no quiet shell local→remote combo path anymore (the old `refreshShellStatusQuietly` / `refreshRemoteStatusQuietly` helpers were removed once boot/foreground became full auto-sync).
+- Any refresh that reaches the network is startup-path work if it can run before launch settles — see [boot-optimization.md](boot-optimization.md#boot-sync-is-gated-on-launch-settlement) for the regression that caused.
+- `SyncUiState.Syncing` short-circuits every refresh, which is why auto-sync must never leave that state stuck.
 
 ## Automatic vault sync triggers
 

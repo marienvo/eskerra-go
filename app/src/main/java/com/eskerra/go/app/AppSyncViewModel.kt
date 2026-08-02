@@ -121,52 +121,6 @@ class AppSyncViewModel(
         }
     }
 
-    fun refreshRemoteStatusQuietly(force: Boolean = false) {
-        if (_uiState.value is SyncUiState.Syncing) {
-            return
-        }
-
-        val now = clock()
-        if (!force &&
-            lastRemoteRefreshAtMs >= 0L &&
-            now - lastRemoteRefreshAtMs < refreshDebounceMs
-        ) {
-            return
-        }
-
-        loadJob?.cancel()
-        loadJob = viewModelScope.launch {
-            emitReadyState(refreshRemoteSyncStatus(config, filesDir))
-            lastRemoteRefreshAtMs = clock()
-        }
-    }
-
-    /** Local status first, then optional debounced remote check in one load job. */
-    fun refreshShellStatusQuietly(forceRemote: Boolean = false) {
-        if (_uiState.value is SyncUiState.Syncing) {
-            return
-        }
-
-        loadJob?.cancel()
-        loadJob = viewModelScope.launch {
-            emitReadyState(loadSyncStatus(config, filesDir))
-            if (_uiState.value is SyncUiState.Syncing) {
-                return@launch
-            }
-
-            val now = clock()
-            if (!forceRemote &&
-                lastRemoteRefreshAtMs >= 0L &&
-                now - lastRemoteRefreshAtMs < refreshDebounceMs
-            ) {
-                return@launch
-            }
-
-            emitReadyState(refreshRemoteSyncStatus(config, filesDir))
-            lastRemoteRefreshAtMs = clock()
-        }
-    }
-
     fun syncNow() {
         viewModelScope.launch {
             if (syncJob?.isActive == true || _uiState.value is SyncUiState.Syncing) {
