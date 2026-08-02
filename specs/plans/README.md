@@ -1,6 +1,6 @@
 # Plans README
 
-Last reviewed: 2026-07-12. Re-review whenever a plan completes or a new one lands.
+Last reviewed: 2026-08-02 (stack rewritten from the 2026-07-05 audit + notebox 2026-07-19 sibling bar; `make-slices-real.md` added; parity plan re-verified; `workspace-setup.md` marked for disposal). Re-review whenever a plan completes or a new one lands.
 
 ## 1. Purpose of this folder
 
@@ -11,40 +11,47 @@ This folder holds **active or intentionally parked planning documents** — noth
 1. Pick the next step from §4, not the most interesting plan.
 2. Read only the plan you're executing plus the companions it names.
 3. Convert **one phase** into a small PR or PR series (each reviewable in ~30 minutes). The `plan-next-pr` skill turns a phase into a disposable per-PR work doc.
-4. After execution, move durable decisions out: `specs/adr/` for decisions, [`specs/architecture/app-contract.md`](../architecture/app-contract.md) for product boundaries, tests for invariants.
+4. After execution, move durable decisions out: `specs/adr/` for decisions, [`app-contract.md`](../architecture/app-contract.md) for product boundaries, tests/ArchUnit for invariants.
 5. Then delete the executed part of the plan — or the whole plan.
 
 **Warnings:**
 
-- Plan text is never more authoritative than current code and tests. Plans contain snapshots that drift; verify before executing, and when a plan contradicts the code, the code is the fact and the plan gets fixed.
-- Steps touching `data/git`, credentials, or the workspace scanner rules carry their tests in the same PR (see the sync-hardening spec); never batch them with unrelated work.
-- One phase per PR series; never two plans' phases in one PR.
+- Plan text is never more authoritative than current code and tests. Snapshots drift; verify before executing, and when a plan contradicts the code, the code is the fact and the plan gets fixed.
+- **A G1 production-code move never shares a PR with a semantic, behavioral, or architectural production-code change** — e.g. a ViewModel move and the non-inbox-editing rule flip must never meet. Required companion artifacts — documentation the phase mandates (a slice README), import-only test moves, generated-file re-syncs, plan bookkeeping — may accompany the move, isolated in their own commits where that improves reviewability; they must never conceal a production behavior change.
+- **Never execute phases of both tracks in one PR.** One plan-phase per PR (or PR series); a phase's mandated companion artifacts count as part of that phase, not as a second phase. Unrelated cleanup gets its own small PR.
+- Steps touching `data/git`, credentials, vault-write paths, or the workspace scanner rules are G3: tests in the same PR, red/yellow-tier rules apply (`specs/rules/change-safety.md`).
 
-## 3. Current plans
+## 3. The two tracks
 
-| Plan | Class | Note |
+Deliberately orthogonal (notebox lesson: structure and product must not blur):
+
+| | `make-slices-real.md` | `studio-feature-parity.md` |
 |---|---|---|
-| `studio-feature-parity.md` | **Active now** | The stack's driver. Three-tier parity model (contract / product / deliberate divergence). Next step: **P0 verified inventory** (no code — correct the plan's own gap matrix against the running app). P1 (non-inbox editing + foreground-resume sync) is the headline product gap and gates the audiobook player's Go phase. |
-| `workspace-setup.md` | **Candidate for deletion** | A "what was built" log for the (long-shipped) setup flow — history, not a plan. Anything durable in it belongs in `app-contract.md` or an architecture doc; verify nothing is missing there, then delete. |
+| **Axis** | Quality / structure — where code lives, how it is guarded | Product parity — what the app does vs Studio |
+| **Why it exists** | 2026-07-05 audit primary blocker: 11/12 ViewModels in `app/`; slices aspirational; 0 in-source docs; `core→data` leak; guardrail residuals | "Continue on your phone" breaks without non-inbox editing + sync moments; contract drift vs Studio |
+| **Use it for** | VM moves with their slice README as mandated companion (Q0–Q1), README backfill for the slices no move covers (Q2), dependency inversion (Q3), app-shell thinning (Q4), CI zone gate / ArchUnit ratchet / CODEOWNERS (Q5), test splits (Q6) | P0 verified inventory, P1a non-inbox plain-Markdown editing, P1b foreground-resume sync trigger, P2 contract adoption + small items |
+| **Must NOT be used for** | Any behavior or contract change; anything parity-shaped | Any file move or guardrail change; structure work hiding in feature PRs |
+| **Status** | **Active now** (Q0 pilot is the next PR) | **Active** (P0 whenever a device session is available; P1a/P1b after P0) |
+| **Deletion condition** | Counters full (10/10 + 8/8), ArchUnit rules enforced, Q5 residuals merged, **and Q4 resolved** — done and its routing/shell decision absorbed into ADR-001 or `app-contract.md`, or explicitly parked/transferred to a named surviving doc; Q4 skipped does not count (its §Deletion) | P0, P1a, P1b, and P2 done, `app-contract.md` updated, m4b gate re-pointed (its §5) |
 
-Feature plans arriving later (e.g. the M4B audiobook player, whose cross-client contract lives in the notebox repo) enter this table as **Active later** with their gate stated in the row.
+| Other files | Class | Note |
+|---|---|---|
+| `workspace-setup.md` | **Disposal pending** | Trophy log. One small PR: salvage the setup-rollback rule + setup modes/boundaries into `app-contract.md` (they are in no architecture doc today), then delete. |
+
+Feature plans arriving later (e.g. the M4B audiobook player, whose cross-client contract lives in notebox) enter this table as **Active later** with their gate stated in the row.
 
 ## 4. Recommended execution order
 
-1. **Parity P0 — verified inventory.** No code; corrects `studio-feature-parity.md` §3 against the actual app. Nothing may be scheduled off unverified matrix rows.
-2. **`workspace-setup.md` disposal.** One small PR: salvage anything `app-contract.md` lacks, delete the file.
-3. **Parity P1 — non-inbox editing + foreground-resume sync.** The deliberate contract change (`app-contract.md` + AGENTS.md updated in the same PR as the domain rule flips). Feature-slice tests mandatory; module budgets hold.
-4. **Parity P2 — contract adoption + small items** (settings document / `vaultLayout`, theme-preference read, attachments render, Today Hub depth per P0 findings). Independent small PRs.
-5. **Audiobook player Go phase** — unlocked by step 3; its own plan governs it.
-6. **Parity P3 long tail** — explicitly allowed to stay parked.
+The two tracks interleave freely **except** where a step below names a hold. Quality PRs are small and G1-heavy (agent-drivable); parity P0/P1a/P1b need product judgment and a device — pull from whichever track matches the session, taking the lowest open step in that track.
 
-The process track that seeded quality guardrails from notebox (module budgets,
-doc map, ArchUnit, change-safety rules, observability spec) is done — all five
-commits landed and `spec-parity-guardrails.md` is deleted per the lifecycle rule.
-Durable outcomes: `specs/rules/change-safety.md`, `specs/README.md`,
-`specs/observability/README.md`, `AGENTS.md` §§ Module size budget / Key
-invariants / Proposing new work / Change process / Observability, the ArchUnit
-suite, and the two repo-local review skills.
+1. **Quality Q0 — pilot** (`make-slices-real.md`): move `SearchViewModel` + `feature/search/README.md`, then the written retro. *Unblocked; the default next PR.*
+2. **Parity P0 — verified inventory** (`studio-feature-parity.md`): doc-only correction of the matrix against the running app. *Unblocked; needs a device session; nothing parity-flavored may be scheduled off unverified rows until this lands.*
+3. **`workspace-setup.md` disposal:** salvage → `app-contract.md`, delete the file. *Unblocked, trivial; an independent small doc PR of its own.*
+4. **Quality Q1 — batch VM moves**, each PR carrying its destination slice's README as mandated companion documentation (after the Q0 retro). **Quality Q2** then backfills READMEs for the slices no move covers (`podcasts`, `menu`) as its own small doc PR — it is not executed inside a Q1 PR. Q6 test splits (G4) may interleave anytime, respecting move-first-then-split per file.
+5. **Parity P1a — non-inbox plain-Markdown editing**, then **P1b — foreground-resume sync trigger/prompt** (both after P0; each gets its own disposable work doc and its own PR). P1a is the contract change: `app-contract.md` + AGENTS.md flip in the same PR as the domain rule. **Hold:** no Q-track PR touching the same slices/use-cases in the same review window; P1b and Q3's G3 inversions touch the same sync use cases — whichever runs second waits.
+6. **Quality Q3–Q5 — inversion, shell thinning, guardrail residuals** (Q3 after Q1 batches 1–4; Q4 after Q1; Q5 opportunistic, CODEOWNERS strictly after Q1).
+7. **m4b audiobook Go phase** — gated on **both P1a and P1b** completing (gate lives in the notebox m4b plan §15, Phase 3, and here). This is a portfolio-sequencing / review-attention gate, not a technical dependency. Never interleaves with Q-track moves.
+8. **Parity P2 — settings document (`vaultLayout`), theme read, attachments render, Today Hub depth** per P0 findings; coordinate with `notebox/specs/plans/desktop-settings-workspace.md`. **P3 long tail stays parked.**
 
 ## 5. Plan lifecycle rules
 
@@ -52,11 +59,13 @@ suite, and the two repo-local review skills.
 2. **No trophies.** "Status: complete" + checkmarks is the signal to delete, not to keep.
 3. **Downgrade honestly.** Not intended for execution this quarter → mark parked here and stop maintaining its inventories.
 4. **Snapshots expire.** Any file inventory or gap matrix is advisory after ~2 weeks; regenerate before acting.
-5. **Product boundaries land in `app-contract.md`,** never only in a plan — the contract doc is what future work reads.
-6. This README follows its own rules: if the folder shrinks to one plan, fold this file into a paragraph in that plan.
+5. **Product boundaries land in `app-contract.md`,** never only in a plan.
+6. **Live counters only while coordinating** a running multi-PR effort; they go when coordination ends.
+7. This README follows its own rules: if the folder shrinks to one plan, fold this file into a paragraph in that plan.
 
 ## 6. Recommended immediate next action
 
-- **Next PR:** parity **P0** — verify the gap matrix against the running app; doc-only.
-- **Delete first:** `workspace-setup.md` after its salvage check.
-- **Do not touch yet:** audiobook Go work (gated on parity P1) and any scheduled-background-sync ambitions (deliberate divergence per `app-contract.md` — a product decision, not a backlog item).
+- **Next PR:** quality **Q0** — `SearchViewModel` + test → `feature/search/` (G1) + `feature/search/README.md` (G2). Checks: `./scripts/check-module-budgets.sh` && `./scripts/gradle.sh :app:ktlintCheck :app:lintDebug :app:testDebugUnitTest`. Retro lines mandatory before Q1.
+- **Also unblocked, next device session:** parity **P0** (doc-only matrix verification).
+- **Independent small doc PRs (each gets its own PR):** `workspace-setup.md` disposal; the AGENTS.md broken-link fix (`android-vault-notes-rebuild-plan.md` — see `make-slices-real.md` §Follow-ups; it may join another PR only when that PR already edits the same documentation surface).
+- **Do not touch yet:** parity P1a/P1b (blocked on P0); Q3's G3 inversions (after Q1 batches 1–4, never alongside P1b); CODEOWNERS (after Q1); m4b Go work (blocked on P1a+P1b); scheduled background sync (Tier D in `app-contract.md` — a product decision, not backlog); proactive splitting of the pinned podcasts files (split-before-grow only, on touch).

@@ -41,7 +41,7 @@ Use this structure in `specs/ubiquitous-language.md`:
 
 | Term     | Definition                                                                 | Aliases to avoid  |
 | -------- | -------------------------------------------------------------------------- | ----------------- |
-| **Vault** | The user-chosen root directory that holds notes and podcast data, possibly synced (e.g. Syncthing) | Folder, workspace |
+| **Vault** | The user-chosen root directory that holds notes and podcast data, synced via Git (with R2 for selected cloud objects) | Folder, workspace |
 | **Inbox** | The folder of user `.md` notes; directory listing is source of truth      | —                 |
 
 ## Podcasts and playback
