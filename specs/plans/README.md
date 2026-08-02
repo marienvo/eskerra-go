@@ -32,7 +32,7 @@ Deliberately orthogonal (notebox lesson: structure and product must not blur):
 | **Use it for** | VM moves with their slice README as mandated companion (Q0–Q1), README backfill for the slices no move covers (Q2), dependency inversion (Q3), app-shell thinning (Q4), CI zone gate / ArchUnit ratchet / CODEOWNERS (Q5), test splits (Q6) | P0 verified inventory, P1a non-inbox plain-Markdown editing, P1b foreground-resume sync trigger, P2 contract adoption + small items |
 | **Must NOT be used for** | Any behavior or contract change; anything parity-shaped | Any file move or guardrail change; structure work hiding in feature PRs |
 | **Status** | **Active now** (Q0 pilot is the next PR) | **Active** (P0 whenever a device session is available; P1a/P1b after P0) |
-| **Deletion condition** | Counters full, ArchUnit rules enforced, residuals merged (its §Deletion) | P0–P2 done, `app-contract.md` updated, m4b gate re-pointed (its §5) |
+| **Deletion condition** | Counters full (10/10 + 8/8), ArchUnit rules enforced, Q5 residuals merged, **and Q4 resolved** — done and its routing/shell decision absorbed into ADR-001 or `app-contract.md`, or explicitly parked/transferred to a named surviving doc; Q4 skipped does not count (its §Deletion) | P0, P1a, P1b, and P2 done, `app-contract.md` updated, m4b gate re-pointed (its §5) |
 
 | Other files | Class | Note |
 |---|---|---|

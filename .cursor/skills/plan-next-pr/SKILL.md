@@ -83,9 +83,9 @@ Path: `.claude/plans/pr-current.md`. **Never `git add` this file** — it must n
 # PR work doc — <branch> — <date>
 Source: specs/plans/<plan>.md §<phase>   Delete-me-by: PR ready for review
 
-Goal (1 sentence). Behavior change: yes/no. Change-type: <repo taxonomy>. Area/layer(s) touched: <...>.
-Priority: <T0|T1|T2|T3, from Step 0>. Why now: <one line; for T0/T1, the concrete override evidence>.
-Triage checked: <what the Step-0 scan actually inspected, one line>
+Goal (1 sentence). Behavior change: yes/no. Change-types: <one or more repo change-types; when multiple, name the commit boundary>. Area/layer(s) touched: <...>.
+Priority: <T0|T1|T2|T3, from triage — Step 0 or a Step 2 escalation>. Why now: <one line; for T0/T1, the concrete override evidence>.
+Triage checked: <what was actually inspected — the Step-0 global scan and the Step-2 candidate checks, one line>
 Triage not checked: <signals not inspectable from this environment — include only when relevant>
 Verified state: <the Step-2 checks that passed, one line each>
 Stop conditions: <the specific mismatches that mean pause + report, from Step 2>
@@ -115,6 +115,7 @@ Rules for the doc:
 - Respect the repo's standing house rules in every step.
   Module-size budgets, layer rules, and the seams AGENTS.md names; every touched module keeps or gains its tests.
 - **Mechanical moves stay pure at the production-code level.** A step of the repo's mechanical-move change-type must never share a PR with a semantic, behavioral, or architectural production-code change. Required companion artifacts — documentation the source phase mandates (e.g. a slice/feature README), import-only test moves, generated-file re-syncs, and plan bookkeeping — may ride in the same PR, isolated in their own commits where that improves reviewability; they must never conceal a production behavior change. Unrelated cleanup gets its own PR.
+- **One type per change; a PR may carry more than one change.** Every individual change still declares exactly **one** change-type — that rule lives in the repo's change-safety file and this skill does not relax it. A PR may contain several separately declared changes **only** where the source phase explicitly mandates companion artifacts (the bullet above). When it does, list every type in the header and name the commit boundary — e.g. `Change-types: G1 + G2 (one per commit)`. Multiple types are never a way to smuggle a mixed production-code change past review: if two types touch production behavior in one PR, it is mis-scoped and splits into two PRs.
 - Steps must fit the house review rule: if the resulting PR can't be reviewed in ~30 minutes, plan a PR series (one work doc per PR, regenerated from the same source phase).
 - The **plan-hygiene step is mandatory** (README lifecycle rules: delete on absorption, no trophies): completing a phase must shrink or delete its source plan text in the same PR, and update the README row if the classification changed.
 - The **self-delete step is mandatory** and is the last thing done before requesting review.

@@ -46,7 +46,7 @@ ViewModels moved into their slice: **0 / 10** (excluded by design: `AppGateViewM
 - **Settings-slice decision (in batch 5, not before):** do **not** create `feature/settings/` now. Settings screens are sync-centric today (`SyncSettingsScreen`, `VaultSettings*` in `feature/sync/`); a dedicated slice is only justified when parity P2 (settings-document adoption) gives it real domain content. Record the decision in `feature/sync/README.md`.
 - **Stays in `app/`:** `AppGateViewModel` (launch gate is composition-root behavior by design).
 - **G-type:** G1 per PR. `AppSyncViewModel` touches sync *orchestration wiring* — its PR is still G1 (verbatim move) but flag `App.kt` as yellow-tier in the work order.
-- **Acceptance (end of series):** `ls app/src/main/java/com/eskerra/go/app/*ViewModel*` = `AppGateViewModel.kt` only; counter 10/10; full suite green each PR.
+- **Acceptance (end of series):** `ls app/src/main/java/com/eskerra/go/app/*ViewModel*` = `AppGateViewModel.kt` only; **ViewModel counter 10/10 and slice-README counter 6/8** (the six Q1 companions; Q2 backfills the last two and closes it at 8/8); full suite green each PR.
 - **Checks:** same trio as Q0, every PR.
 - **New guardrail on completion:** add an ArchUnit rule "no class named `*ViewModel` resides in `..app..` except `AppGateViewModel`" (G5, maintainer) so the hub cannot re-form.
 - **Shrink rule:** delete each batch line as it lands; delete the phase when the ArchUnit rule merges.
@@ -132,4 +132,11 @@ Independent of Q1–Q4; schedule opportunistically. All G5, maintainer-reviewed.
 
 ## Deletion condition
 
-Delete this plan when: counter reads 10/10 + 8/8, the Q3 grep is zero, both ArchUnit rules (VM placement, core→data) are enforced, and Q5's three residuals merged. Survivors: ADR-001 amendment, slice READMEs, ArchUnit rules, CODEOWNERS, the CI zone gate. Q6 leftovers become backlog lines in `specs/team-scalability/README.md`, not a reason to keep the plan.
+Delete this plan when: counter reads 10/10 + 8/8, the Q3 grep is zero, both ArchUnit rules (VM placement, core→data) are enforced, Q5's three residuals merged, **and Q4 is resolved** — resolved meaning one of exactly two outcomes, written down:
+
+- **Q4 done:** the sub-grouping landed and the routing design note's decision is absorbed into the ADR-001 amendment or `app-contract.md`; or
+- **Q4 parked or transferred:** the phase is explicitly parked, or moved into a named surviving document (`specs/team-scalability/README.md` backlog, or an architecture doc), with the reason recorded there.
+
+**Q4 silently skipped does not satisfy deletion** — the routing/shell decision must live somewhere that outlives this file.
+
+Survivors: ADR-001 amendment, slice READMEs, ArchUnit rules, CODEOWNERS, the CI zone gate, and Q4's decision in its named home. Q6 leftovers become backlog lines in `specs/team-scalability/README.md`, not a reason to keep the plan.
