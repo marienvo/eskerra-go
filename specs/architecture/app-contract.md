@@ -44,13 +44,20 @@ All JGit mutations share one process-wide mutex so vault sync and podcast auto-s
 
 | Channel | Trigger | Staged paths | Integration | Push |
 | --- | --- | --- | --- | --- |
-| Manual vault sync | User taps sync | All safe local changes | FF when behind; auto-merge on divergence | Yes, with retry |
+| Vault sync | User taps sync, **or any note write** (inbox create, editor save, inbox delete) | All safe local changes | FF when behind; auto-merge on divergence | Yes, with retry |
 | Podcast RSS refresh | Pull-to-refresh | RSS writes `General/`; then vault sync engine | Same as vault sync | Same as vault sync |
 | Podcast mark-as-played | Checkbox | Changed podcast paths under `General/` only | **Fast-forward only** | Best-effort; pending on divergence |
 
-Podcast auto-sync is foreground work tied to user actions, not a background scheduler.
+**Sync moments.** Note writes always start a vault sync — the same code path as the button, with
+coalescing so rapid writes collapse to one follow-up. Automatic syncs fail **silently**: the `"!"`
+shell badge and the sync screen carry the detail; there are no toasts. Trigger rules (coalescing,
+blocked preflight, mutex contention) are in
+[sync-hardening-and-recovery.md](sync-hardening-and-recovery.md#automatic-vault-sync-triggers).
+App start and foreground return still run only the **read-only** status check, not a sync.
 
-Vault sync (manual button and RSS refresh) auto-merges diverged histories with conflict sidecars. Podcast mark-as-played never auto-merges, rebase, or reset.
+All of this is foreground work tied to user actions, never a background scheduler.
+
+Vault sync (button, note writes, and RSS refresh) auto-merges diverged histories with conflict sidecars. Podcast mark-as-played never auto-merges, rebase, or reset.
 
 ## Sync branch alignment
 
