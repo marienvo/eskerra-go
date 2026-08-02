@@ -123,8 +123,10 @@ Every note write, app boot, and foreground return starts a **full vault sync**
 save, inbox delete, boot, and every real foreground `ON_START`. `requestAutoSync()` is the
 sole entry point for automatic triggers and runs the same code path as the manual button.
 
-Boot's trigger waits for `launchSettled` plus one rendered frame and fires exactly once per process
-(`shouldTriggerBootSync`). The foreground observer ignores only the synthetic `ON_START` that
+Boot's trigger waits for `launchSettled` plus one rendered frame and fires once per
+`AppSyncViewModel` instance after settle (`shouldTriggerBootSync`). The flag is keyed to that
+instance: a composition-lifetime flag would leave a ViewModel recreated by branch/remote changes
+stuck in `SyncUiState.Loading`. The foreground observer ignores only the synthetic `ON_START` that
 `LifecycleRegistry` may replay while `addObserver` runs (`shouldAutoSyncOnLifecycleEvent`); every
 later resume syncs. Cold start is boot's job, so the two do not double-fire. Both live in
 [AppBootEffects.kt](app/src/main/java/com/eskerra/go/app/AppBootEffects.kt).

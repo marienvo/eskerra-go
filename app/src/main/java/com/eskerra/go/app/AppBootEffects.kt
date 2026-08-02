@@ -23,8 +23,11 @@ internal fun AppBootEffects(
     onConfigUpdated: (WorkspaceConfig) -> Unit,
     onConfigChanged: (WorkspaceConfig) -> Unit
 ) {
-    val bootSyncRequested = remember { mutableStateOf(false) }
-    LaunchedEffect(launchSettled) {
+    // Keyed to the ViewModel: AppSyncViewModel is recreated when remoteUri/branch changes
+    // (syncViewModelKey). A composition-lifetime flag would leave the new instance stuck in
+    // SyncUiState.Loading with no automatic status advance.
+    val bootSyncRequested = remember(appSyncViewModel) { mutableStateOf(false) }
+    LaunchedEffect(launchSettled, appSyncViewModel) {
         if (!shouldTriggerBootSync(launchSettled, bootSyncRequested.value)) {
             return@LaunchedEffect
         }
@@ -74,6 +77,9 @@ internal fun shouldAutoSyncOnLifecycleEvent(
     accepting: Boolean
 ): Boolean = accepting && event == Lifecycle.Event.ON_START
 
-/** Boot fires the auto-sync exactly once, and only once launch has settled. */
+/**
+ * Boot fires the auto-sync once per ViewModel instance, and only once launch has settled.
+ * [alreadyRequested] is scoped to that instance (see remember(appSyncViewModel) in AppBootEffects).
+ */
 internal fun shouldTriggerBootSync(launchSettled: Boolean, alreadyRequested: Boolean): Boolean =
     launchSettled && !alreadyRequested

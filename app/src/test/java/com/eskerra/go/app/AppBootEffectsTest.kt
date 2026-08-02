@@ -51,4 +51,11 @@ class AppBootEffectsTest {
     fun bootSync_doesNotFireAgainOnceAlreadyRequested() {
         assertFalse(shouldTriggerBootSync(launchSettled = true, alreadyRequested = true))
     }
+
+    @Test
+    fun bootSync_mayFireAgainForNewViewModelInstanceAfterSettle() {
+        // A recreated AppSyncViewModel starts with alreadyRequested = false even when
+        // launchSettled is already true; the composition-lifetime flag must not block it.
+        assertTrue(shouldTriggerBootSync(launchSettled = true, alreadyRequested = false))
+    }
 }
