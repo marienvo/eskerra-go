@@ -185,6 +185,11 @@ class AppSyncViewModel(
 
     private suspend fun processAutoSyncRequest() {
         if (config.remoteUri.isNullOrBlank()) {
+            // No remote to sync against, but a local-only vault (InitializeLocal setup) still needs
+            // its local status to leave SyncUiState.Loading — otherwise, now that boot/foreground/
+            // write triggers all route through this function, uiState never advances and the Sync
+            // screen's Loading branch (no retry affordance) is stuck forever.
+            refreshLocalStatusQuietly()
             return
         }
         if (syncJob?.isActive == true) {

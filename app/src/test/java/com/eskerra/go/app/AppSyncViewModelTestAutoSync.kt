@@ -173,7 +173,11 @@ class AppSyncViewModelTestAutoSync {
     }
 
     @Test
-    fun noRemoteConfigured_isNoOp() = runTest {
+    fun noRemoteConfigured_doesNotSync_butStillRefreshesLocalStatus() = runTest {
+        // A local-only vault (WorkspaceSetupMode.InitializeLocal) has no remote to sync against, but
+        // now that boot, foreground-resume, and every write site all route through requestAutoSync(),
+        // a pure no-op here would leave uiState stuck on Loading forever — the Sync screen's Loading
+        // branch has no retry affordance, so it would be permanently stuck for that setup mode.
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         try {
             var syncCount = 0
@@ -191,7 +195,8 @@ class AppSyncViewModelTestAutoSync {
 
             assertEquals(0, syncCount)
             assertTrue(attempts.saved.isEmpty())
-            assertTrue(viewModel.uiState.value is SyncUiState.Loading)
+            val ready = viewModel.uiState.value as SyncUiState.Ready
+            assertEquals(SyncStatusState.Unavailable, ready.status.state)
         } finally {
             Dispatchers.resetMain()
         }
