@@ -65,6 +65,28 @@ class InboxViewModel(
             }
             refresh(showFullScreenLoading = cached == null)
         }
+        // Sync (and any other writer) refreshes NoteRegistryCache directly. Observe that shared
+        // registry so a remote delete drops from the list even if the Compose inboxRefreshSignal
+        // path is missed — otherwise the row stays until the user taps and gets "note not found".
+        viewModelScope.launch {
+            loadInboxSummaries.registryUpdates.collect { registry ->
+                if (registry != null) {
+                    applyExternalInboxSummaries(registry.inboxSummaries)
+                }
+            }
+        }
+    }
+
+    /** Applies inbox summaries published by the shared registry without starting a new scan. */
+    private fun applyExternalInboxSummaries(notes: List<NoteSummary>) {
+        rawSummaries = notes
+        val visible = visibleSummaries()
+        val isRefreshing = (_uiState.value as? InboxUiState.Content)?.isRefreshing ?: false
+        val currentNotes = (_uiState.value as? InboxUiState.Content)?.notes
+        if (visible == currentNotes && _uiState.value is InboxUiState.Content) {
+            return
+        }
+        _uiState.value = visible.toInboxUiState(isRefreshing = isRefreshing)
     }
 
     /**

@@ -155,6 +155,11 @@ with `refresh()`. `InboxViewModel.refresh()` must therefore never invoke `onInbo
 write-site trigger), or writes and refreshes would loop. Pinned by
 `InboxViewModelFeedbackLoopTest`.
 
+Inbox UI also observes `NoteRegistryCache.registry` directly. Sync already refreshes that shared
+registry after pull; applying `inboxSummaries` from the flow drops remote deletes even when the
+Compose `inboxRefreshSignal` path is missed (otherwise the row stays until tap → "note not found").
+Pinned by `InboxViewModelRegistryObservationTest`.
+
 ## Out of scope
 
 WorkManager/AlarmManager scheduled sync, SSH, interactive conflict-resolution UI, full sync history, note deletion/move/rename (inbox delete is implemented separately).

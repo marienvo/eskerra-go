@@ -145,10 +145,10 @@ class MainActivity : ComponentActivity() {
             repository = noteRegistryRepository,
             snapshotStore = FileNoteRegistrySnapshotStore()
         )
-
         val loadInboxSummaries = LoadInboxSummariesCached(
             delegate = LoadInboxSummaries(noteRegistryCache),
-            snapshotStore = FileInboxSnapshotStore()
+            snapshotStore = FileInboxSnapshotStore(),
+            registryUpdates = noteRegistryCache.registry
         )
         val loadNoteForReading = LoadNoteForReading(
             registryCache = noteRegistryCache,
