@@ -1,4 +1,4 @@
-package com.eskerra.go.app
+package com.eskerra.go.feature.inbox
 
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NoteIndexError
