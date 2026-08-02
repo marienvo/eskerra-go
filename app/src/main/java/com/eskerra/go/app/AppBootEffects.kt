@@ -72,10 +72,8 @@ internal fun AppForegroundSyncEffect(appSyncViewModel: AppSyncViewModel) {
 }
 
 /** Auto-sync on ON_START only after the observer is fully registered ([accepting]). */
-internal fun shouldAutoSyncOnLifecycleEvent(
-    event: Lifecycle.Event,
-    accepting: Boolean
-): Boolean = accepting && event == Lifecycle.Event.ON_START
+internal fun shouldAutoSyncOnLifecycleEvent(event: Lifecycle.Event, accepting: Boolean): Boolean =
+    accepting && event == Lifecycle.Event.ON_START
 
 /**
  * Boot fires the auto-sync once per ViewModel instance, and only once launch has settled.
