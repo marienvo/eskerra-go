@@ -9,7 +9,7 @@ Companion docs: `specs/adr/001-hybrid-layering-and-feature-slices.md` (the claim
 
 ## Live counter (delete with the plan)
 
-ViewModels moved into their slice: **1 / 10** (excluded by design: `AppGateViewModel` — genuinely app-level). Slice READMEs written: **0 / 8** — the eight beyond Q0's `search` pilot: six delivered as Q1 move companions (`inbox`, `editor`, `note`, `todayhub`, `setup`, `sync`) and two backfilled by Q2 (`podcasts`, `menu`).
+ViewModels moved into their slice: **2 / 10** (excluded by design: `AppGateViewModel` — genuinely app-level). Slice READMEs written: **1 / 8** — the eight beyond Q0's `search` pilot: six delivered as Q1 move companions (`inbox`, `editor`, `note`, `todayhub`, `setup`, `sync`) and two backfilled by Q2 (`podcasts`, `menu`).
 
 **Q0 — done** (branch `quality-q0-search-slice`; `SearchViewModel` + test in `feature/search/`, pilot README written). Retro outcome: review cost was minimal (two pure renames, three import lines, a 45-line README); the one unpredicted cost is that **the frozen ArchUnit store is keyed by fully-qualified name, so every move rekeys pre-existing violations and its G1 commit must carry the store edit**; the 5-section README template held at 45 lines with "what not to touch" carrying the real value; **Q1 runs two VMs per PR when slice-coherent**, dropping to one where the README needs genuine domain thinking (`sync`, `todayhub`).
 
@@ -23,15 +23,14 @@ ViewModels moved into their slice: **1 / 10** (excluded by design: `AppGateViewM
 
 ## Phases
 
-### Q1 — Batch VM moves (G1 PR series) *(next PR: batch 1)*
+### Q1 — Batch VM moves (G1 PR series) *(next PR: batch 2)*
 
 - **Why:** the audit's primary blocker and #1 merge hotspot; every remaining feature edit currently collides in `app/`.
 - **Gate:** cleared — Q0 retro written (PR #33).
 - **Companion documentation is mandatory per unit.** Every move unit below ships the destination slice's `README.md` (same 5-section template as Q0) in the same PR, as its own commit — the move and its slice doc are one phase's work, not two phases. When a unit targets a slice whose README already exists (batch 6 into `feature/sync/`), the unit updates that README's key-files/state-owner sections instead of adding a new file.
-- **Frozen-store rekey is part of every G1 commit** (Q0 retro): the ArchUnit store is keyed by fully-qualified name, so a move rekeys pre-existing violations. Include the `app/archunit_store/` edit in the move commit and review it as a rekey, not as a new violation.
+- **Frozen-store rekey is part of every G1 commit** (Q0 retro, re-confirmed by batch 1): whenever the moved class already appears in the store, the ArchUnit store — keyed by fully-qualified name — rekeys with it. Include the `app/archunit_store/` edit in the move commit and review it as a rekey (same count, new FQN), not as a new violation.
 - **README budget (Q0 retro):** ~45 lines is the working size; spend it on "what not to touch" — the only section not re-derivable from an `ls` of the slice — and keep "key files" terse.
 - **Batches** (retro outcome: **two VMs per PR when slice-coherent**, one where the README needs genuine domain thinking — `todayhub`, `sync`; the slice named in each line owns that unit's README):
-  1. `InboxViewModel` → `feature/inbox/`
   2. `NoteEditorViewModel` → `feature/editor/`; `NoteReaderViewModel` → `feature/note/`
   3. `TodayHubViewModel` → `feature/todayhub/`
   4. `WorkspaceSetupViewModel` → `feature/setup/`
@@ -100,7 +99,7 @@ Independent of Q1–Q4; schedule opportunistically. All G5, maintainer-reviewed.
   - `data/workspace/RemoteSyncSettingsRepositoryTest.kt` — 571. No Q1 move pending (not a ViewModel test): splittable now.
   - `core/usecase/ManualSyncNowTest.kt` — 552. Same: splittable now.
   - `feature/podcasts/PodcastsViewModelTest.kt` — 480. Already slice-local (no Q1 move pending): splittable now.
-  - `app/InboxViewModelTest.kt` — 457. Moves to `feature/inbox/` in Q1 batch 1: **move first, then split** if still over 450.
+  - `feature/inbox/InboxViewModelTest.kt` — 457. Move landed (Q1 batch 1) without a split, per **move first, then split**: splittable now.
   - `data/workspace/WorkspaceSetupRepositoryTest.kt` — 450: already satisfies acceptance; **not scheduled** (do not invent splits).
 - **Gate:** none — G4 is the ideal idle-agent task. Coordination rule: a test file being split and being moved never overlap in one review window; per-file, **move first, then split** (Q1 wins ties).
 - **How:** split by scenario group (e.g. `ManualSyncNowTest` → commit/stage, integrate/merge, recovery, push-retry); zero production diff, zero assertion changes.
