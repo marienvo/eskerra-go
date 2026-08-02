@@ -68,8 +68,9 @@ Every change declares one change type (G1–G5) per
 [`specs/rules/change-safety.md`](specs/rules/change-safety.md) (binding) — the type sets the
 required context, tests, reviewer, and whether an agent may drive it. That file also holds
 the green/yellow/**red** file-access tiers (sync/vault-write internals, guardrail ratchets,
-CI, and hooks are red: propose-only unless the task explicitly targets them with approved
-scope) and the delegated work-order + report format. Three repo-local review skills back it
+CI, and hooks are red: extra caution — include them in the task allowlist and meet the
+G3/G5 bar; agents always apply, never "propose only") and the delegated work-order +
+report format. Three repo-local review skills back it
 up: `review-markdown-integrity-data-loss-prevention` (any Markdown/vault write path),
 `review-state-consistency-coroutine-safety` (ViewModels, `StateFlow`, coroutine races), and
 `review-architecture-drift-responsibility-boundaries` (layer seams, god modules, ownership).
