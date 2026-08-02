@@ -1,4 +1,4 @@
-package com.eskerra.go.app
+package com.eskerra.go.feature.search
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider

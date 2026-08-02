@@ -9,6 +9,7 @@ import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.feature.search.SearchScreen
+import com.eskerra.go.feature.search.SearchViewModel
 
 @Composable
 internal fun AppSearchRoute(

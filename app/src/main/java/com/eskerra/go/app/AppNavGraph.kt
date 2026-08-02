@@ -55,6 +55,7 @@ import com.eskerra.go.feature.inbox.InboxUiState
 import com.eskerra.go.feature.note.NoteReaderUiState
 import com.eskerra.go.feature.note.NoteScreen
 import com.eskerra.go.feature.podcasts.PlaylistR2PollingHost
+import com.eskerra.go.feature.search.SearchViewModel
 import com.eskerra.go.feature.sync.SyncScreen
 import com.eskerra.go.feature.sync.SyncSettingsScreen
 import com.eskerra.go.feature.sync.SyncUiState

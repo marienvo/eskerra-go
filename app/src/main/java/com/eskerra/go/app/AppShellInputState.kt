@@ -9,6 +9,7 @@ import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.usecase.MaintainVaultSearchIndex
 import com.eskerra.go.core.usecase.RepairVaultSearchIndex
 import com.eskerra.go.core.usecase.SearchVault
+import com.eskerra.go.feature.search.SearchViewModel
 import java.io.File
 
 data class ShellInputPresentation(
