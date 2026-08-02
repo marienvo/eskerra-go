@@ -1,6 +1,6 @@
 # Plans README
 
-Last reviewed: 2026-08-02 (stack rewritten from the 2026-07-05 audit + notebox 2026-07-19 sibling bar; `make-slices-real.md` added; parity plan re-verified; `workspace-setup.md` marked for disposal). Re-review whenever a plan completes or a new one lands.
+Last reviewed: 2026-08-02 (stack rewritten from the 2026-07-05 audit + notebox 2026-07-19 sibling bar; `make-slices-real.md` added; parity plan re-verified; `workspace-setup.md` marked for disposal; `always-on-sync-and-spinner.md` added and parity P1b folded into it). Re-review whenever a plan completes or a new one lands.
 
 ## 1. Purpose of this folder
 
@@ -29,29 +29,31 @@ Deliberately orthogonal (notebox lesson: structure and product must not blur):
 |---|---|---|
 | **Axis** | Quality / structure — where code lives, how it is guarded | Product parity — what the app does vs Studio |
 | **Why it exists** | 2026-07-05 audit primary blocker: 11/12 ViewModels in `app/`; slices aspirational; 0 in-source docs; `core→data` leak; guardrail residuals | "Continue on your phone" breaks without non-inbox editing + sync moments; contract drift vs Studio |
-| **Use it for** | VM moves with their slice README as mandated companion (Q0–Q1), README backfill for the slices no move covers (Q2), dependency inversion (Q3), app-shell thinning (Q4), CI zone gate / ArchUnit ratchet / CODEOWNERS (Q5), test splits (Q6) | P0 verified inventory, P1a non-inbox plain-Markdown editing, P1b foreground-resume sync trigger, P2 contract adoption + small items |
+| **Use it for** | VM moves with their slice README as mandated companion (Q0–Q1), README backfill for the slices no move covers (Q2), dependency inversion (Q3), app-shell thinning (Q4), CI zone gate / ArchUnit ratchet / CODEOWNERS (Q5), test splits (Q6) | P0 verified inventory, P1a non-inbox plain-Markdown editing, P2 contract adoption + small items (P1b now lives in `always-on-sync-and-spinner.md`) |
 | **Must NOT be used for** | Any behavior or contract change; anything parity-shaped | Any file move or guardrail change; structure work hiding in feature PRs |
-| **Status** | **Active now** (Q0 done; Q1 batch 1 is the next PR) | **Active** (P0 whenever a device session is available; P1a/P1b after P0) |
-| **Deletion condition** | Counters full (10/10 + 8/8), ArchUnit rules enforced, Q5 residuals merged, **and Q4 resolved** — done and its routing/shell decision absorbed into ADR-001 or `app-contract.md`, or explicitly parked/transferred to a named surviving doc; Q4 skipped does not count (its §Deletion) | P0, P1a, P1b, and P2 done, `app-contract.md` updated, m4b gate re-pointed (its §5) |
+| **Status** | **Active now** (Q0 done; Q1 batch 1 is the next PR) | **Active** (P0 whenever a device session is available; P1a after P0; P1b absorbed by `always-on-sync-and-spinner.md`) |
+| **Deletion condition** | Counters full (10/10 + 8/8), ArchUnit rules enforced, Q5 residuals merged, **and Q4 resolved** — done and its routing/shell decision absorbed into ADR-001 or `app-contract.md`, or explicitly parked/transferred to a named surviving doc; Q4 skipped does not count (its §Deletion) | P0, P1a, and P2 done (P1b via `always-on-sync-and-spinner.md`), `app-contract.md` updated, m4b gate re-pointed (its §5) |
 
 | Other files | Class | Note |
 |---|---|---|
+| `always-on-sync-and-spinner.md` | **Active now** (product track; Phase A done) | Sync spinner in the badge slot (G2, landed), then writes-always-sync and boot/foreground-always-sync (both G3). **Absorbs parity P1b** — do not schedule P1b separately. Inherits P1b's hold against `make-slices-real.md` Q3. |
 | `workspace-setup.md` | **Disposal pending** | Trophy log. One small PR: salvage the setup-rollback rule + setup modes/boundaries into `app-contract.md` (they are in no architecture doc today), then delete. |
 
 Feature plans arriving later (e.g. the M4B audiobook player, whose cross-client contract lives in notebox) enter this table as **Active later** with their gate stated in the row.
 
 ## 4. Recommended execution order
 
-The two tracks interleave freely **except** where a step below names a hold. Quality PRs are small and G1-heavy (agent-drivable); parity P0/P1a/P1b need product judgment and a device — pull from whichever track matches the session, taking the lowest open step in that track.
+The two tracks interleave freely **except** where a step below names a hold. Quality PRs are small and G1-heavy (agent-drivable); parity P0/P1a and the G3 sync phases need product judgment and a device — pull from whichever track matches the session, taking the lowest open step in that track.
 
 1. ~~**Quality Q0 — pilot**~~ *(done — PR #33; retro written, Q1 gate cleared).*
 2. **Parity P0 — verified inventory** (`studio-feature-parity.md`): doc-only correction of the matrix against the running app. *Unblocked; needs a device session; nothing parity-flavored may be scheduled off unverified rows until this lands.*
 3. **`workspace-setup.md` disposal:** salvage → `app-contract.md`, delete the file. *Unblocked, trivial; an independent small doc PR of its own.*
 4. **Quality Q1 — batch VM moves** *(unblocked; the default next PR — start with batch 1, `InboxViewModel` → `feature/inbox/`)*, each PR carrying its destination slice's README as mandated companion documentation. Per the Q0 retro: two VMs per PR when slice-coherent (one for `todayhub`/`sync`), and the `app/archunit_store/` rekey rides in the G1 commit. **Quality Q2** then backfills READMEs for the slices no move covers (`podcasts`, `menu`) as its own small doc PR — it is not executed inside a Q1 PR. Q6 test splits (G4) may interleave anytime, respecting move-first-then-split per file.
-5. **Parity P1a — non-inbox plain-Markdown editing**, then **P1b — foreground-resume sync trigger/prompt** (both after P0; each gets its own disposable work doc and its own PR). P1a is the contract change: `app-contract.md` + AGENTS.md flip in the same PR as the domain rule. **Hold:** no Q-track PR touching the same slices/use-cases in the same review window; P1b and Q3's G3 inversions touch the same sync use cases — whichever runs second waits.
-6. **Quality Q3–Q5 — inversion, shell thinning, guardrail residuals** (Q3 after Q1 batches 1–4; Q4 after Q1; Q5 opportunistic, CODEOWNERS strictly after Q1).
-7. **m4b audiobook Go phase** — gated on **both P1a and P1b** completing (gate lives in the notebox m4b plan §15, Phase 3, and here). This is a portfolio-sequencing / review-attention gate, not a technical dependency. Never interleaves with Q-track moves.
-8. **Parity P2 — settings document (`vaultLayout`), theme read, attachments render, Today Hub depth** per P0 findings; coordinate with `notebox/specs/plans/desktop-settings-workspace.md`. **P3 long tail stays parked.**
+5. ~~**`always-on-sync-and-spinner.md` Phase A — sync spinner**~~ *(done on `always-on-sync-spinner`; gate green)*, then **Phases B and C** (G3, one PR each). These **replace parity P1b**, which they absorb.
+6. **Parity P1a — non-inbox plain-Markdown editing** (after P0; its own disposable work doc and its own PR). P1a is the contract change: `app-contract.md` + AGENTS.md flip in the same PR as the domain rule. **Hold:** no Q-track PR touching the same slices/use-cases in the same review window; `always-on-sync-and-spinner.md` Phases B/C and Q3's G3 inversions touch the same sync use cases — whichever runs second waits.
+7. **Quality Q3–Q5 — inversion, shell thinning, guardrail residuals** (Q3 after Q1 batches 1–4; Q4 after Q1; Q5 opportunistic, CODEOWNERS strictly after Q1).
+8. **m4b audiobook Go phase** — gated on **P1a plus `always-on-sync-and-spinner.md` Phases B–C** (the former P1b) completing (gate lives in the notebox m4b plan §15, Phase 3, and here). This is a portfolio-sequencing / review-attention gate, not a technical dependency. Never interleaves with Q-track moves.
+9. **Parity P2 — settings document (`vaultLayout`), theme read, attachments render, Today Hub depth** per P0 findings; coordinate with `notebox/specs/plans/desktop-settings-workspace.md`. **P3 long tail stays parked.**
 
 ## 5. Plan lifecycle rules
 
