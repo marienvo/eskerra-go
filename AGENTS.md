@@ -104,6 +104,11 @@ Enable the main-branch guard once per clone:
 git config core.hooksPath scripts/githooks
 ```
 
+**Before the first commit in any session, verify it is active** — `git config core.hooksPath`
+must print `scripts/githooks`. A fresh clone or worktree has it unset, and an unset hooksPath
+commits silently to `main` with no warning (this has happened: an agent committed two G2 changes
+directly to `main` before noticing). If unset, run the command above before committing anything.
+
 ## Commands
 
 Gradle requires **Java 17** (CI uses Temurin 17). Use `./scripts/gradle.sh` for local and agent runs — it picks JDK 17 automatically when `JAVA_HOME` is unset. Plain `./gradlew` is fine when JDK 17 is already your default (as in CI).
