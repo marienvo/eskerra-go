@@ -3,6 +3,9 @@ package com.eskerra.go.app
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.withFrameNanos
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ProcessLifecycleOwner
@@ -14,15 +17,22 @@ import java.io.File
 internal fun AppBootEffects(
     config: WorkspaceConfig,
     filesDir: File,
-    // Threaded through for the boot auto-sync trigger (Phase C step 2); not yet consumed here.
-    @Suppress("UNUSED_PARAMETER") launchSettled: Boolean,
+    launchSettled: Boolean,
     reconcileWorkspaceSyncBranch: ReconcileWorkspaceSyncBranch,
     appSyncViewModel: AppSyncViewModel,
     onConfigUpdated: (WorkspaceConfig) -> Unit,
     onConfigChanged: (WorkspaceConfig) -> Unit
 ) {
-    LaunchedEffect(config) {
-        appSyncViewModel.refreshShellStatusQuietly(forceRemote = true)
+    val bootSyncRequested = remember { mutableStateOf(false) }
+    LaunchedEffect(launchSettled) {
+        if (!launchSettled || bootSyncRequested.value) {
+            return@LaunchedEffect
+        }
+        // launchSettled describes ready content; wait for that content to reach a frame before
+        // starting Git/network work so sync stays off the first-render path.
+        withFrameNanos { }
+        bootSyncRequested.value = true
+        appSyncViewModel.requestAutoSync()
     }
 
     LaunchedEffect(config) {
@@ -41,9 +51,14 @@ internal fun AppBootEffects(
 @Composable
 internal fun AppForegroundSyncEffect(appSyncViewModel: AppSyncViewModel) {
     DisposableEffect(appSyncViewModel) {
+        var firstStart = true
         val observer = LifecycleEventObserver { _, event ->
+            val shouldAutoSync = shouldAutoSyncOnLifecycleEvent(event, firstStart)
             if (event == Lifecycle.Event.ON_START) {
-                appSyncViewModel.refreshShellStatusQuietly(forceRemote = false)
+                firstStart = false
+            }
+            if (shouldAutoSync) {
+                appSyncViewModel.requestAutoSync()
             }
         }
         ProcessLifecycleOwner.get().lifecycle.addObserver(observer)
@@ -52,3 +67,8 @@ internal fun AppForegroundSyncEffect(appSyncViewModel: AppSyncViewModel) {
         }
     }
 }
+
+internal fun shouldAutoSyncOnLifecycleEvent(
+    event: Lifecycle.Event,
+    isFirstStart: Boolean
+): Boolean = event == Lifecycle.Event.ON_START && !isFirstStart
