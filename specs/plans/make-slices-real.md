@@ -9,7 +9,9 @@ Companion docs: `specs/adr/001-hybrid-layering-and-feature-slices.md` (the claim
 
 ## Live counter (delete with the plan)
 
-ViewModels moved into their slice: **0 / 10** (excluded by design: `AppGateViewModel` — genuinely app-level). Slice READMEs written: **0 / 8** — the eight beyond Q0's `search` pilot: six delivered as Q1 move companions (`inbox`, `editor`, `note`, `todayhub`, `setup`, `sync`) and two backfilled by Q2 (`podcasts`, `menu`).
+ViewModels moved into their slice: **1 / 10** (excluded by design: `AppGateViewModel` — genuinely app-level). Slice READMEs written: **0 / 8** — the eight beyond Q0's `search` pilot: six delivered as Q1 move companions (`inbox`, `editor`, `note`, `todayhub`, `setup`, `sync`) and two backfilled by Q2 (`podcasts`, `menu`).
+
+**Q0 — done** (branch `quality-q0-search-slice`; `SearchViewModel` + test in `feature/search/`, pilot README written). Retro outcome: review cost was minimal (two pure renames, three import lines, a 45-line README); the one unpredicted cost is that **the frozen ArchUnit store is keyed by fully-qualified name, so every move rekeys pre-existing violations and its G1 commit must carry the store edit**; the 5-section README template held at 45 lines with "what not to touch" carrying the real value; **Q1 runs two VMs per PR when slice-coherent**, dropping to one where the README needs genuine domain thinking (`sync`, `todayhub`).
 
 ## Design rules (binding for every phase)
 
@@ -21,22 +23,14 @@ ViewModels moved into their slice: **0 / 10** (excluded by design: `AppGateViewM
 
 ## Phases
 
-### Q0 — Pilot: move `SearchViewModel` + write `feature/search/README.md` *(next PR)*
-
-- **Why first:** cheapest representative move (self-contained VM, no sync surface), and it prices the recipe — package rewrite, test move (`app/SearchViewModelTest.kt` → `feature/search/`), wiring touch-point in `app/` — before nine more are scheduled. Mirrors notebox's podcasts-pilot discipline: the pilot's output is a *decision*, not just the artifact.
-- **Scope:** `app/SearchViewModel.kt` (+ its UI state if separate) → `feature/search/`; matching test move; a ~40-line `feature/search/README.md` (purpose, key files, state owner, tests to run, what-not-to-touch). Two commits in one PR: (1) G1 move, (2) G2 README — reviewable together, never interleaved line-wise.
-- **G-type:** G1 (move) + G2 (README). **Gate:** none — unblocked today.
-- **Acceptance:** `SearchViewModel` and its test live under `feature/search/`; no `Search*` file remains in `app/`; README exists; full suite green with no assertion changes.
-- **Checks:** `./scripts/check-module-budgets.sh` && `./scripts/gradle.sh :app:ktlintCheck :app:lintDebug :app:testDebugUnitTest`
-- **Retro (mandatory before Q1):** 5 lines in the PR description — actual review cost, wiring surprises, whether README template held, whether one-VM-per-PR or two-per-PR is right for the batch. Update Q1's batching below accordingly.
-- **Shrink rule:** this section collapses to one "done + retro outcome" line in the counter.
-
-### Q1 — Batch VM moves (G1 PR series)
+### Q1 — Batch VM moves (G1 PR series) *(next PR: batch 1)*
 
 - **Why:** the audit's primary blocker and #1 merge hotspot; every remaining feature edit currently collides in `app/`.
-- **Gate:** Q0 retro written.
+- **Gate:** cleared — Q0 retro written (PR #33).
 - **Companion documentation is mandatory per unit.** Every move unit below ships the destination slice's `README.md` (same 5-section template as Q0) in the same PR, as its own commit — the move and its slice doc are one phase's work, not two phases. When a unit targets a slice whose README already exists (batch 6 into `feature/sync/`), the unit updates that README's key-files/state-owner sections instead of adding a new file.
-- **Batches** (per-PR grouping subject to retro; suggested 1–2 VMs per PR, slice-coherent; the slice named in each line owns that unit's README):
+- **Frozen-store rekey is part of every G1 commit** (Q0 retro): the ArchUnit store is keyed by fully-qualified name, so a move rekeys pre-existing violations. Include the `app/archunit_store/` edit in the move commit and review it as a rekey, not as a new violation.
+- **README budget (Q0 retro):** ~45 lines is the working size; spend it on "what not to touch" — the only section not re-derivable from an `ls` of the slice — and keep "key files" terse.
+- **Batches** (retro outcome: **two VMs per PR when slice-coherent**, one where the README needs genuine domain thinking — `todayhub`, `sync`; the slice named in each line owns that unit's README):
   1. `InboxViewModel` → `feature/inbox/`
   2. `NoteEditorViewModel` → `feature/editor/`; `NoteReaderViewModel` → `feature/note/`
   3. `TodayHubViewModel` → `feature/todayhub/`
@@ -47,7 +41,7 @@ ViewModels moved into their slice: **0 / 10** (excluded by design: `AppGateViewM
 - **Stays in `app/`:** `AppGateViewModel` (launch gate is composition-root behavior by design).
 - **G-type:** G1 per PR. `AppSyncViewModel` touches sync *orchestration wiring* — its PR is still G1 (verbatim move) but flag `App.kt` as yellow-tier in the work order.
 - **Acceptance (end of series):** `ls app/src/main/java/com/eskerra/go/app/*ViewModel*` = `AppGateViewModel.kt` only; **ViewModel counter 10/10 and slice-README counter 6/8** (the six Q1 companions; Q2 backfills the last two and closes it at 8/8); full suite green each PR.
-- **Checks:** same trio as Q0, every PR.
+- **Checks:** every PR — `./scripts/check-module-budgets.sh` && `./scripts/gradle.sh :app:ktlintCheck :app:lintDebug :app:testDebugUnitTest`.
 - **New guardrail on completion:** add an ArchUnit rule "no class named `*ViewModel` resides in `..app..` except `AppGateViewModel`" (G5, maintainer) so the hub cannot re-form.
 - **Shrink rule:** delete each batch line as it lands; delete the phase when the ArchUnit rule merges.
 
@@ -59,7 +53,7 @@ ViewModels moved into their slice: **0 / 10** (excluded by design: `AppGateViewM
   - **`podcasts`** — already self-contained; it is the template slice, so its README doubles as the reference example. Write it any time.
   - **`menu`** — single-screen slice with no ViewModel; nothing will ever move into it.
   - **plus any README the live counter still shows missing** once the Q1 series ends (e.g. a batch that shipped its move but skipped its doc — that is a Q2 backfill, and a signal the Q1 companion rule was not followed).
-- Same 5-section template as Q0 (~40 lines, hard cap 80). Do **not** duplicate global specs; link `sync-hardening-and-recovery.md` etc. from the sync README instead of restating it.
+- Same 5-section template as the Q0 pilot — copy `app/src/main/java/com/eskerra/go/feature/search/README.md` (~45 lines, hard cap 80). Do **not** duplicate global specs; link `sync-hardening-and-recovery.md` etc. from the sync README instead of restating it.
 - **G-type:** G2 (docs). Delivery: its own small documentation PR (one or both slices), independent of the Q1 series.
 - **Acceptance:** every `feature/*` slice has a README; counter 8/8 (the eight beyond Q0's `search` pilot).
 - **Shrink rule:** phase deletes when the counter fills.
