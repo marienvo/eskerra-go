@@ -14,6 +14,8 @@ import java.io.File
 internal fun AppBootEffects(
     config: WorkspaceConfig,
     filesDir: File,
+    // Threaded through for the boot auto-sync trigger (Phase C step 2); not yet consumed here.
+    @Suppress("UNUSED_PARAMETER") launchSettled: Boolean,
     reconcileWorkspaceSyncBranch: ReconcileWorkspaceSyncBranch,
     appSyncViewModel: AppSyncViewModel,
     onConfigUpdated: (WorkspaceConfig) -> Unit,
