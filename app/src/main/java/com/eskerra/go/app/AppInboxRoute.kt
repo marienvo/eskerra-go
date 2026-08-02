@@ -65,7 +65,7 @@ internal fun AppInboxRoute(
             activeTodayHubStore = activeTodayHubStore,
             onInboxMutated = { paths ->
                 entry.savedStateHandle[NOTES_CHANGED_KEY] = true
-                appSyncViewModel.refreshLocalStatusQuietly()
+                appSyncViewModel.requestAutoSync()
                 scope.touchVaultSearchPathsAsync(
                     touchVaultSearchPaths,
                     currentConfig,

@@ -59,7 +59,7 @@ internal fun rememberShellNewNoteInputState(
     LaunchedEffect(createInboxNoteViewModel, currentConfig, filesDir, appSyncViewModel) {
         createInboxNoteViewModel.savedNoteEvents.collect { noteId ->
             markInboxNotesChanged()
-            appSyncViewModel.refreshLocalStatusQuietly()
+            appSyncViewModel.requestAutoSync()
             scope.touchVaultSearchPathsAsync(
                 touchVaultSearchPaths,
                 currentConfig,
