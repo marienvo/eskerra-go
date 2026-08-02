@@ -143,6 +143,36 @@ class AppSyncViewModelTestAutoSync {
     }
 
     @Test
+    fun permanentContention_givesUpQuietly_insteadOfSpinningForever() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            var syncCount = 0
+            val attempts = RecordingLastSyncStatusStore()
+            val viewModel = createViewModel(
+                attempts = attempts,
+                retryDelay = {}
+            ) { _, _, _ ->
+                // Another git channel holds the shared mutex and never releases it.
+                syncCount++
+                Result.failure(SyncException(SyncError.SyncAlreadyRunning))
+            }
+
+            viewModel.requestAutoSync()
+            advanceUntilIdle()
+
+            assertEquals(
+                AppSyncViewModel.MAX_AUTO_SYNC_CONTENTION_RETRIES + 1,
+                syncCount
+            )
+            // Giving up is not a failure, and must not leave the shell stuck on Syncing.
+            assertTrue(attempts.saved.isEmpty())
+            assertTrue(viewModel.uiState.value is SyncUiState.Ready)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
     fun noRemoteConfigured_isNoOp() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         try {

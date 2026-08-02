@@ -209,11 +209,21 @@ class AppSyncViewModel(
         val job = viewModelScope.launch(start = CoroutineStart.LAZY) {
             try {
                 var outcome = runSync(trigger)
+                var contentionRetries = 0
                 while (trigger == SyncTrigger.Automatic &&
-                    outcome == SyncRunOutcome.RetryAfterContention
+                    outcome == SyncRunOutcome.RetryAfterContention &&
+                    contentionRetries < MAX_AUTO_SYNC_CONTENTION_RETRIES
                 ) {
+                    contentionRetries++
                     autoSyncRetryDelay()
                     outcome = runSync(trigger)
+                }
+                if (outcome == SyncRunOutcome.RetryAfterContention) {
+                    // Another git channel (podcast sync) held the shared mutex for every attempt.
+                    // Giving up is not a failure: record nothing and show no error, but clear the
+                    // Syncing state so the shell stops spinning and status refreshes unblock. The
+                    // next trigger — any write, or the next foreground return — syncs again.
+                    emitReadyStateNow(loadSyncStatus(config, filesDir))
                 }
             } finally {
                 val runFollowUp = pendingAutoSync
@@ -301,6 +311,11 @@ class AppSyncViewModel(
         if (_uiState.value is SyncUiState.Syncing) {
             return
         }
+        emitReadyStateNow(status)
+    }
+
+    /** Emits Ready even while [SyncUiState.Syncing] — only for the owner of the running sync. */
+    private suspend fun emitReadyStateNow(status: com.eskerra.go.core.model.SyncStatusSummary) {
         val preflight = buildSyncPreflight(config, filesDir)
         val diagnostic = buildSafeSyncDiagnostic(config, filesDir)
         _uiState.value = SyncUiState.Ready(
@@ -317,6 +332,14 @@ class AppSyncViewModel(
         const val DEFAULT_REFRESH_DEBOUNCE_MS = 30_000L
         const val SYNC_SPINNER_HOLD_MS = 450L
         const val DEFAULT_AUTO_SYNC_RETRY_DELAY_MS = 250L
+
+        /**
+         * Bounds the wait for the shared git mutex. Podcast sync holds it across a network
+         * fetch + push, so contention is expected and worth retrying — but an unbounded retry
+         * would spin forever if that channel ever wedges, pinning the shell on Syncing and
+         * blocking every status refresh.
+         */
+        const val MAX_AUTO_SYNC_CONTENTION_RETRIES = 8
 
         fun factory(
             config: WorkspaceConfig,
