@@ -37,6 +37,12 @@ Clear fingerprint when:
 
 [ReconcileWorkspaceSyncBranch](app/src/main/java/com/eskerra/go/core/usecase/ReconcileWorkspaceSyncBranch.kt) runs **after** the gate is `Ready`, from [App.kt](app/src/main/java/com/eskerra/go/app/App.kt). It must not block the root spinner. Manual sync still re-runs branch alignment before commit.
 
+### Boot sync is gated on launch settlement
+
+The boot vault sync fires from [AppBootEffects.kt](app/src/main/java/com/eskerra/go/app/AppBootEffects.kt) only once `launchSettled` is true **and** one frame has been rendered (`withFrameNanos { }`), exactly once per process (`shouldTriggerBootSync`). Gate `Ready` is *not* sufficient: it precedes the vault scan and inbox load that settlement waits on.
+
+**No Git or network work may run before launch settles**, however cheap it looks. Until 2026-08-02 boot ran `refreshShellStatusQuietly(forceRemote = true)` from a `LaunchedEffect(config)` at composition time. It read as a harmless "status refresh for the shell indicator", but `forceRemote` skips the 30 s debounce, making it a network `fetch` on every cold start, competing with the scan. Deferring it cut median launch-settled by **~840 ms (−19.8 %)** on a 1232-file vault — measured in [specs/performance/cold-start-debug-logbook.md](../performance/cold-start-debug-logbook.md) (H01). A "status refresh" that reaches the network is startup-path work; treat it as such.
+
 ## Note registry cache
 
 Process-scoped [NoteRegistryCache](app/src/main/java/com/eskerra/go/data/notes/NoteRegistryCache.kt) in [MainActivity.kt](app/src/main/java/com/eskerra/go/MainActivity.kt) is the single source of truth for indexed note summaries across inbox, reader, and Today Hub.

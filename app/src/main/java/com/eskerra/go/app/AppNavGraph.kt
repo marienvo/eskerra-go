@@ -342,7 +342,7 @@ internal fun NavGraphBuilder.sharedDestinations(ctx: AppNavGraphContext) {
         LaunchedEffect(editorViewModel) {
             editorViewModel.noteSavedEvents.collect {
                 ctx.markInboxNotesChanged()
-                ctx.appSyncViewModel.refreshLocalStatusQuietly()
+                ctx.appSyncViewModel.requestAutoSync()
                 ctx.scope.touchVaultSearchPathsAsync(
                     ctx.touchVaultSearchPaths,
                     ctx.currentConfig,

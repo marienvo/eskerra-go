@@ -62,14 +62,12 @@ import com.eskerra.go.feature.inbox.InboxUiState
 import com.eskerra.go.feature.todayhub.TodayHubUiState
 import java.io.File
 
-/**
- * Root composable. Owns the navigation graph and wires ViewModels to stateless
- * feature screens.
- */
+/** Root composable. Owns the navigation graph and wires ViewModels to stateless feature screens. */
 @Composable
 fun App(
     config: WorkspaceConfig,
     filesDir: File,
+    launchSettled: Boolean,
     loadInboxSummaries: LoadInboxSummariesCached,
     loadNoteForReading: LoadNoteForReading,
     prefetchLinkedNotes: PrefetchLinkedNotes,
@@ -177,6 +175,7 @@ fun App(
     AppBootEffects(
         config = currentConfig,
         filesDir = filesDir,
+        launchSettled = launchSettled,
         reconcileWorkspaceSyncBranch = reconcileWorkspaceSyncBranch,
         appSyncViewModel = appSyncViewModel,
         onConfigUpdated = onConfigUpdated,
@@ -189,7 +188,7 @@ fun App(
     )
     AppForegroundSyncEffect(appSyncViewModel)
 
-    val syncIndicator = shellSyncIndicatorState(syncState, remoteConfigured)
+    val syncIndicator = rememberShellSyncIndicator(appSyncViewModel, remoteConfigured)
     val selectedTopLevelRoute = destinationTopLevelRoute ?: currentTopLevelRoute
     val inPodcastMode = selectedTopLevelRoute == AppRoute.PODCASTS_GRAPH
     val newNoteInputState = rememberShellNewNoteInputState(

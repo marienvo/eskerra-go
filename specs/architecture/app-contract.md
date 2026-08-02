@@ -5,11 +5,11 @@ Product behavior and boundaries for the native Android app. Non-obvious rules th
 ## Core capabilities
 
 - Git-first workspace setup (one workspace per install).
-- Clone from `file://` or sanitized `https://` remotes; manual vault sync for HTTPS.
+- Clone from `file://` or sanitized `https://` remotes; vault sync for HTTPS remotes only.
 - Inbox list from markdown files; create and edit inbox notes; non-inbox notes read-only.
 - Markdown reader with clickable wiki links (title or filename stem, case-insensitive; path-like targets stay case-sensitive).
 - Full-text vault search (SQLite FTS5).
-- Manual HTTPS remote sync (explicit user action): commits all local vault changes; integrates remote via fast-forward or auto-merge with conflict sidecars.
+- HTTPS remote sync: commits all local vault changes; integrates remote via fast-forward or auto-merge with conflict sidecars. Runs on the sync button and automatically on note writes, boot, and foreground return — always foreground work, never a background scheduler.
 - Podcast episodes tab: catalog, playback, R2 playlist handoff, RSS refresh, mark-as-played.
 - Floating shell navigation with tab state preservation.
 
@@ -44,13 +44,29 @@ All JGit mutations share one process-wide mutex so vault sync and podcast auto-s
 
 | Channel | Trigger | Staged paths | Integration | Push |
 | --- | --- | --- | --- | --- |
-| Manual vault sync | User taps sync | All safe local changes | FF when behind; auto-merge on divergence | Yes, with retry |
+| Vault sync | User taps sync, **any note write** (inbox create, editor save, inbox delete), **boot**, or **foreground return** | All safe local changes | FF when behind; auto-merge on divergence | Yes, with retry |
 | Podcast RSS refresh | Pull-to-refresh | RSS writes `General/`; then vault sync engine | Same as vault sync | Same as vault sync |
 | Podcast mark-as-played | Checkbox | Changed podcast paths under `General/` only | **Fast-forward only** | Best-effort; pending on divergence |
 
-Podcast auto-sync is foreground work tied to user actions, not a background scheduler.
+**Sync moments.** Note writes, app boot, and every foreground return always start a vault sync — the
+same code path as the button, with coalescing so rapid triggers collapse to one follow-up. Automatic
+syncs fail **silently**: the `"!"` shell badge and the sync screen carry the detail; there are no
+toasts. Trigger rules (coalescing, blocked preflight, mutex contention) are in
+[sync-hardening-and-recovery.md](sync-hardening-and-recovery.md#automatic-vault-sync-triggers).
+Boot's sync waits until launch has settled and one frame has been drawn, keeping Git and network work
+off the startup path ([boot-optimization.md](boot-optimization.md)); the first `ON_START` of the
+process is boot's, so it does not sync twice.
 
-Vault sync (manual button and RSS refresh) auto-merges diverged histories with conflict sidecars. Podcast mark-as-played never auto-merges, rebase, or reset.
+All of this is foreground work tied to user actions, never a background scheduler.
+
+Vault sync (button, note writes, and RSS refresh) auto-merges diverged histories with conflict sidecars. Podcast mark-as-played never auto-merges, rebase, or reset.
+
+## Shell sync indicator
+
+One badge slot on the hamburger carries the whole sync story, and it never changes size — the pending-change count, the `"!"` after a failure, and the spinner all occupy the same 16×16 dp `Badge` inside the existing `BadgedBox`, so nothing shifts as the state changes. While a sync runs, the spinner **replaces** the count; the count returns when the spinner stops.
+
+- The spinner is drawn ([SyncSpinner.kt](app/src/main/java/com/eskerra/go/feature/sync/SyncSpinner.kt)), not a rotated asset: every coordinate derives from the draw scope's `center` and one radius, and rotation uses `rotate(pivot = center)` rather than `Modifier.graphicsLayer { rotationZ }`, whose pivot is the layer's center and drifts when the composable is not perfectly square. A rotated vector icon wobbles because its drawn centroid is not its viewport center; that wobble is the reason this composable exists.
+- Spinner visibility is held for a minimum duration (`holdTrueAtLeast`) so a sync that finishes in 200 ms does not flash it. The hold is a Flow operator, not a UI timer, so it is unit-testable with virtual time.
 
 ## Sync branch alignment
 

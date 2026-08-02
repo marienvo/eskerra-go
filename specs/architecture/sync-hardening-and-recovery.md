@@ -27,7 +27,7 @@ All JGit mutations share one process-wide **mutex** so vault sync and podcast au
 
 | Channel | Trigger | Stage | Integration | Push |
 | --- | --- | --- | --- | --- |
-| Manual vault sync | User taps sync | All safe local changes | FF when behind; auto-merge on divergence | Yes, with retry |
+| Vault sync | User taps sync, **or any note write** (see [Automatic vault sync triggers](#automatic-vault-sync-triggers)) | All safe local changes | FF when behind; auto-merge on divergence | Yes, with retry |
 | Podcast RSS refresh | Pull-to-refresh | RSS writes `General/`; then delegates to `ManualSyncNow` | Same as vault sync | Same as vault sync |
 | Podcast mark-as-played | Checkbox | Changed podcast paths under `General/` only | **Fast-forward only** | Best-effort; `pendingPush` on divergence/offline |
 
@@ -65,10 +65,11 @@ Podcast auto-sync is **foreground work** tied to user actions, not a background 
 
 ## Reentrancy
 
-- **UI/ViewModel:** ignore duplicate `syncNow()` while `SyncUiState.Syncing`. Do not cancel and restart an in-flight sync on double-tap.
-- **UI/ViewModel:** `syncNow()` cancels any in-flight status `loadJob` before starting sync so a completing refresh cannot overwrite `SyncUiState.Syncing`.
+- **UI/ViewModel:** ignore duplicate `syncNow()` while a sync job is active or `SyncUiState.Syncing`. Do not cancel and restart an in-flight sync on double-tap.
+- **UI/ViewModel:** starting a sync cancels any in-flight status `loadJob` first so a completing refresh cannot overwrite `SyncUiState.Syncing`.
 - **Use case:** `ManualSyncNow` holds the shared git mutex. A concurrent invoke returns `SyncError.SyncAlreadyRunning`.
 - **Editor/save:** local editing and saving remain allowed during sync (no global UI lock).
+- **Trigger state** (`syncJob`, `pendingAutoSync`) is owned exclusively by `viewModelScope`/Main. Public entry points marshal onto that scope, so it needs no locks or `@Volatile`. The sync job is created with `CoroutineStart.LAZY` and started only after `syncJob` is assigned, so a second caller cannot slip past the guard before the field is set.
 
 ## Staged index safety (vault sync)
 
@@ -107,12 +108,60 @@ Each blocking `SyncError` maps to a short recovery hint via `SyncRecoveryGuidanc
 
 ## Foreground sync-status refresh
 
-- On app start (after the workspace gate is `Ready`) and when the app returns to the foreground, the shell may run a **read-only** remote check: `fetch` to update remote-tracking refs, then local ahead/behind comparison.
-- Start with a **local-only** status read for the shell indicator, then run the remote check without forcing `SyncUiState.Loading` so the sync button stays usable while the fetch completes. Use a single status `loadJob` so the local emit completes before the remote fetch starts (no cancel between the two steps).
-- This is user-visible foreground work only; it does not commit, pull, or push.
-- Debounce rapid foreground refreshes (for example within 30 seconds) to avoid redundant network calls.
-- After inbox note create or save, the app may reload **local-only** Git sync status for the shell indicator. This does not fetch remote.
+Since 2026-08-02 app start and foreground return run a **full auto-sync**, not a read-only remote check
+(see [Automatic vault sync triggers](#automatic-vault-sync-triggers)). What remains of the
+status-refresh path:
+
+- **Local-only reads** (`refreshLocalStatus`, `refreshLocalStatusQuietly`) still serve the shell badge and the sync screen wherever a sync must not or cannot run: no remote configured, blocked preflight, opening the sync screen after Success.
+- Quiet local refreshes must not force `SyncUiState.Loading`, so the sync button stays usable.
+- `refreshRemoteStatus` (debounced, 30 s) remains for an explicit remote status read; there is no quiet shell local→remote combo path anymore (the old `refreshShellStatusQuietly` / `refreshRemoteStatusQuietly` helpers were removed once boot/foreground became full auto-sync).
+- Any refresh that reaches the network is startup-path work if it can run before launch settles — see [boot-optimization.md](boot-optimization.md#boot-sync-is-gated-on-launch-settlement) for the regression that caused.
+- `SyncUiState.Syncing` short-circuits every refresh, which is why auto-sync must never leave that state stuck.
+
+## Automatic vault sync triggers
+
+Every note write, app boot, and foreground return starts a **full vault sync**
+(`AppSyncViewModel.requestAutoSync()`), not merely a status refresh: inbox note create, note editor
+save, inbox delete, boot, and every real foreground `ON_START`. `requestAutoSync()` is the
+sole entry point for automatic triggers and runs the same code path as the manual button.
+
+Boot's trigger waits for `launchSettled` plus one rendered frame and fires once per
+`AppSyncViewModel` instance after settle (`shouldTriggerBootSync`). The flag is keyed to that
+instance: a composition-lifetime flag would leave a ViewModel recreated by branch/remote changes
+stuck in `SyncUiState.Loading`. The foreground observer ignores only the synthetic `ON_START` that
+`LifecycleRegistry` may replay while `addObserver` runs (`shouldAutoSyncOnLifecycleEvent`); every
+later resume syncs. Cold start is boot's job, so the two do not double-fire. Both live in
+[AppBootEffects.kt](app/src/main/java/com/eskerra/go/app/AppBootEffects.kt).
+
+Rules:
+
+- **No remote configured** → do not sync, but still run a quiet **local** status refresh. A pure no-op
+  would strand a local-only vault in `SyncUiState.Loading` forever, since these triggers are now the
+  only thing that advances that state on boot.
+- **Blocked preflight** (`!preflight.canSync`, e.g. unsafe local paths) → do **not** sync; run a quiet
+  local status refresh so the shell badge still tells the truth. A blocked preflight is not an error
+  state and is not retried.
+- **Sync already in flight** → coalesce: mark one follow-up and run it when the current sync
+  finishes. N requests during one sync collapse to exactly one follow-up, never a queue.
+- **`SyncError.SyncAlreadyRunning`** (a podcast channel holds the shared git mutex) is **not a
+  failure**: record no attempt, emit no error, and retry after a short delay. Retries are capped
+  (`MAX_AUTO_SYNC_CONTENTION_RETRIES`); on exhaustion give up quietly and clear `SyncUiState.Syncing`
+  so the shell unblocks. Leaving it uncapped would pin the shell on `Syncing` — which every status
+  refresh early-returns on — and wedge auto-sync entirely if that channel ever hung.
+- **Failures are silent.** An automatic sync that fails records the attempt and sets
+  `SyncUiState.Error`, which surfaces only as the `"!"` shell badge plus detail on the sync screen.
+  No toasts, no dialogs. Manual sync keeps its own messaging.
+
+Feedback-loop safety: a successful sync calls `markInboxNotesChanged`, which the inbox route answers
+with `refresh()`. `InboxViewModel.refresh()` must therefore never invoke `onInboxMutated` (which is a
+write-site trigger), or writes and refreshes would loop. Pinned by
+`InboxViewModelFeedbackLoopTest`.
+
+Inbox UI also observes `NoteRegistryCache.registry` directly. Sync already refreshes that shared
+registry after pull; applying `inboxSummaries` from the flow drops remote deletes even when the
+Compose `inboxRefreshSignal` path is missed (otherwise the row stays until tap → "note not found").
+Pinned by `InboxViewModelRegistryObservationTest`.
 
 ## Out of scope
 
-WorkManager/AlarmManager scheduled sync, inbox sync-on-save, SSH, interactive conflict-resolution UI, full sync history, note deletion/move/rename (inbox delete is implemented separately).
+WorkManager/AlarmManager scheduled sync, SSH, interactive conflict-resolution UI, full sync history, note deletion/move/rename (inbox delete is implemented separately).

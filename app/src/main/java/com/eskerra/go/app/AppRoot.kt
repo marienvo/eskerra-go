@@ -142,6 +142,12 @@ fun AppRoot(
                 var inboxUiState by remember { mutableStateOf<InboxUiState?>(null) }
                 var todayHubUiState by remember { mutableStateOf<TodayHubUiState?>(null) }
                 var podcastFirstLaunch by remember { mutableStateOf(false) }
+                val launchSettled = isLaunchSettled(
+                    gateState,
+                    inboxUiState,
+                    todayHubUiState,
+                    podcastFirstLaunch
+                )
 
                 AppLaunchSettledEffect(
                     gateState = gateState,
@@ -193,6 +199,7 @@ fun AppRoot(
                     is AppGateState.Ready -> App(
                         config = gate.config,
                         filesDir = filesDir,
+                        launchSettled = launchSettled,
                         loadInboxSummaries = loadInboxSummaries,
                         loadNoteForReading = loadNoteForReading,
                         prefetchLinkedNotes = prefetchLinkedNotes,

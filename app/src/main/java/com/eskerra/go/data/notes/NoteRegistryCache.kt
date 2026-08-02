@@ -37,7 +37,7 @@ class NoteRegistryCache(
     private val _registry = MutableStateFlow<NoteRegistry?>(null)
 
     /** Shared in-memory registry; `null` until the first successful [current] or [refresh]. */
-    val registry: StateFlow<NoteRegistry?> = _registry.asStateFlow()
+    override val registry: StateFlow<NoteRegistry?> = _registry.asStateFlow()
 
     /**
      * Returns the cached registry without scanning: in-memory → persisted snapshot → `null`.

@@ -61,7 +61,7 @@ ViewModels moved into their slice: **1 / 10** (excluded by design: `AppGateViewM
 ### Q3 — Invert `core → data`; kill `AppGateResolver → app`
 
 - **Why:** audit finding #1/#4: 30 concrete `data` imports across 9 `core/usecase` files (grew from 29 — `SyncBinaries` added post-audit), plus the one reverse leak `data/workspace/AppGateResolver.kt:3` importing `app.AppGateState`. Layering is convention-enforced, not compile-enforced.
-- **Gate:** none technically, but schedule **after** Q1 batches 1–4 so review attention isn't split, and **never** in the same review window as parity P1b (foreground-resume sync trigger — same use-case files).
+- **Gate:** none technically, but schedule **after** Q1 batches 1–4 so review attention isn't split. The old "never alongside parity P1b" hold is released: the always-on-sync work delivered P1b and is closed, so no parity phase competes for these sync use-case files.
 - **Scope (PR series, smallest first):**
   1. `AppGateResolver`: move `AppGateState` (or an interface for it) into `core`/`data`-appropriate home; delete the `app.` import. Small, self-contained.
   2. Lower-risk (non-G3) dependency inversions — behavior-preserving interface extraction on the use cases outside the G3 trio (`SyncBinaries`, `LoadGitStatusSummary`, `BuildSafeSyncDiagnostic`, `BuildSyncPreflight`, `LoadSyncStatus`, `RefreshRemoteSyncStatus`): introduce `core` interfaces for the `data` concretions they name (`WorkspacePaths`, `CredentialStore`, error mappers…), wire in `app/`.

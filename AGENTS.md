@@ -26,11 +26,11 @@ Architecture style (hybrid layering + feature slices) and placement rules for ne
 - Markdown parsing and wiki-link resolution live outside UI.
 - Inbox editability is a domain rule: inbox notes editable, all other notes read-only.
 - **Git sync channels** (see [`specs/architecture/sync-hardening-and-recovery.md`](specs/architecture/sync-hardening-and-recovery.md)):
-  - Manual vault sync (`ManualSyncNow`): commits all safe local changes, auto-merges on divergence with conflict sidecars, recovers interrupted Git ops before proceeding.
+  - Vault sync (`ManualSyncNow`): commits all safe local changes, auto-merges on divergence with conflict sidecars, recovers interrupted Git ops before proceeding. Triggered by the sync button **and by every note write** (create/save/delete), **on boot**, and **on every foreground return**, via `AppSyncViewModel.requestAutoSync()`, which coalesces concurrent requests and fails silently to the `"!"` badge.
   - Podcast RSS refresh delegates to `ManualSyncNow` via `SyncPodcastChangesViaVaultSync` after RSS writes `General/`.
   - Podcast mark-as-played uses `SyncPodcastChange`: stages changed **General/** podcast paths only, fetch + fast-forward + push; no auto-merge/rebase/reset on divergence.
   - All git mutations share one mutex.
-  - No WorkManager/AlarmManager scheduled sync; read-only remote `fetch` for the shell indicator is allowed on foreground.
+  - No WorkManager/AlarmManager scheduled sync. Boot and foreground return run a **full auto-sync**, not a read-only `fetch`; boot's is deferred until after launch settles so no Git or network work sits on the startup path (see [`specs/architecture/boot-optimization.md`](specs/architecture/boot-optimization.md)).
 - Full-text search uses **Android's bundled SQLite FTS5** (`SQLiteOpenHelper`). See [`specs/plans/android-vault-notes-rebuild-plan.md`](specs/plans/android-vault-notes-rebuild-plan.md) (Phase 7) for the index schema, reconcile strategy, and ranker tiers.
 - No multi-workspace support.
 - **Module size budget — touch it, tidy it.** Any `.kt` file under `app/src/{main,test,androidTest}/java/` that your change touches must end no larger than `max(400, the line count it had at the merge base)`: a file at or under 400 may never cross 400, and a file already over 400 may only shrink or stay equal. Renamed/moved files inherit the old path's merge-base size; brand-new files have a hard 400-line ceiling; untouched files are left alone. Pre-existing large files are pinned in [`scripts/module-budget-baseline.json`](scripts/module-budget-baseline.json) and that cap **only ratchets down** — `update-module-budget-baseline.sh` will never raise a cap or add an entry for a grown file. Pinning a new large file is a deliberate manual edit of the baseline JSON, justified in the commit message. `./scripts/check-module-budgets.sh` enforces this in CI. See [`specs/team-scalability/README.md`](specs/team-scalability/README.md).
@@ -103,6 +103,11 @@ Enable the main-branch guard once per clone:
 ```bash
 git config core.hooksPath scripts/githooks
 ```
+
+**Before the first commit in any session, verify it is active** — `git config core.hooksPath`
+must print `scripts/githooks`. A fresh clone or worktree has it unset, and an unset hooksPath
+commits silently to `main` with no warning (this has happened: an agent committed two G2 changes
+directly to `main` before noticing). If unset, run the command above before committing anything.
 
 ## Commands
 
