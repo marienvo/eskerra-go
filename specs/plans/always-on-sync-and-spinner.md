@@ -1,10 +1,11 @@
 # Always-on sync + sync spinner
 
-Last reviewed: 2026-08-02 (Phases A–B landed; C still open).
-Status: **Phases A–B done** (spinner + write-triggered auto-sync; quality gate green). Phase C remains.
-Track: **product** (parity-adjacent). This plan **absorbs parity phase P1b**
-("foreground-resume sync trigger or prompt") from [`studio-feature-parity.md`](studio-feature-parity.md)
-and goes further: it also makes every vault write and every cold boot a sync moment.
+Last reviewed: 2026-08-02 (Phases A–C landed; only D remains).
+Status: **Phases A–C done** (spinner, write-triggered auto-sync, boot/foreground sync; quality gate
+green). Only **Phase D** remains: absorb and delete this plan.
+Track: **product** (parity-adjacent). This plan **delivered parity phase P1b** ("foreground-resume sync
+trigger or prompt") from [`studio-feature-parity.md`](studio-feature-parity.md), closed 2026-08-02, and
+went further: every vault write and every cold boot is now a sync moment too.
 
 Companion docs (read before executing any phase):
 [`specs/architecture/sync-hardening-and-recovery.md`](../architecture/sync-hardening-and-recovery.md),

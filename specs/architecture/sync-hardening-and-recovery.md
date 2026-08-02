@@ -108,20 +108,31 @@ Each blocking `SyncError` maps to a short recovery hint via `SyncRecoveryGuidanc
 
 ## Foreground sync-status refresh
 
-- On app start (after the workspace gate is `Ready`) and when the app returns to the foreground, the shell may run a **read-only** remote check: `fetch` to update remote-tracking refs, then local ahead/behind comparison.
-- Start with a **local-only** status read for the shell indicator, then run the remote check without forcing `SyncUiState.Loading` so the sync button stays usable while the fetch completes. Use a single status `loadJob` so the local emit completes before the remote fetch starts (no cancel between the two steps).
-- This is user-visible foreground work only; it does not commit, pull, or push.
-- Debounce rapid foreground refreshes (for example within 30 seconds) to avoid redundant network calls.
+Since 2026-08-02 app start and foreground return run a **full auto-sync**, not a read-only remote check
+(see below). What remains of the status-refresh path:
+
+- **Local-only reads** (`refreshLocalStatus`, `refreshLocalStatusQuietly`) still serve the shell badge and the sync screen wherever a sync must not or cannot run: no remote configured, blocked preflight, opening the sync screen.
+- Quiet refreshes must not force `SyncUiState.Loading`, so the sync button stays usable. Use a single status `loadJob` so a local emit completes before any remote step starts (no cancel between the two steps).
+- Any refresh that reaches the network is startup-path work if it can run before launch settles — see [boot-optimization.md](boot-optimization.md#boot-sync-is-gated-on-launch-settlement) for the regression this caused.
+- Remote status reads stay debounced (30 s) to avoid redundant network calls; `SyncUiState.Syncing` short-circuits every refresh, which is why auto-sync must never leave that state stuck.
 
 ## Automatic vault sync triggers
 
-Every note write starts a **full vault sync** (`AppSyncViewModel.requestAutoSync()`), not merely a
-status refresh: inbox note create, note editor save, and inbox delete. `requestAutoSync()` is the
+Every note write, app boot, and foreground return starts a **full vault sync**
+(`AppSyncViewModel.requestAutoSync()`), not merely a status refresh: inbox note create, note editor
+save, inbox delete, boot, and every `ON_START` after the process's first. `requestAutoSync()` is the
 sole entry point for automatic triggers and runs the same code path as the manual button.
+
+Boot's trigger waits for `launchSettled` plus one rendered frame and fires exactly once per process
+(`shouldTriggerBootSync`); because boot already syncs, the first `ON_START` is skipped
+(`shouldAutoSyncOnLifecycleEvent`) so a cold start does not sync twice. Both live in
+[AppBootEffects.kt](app/src/main/java/com/eskerra/go/app/AppBootEffects.kt).
 
 Rules:
 
-- **No remote configured** → no-op. No state change, no error.
+- **No remote configured** → do not sync, but still run a quiet **local** status refresh. A pure no-op
+  would strand a local-only vault in `SyncUiState.Loading` forever, since these triggers are now the
+  only thing that advances that state on boot.
 - **Blocked preflight** (`!preflight.canSync`, e.g. unsafe local paths) → do **not** sync; run a quiet
   local status refresh so the shell badge still tells the truth. A blocked preflight is not an error
   state and is not retried.

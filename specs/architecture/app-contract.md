@@ -5,11 +5,11 @@ Product behavior and boundaries for the native Android app. Non-obvious rules th
 ## Core capabilities
 
 - Git-first workspace setup (one workspace per install).
-- Clone from `file://` or sanitized `https://` remotes; manual vault sync for HTTPS.
+- Clone from `file://` or sanitized `https://` remotes; vault sync for HTTPS remotes only.
 - Inbox list from markdown files; create and edit inbox notes; non-inbox notes read-only.
 - Markdown reader with clickable wiki links (title or filename stem, case-insensitive; path-like targets stay case-sensitive).
 - Full-text vault search (SQLite FTS5).
-- Manual HTTPS remote sync (explicit user action): commits all local vault changes; integrates remote via fast-forward or auto-merge with conflict sidecars.
+- HTTPS remote sync: commits all local vault changes; integrates remote via fast-forward or auto-merge with conflict sidecars. Runs on the sync button and automatically on note writes, boot, and foreground return — always foreground work, never a background scheduler.
 - Podcast episodes tab: catalog, playback, R2 playlist handoff, RSS refresh, mark-as-played.
 - Floating shell navigation with tab state preservation.
 
@@ -44,16 +44,18 @@ All JGit mutations share one process-wide mutex so vault sync and podcast auto-s
 
 | Channel | Trigger | Staged paths | Integration | Push |
 | --- | --- | --- | --- | --- |
-| Vault sync | User taps sync, **or any note write** (inbox create, editor save, inbox delete) | All safe local changes | FF when behind; auto-merge on divergence | Yes, with retry |
+| Vault sync | User taps sync, **any note write** (inbox create, editor save, inbox delete), **boot**, or **foreground return** | All safe local changes | FF when behind; auto-merge on divergence | Yes, with retry |
 | Podcast RSS refresh | Pull-to-refresh | RSS writes `General/`; then vault sync engine | Same as vault sync | Same as vault sync |
 | Podcast mark-as-played | Checkbox | Changed podcast paths under `General/` only | **Fast-forward only** | Best-effort; pending on divergence |
 
-**Sync moments.** Note writes always start a vault sync — the same code path as the button, with
-coalescing so rapid writes collapse to one follow-up. Automatic syncs fail **silently**: the `"!"`
-shell badge and the sync screen carry the detail; there are no toasts. Trigger rules (coalescing,
-blocked preflight, mutex contention) are in
+**Sync moments.** Note writes, app boot, and every foreground return always start a vault sync — the
+same code path as the button, with coalescing so rapid triggers collapse to one follow-up. Automatic
+syncs fail **silently**: the `"!"` shell badge and the sync screen carry the detail; there are no
+toasts. Trigger rules (coalescing, blocked preflight, mutex contention) are in
 [sync-hardening-and-recovery.md](sync-hardening-and-recovery.md#automatic-vault-sync-triggers).
-App start and foreground return still run only the **read-only** status check, not a sync.
+Boot's sync waits until launch has settled and one frame has been drawn, keeping Git and network work
+off the startup path ([boot-optimization.md](boot-optimization.md)); the first `ON_START` of the
+process is boot's, so it does not sync twice.
 
 All of this is foreground work tied to user actions, never a background scheduler.
 
