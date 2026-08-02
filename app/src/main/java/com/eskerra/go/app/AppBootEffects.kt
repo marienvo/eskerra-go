@@ -25,7 +25,7 @@ internal fun AppBootEffects(
 ) {
     val bootSyncRequested = remember { mutableStateOf(false) }
     LaunchedEffect(launchSettled) {
-        if (!launchSettled || bootSyncRequested.value) {
+        if (!shouldTriggerBootSync(launchSettled, bootSyncRequested.value)) {
             return@LaunchedEffect
         }
         // launchSettled describes ready content; wait for that content to reach a frame before
@@ -72,3 +72,7 @@ internal fun shouldAutoSyncOnLifecycleEvent(
     event: Lifecycle.Event,
     isFirstStart: Boolean
 ): Boolean = event == Lifecycle.Event.ON_START && !isFirstStart
+
+/** Boot fires the auto-sync exactly once, and only once launch has settled. */
+internal fun shouldTriggerBootSync(launchSettled: Boolean, alreadyRequested: Boolean): Boolean =
+    launchSettled && !alreadyRequested

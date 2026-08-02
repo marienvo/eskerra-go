@@ -36,4 +36,19 @@ class AppBootEffectsTest {
             )
         )
     }
+
+    @Test
+    fun bootSync_doesNotFireBeforeLaunchSettles() {
+        assertFalse(shouldTriggerBootSync(launchSettled = false, alreadyRequested = false))
+    }
+
+    @Test
+    fun bootSync_firesOnceLaunchSettles() {
+        assertTrue(shouldTriggerBootSync(launchSettled = true, alreadyRequested = false))
+    }
+
+    @Test
+    fun bootSync_doesNotFireAgainOnceAlreadyRequested() {
+        assertFalse(shouldTriggerBootSync(launchSettled = true, alreadyRequested = true))
+    }
 }
