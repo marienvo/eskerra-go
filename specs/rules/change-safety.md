@@ -22,7 +22,7 @@ Reviewer legend — **self**: author merges on green CI (solo era); **maintainer
 |---|---|---|---|---|---|---|
 | **G1** | **Mechanical move** — file split / `git mv` + import rewrites, zero content edits | Low–Med | Target paths; module-budget note (touched files stay within touch-it-tidy-it) | Full `:app:testDebugUnitTest` green with **no test-body edits** beyond import lines | self; maintainer if a red-tier file moves | **Yes** — ideal agent work |
 | **G2** | **Local feature change** — one feature slice, no sync/vault-write surface | Low | [`specs/adr/001-hybrid-layering-and-feature-slices.md`](../adr/001-hybrid-layering-and-feature-slices.md) (placement); the slice's existing files across `feature`/`data`/`core` | Colocated unit test for the changed domain/data behavior (AGENTS.md rule); single-file run named in the report | self | **Yes** |
-| **G3** | **Sync / vault-write change** — anything touching `data/git`, `ManualSyncNow`, the podcast sync channels, the shared git mutex, a Markdown/vault write path, or FTS reconcile | **Critical** | [`specs/architecture/sync-hardening-and-recovery.md`](../architecture/sync-hardening-and-recovery.md); the layering ADR; enumerate every write/mutation path the change adds or removes | Tests **in the same change** (hard rule); the affected sync/recovery/mark-as-played suites; a new write path ⇒ a new test proving the write is scoped and safe | maintainer (+ 2nd-model) | **No autonomous execution** — agent *proposes* a diff + invariant argument; human applies and verifies |
+| **G3** | **Sync / vault-write change** — anything touching `data/git`, `ManualSyncNow`, the podcast sync channels, the shared git mutex, a Markdown/vault write path, or FTS reconcile | **Critical** | [`specs/architecture/sync-hardening-and-recovery.md`](../architecture/sync-hardening-and-recovery.md); the layering ADR; enumerate every write/mutation path the change adds or removes | Tests **in the same change** (hard rule); the affected sync/recovery/mark-as-played suites; a new write path ⇒ a new test proving the write is scoped and safe | maintainer (+ 2nd-model) | **Yes** — agent applies the diff; risk raises the bar (same-PR tests + invariant argument in the report), not whether the agent may build |
 | **G4** | **Test-only change** — new tests, splits, fakes, harness | Low | The module's existing test style (behavioral, not snapshot) | The tests themselves green; **zero production diff** (CI-verifiable: no non-test file changed) | self | **Yes** — best first task for a new agent |
 | **G5** | **Guardrail / meta change** — module budgets, `module-budget-baseline.json`, ArchUnit rules + violation store, `.github/workflows/`, git hooks, this rules file | High (meta) | The guardrail's own tests (`check-module-budget-baseline.test.sh`, the ArchUnit suite); the ratchet philosophy (baselines only go down) | The guardrail's own colocated tests green | maintainer, always | **Mechanism yes, policy no** — an agent may build the checker; only a human decides what it permits |
 
@@ -34,8 +34,9 @@ A change that cannot answer "which G is this?" in one type is mis-scoped.
 - **Yellow** (edit only when the task explicitly targets them): sync orchestration
   (`core/usecase/ManualSyncNow.kt`, `SyncPodcastChange.kt`, `SyncPodcastVaultRefresh.kt`,
   `SyncPodcastChangesViaVaultSync.kt`) and `app/App.kt` (the navigation host).
-- **Red** (propose only — the agent may not apply the edit *unless* the task explicitly
-  targets that file or category **and** the human approved that scope up front):
+- **Red** (extra caution — agent may edit when the task allowlist includes the path;
+  required packet = sync/vault specs + write-path inventory + invariant argument for G3,
+  or the guardrail's own tests for G5):
   - `data/git/**` (JGit engine internals: `JGitRemoteSyncRepository`, `GitChangeStager`,
     `GitIndexLockRecovery`, `GitLocalBranchAlignment`, `SyncPathClassifier`, `GitSyncMutex`, …)
   - Markdown / vault write paths: `data/notes/FileNoteWriteRepository.kt`,
@@ -48,7 +49,7 @@ A change that cannot answer "which G is this?" in one type is mis-scoped.
   - This file and any file under `specs/rules/`.
 
 Red tier and G3 overlap by design: touching a red file is almost always a G3 (or G5)
-change, and neither is autonomous agent work.
+change. Risk raises the review bar; it does not forbid the agent from applying the edit.
 
 ## Work-order format (delegated task prompt)
 
@@ -60,7 +61,7 @@ TYPE: G<1-5> per specs/rules/change-safety.md
 GOAL: <one sentence; behavior-preserving? yes/no>
 READ FIRST: <the exact spec sections / ADR / ARCHITECTURE files for this type's packet>
 FILE ALLOWLIST: <globs the diff may touch — anything else is out of scope>
-CAUTION FILES: <yellow/red overlaps; "propose only" or "do not touch">
+CAUTION FILES: <yellow/red overlaps; "caution — include in allowlist + invariant argument">
 TESTS THAT DEFINE DONE: <exact ./scripts/gradle.sh invocations that must pass, and which
   NEW tests must exist>
 NON-GOALS: <the 2-3 adjacent improvements the agent will be tempted to make>

@@ -59,7 +59,7 @@ Plans contain snapshots that drift. Before writing anything, verify the provisio
 
 - **Gates actually met?** (e.g. "after podcasts pilot" → does the podcasts feature slice exist? "after change-safety PR 1" → does CI actually run the new check?) Check git log / file existence, not memory.
 - **Referenced files still exist at the stated paths / sizes?** (`wc -l`, `ls`) Regenerate any inventory older than ~2 weeks (the README's snapshot-expiry lifecycle rule).
-- **Overlapping work:** does an open PR, in-flight branch, or worktree already cover this step or touch the candidate's files? (Step 0 already established branch + uncommitted state; do not re-run it here.) When PR state is not inspectable from this environment, say so rather than assuming none.
+- **Overlapping work:** does an open PR, in-flight branch, or worktree already cover this step or touch the candidate's files? (Step 0 already established branch + uncommitted state; do not re-run it here.) When PR state is not inspectable from this environment, say so rather than assuming none. **Overlap is a plan-time warning only** — record it under `Warnings` in the work doc; never invent a BLOCKING GATE, never refuse to write the doc, never wait for a human to apply code.
 - **Plan-vs-code contradictions:** does the candidate's premise still hold, or has the code moved past it?
 - **Hold-lists and danger zones:** does the step touch a danger zone flagged in the repo's docs?
   The danger zones your AGENTS.md names — persistence/sync invariants, credential storage, scanner skip rules, and similar.
@@ -69,7 +69,11 @@ broken gate that blocks several phases, or a data-loss risk found in the candida
 surface. Record the concrete evidence in `Why now`, exactly as Step 0 requires; the priority
 label is set once, from whichever step found the evidence.
 
-**Abort rule (safety first):** if the codebase contradicts the plan — a gate is unmet, files moved, the phase is half-done, or the plan's premise no longer holds — **stop**. Do not bend the work doc to make it fit. Report the mismatch, propose the plan/README fix as the *actual* next PR, and let the user decide. A step back beats a confident wrong step.
+**Re-plan rule (code wins, agents still build):** if the codebase contradicts the plan — a
+gate is unmet, files moved, the phase is half-done, or the plan's premise no longer holds —
+**do not bend facts** (code beats stale plan text). Report the mismatch, rewrite the work
+doc and/or propose plan/README hygiene **in the same session**, and proceed. Never refuse
+to build waiting for a human apply; never invent behavior to paper over a broken premise.
 
 ## Step 3 — Ask at most 1–2 questions (only if needed)
 
@@ -88,7 +92,8 @@ Priority: <T0|T1|T2|T3, from triage — Step 0 or a Step 2 escalation>. Why now:
 Triage checked: <what was actually inspected — the Step-0 global scan and the Step-2 candidate checks, one line>
 Triage not checked: <signals not inspectable from this environment — include only when relevant>
 Verified state: <the Step-2 checks that passed, one line each>
-Stop conditions: <the specific mismatches that mean pause + report, from Step 2>
+Warnings: <plan-time only — open-PR/worktree overlap, unmet soft gates, danger-zone touch; never blocking>
+Stop conditions: <narrow — mismatches that mean rewrite steps in-session / do not invent behavior; never overlap or red-tier touch alone>
 
 ## Steps
 1. <action> — **Model: <one name>** — check: <exact test/lint command>   <!-- append " — high: <one-clause reason>" only when the step needs high/xhigh; no suffix = medium -->
@@ -122,4 +127,4 @@ Rules for the doc:
 
 ## Step 5 — Hand off
 
-Present the work doc contents to the user for a go/no-go. Do not start executing steps in the same turn unless the user already asked for execution. If mid-execution the codebase starts contradicting the doc (a check fails for plan-premise reasons, not typo reasons), apply the Step-2 abort rule: pause, report, re-plan — never improvise past a broken premise.
+Present the work doc contents to the user for a go/no-go. Do not start executing steps in the same turn unless the user already asked for execution. If mid-execution the codebase starts contradicting the doc (a check fails for plan-premise reasons, not typo reasons), apply the Step-2 re-plan rule: report, rewrite the remaining steps in-session, continue building — never invent behavior past a broken premise, and never freeze waiting for a human apply.
