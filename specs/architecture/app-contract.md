@@ -61,6 +61,13 @@ All of this is foreground work tied to user actions, never a background schedule
 
 Vault sync (button, note writes, and RSS refresh) auto-merges diverged histories with conflict sidecars. Podcast mark-as-played never auto-merges, rebase, or reset.
 
+## Shell sync indicator
+
+One badge slot on the hamburger carries the whole sync story, and it never changes size — the pending-change count, the `"!"` after a failure, and the spinner all occupy the same 16×16 dp `Badge` inside the existing `BadgedBox`, so nothing shifts as the state changes. While a sync runs, the spinner **replaces** the count; the count returns when the spinner stops.
+
+- The spinner is drawn ([SyncSpinner.kt](app/src/main/java/com/eskerra/go/feature/sync/SyncSpinner.kt)), not a rotated asset: every coordinate derives from the draw scope's `center` and one radius, and rotation uses `rotate(pivot = center)` rather than `Modifier.graphicsLayer { rotationZ }`, whose pivot is the layer's center and drifts when the composable is not perfectly square. A rotated vector icon wobbles because its drawn centroid is not its viewport center; that wobble is the reason this composable exists.
+- Spinner visibility is held for a minimum duration (`holdTrueAtLeast`) so a sync that finishes in 200 ms does not flash it. The hold is a Flow operator, not a UI timer, so it is unit-testable with virtual time.
+
 ## Sync branch alignment
 
 Configured sync branch, local checkout, and `origin/<branch>` must stay aligned for manual sync. See [sync-branch-alignment.md](sync-branch-alignment.md).

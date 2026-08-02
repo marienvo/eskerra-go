@@ -17,9 +17,9 @@ Metric definitions used throughout:
 
 ## 2026-08-02 — H01: boot's forced remote fetch sits on the startup path
 
-**Context.** Verification measurement for the always-on-sync plan
-([`specs/plans/always-on-sync-and-spinner.md`](../plans/always-on-sync-and-spinner.md)) Phase C,
-which moves the boot sync behind launch settlement. The plan asked only that cold start **not
+**Context.** Verification measurement for the always-on-sync work (now retired plan; behavior lives in
+[`specs/architecture/sync-hardening-and-recovery.md`](../architecture/sync-hardening-and-recovery.md)),
+which moved the boot sync behind launch settlement. The plan asked only that cold start **not
 regress**; the measurement found a sizeable improvement instead, so it is recorded as a hypothesis
 result rather than a pass/fail gate.
 
@@ -72,7 +72,7 @@ not a warm-up or thermal artifact. The distributions barely overlap (BEFORE min 
 **removed ~840 ms of network work from the startup path**. The old forced `fetch` was a real
 violation of the startup invariant hiding in plain sight: it was framed as a cheap "status refresh
 for the shell indicator", but `forceRemote = true` made it a debounce-skipping network round trip on
-every cold start. Phase C both adds the always-on-sync behavior and fixes that.
+every cold start. Phase C both added the boot/foreground sync behavior and fixed that.
 
 **Caveats.**
 

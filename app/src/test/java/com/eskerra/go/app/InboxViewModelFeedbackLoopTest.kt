@@ -27,7 +27,7 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
 /**
- * Pins the feedback-loop safety this always-on-sync plan depends on: auto-sync success calls
+ * Pins the feedback-loop safety automatic sync depends on: auto-sync success calls
  * `markInboxNotesChanged`, and the inbox route answers that with a plain `refresh()`. If `refresh()`
  * ever called `onInboxMutated`, that would loop (refresh -> onInboxMutated -> another sync trigger ->
  * another refresh -> ...). `onInboxMutated` must fire only from `deleteSelected()`'s success path.
