@@ -6,8 +6,12 @@ import com.eskerra.go.core.model.AppShellMode
 
 internal fun resolveInitialShellRoute(
     preferredShellMode: AppShellMode,
-    hasResumablePlayback: Boolean
+    hasResumablePlayback: Boolean,
+    hasPendingShare: Boolean = false
 ): String = when {
+    // A share was the reason the app opened: it wins over resumable playback, because the
+    // compose pill only exists in the Home graph.
+    hasPendingShare -> AppRoute.HOME_GRAPH
     hasResumablePlayback -> AppRoute.PODCASTS_GRAPH
     preferredShellMode == AppShellMode.PODCASTS -> AppRoute.PODCASTS_GRAPH
     else -> AppRoute.HOME_GRAPH
