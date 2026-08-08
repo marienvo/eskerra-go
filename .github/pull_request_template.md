@@ -1,3 +1,6 @@
+**Release:** minor (default) / `version:hotfix` / `version:none`
+<!-- Add the selected non-default label to the GitHub PR itself; see specs/rules/release-versioning.md. -->
+
 ### Summary
 
 <!-- Briefly explain the intent and outcome of this PR. Prefer 2-4 bullets. -->
