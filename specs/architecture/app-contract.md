@@ -13,6 +13,34 @@ Product behavior and boundaries for the native Android app. Non-obvious rules th
 - Podcast episodes tab: catalog, playback, R2 playlist handoff, RSS refresh, mark-as-played.
 - Floating shell navigation with tab state preservation.
 
+## Share target (other apps → inbox draft)
+
+Eskerra appears in the Android share sheet for **`text/plain` only** (`ACTION_SEND`; no `ACTION_SEND_MULTIPLE`, no images or other MIME types). The chooser label is "Eskerra"; the launcher stays "Eskerra Go".
+
+A share prefills the existing compose pill and **never saves by itself** — the user still presses send, exactly as for a note typed by hand.
+
+Line 1 of the pill becomes the note's h1 **and its filename**, which drives the two shapes:
+
+| Shared | Line 1 | Line 3 | Caret |
+|---|---|---|---|
+| Anything with a usable `EXTRA_SUBJECT` | the subject (sanitized, ≤120 chars) | the shared text | end of line 1 |
+| A bare URL whose page title was fetched | the fetched `<title>` | the URL | end of line 1 |
+| A bare URL with no title available, or plain text | *(empty — user types it)* | the shared text | offset 0 |
+
+Rules that follow from that:
+
+- **A URL is never line 1.** "It is a URL" means the whole trimmed share is one `http(s)` token; a link inside prose is body text.
+- **`EXTRA_SUBJECT` wins and costs no network call.** The page `<title>` is fetched only when no usable subject arrived; it is bounded (4 s, 256 KB, textual responses only) and any failure is silent — the draft is already usable, and the user simply types the title.
+- **A late-arriving fetched title is applied only while the draft is untouched** — still byte-for-byte what the app wrote for that share, with no save in flight. One keystroke and it is dropped silently.
+- **A share never destroys typed text**: it takes a blank draft, otherwise it appends below. A share arriving mid-save is replayed after the save settles.
+- **A share always lands where the pill is visible**: it wins over resumable podcast playback on a cold start, pops out of search (the pill drives the query there), and leaves the user in place on the inbox or a note reader.
+- If the workspace is not set up yet, the share waits and is delivered once setup completes; it is not persisted across process death.
+- `MainActivity` is `singleTask`, so a share reuses the single existing instance instead of building a second composition root. Consequence: **Back after a share returns to the launcher**, not to the sharing app.
+
+## Compose pill focus
+
+A completed inbox-note save releases the field's focus and lets the keyboard go — for every note, not only shared ones. A failed save keeps focus so the error can be fixed in place.
+
 ## Shell bottom navigation
 
 Top-level tab switches use `popUpTo(inbox) { saveState = true }`, `launchSingleTop`, and `restoreState` so sibling stacks (Podcasts, Menu, Search) retain state across round trips. Re-tapping the active tab is a no-op.
