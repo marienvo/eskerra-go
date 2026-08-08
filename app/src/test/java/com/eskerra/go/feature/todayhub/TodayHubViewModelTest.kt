@@ -1,4 +1,4 @@
-package com.eskerra.go.app
+package com.eskerra.go.feature.todayhub
 
 import com.eskerra.go.core.model.NoteContent
 import com.eskerra.go.core.model.NoteContentError
@@ -20,7 +20,6 @@ import com.eskerra.go.data.notes.FakeNoteRegistrySnapshotStore
 import com.eskerra.go.data.notes.NoteRegistryCache
 import com.eskerra.go.data.todayhub.FakeTodayHubSnapshotStore
 import com.eskerra.go.data.workspace.WorkspacePaths
-import com.eskerra.go.feature.todayhub.TodayHubUiState
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi

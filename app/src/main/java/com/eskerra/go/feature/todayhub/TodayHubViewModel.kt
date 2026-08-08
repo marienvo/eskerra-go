@@ -1,4 +1,4 @@
-package com.eskerra.go.app
+package com.eskerra.go.feature.todayhub
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -19,7 +19,6 @@ import com.eskerra.go.core.todayhub.TodayHubSnapshot
 import com.eskerra.go.core.todayhub.TodayHubWeeks
 import com.eskerra.go.core.usecase.LoadTodayHub
 import com.eskerra.go.core.usecase.LoadTodayHubRow
-import com.eskerra.go.feature.todayhub.TodayHubUiState
 import java.io.File
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
