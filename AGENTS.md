@@ -53,6 +53,18 @@ Implemented in
 [`PlaylistMerge.kt`](app/src/main/java/com/eskerra/go/core/playlist/PlaylistMerge.kt)
 (`pickNewerPlaylistEntry`), mirroring `packages/eskerra-core/src/playlist.ts` in notebox.
 
+**Releases:** `versionName` and `versionCode` are canonical in `app/build.gradle.kts`. Builds never
+bump them or edit tracked files. After green main CI, each merged non-automation PR gets one
+generated minor-bump PR by default; `version:hotfix` selects patch and `version:none` suppresses the
+bump for wholly non-shipping changes. The labels are mutually exclusive and automation never bumps
+major. Any agent creating a PR must inspect the complete diff and add the applicable non-default
+label to the GitHub PR itself: use `version:none` only when no shipped Android behavior or release
+artifact can change (for example docs/plans/agent instructions/PR templates/test-only changes), use
+`version:hotfix` for an urgent patch, and otherwise set neither label. When uncertain, allow the
+default minor bump. Generated release metadata is expected review output—flag only
+policy/versionCode/marker/allowlist drift. Full contract:
+[`specs/rules/release-versioning.md`](specs/rules/release-versioning.md).
+
 ## Proposing new work
 
 When proposing a new dependency, provider, startup initialization, background process,

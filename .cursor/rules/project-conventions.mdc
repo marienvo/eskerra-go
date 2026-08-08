@@ -22,6 +22,21 @@ Rules:
 - Prefer small files. Module size is enforced mechanically at **400** lines (touch it, tidy it) — see AGENTS.md § Module size budget and `specs/team-scalability/README.md`.
 - Every feature slice must include at least one unit test for domain/data behavior.
 
+## Release label when creating a PR
+
+Inspect the complete diff and apply exactly one policy from
+[`specs/rules/release-versioning.md`](../../specs/rules/release-versioning.md):
+
+- Normal shipping change: add no version label; the default is a minor bump.
+- Urgent hotfix: create the PR with `--label version:hotfix`.
+- Wholly non-shipping change: create the PR with `--label version:none`. This is limited to diffs
+  that cannot affect the shipped Android app or release artifacts, such as docs, plans, agent
+  instructions, PR templates, or test-only changes.
+
+Never combine `version:hotfix` and `version:none`. Build, packaging, dependency, generated-asset,
+and product-code changes are shipping changes. When uncertain, use the default minor bump. The label
+must be on the GitHub PR; text in the PR body is not sufficient.
+
 ## Quality gate
 
 After changes under `app/src/**` or `*.gradle.kts`, run before marking work complete:

@@ -1,0 +1,146 @@
+name: Release version after merge
+
+on:
+  workflow_run:
+    workflows: [Android CI]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-version-main
+  cancel-in-progress: false
+
+jobs:
+  bump-version:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Resolve merged source PR
+        id: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          decision="$(gh api \
+            -H 'Accept: application/vnd.github+json' \
+            "repos/$GITHUB_REPOSITORY/commits/$SOURCE_SHA/pulls" | \
+            ./scripts/release-version-automation-resolve-pr.sh -)"
+          if [ "$decision" = "null" ]; then
+            echo "should_bump=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          source_pr="$(jq -r '.sourcePrNumber' <<<"$decision")"
+          release_kind="$(jq -r '.releaseKind' <<<"$decision")"
+          echo "should_bump=true" >> "$GITHUB_OUTPUT"
+          echo "source_pr=$source_pr" >> "$GITHUB_OUTPUT"
+          echo "release_kind=$release_kind" >> "$GITHUB_OUTPUT"
+
+      - name: Generate and validate release bump
+        id: release
+        if: steps.source.outputs.should_bump == 'true'
+        env:
+          SOURCE_PR: ${{ steps.source.outputs.source_pr }}
+          RELEASE_KIND: ${{ steps.source.outputs.release_kind }}
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          marker="Release-For-PR: #$SOURCE_PR"
+          if git log origin/main --format=%B --fixed-strings --grep="$marker" -1 | grep -Fq "$marker"; then
+            echo "already_released=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          branch="automation/release-pr-$SOURCE_PR"
+          git switch -C "$branch" origin/main
+          ./scripts/bump-release-version.sh --kind "$RELEASE_KIND"
+
+          expected='app/build.gradle.kts'
+          actual="$(git diff --name-only)"
+          if [ "$actual" != "$expected" ]; then
+            echo "Unexpected release diff:" >&2
+            git diff --name-status >&2
+            exit 1
+          fi
+
+          git diff --check
+          ./scripts/release-version-automation.test.sh
+          version_name="$(sed -nE 's/^[[:space:]]*versionName = "([0-9]+\.[0-9]+\.[0-9]+)"[[:space:]]*$/\1/p' app/build.gradle.kts)"
+          version_code="$(sed -nE 's/^[[:space:]]*versionCode = ([0-9]+)[[:space:]]*$/\1/p' app/build.gradle.kts)"
+          title="chore(release): bump Android to $version_name+$version_code"
+          body="$(printf '%s\n' \
+            'Release-Automation: true' \
+            "Release-For-PR: #$SOURCE_PR" \
+            "Release-Kind: $RELEASE_KIND")"
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- app/build.gradle.kts
+          git commit -m "$title" -m "$body"
+
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
+            git fetch origin "$branch:refs/remotes/origin/$branch"
+          fi
+          git push --force-with-lease origin "HEAD:refs/heads/$branch"
+
+          echo "already_released=false" >> "$GITHUB_OUTPUT"
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          echo "title=$title" >> "$GITHUB_OUTPUT"
+
+      - name: Create and merge generated release PR
+        if: >-
+          steps.source.outputs.should_bump == 'true' &&
+          steps.release.outputs.already_released == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_PR: ${{ steps.source.outputs.source_pr }}
+          RELEASE_KIND: ${{ steps.source.outputs.release_kind }}
+          RELEASE_BRANCH: ${{ steps.release.outputs.branch }}
+          RELEASE_TITLE: ${{ steps.release.outputs.title }}
+        run: |
+          set -euo pipefail
+          body="$(printf '%s\n\n%s\n%s\n%s\n' \
+            "Automated Android release metadata for #$SOURCE_PR. No product code changed." \
+            'Release-Automation: true' \
+            "Release-For-PR: #$SOURCE_PR" \
+            "Release-Kind: $RELEASE_KIND")"
+          pr_url="$(gh pr list \
+            --state open \
+            --head "$RELEASE_BRANCH" \
+            --json url \
+            --jq '.[0].url // empty')"
+          if [ -z "$pr_url" ]; then
+            pr_url="$(gh pr create \
+              --base main \
+              --head "$RELEASE_BRANCH" \
+              --title "$RELEASE_TITLE" \
+              --body "$body")"
+          fi
+
+          merged=false
+          for attempt in 1 2 3 4 5; do
+            if gh pr merge "$pr_url" \
+              --merge \
+              --delete-branch \
+              --subject "$RELEASE_TITLE" \
+              --body "$body"; then
+              merged=true
+              break
+            fi
+            sleep "$((attempt * 2))"
+          done
+          if [ "$merged" != true ]; then
+            echo "Could not merge generated release PR: $pr_url" >&2
+            exit 1
+          fi

@@ -32,6 +32,9 @@ jobs:
       - name: Test module budget scripts
         run: ./scripts/check-module-budget-baseline.test.sh
 
+      - name: Test release automation scripts
+        run: ./scripts/release-version-automation.test.sh
+
       - name: Set up JDK
         uses: actions/setup-java@v5
         with:
