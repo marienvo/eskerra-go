@@ -7,6 +7,7 @@ import com.tngtech.archunit.junit.AnalyzeClasses
 import com.tngtech.archunit.junit.ArchTest
 import com.tngtech.archunit.junit.ArchUnitRunner
 import com.tngtech.archunit.lang.ArchRule
+import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes
 import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses
 import com.tngtech.archunit.library.freeze.FreezingArchRule
 import org.junit.runner.RunWith
@@ -26,11 +27,12 @@ class ExcludeAndroidTestClasses : ImportOption {
  * enforced unit tests. Runs inside :app:testDebugUnitTest, so it is part of the
  * standard quality gate and CI — no separate mechanism.
  *
- * Rules verified clean against the codebase land active. The "UI must not touch
- * java.io/java.nio file APIs" rule has pre-existing violations (mostly image
- * loading), so it is frozen: the committed violation store may only shrink, new
- * violations fail the build. See specs/rules/change-safety.md (once it lands) for
- * the ratchet philosophy shared with the module budgets.
+ * Rules verified clean against the codebase land active (enforced): every rule
+ * here except one. The single exception is "UI must not touch java.io/java.nio
+ * file APIs", which has pre-existing violations (mostly image loading), so it is
+ * frozen: the committed violation store may only shrink, new violations fail the
+ * build. See specs/rules/change-safety.md for the ratchet philosophy shared with
+ * the module budgets.
  */
 @RunWith(ArchUnitRunner::class)
 @AnalyzeClasses(
@@ -72,6 +74,17 @@ class ArchitectureLayerRulesTest {
             .because(
                 "core holds domain + parsing (markdown, wiki-links); UI depends inward on core, " +
                     "never the reverse, so parsing/resolution stays out of the UI layer"
+            )
+
+    @ArchTest
+    val viewModelsLiveInTheirFeatureSliceNotInApp: ArchRule =
+        classes()
+            .that().haveSimpleNameEndingWith("ViewModel")
+            .and().doNotHaveSimpleName("AppGateViewModel")
+            .should().resideOutsideOfPackage("..app..")
+            .because(
+                "ADR-001: a ViewModel belongs to its feature slice, not to the " +
+                    "composition root; AppGateViewModel is the one app-level exception"
             )
 
     @ArchTest
