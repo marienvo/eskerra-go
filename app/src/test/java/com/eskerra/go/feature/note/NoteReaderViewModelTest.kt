@@ -1,4 +1,4 @@
-package com.eskerra.go.app
+package com.eskerra.go.feature.note
 
 import com.eskerra.go.core.model.NoteContentError
 import com.eskerra.go.core.model.NoteId
@@ -10,7 +10,6 @@ import com.eskerra.go.data.notes.FakeNoteContentRepository
 import com.eskerra.go.data.notes.FakeNoteRegistryRepository
 import com.eskerra.go.data.notes.NoteRegistryCache
 import com.eskerra.go.data.workspace.WorkspacePaths
-import com.eskerra.go.feature.note.NoteReaderUiState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
