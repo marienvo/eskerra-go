@@ -1,4 +1,4 @@
-package com.eskerra.go.app
+package com.eskerra.go.feature.setup
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -10,7 +10,6 @@ import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.data.workspace.WorkspaceSetupCompletion
 import com.eskerra.go.data.workspace.WorkspaceSetupException
 import com.eskerra.go.data.workspace.WorkspaceSetupMode
-import com.eskerra.go.feature.setup.WorkspaceSetupUiState
 import java.io.File
 import kotlinx.coroutines.launch
 

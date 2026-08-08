@@ -64,6 +64,7 @@ import com.eskerra.go.data.workspace.WorkspaceSetupCompletion
 import com.eskerra.go.data.workspace.WorkspaceStore
 import com.eskerra.go.feature.inbox.InboxUiState
 import com.eskerra.go.feature.setup.WorkspaceSetupScreen
+import com.eskerra.go.feature.setup.WorkspaceSetupViewModel
 import com.eskerra.go.feature.todayhub.TodayHubUiState
 import com.eskerra.go.ui.markdown.LocalParsedMarkdownCache
 import com.eskerra.go.ui.theme.EskerraGoTheme
