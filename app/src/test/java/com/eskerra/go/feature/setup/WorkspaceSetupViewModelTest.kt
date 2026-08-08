@@ -1,4 +1,4 @@
-package com.eskerra.go.app
+package com.eskerra.go.feature.setup
 
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.data.workspace.WorkspacePaths
