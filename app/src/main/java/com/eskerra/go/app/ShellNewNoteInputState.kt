@@ -12,6 +12,7 @@ import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.ActiveTodayHubStore
 import com.eskerra.go.core.usecase.CreateInboxNote
 import com.eskerra.go.core.usecase.TouchVaultSearchPaths
+import com.eskerra.go.feature.editor.CreateInboxNoteViewModel
 import com.eskerra.go.feature.editor.CreateInboxUiState
 import java.io.File
 import kotlinx.coroutines.CoroutineScope

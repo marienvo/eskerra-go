@@ -14,6 +14,7 @@ import com.eskerra.go.data.notes.FakeNoteWriteRepository
 import com.eskerra.go.data.notes.NoteRegistryCache
 import com.eskerra.go.data.workspace.WorkspacePaths
 import com.eskerra.go.feature.editor.NoteEditorUiState
+import com.eskerra.go.feature.editor.NoteEditorViewModel
 import com.eskerra.go.feature.note.NoteReaderUiState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
