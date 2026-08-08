@@ -94,11 +94,37 @@ class AppShellInputStateTest {
         assertFalse(savingNote.submitEnabled)
     }
 
+    @Test
+    fun fieldSignalReachesNoteModeOnly() {
+        val signal = ShellFieldSignal.ReleaseFocus(token = 7L)
+
+        val noteMode = buildShellInputPresentation(
+            searchMode = false,
+            searchQuery = "",
+            newNoteInputState = newNoteState(fieldSignal = signal),
+            onSearchModeChange = {},
+            onSearchQueryChange = {},
+            onSearchSubmit = {}
+        )
+        val searchMode = buildShellInputPresentation(
+            searchMode = true,
+            searchQuery = "query",
+            newNoteInputState = newNoteState(fieldSignal = signal),
+            onSearchModeChange = {},
+            onSearchQueryChange = {},
+            onSearchSubmit = {}
+        )
+
+        assertEquals(signal, noteMode.fieldSignal)
+        assertNull(searchMode.fieldSignal)
+    }
+
     private fun newNoteState(
         draft: String = "",
         isSaving: Boolean = false,
         onDraftChange: (String) -> Unit = {},
-        onSave: () -> Unit = {}
+        onSave: () -> Unit = {},
+        fieldSignal: ShellFieldSignal? = null
     ) = ShellNewNoteInputState(
         visible = true,
         draft = draft,
@@ -106,6 +132,7 @@ class AppShellInputStateTest {
         isSaving = isSaving,
         errorMessage = "Draft error",
         onDraftChange = onDraftChange,
-        onSave = onSave
+        onSave = onSave,
+        fieldSignal = fieldSignal
     )
 }

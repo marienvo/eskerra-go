@@ -5,6 +5,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.eskerra.go.core.model.AppShellMode
@@ -25,7 +29,8 @@ internal data class ShellNewNoteInputState(
     val isSaving: Boolean,
     val errorMessage: String?,
     val onDraftChange: (String) -> Unit,
-    val onSave: () -> Unit
+    val onSave: () -> Unit,
+    val fieldSignal: ShellFieldSignal?
 )
 
 @Composable
@@ -53,6 +58,8 @@ internal fun rememberShellNewNoteInputState(
     )
     val createInboxState by createInboxNoteViewModel.uiState.collectAsState()
     val createInboxContent = createInboxState as? CreateInboxUiState.Content
+    var fieldSignal by remember { mutableStateOf<ShellFieldSignal?>(null) }
+    var fieldSignalToken by remember { mutableLongStateOf(0L) }
     val selectedShellMode = when (selectedTopLevelRoute) {
         AppRoute.PODCASTS_GRAPH -> AppShellMode.PODCASTS
         else -> AppShellMode.HOME
@@ -60,6 +67,10 @@ internal fun rememberShellNewNoteInputState(
 
     LaunchedEffect(createInboxNoteViewModel, currentConfig, filesDir, appSyncViewModel) {
         createInboxNoteViewModel.savedNoteEvents.collect { noteId ->
+            // The note is written: let go of the field so the keyboard drops out of the way
+            // instead of hanging over the inbox you just added to.
+            fieldSignalToken += 1
+            fieldSignal = ShellFieldSignal.ReleaseFocus(fieldSignalToken)
             markInboxNotesChanged()
             appSyncViewModel.requestAutoSync()
             scope.touchVaultSearchPathsAsync(
@@ -79,7 +90,8 @@ internal fun rememberShellNewNoteInputState(
         isSaving = createInboxContent?.isSaving == true,
         errorMessage = createInboxContent?.errorMessage,
         onDraftChange = createInboxNoteViewModel::updateDraft,
-        onSave = createInboxNoteViewModel::save
+        onSave = createInboxNoteViewModel::save,
+        fieldSignal = fieldSignal
     )
 }
 

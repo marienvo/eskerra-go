@@ -27,15 +27,21 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 
 /** Resting height of the compact single-line pill; its 50% radius drives [PillCorner]. */
@@ -54,6 +60,9 @@ private val FieldMaxHeight = 180.dp
  * Bottom pill that doubles as the inbox-note composer and the live vault-search input. [searchMode]
  * (owned by the shell so it survives navigation) picks which: the caller wires [value]/[onValueChange]
  * to the inbox-note draft or the shared search query, and [onSubmit] to save-note or open results.
+ *
+ * [fieldSignal] carries one-shot focus/caret instructions (a share prefilling the draft, a save
+ * releasing the keyboard). The text remains owned by the caller; only the selection lives here.
  */
 @Composable
 fun ShellNewNoteInput(
@@ -65,9 +74,34 @@ fun ShellNewNoteInput(
     submitEnabled: Boolean,
     isSaving: Boolean,
     errorMessage: String?,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    fieldSignal: ShellFieldSignal? = null
 ) {
     var isMultiline by remember { mutableStateOf(false) }
+
+    var fieldState by remember { mutableStateOf(TextFieldValue(value)) }
+    // The caller's text is the single source of truth: when it changes underneath us (save reset,
+    // note/search swap, share prefill) the field follows it. While typing the caller echoes the
+    // same string back, so this is a no-op and the IME composition survives.
+    val fieldValue = syncFieldValue(fieldState, value).also { fieldState = it }
+    val focusRequester = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+
+    LaunchedEffect(fieldSignal?.token) {
+        when (val signal = fieldSignal) {
+            is ShellFieldSignal.PlaceCaret -> {
+                fieldState = caretFieldValue(value, signal.offset)
+                runCatching { focusRequester.requestFocus() }
+                keyboardController?.show()
+            }
+            is ShellFieldSignal.ReleaseFocus -> {
+                focusManager.clearFocus(force = true)
+                keyboardController?.hide()
+            }
+            null -> Unit
+        }
+    }
 
     // Horizontal space the toggle + action button (and the gaps around them) claim from the field
     // in single-line mode. In multi-line mode the field is full width, so this is exactly how much
@@ -112,11 +146,17 @@ fun ShellNewNoteInput(
                     SearchModeToggle(searchMode = searchMode, onToggle = onSearchModeChange)
                 }
                 NewNoteField(
-                    value = value,
-                    onValueChange = onValueChange,
+                    value = fieldValue,
+                    onValueChange = { next ->
+                        fieldState = next
+                        if (next.text != value) {
+                            onValueChange(next.text)
+                        }
+                    },
                     readOnly = isSaving,
                     placeholder = placeholder,
                     onTextLayout = onTextLayout,
+                    focusRequester = focusRequester,
                     modifier = Modifier.weight(1f)
                 )
                 if (!isMultiline) {
@@ -211,11 +251,12 @@ private fun ShellNewNoteActionButton(
 
 @Composable
 private fun NewNoteField(
-    value: String,
-    onValueChange: (String) -> Unit,
+    value: TextFieldValue,
+    onValueChange: (TextFieldValue) -> Unit,
     readOnly: Boolean,
     placeholder: String,
     onTextLayout: (TextLayoutResult) -> Unit,
+    focusRequester: FocusRequester,
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
@@ -229,7 +270,8 @@ private fun NewNoteField(
         onValueChange = onValueChange,
         modifier = modifier
             .heightIn(max = FieldMaxHeight)
-            .verticalScroll(scrollState),
+            .verticalScroll(scrollState)
+            .focusRequester(focusRequester),
         readOnly = readOnly,
         maxLines = Int.MAX_VALUE,
         textStyle = textStyle,
@@ -242,7 +284,7 @@ private fun NewNoteField(
                     .padding(horizontal = 8.dp, vertical = 8.dp),
                 contentAlignment = Alignment.CenterStart
             ) {
-                if (value.isEmpty()) {
+                if (value.text.isEmpty()) {
                     Text(
                         text = placeholder,
                         style = textStyle,
