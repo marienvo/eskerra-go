@@ -27,7 +27,7 @@ We use the **hybrid** approach:
 com.eskerra.go/
 ├── core/        domain: model, repository interfaces, use cases, wikilink
 ├── data/        infrastructure: git, notes, credentials, workspace, r2
-├── feature/     slices: inbox, note, editor, add, sync, setup, menu, podcasts
+├── feature/     slices: inbox, note, editor, search, sync, setup, menu, podcasts, todayhub
 ├── ui/          theme, shared UI
 └── app/         composition root
 ```
@@ -46,6 +46,12 @@ The note features (inbox, note, editor, add, sync) share one underlying model: a
 2. **Cross-cutting domain rules.** "Inbox notes editable, all other notes read-only" spans multiple slices and must live in one place (`core`), not be copied and allowed to drift.
 
 Layering also enables JVM unit tests for domain/data logic (`testDebugUnitTest` quality gate) without instrumented tests — enforced via the AGENTS.md rules "UI must not read files", "ViewModels must not depend on Android Context".
+
+### 2026-06..08: the slice rule drifted, and was restored
+
+ViewModels accreted in `app/` contrary to this ADR — the 2026-07-05 audit found 11 of 12 living in the composition root, with only `podcasts` self-contained. They are being moved back into their slices per [`specs/plans/make-slices-real.md`](../plans/make-slices-real.md); as of batch 3 the majority have landed. **The placement rule stands** — it was never amended, only unobserved.
+
+Enforcement is following, not assumed: the ArchUnit rule "no `*ViewModel` in `..app..` except `AppGateViewModel`" lands when that move series completes. Until it merges, this section is the only thing standing between the rule and the next drift.
 
 ## Placement rules
 

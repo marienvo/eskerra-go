@@ -99,7 +99,7 @@ Cold start keeps the Android splash screen (inset foreground via `drawable/ic_sp
 Implementation:
 
 - [MainActivity.kt](app/src/main/java/com/eskerra/go/MainActivity.kt) — `setKeepOnScreenCondition` until [AppLaunchSettled.kt](app/src/main/java/com/eskerra/go/app/AppLaunchSettled.kt) fires.
-- [TodayHubViewModel.restoreSnapshot()](app/src/main/java/com/eskerra/go/app/TodayHubViewModel.kt) uses `registryCache.current()` (persisted snapshot) instead of bailing when the in-memory registry is null; background revalidation stays silent when a snapshot is already shown.
+- [TodayHubViewModel.restoreSnapshot()](app/src/main/java/com/eskerra/go/feature/todayhub/TodayHubViewModel.kt) uses `registryCache.current()` (persisted snapshot) instead of bailing when the in-memory registry is null; background revalidation stays silent when a snapshot is already shown.
 - Gate `Loading` renders an empty surface (no spinner); splash covers it.
 - Shell sync FAB maps `SyncUiState.Loading` to no indicator (quiet shell refresh per [sync-hardening-and-recovery.md](sync-hardening-and-recovery.md)).
 - Inbox background rescan uses debounced `showRefreshIndicator` (~300ms) so fast cache-hit refreshes stay silent.

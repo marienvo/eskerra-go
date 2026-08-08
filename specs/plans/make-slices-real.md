@@ -9,7 +9,7 @@ Companion docs: `specs/adr/001-hybrid-layering-and-feature-slices.md` (the claim
 
 ## Live counter (delete with the plan)
 
-ViewModels moved into their slice: **4 / 10** (excluded by design: `AppGateViewModel` — genuinely app-level). Slice READMEs written: **3 / 8** — the eight beyond Q0's `search` pilot: six delivered as Q1 move companions (`inbox`, `editor`, `note`, `todayhub`, `setup`, `sync`) and two backfilled by Q2 (`podcasts`, `menu`).
+ViewModels moved into their slice: **5 / 10** (excluded by design: `AppGateViewModel` — genuinely app-level). Slice READMEs written: **4 / 8** — the eight beyond Q0's `search` pilot: six delivered as Q1 move companions (`inbox`, `editor`, `note`, `todayhub`, `setup`, `sync`) and two backfilled by Q2 (`podcasts`, `menu`).
 
 **Q0 — done** (branch `quality-q0-search-slice`; `SearchViewModel` + test in `feature/search/`, pilot README written). Retro outcome: review cost was minimal (two pure renames, three import lines, a 45-line README); the one unpredicted cost is that **the frozen ArchUnit store is keyed by fully-qualified name, so every move rekeys pre-existing violations and its G1 commit must carry the store edit**; the 5-section README template held at 45 lines with "what not to touch" carrying the real value; **Q1 runs two VMs per PR when slice-coherent**, dropping to one where the README needs genuine domain thinking (`sync`, `todayhub`).
 
@@ -23,7 +23,7 @@ ViewModels moved into their slice: **4 / 10** (excluded by design: `AppGateViewM
 
 ## Phases
 
-### Q1 — Batch VM moves (G1 PR series) *(next PR: batch 3)*
+### Q1 — Batch VM moves (G1 PR series) *(next PR: batch 4)*
 
 - **Why:** the audit's primary blocker and #1 merge hotspot; every remaining feature edit currently collides in `app/`.
 - **Gate:** cleared — Q0 retro written (PR #33).
@@ -31,7 +31,6 @@ ViewModels moved into their slice: **4 / 10** (excluded by design: `AppGateViewM
 - **Frozen-store update is part of every G1 commit** (Q0 retro; corrected by batches 1–2). The frozen `java.io.File` rule scopes to `..feature..`/`..ui..` only, so a ViewModel sitting in `app/` is *not* in the store: moving it **adds** entries rather than rekeying them, and the store's line count grows. Regenerate by running the ArchUnit test once with `freeze.refreeze=true` in `app/src/test/resources/archunit.properties`, then restore that file. Include the `app/archunit_store/` edit in the move commit and review it as relocated pre-existing `java.io.File` usage — verify the diff is purely additive and every added FQN is the moved class.
 - **README budget (Q0 retro):** ~45 lines is the working size; spend it on "what not to touch" — the only section not re-derivable from an `ls` of the slice — and keep "key files" terse.
 - **Batches** (retro outcome: **two VMs per PR when slice-coherent**, one where the README needs genuine domain thinking — `todayhub`, `sync`; the slice named in each line owns that unit's README):
-  3. `TodayHubViewModel` → `feature/todayhub/`
   4. `WorkspaceSetupViewModel` → `feature/setup/`
   5. `SyncSettingsViewModel`, `VaultSettingsViewModel` → `feature/sync/` (settings UI already lives there — see decision below)
   6. `AppSyncViewModel`, `BinariesViewModel` → `feature/sync/`
@@ -112,7 +111,7 @@ Independent of Q1–Q4; schedule opportunistically. All G5, maintainer-reviewed.
 
 ## Follow-ups this plan must schedule (docs honesty)
 
-- **ADR-001 amendment** after Q1 batch 3 (majority moved): dated note in Consequences — "2026-06..08: ViewModels accreted in `app/` contrary to this ADR; moved back per `make-slices-real.md`; the placement rule stands and is now ArchUnit-enforced." Until then ADR-001 should gain a one-line self-flag (stale-doc lesson from notebox).
+- ~~**ADR-001 amendment** after Q1 batch 3~~ *(done — landed with batch 3; the dated Consequences note says the ArchUnit rule is still pending rather than claiming enforcement, and the note must be revisited when the Q1 guardrail merges).*
 - **AGENTS.md broken link** (its own tiny doc PR; it may join another PR only when that PR already edits AGENTS.md or the same documentation surface): `specs/plans/android-vault-notes-rebuild-plan.md` doesn't exist. Recover the FTS index-schema/reconcile/ranker content from git history into `specs/architecture/vault-search.md` (or point at the actual current source) and fix the link.
 - **AGENTS.md / change-safety.md**: when Q5.1 lands, change-safety.md's tier section gains one line: "machine-checked in CI".
 
