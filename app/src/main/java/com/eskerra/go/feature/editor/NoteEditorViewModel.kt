@@ -1,4 +1,4 @@
-package com.eskerra.go.app
+package com.eskerra.go.feature.editor
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -18,8 +18,6 @@ import com.eskerra.go.core.usecase.CreateInboxNote
 import com.eskerra.go.core.usecase.LoadEditableNote
 import com.eskerra.go.core.usecase.LoadGitStatusSummary
 import com.eskerra.go.core.usecase.SaveNote
-import com.eskerra.go.feature.editor.CreateInboxUiState
-import com.eskerra.go.feature.editor.NoteEditorUiState
 import java.io.File
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel

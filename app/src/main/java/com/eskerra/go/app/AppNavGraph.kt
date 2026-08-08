@@ -51,8 +51,10 @@ import com.eskerra.go.core.usecase.SyncPodcastVaultRefresh
 import com.eskerra.go.core.usecase.TestRemoteConnection
 import com.eskerra.go.core.usecase.TouchVaultSearchPaths
 import com.eskerra.go.feature.editor.NoteEditorScreen
+import com.eskerra.go.feature.editor.NoteEditorViewModel
 import com.eskerra.go.feature.inbox.InboxUiState
 import com.eskerra.go.feature.note.NoteReaderUiState
+import com.eskerra.go.feature.note.NoteReaderViewModel
 import com.eskerra.go.feature.note.NoteScreen
 import com.eskerra.go.feature.podcasts.PlaylistR2PollingHost
 import com.eskerra.go.feature.search.SearchViewModel

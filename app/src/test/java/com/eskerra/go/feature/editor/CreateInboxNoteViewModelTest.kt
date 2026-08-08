@@ -1,4 +1,4 @@
-package com.eskerra.go.app
+package com.eskerra.go.feature.editor
 
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NoteSummary
@@ -10,7 +10,6 @@ import com.eskerra.go.data.notes.FakeNoteRegistryRepository
 import com.eskerra.go.data.notes.FakeNoteWriteRepository
 import com.eskerra.go.data.notes.NoteRegistryCache
 import com.eskerra.go.data.workspace.WorkspacePaths
-import com.eskerra.go.feature.editor.CreateInboxUiState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher

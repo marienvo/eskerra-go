@@ -1,4 +1,4 @@
-package com.eskerra.go.app
+package com.eskerra.go.feature.note
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -10,7 +10,6 @@ import com.eskerra.go.core.model.NoteReaderDocument
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.usecase.LoadNoteForReading
 import com.eskerra.go.core.usecase.PrefetchLinkedNotes
-import com.eskerra.go.feature.note.NoteReaderUiState
 import java.io.File
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
