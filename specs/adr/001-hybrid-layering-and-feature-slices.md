@@ -49,9 +49,9 @@ Layering also enables JVM unit tests for domain/data logic (`testDebugUnitTest` 
 
 ### 2026-06..08: the slice rule drifted, and was restored
 
-ViewModels accreted in `app/` contrary to this ADR — the 2026-07-05 audit found 11 of 12 living in the composition root, with only `podcasts` self-contained. They are being moved back into their slices per [`specs/plans/make-slices-real.md`](../plans/make-slices-real.md); as of batch 3 the majority have landed. **The placement rule stands** — it was never amended, only unobserved.
+ViewModels accreted in `app/` contrary to this ADR — the 2026-07-05 audit found 11 of 12 living in the composition root, with only `podcasts` self-contained. They were moved back into their slices over six batches (2026-08-08); `app/` now holds `AppGateViewModel` only, which is app-level by design. **The placement rule stands** — it was never amended, only unobserved.
 
-Enforcement is following, not assumed: the ArchUnit rule "no `*ViewModel` in `..app..` except `AppGateViewModel`" lands when that move series completes. Until it merges, this section is the only thing standing between the rule and the next drift.
+Enforcement no longer rests on this prose. The rule "every `*ViewModel` except `AppGateViewModel` resides outside `..app..`" is machine-checked as `viewModelsLiveInTheirFeatureSliceNotInApp` in [`ArchitectureLayerRulesTest.kt`](../../app/src/test/java/com/eskerra/go/architecture/ArchitectureLayerRulesTest.kt), enforced (not frozen) inside `:app:testDebugUnitTest` — so it runs in the standard quality gate and in CI. A ViewModel added to the composition root fails the build; re-forming the hub now takes a deliberate edit to the rule.
 
 ## Placement rules
 

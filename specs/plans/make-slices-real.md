@@ -9,7 +9,7 @@ Companion docs: `specs/adr/001-hybrid-layering-and-feature-slices.md` (the claim
 
 ## Live counter (delete with the plan)
 
-ViewModels moved into their slice: **10 / 10 — done** (excluded by design: `AppGateViewModel` — genuinely app-level). Slice READMEs written: **6 / 8** — the eight beyond Q0's `search` pilot: six delivered as Q1 move companions (`inbox`, `editor`, `note`, `todayhub`, `setup`, `sync`) and two backfilled by Q2 (`podcasts`, `menu`).
+The VM-move counter is retired: the moves are done (10/10) and the placement rule is now enforced by ArchUnit, so the code — not this file — is the record. Slice READMEs written: **6 / 8** — the two still missing (`podcasts`, `menu`) are Q2.
 
 ## Design rules (binding for every phase)
 
@@ -21,21 +21,13 @@ ViewModels moved into their slice: **10 / 10 — done** (excluded by design: `Ap
 
 ## Phases
 
-### Q1 — VM moves *(moves complete; one guardrail item left)*
-
-- **Done 2026-08-08:** all 10 movable ViewModels now live in their slice (`ls app/src/main/java/com/eskerra/go/app/*ViewModel*` = `AppGateViewModel.kt` only, which stays by design). Six batches, each a G1 move plus its slice README as mandated companion, each with the additive `app/archunit_store/` update in the move commit.
-- **Remaining — the guardrail (G5, maintainer, its own PR):** add an ArchUnit rule "no class named `*ViewModel` resides in `..app..` except `AppGateViewModel`" so the hub cannot re-form. It is not a companion of any move, so it never rode along with one.
-- **On merge of that rule:** revisit the dated ADR-001 Consequences note (it currently says the rule is pending rather than enforced), then **delete this phase**.
-- **Checks:** `./scripts/check-module-budgets.sh` && `./scripts/gradle.sh :app:ktlintCheck :app:lintDebug :app:testDebugUnitTest`.
-
 ### Q2 — Slice-README backfill (the slices no move covers)
 
 - **Why:** audit's −0.30 penalty: zero in-source docs; slices need code archaeology to onboard. Q0 and Q1 cover every slice that receives a ViewModel; this phase closes the rest so the counter can actually reach 8/8.
-- **Gate:** none for the two slices below. For any slice that *does* have a move pending, the README belongs to that move unit (Q0/Q1), not here — writing it earlier would document the wrong layout.
+- **Gate:** none — the move series is over, so no README here can document a layout that is about to change.
 - **Scope:** `feature/<name>/README.md` for the slices no move unit delivers:
   - **`podcasts`** — already self-contained; it is the template slice, so its README doubles as the reference example. Write it any time.
   - **`menu`** — single-screen slice with no ViewModel; nothing will ever move into it.
-  - **plus any README the live counter still shows missing** once the Q1 series ends (e.g. a batch that shipped its move but skipped its doc — that is a Q2 backfill, and a signal the Q1 companion rule was not followed).
 - Same 5-section template as the Q0 pilot — copy `app/src/main/java/com/eskerra/go/feature/search/README.md` (~45 lines, hard cap 80). Do **not** duplicate global specs; link `sync-hardening-and-recovery.md` etc. from the sync README instead of restating it.
 - **G-type:** G2 (docs). Delivery: its own small documentation PR (one or both slices), independent of the Q1 series.
 - **Acceptance:** every `feature/*` slice has a README; counter 8/8 (the eight beyond Q0's `search` pilot).
@@ -70,7 +62,7 @@ ViewModels moved into their slice: **10 / 10 — done** (excluded by design: `Ap
 Independent of Q1–Q4; schedule opportunistically. All G5, maintainer-reviewed.
 
 1. **Zone gate in CI:** port the *shape* of notebox's `check-change-safety-zones` — a script + `android-ci.yml` step failing a PR that touches red-tier globs (`data/git/**`, vault-write paths, FTS reconcile, ratchet files, workflows) without a `G3`/`G5` declaration line in the PR body. Mechanism may be agent-built; the glob list is policy (human). This replaces "another prose rewrite" of change-safety.md — the file is fine; it just isn't machine-checked.
-2. **ArchUnit ratchet honesty:** the frozen violation store (`app/archunit_store/`) currently has nothing forcing shrink-only. Add a check mirroring the budget baseline rule: the store may lose lines, never gain (CI diff check). **Sequencing (learned in batches 1–2):** every remaining Q1 move *grows* the store, because moving a ViewModel from `app/` into `feature/` brings pre-existing `java.io.File` usage into the rule's scope. So this item lands **after** Q1 completes, or it ships with an explicit move exemption — otherwise it blocks its own track. Burn-down of the `java.io.File`-in-feature violations is opportunistic only, and only inside a PR already making semantic changes to those files — **never** inside a G1 move PR (burn-down changes signatures) and never as its own mass edit.
+2. **ArchUnit ratchet honesty:** the frozen violation store (`app/archunit_store/`) currently has nothing forcing shrink-only. Add a check mirroring the budget baseline rule: the store may lose lines, never gain (CI diff check). **Sequencing gate: cleared** — each Q1 move *grew* the store (moving a ViewModel from `app/` into `feature/` brings pre-existing `java.io.File` usage into the rule's scope), so this item had to wait for the move series. That series ended 2026-08-08, and no further growth is expected. Burn-down of the `java.io.File`-in-feature violations is opportunistic only, and only inside a PR already making semantic changes to those files — **never** inside a G1 move PR (burn-down changes signatures) and never as its own mass edit.
 3. **CODEOWNERS:** unblocked — the Q1 moves are done, so the paths ownership keys to are now stable (the audit's own sequencing lesson: ownership needs paths). Keyed to `feature/*`, `data/git/**`, `core/**`, `scripts/**`, `.github/**`. Solo-era value is routing review attention + making red-tier ownership explicit, not enforcement.
 - **Acceptance:** each item = its own small PR with the guardrail's own test (`check-*.test.sh` pattern).
 - **Shrink rule:** delete per item on merge.
@@ -96,7 +88,6 @@ Independent of Q1–Q4; schedule opportunistically. All G5, maintainer-reviewed.
 
 ## Follow-ups this plan must schedule (docs honesty)
 
-- ~~**ADR-001 amendment** after Q1 batch 3~~ *(done — landed with batch 3; the dated Consequences note says the ArchUnit rule is still pending rather than claiming enforcement, and the note must be revisited when the Q1 guardrail merges).*
 - **AGENTS.md broken link** (its own tiny doc PR; it may join another PR only when that PR already edits AGENTS.md or the same documentation surface): `specs/plans/android-vault-notes-rebuild-plan.md` doesn't exist. Recover the FTS index-schema/reconcile/ranker content from git history into `specs/architecture/vault-search.md` (or point at the actual current source) and fix the link.
 - **`SyncSettingsViewModel` and `BinariesViewModel` have no unit tests** (found while moving them in batches 5 and 6; both arrived in `feature/sync/` untested, and a G1 move PR is the wrong place to add one). Not a Q6 item — Q6 is test *splits* over 450 LOC. Write them with the next semantic change to either file, or as one small G4 PR: for `SyncSettingsViewModel`, save / test-connection / clear plus the rule that a successful save clears `replacementToken`; for `BinariesViewModel`, the list/refresh and sync-failure paths.
 - **AGENTS.md / change-safety.md**: when Q5.1 lands, change-safety.md's tier section gains one line: "machine-checked in CI".
@@ -110,7 +101,7 @@ Independent of Q1–Q4; schedule opportunistically. All G5, maintainer-reviewed.
 
 ## Deletion condition
 
-Delete this plan when: counter reads 10/10 + 8/8, the Q3 grep is zero, both ArchUnit rules (VM placement, core→data) are enforced, Q5's three residuals merged, **and Q4 is resolved** — resolved meaning one of exactly two outcomes, written down:
+Delete this plan when: the README counter reads 8/8, the Q3 grep is zero, the core→data ArchUnit rule is enforced (VM placement: done 2026-08-08), Q5's three residuals merged, **and Q4 is resolved** — resolved meaning one of exactly two outcomes, written down:
 
 - **Q4 done:** the sub-grouping landed and the routing design note's decision is absorbed into the ADR-001 amendment or `app-contract.md`; or
 - **Q4 parked or transferred:** the phase is explicitly parked, or moved into a named surviving document (`specs/team-scalability/README.md` backlog, or an architecture doc), with the reason recorded there.
