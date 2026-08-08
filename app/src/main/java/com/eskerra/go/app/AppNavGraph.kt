@@ -60,7 +60,9 @@ import com.eskerra.go.feature.podcasts.PlaylistR2PollingHost
 import com.eskerra.go.feature.search.SearchViewModel
 import com.eskerra.go.feature.sync.SyncScreen
 import com.eskerra.go.feature.sync.SyncSettingsScreen
+import com.eskerra.go.feature.sync.SyncSettingsViewModel
 import com.eskerra.go.feature.sync.SyncUiState
+import com.eskerra.go.feature.sync.VaultSettingsViewModel
 import com.eskerra.go.feature.todayhub.TodayHubUiState
 import com.eskerra.go.ui.markdown.AmbiguousWikiLinkSheet
 import java.io.File
