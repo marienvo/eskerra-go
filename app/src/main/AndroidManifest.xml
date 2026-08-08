@@ -33,10 +33,10 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- Share sheet entry. The label sits on the filter so the chooser reads "Eskerra"
-                 while the launcher keeps "Eskerra Go". text/plain only: ACTION_SEND_MULTIPLE and
-                 non-text payloads never reach the app. -->
-            <intent-filter android:label="Eskerra">
+            <!-- Share sheet entry. The label sits on the filter, so the chooser names the action
+                 ("Add note") under the app name while the launcher keeps "Eskerra Go".
+                 text/plain only: ACTION_SEND_MULTIPLE and non-text payloads never reach the app. -->
+            <intent-filter android:label="Add note">
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="text/plain" />

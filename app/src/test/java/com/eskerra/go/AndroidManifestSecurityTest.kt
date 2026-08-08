@@ -41,7 +41,7 @@ class AndroidManifestSecurityTest {
         assertTrue(text.contains("""<data android:mimeType="text/plain" />"""))
         assertTrue(
             "The chooser label lives on the filter, not the activity",
-            text.contains("""<intent-filter android:label="Eskerra">""")
+            text.contains("""<intent-filter android:label="Add note">""")
         )
         assertFalse(
             "ACTION_SEND_MULTIPLE is deliberately not handled",

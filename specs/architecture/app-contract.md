@@ -15,7 +15,7 @@ Product behavior and boundaries for the native Android app. Non-obvious rules th
 
 ## Share target (other apps → inbox draft)
 
-Eskerra appears in the Android share sheet for **`text/plain` only** (`ACTION_SEND`; no `ACTION_SEND_MULTIPLE`, no images or other MIME types). The chooser label is "Eskerra"; the launcher stays "Eskerra Go".
+Eskerra appears in the Android share sheet for **`text/plain` only** (`ACTION_SEND`; no `ACTION_SEND_MULTIPLE`, no images or other MIME types). The share sheet names the action "Add note" (label on the intent-filter); the launcher stays "Eskerra Go".
 
 A share prefills the existing compose pill and **never saves by itself** — the user still presses send, exactly as for a note typed by hand.
 
