@@ -9,7 +9,7 @@ Companion docs: `specs/adr/001-hybrid-layering-and-feature-slices.md` (the claim
 
 ## Live counter (delete with the plan)
 
-ViewModels moved into their slice: **2 / 10** (excluded by design: `AppGateViewModel` — genuinely app-level). Slice READMEs written: **1 / 8** — the eight beyond Q0's `search` pilot: six delivered as Q1 move companions (`inbox`, `editor`, `note`, `todayhub`, `setup`, `sync`) and two backfilled by Q2 (`podcasts`, `menu`).
+ViewModels moved into their slice: **4 / 10** (excluded by design: `AppGateViewModel` — genuinely app-level). Slice READMEs written: **3 / 8** — the eight beyond Q0's `search` pilot: six delivered as Q1 move companions (`inbox`, `editor`, `note`, `todayhub`, `setup`, `sync`) and two backfilled by Q2 (`podcasts`, `menu`).
 
 **Q0 — done** (branch `quality-q0-search-slice`; `SearchViewModel` + test in `feature/search/`, pilot README written). Retro outcome: review cost was minimal (two pure renames, three import lines, a 45-line README); the one unpredicted cost is that **the frozen ArchUnit store is keyed by fully-qualified name, so every move rekeys pre-existing violations and its G1 commit must carry the store edit**; the 5-section README template held at 45 lines with "what not to touch" carrying the real value; **Q1 runs two VMs per PR when slice-coherent**, dropping to one where the README needs genuine domain thinking (`sync`, `todayhub`).
 
@@ -23,20 +23,20 @@ ViewModels moved into their slice: **2 / 10** (excluded by design: `AppGateViewM
 
 ## Phases
 
-### Q1 — Batch VM moves (G1 PR series) *(next PR: batch 2)*
+### Q1 — Batch VM moves (G1 PR series) *(next PR: batch 3)*
 
 - **Why:** the audit's primary blocker and #1 merge hotspot; every remaining feature edit currently collides in `app/`.
 - **Gate:** cleared — Q0 retro written (PR #33).
 - **Companion documentation is mandatory per unit.** Every move unit below ships the destination slice's `README.md` (same 5-section template as Q0) in the same PR, as its own commit — the move and its slice doc are one phase's work, not two phases. When a unit targets a slice whose README already exists (batch 6 into `feature/sync/`), the unit updates that README's key-files/state-owner sections instead of adding a new file.
-- **Frozen-store rekey is part of every G1 commit** (Q0 retro, re-confirmed by batch 1): whenever the moved class already appears in the store, the ArchUnit store — keyed by fully-qualified name — rekeys with it. Include the `app/archunit_store/` edit in the move commit and review it as a rekey (same count, new FQN), not as a new violation.
+- **Frozen-store update is part of every G1 commit** (Q0 retro; corrected by batches 1–2). The frozen `java.io.File` rule scopes to `..feature..`/`..ui..` only, so a ViewModel sitting in `app/` is *not* in the store: moving it **adds** entries rather than rekeying them, and the store's line count grows. Regenerate by running the ArchUnit test once with `freeze.refreeze=true` in `app/src/test/resources/archunit.properties`, then restore that file. Include the `app/archunit_store/` edit in the move commit and review it as relocated pre-existing `java.io.File` usage — verify the diff is purely additive and every added FQN is the moved class.
 - **README budget (Q0 retro):** ~45 lines is the working size; spend it on "what not to touch" — the only section not re-derivable from an `ls` of the slice — and keep "key files" terse.
 - **Batches** (retro outcome: **two VMs per PR when slice-coherent**, one where the README needs genuine domain thinking — `todayhub`, `sync`; the slice named in each line owns that unit's README):
-  2. `NoteEditorViewModel` → `feature/editor/`; `NoteReaderViewModel` → `feature/note/`
   3. `TodayHubViewModel` → `feature/todayhub/`
   4. `WorkspaceSetupViewModel` → `feature/setup/`
   5. `SyncSettingsViewModel`, `VaultSettingsViewModel` → `feature/sync/` (settings UI already lives there — see decision below)
   6. `AppSyncViewModel`, `BinariesViewModel` → `feature/sync/`
 - **Settings-slice decision (in batch 5, not before):** do **not** create `feature/settings/` now. Settings screens are sync-centric today (`SyncSettingsScreen`, `VaultSettings*` in `feature/sync/`); a dedicated slice is only justified when parity P2 (settings-document adoption) gives it real domain content. Record the decision in `feature/sync/README.md`.
+- **The move unit is the file, not the class** (batch 2): `NoteEditorViewModel.kt` also declares `CreateInboxNoteViewModel`, which moved with it along with its test. Check for co-declared classes before scoping a batch — splitting them would stop being a verbatim move.
 - **Stays in `app/`:** `AppGateViewModel` (launch gate is composition-root behavior by design).
 - **G-type:** G1 per PR. `AppSyncViewModel` touches sync *orchestration wiring* — its PR is still G1 (verbatim move) but flag `App.kt` as yellow-tier in the work order.
 - **Acceptance (end of series):** `ls app/src/main/java/com/eskerra/go/app/*ViewModel*` = `AppGateViewModel.kt` only; **ViewModel counter 10/10 and slice-README counter 6/8** (the six Q1 companions; Q2 backfills the last two and closes it at 8/8); full suite green each PR.
@@ -86,7 +86,7 @@ ViewModels moved into their slice: **2 / 10** (excluded by design: `AppGateViewM
 Independent of Q1–Q4; schedule opportunistically. All G5, maintainer-reviewed.
 
 1. **Zone gate in CI:** port the *shape* of notebox's `check-change-safety-zones` — a script + `android-ci.yml` step failing a PR that touches red-tier globs (`data/git/**`, vault-write paths, FTS reconcile, ratchet files, workflows) without a `G3`/`G5` declaration line in the PR body. Mechanism may be agent-built; the glob list is policy (human). This replaces "another prose rewrite" of change-safety.md — the file is fine; it just isn't machine-checked.
-2. **ArchUnit ratchet honesty:** the 68-entry frozen violation store (`app/archunit_store/`) currently has nothing forcing shrink-only. Add a check mirroring the budget baseline rule: the store may lose lines, never gain (CI diff check). Burn-down of the `java.io.File`-in-feature violations is opportunistic only, and only inside a PR already making semantic changes to those files — **never** inside a G1 move PR (burn-down changes signatures) and never as its own mass edit.
+2. **ArchUnit ratchet honesty:** the frozen violation store (`app/archunit_store/`) currently has nothing forcing shrink-only. Add a check mirroring the budget baseline rule: the store may lose lines, never gain (CI diff check). **Sequencing (learned in batches 1–2):** every remaining Q1 move *grows* the store, because moving a ViewModel from `app/` into `feature/` brings pre-existing `java.io.File` usage into the rule's scope. So this item lands **after** Q1 completes, or it ships with an explicit move exemption — otherwise it blocks its own track. Burn-down of the `java.io.File`-in-feature violations is opportunistic only, and only inside a PR already making semantic changes to those files — **never** inside a G1 move PR (burn-down changes signatures) and never as its own mass edit.
 3. **CODEOWNERS:** after Q1 (the audit's own sequencing lesson: ownership needs paths). Keyed to `feature/*`, `data/git/**`, `core/**`, `scripts/**`, `.github/**`. Solo-era value is routing review attention + making red-tier ownership explicit, not enforcement.
 - **Acceptance:** each item = its own small PR with the guardrail's own test (`check-*.test.sh` pattern).
 - **Shrink rule:** delete per item on merge.
