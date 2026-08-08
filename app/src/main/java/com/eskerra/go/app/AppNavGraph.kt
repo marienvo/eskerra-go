@@ -58,6 +58,8 @@ import com.eskerra.go.feature.note.NoteReaderViewModel
 import com.eskerra.go.feature.note.NoteScreen
 import com.eskerra.go.feature.podcasts.PlaylistR2PollingHost
 import com.eskerra.go.feature.search.SearchViewModel
+import com.eskerra.go.feature.sync.AppSyncViewModel
+import com.eskerra.go.feature.sync.BinariesViewModel
 import com.eskerra.go.feature.sync.SyncScreen
 import com.eskerra.go.feature.sync.SyncSettingsScreen
 import com.eskerra.go.feature.sync.SyncSettingsViewModel

@@ -11,6 +11,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ProcessLifecycleOwner
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.usecase.ReconcileWorkspaceSyncBranch
+import com.eskerra.go.feature.sync.AppSyncViewModel
 import java.io.File
 
 @Composable

@@ -59,6 +59,7 @@ import com.eskerra.go.core.usecase.TouchVaultSearchPaths
 import com.eskerra.go.core.usecase.UpdateSyncToken
 import com.eskerra.go.data.workspace.WorkspacePaths
 import com.eskerra.go.feature.inbox.InboxUiState
+import com.eskerra.go.feature.sync.AppSyncViewModel
 import com.eskerra.go.feature.todayhub.TodayHubUiState
 import java.io.File
 

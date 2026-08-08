@@ -6,6 +6,7 @@ import androidx.compose.runtime.getValue
 import com.eskerra.go.core.model.SyncStatusState
 import com.eskerra.go.core.model.SyncStatusSummary
 import com.eskerra.go.core.model.displayLabel
+import com.eskerra.go.feature.sync.AppSyncViewModel
 import com.eskerra.go.feature.sync.SyncUiState
 
 /** Collects [AppSyncViewModel]'s sync + spinner state and maps it to [ShellSyncIndicatorState]. */

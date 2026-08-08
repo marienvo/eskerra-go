@@ -1,4 +1,4 @@
-package com.eskerra.go.app
+package com.eskerra.go.feature.sync
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -9,9 +9,6 @@ import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.usecase.LoadDownloadedBinaries
 import com.eskerra.go.core.usecase.SyncBinaries
 import com.eskerra.go.data.workspace.WorkspacePaths
-import com.eskerra.go.feature.sync.BinariesUiState
-import com.eskerra.go.feature.sync.DownloadedBinaryRow
-import com.eskerra.go.feature.sync.formatByteSize
 import java.io.File
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow

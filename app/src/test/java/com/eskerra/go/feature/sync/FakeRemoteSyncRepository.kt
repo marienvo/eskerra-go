@@ -1,4 +1,4 @@
-package com.eskerra.go.app
+package com.eskerra.go.feature.sync
 
 import com.eskerra.go.core.model.GitWorkspaceStatus
 import com.eskerra.go.core.model.NoteRegistry
