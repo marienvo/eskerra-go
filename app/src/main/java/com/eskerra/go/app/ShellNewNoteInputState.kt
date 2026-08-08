@@ -14,6 +14,7 @@ import com.eskerra.go.core.usecase.CreateInboxNote
 import com.eskerra.go.core.usecase.TouchVaultSearchPaths
 import com.eskerra.go.feature.editor.CreateInboxNoteViewModel
 import com.eskerra.go.feature.editor.CreateInboxUiState
+import com.eskerra.go.feature.sync.AppSyncViewModel
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 

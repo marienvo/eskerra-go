@@ -2,15 +2,20 @@
 
 ## Purpose
 
-Everything the user sees *about* syncing: the manual sync screen, the merged
-Sync settings screen (remote/branch/token, vault R2 config, this-device name,
-downloaded binaries), and the shell's spinner rule. The slice renders sync
-state and collects settings — it runs no Git. The engine, the shared mutex,
-and the auto-sync triggers live in `data/git` and `core/usecase`; see
+Syncing, as the user meets it: the manual sync screen, the merged Sync settings
+screen (remote/branch/token, vault R2 config, this-device name, downloaded
+binaries), the shell's spinner rule, and the orchestration that decides *when*
+an automatic sync runs. The slice runs no Git itself — the engine and the
+process-wide mutex live in `data/git`, reached through `core/usecase`; see
 [`specs/architecture/sync-hardening-and-recovery.md`](../../../../../../../../../specs/architecture/sync-hardening-and-recovery.md).
 
 ## Key files
 
+- `AppSyncViewModel.kt` — app-scoped sync state: runs vault sync, feeds the
+  shell indicator, and owns `requestAutoSync()`, the single entry point for
+  every automatic trigger (boot, foreground return, note write).
+- `BinariesViewModel.kt` — the "Downloaded binaries" tile: lists on-device
+  binaries and runs their manual sync.
 - `SyncSettingsViewModel.kt` — remote URI, branch, and replacement token;
   save / test-connection / clear.
 - `VaultSettingsViewModel.kt` — vault-level R2 credentials plus the local-only
@@ -22,10 +27,11 @@ and the auto-sync triggers live in `data/git` and `core/usecase`; see
 
 ## State owner
 
-Each ViewModel owns its own `StateFlow` and nothing else's. The *sync
-operation* state is **not** owned here: `AppSyncViewModel` (still in `app/`,
-moves in Q1 batch 6) drives sync and consumes this slice's `holdTrueAtLeast`.
-Do not add a second source of truth for sync progress in this slice.
+Each ViewModel owns its own `StateFlow` and nothing else's. Since Q1 batch 6
+the *sync operation* state lives here too: `AppSyncViewModel` is the single
+source of truth for sync progress and the shell's spinner, and `app/` keeps
+only the composition-root wiring that constructs it. Do not introduce a second
+holder of sync progress anywhere.
 
 **Settings slice decision (2026-08-08):** there is deliberately **no
 `feature/settings/`**. Settings today are sync-centric — remote, token, R2,
@@ -36,13 +42,25 @@ device name — so they live with the sync UI. Revisit only when parity P2
 
 `./scripts/gradle.sh :app:testDebugUnitTest --tests "com.eskerra.go.feature.sync.*"`
 
-`VaultSettingsViewModelTest` uses fake stores and a `StandardTestDispatcher` —
-no filesystem, no network. **`SyncSettingsViewModel` has no test yet** (a
-known gap, tracked in `specs/plans/make-slices-real.md` §Q6): any change to it
-should arrive with one.
+The AppSync tests carry the slice's fakes (`FakeRemoteSyncRepository.kt`, which
+also declares `FakeRegistryRepository`); `app/`'s `ReconcileWorkspaceConfigTest`
+imports the former. **`SyncSettingsViewModel` and `BinariesViewModel` have no
+tests yet** — a known gap, tracked under Follow-ups in
+`specs/plans/make-slices-real.md`; any change to either should arrive with one.
 
 ## What not to touch
 
+- **`requestAutoSync()` is the sole entry point for automatic sync, and its
+  coalescing is load-bearing.** A request arriving while a sync runs sets
+  `pendingAutoSync` and is replayed once in the `finally` block — never queued
+  twice, never dropped. The local-only branch (blank `remoteUri`) must keep
+  refreshing status, or a vault with no remote is stuck in `Loading` forever
+  with no retry affordance.
+- **Losing the race for the shared git mutex is not an error.** After
+  `MAX_AUTO_SYNC_CONTENTION_RETRIES` the code deliberately records nothing,
+  shows no error, and just clears `Syncing` so the shell stops spinning; the
+  next write or foreground return syncs again. Do not "fix" this into a
+  user-visible failure.
 - **Secrets must not leak into displayed state.** `RemoteSyncSettingsUiState`
   exposes `hasStoredCredential`, never the stored token — `replacementToken`
   is write-only input, and `saveSettings()` resets it to `""` from freshly

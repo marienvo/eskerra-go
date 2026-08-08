@@ -1,4 +1,4 @@
-package com.eskerra.go.app
+package com.eskerra.go.feature.sync
 
 import com.eskerra.go.core.model.LastSyncStatus
 import com.eskerra.go.core.model.SyncStatusState
@@ -18,7 +18,6 @@ import com.eskerra.go.data.notes.FakeNoteRegistryRepository
 import com.eskerra.go.data.notes.NoteRegistryCache
 import com.eskerra.go.data.workspace.FakeWorkspaceStore
 import com.eskerra.go.data.workspace.WorkspacePaths
-import com.eskerra.go.feature.sync.SyncUiState
 import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CoroutineDispatcher

@@ -9,9 +9,7 @@ Companion docs: `specs/adr/001-hybrid-layering-and-feature-slices.md` (the claim
 
 ## Live counter (delete with the plan)
 
-ViewModels moved into their slice: **8 / 10** (excluded by design: `AppGateViewModel` — genuinely app-level). Slice READMEs written: **6 / 8** — the eight beyond Q0's `search` pilot: six delivered as Q1 move companions (`inbox`, `editor`, `note`, `todayhub`, `setup`, `sync`) and two backfilled by Q2 (`podcasts`, `menu`).
-
-**Q0 — done** (branch `quality-q0-search-slice`; `SearchViewModel` + test in `feature/search/`, pilot README written). Retro outcome: review cost was minimal (two pure renames, three import lines, a 45-line README); the one unpredicted cost is that **the frozen ArchUnit store is keyed by fully-qualified name, so every move rekeys pre-existing violations and its G1 commit must carry the store edit**; the 5-section README template held at 45 lines with "what not to touch" carrying the real value; **Q1 runs two VMs per PR when slice-coherent**, dropping to one where the README needs genuine domain thinking (`sync`, `todayhub`).
+ViewModels moved into their slice: **10 / 10 — done** (excluded by design: `AppGateViewModel` — genuinely app-level). Slice READMEs written: **6 / 8** — the eight beyond Q0's `search` pilot: six delivered as Q1 move companions (`inbox`, `editor`, `note`, `todayhub`, `setup`, `sync`) and two backfilled by Q2 (`podcasts`, `menu`).
 
 ## Design rules (binding for every phase)
 
@@ -23,22 +21,12 @@ ViewModels moved into their slice: **8 / 10** (excluded by design: `AppGateViewM
 
 ## Phases
 
-### Q1 — Batch VM moves (G1 PR series) *(next PR: batch 6, the last)*
+### Q1 — VM moves *(moves complete; one guardrail item left)*
 
-- **Why:** the audit's primary blocker and #1 merge hotspot; every remaining feature edit currently collides in `app/`.
-- **Gate:** cleared — Q0 retro written (PR #33).
-- **Companion documentation is mandatory per unit.** Every move unit below ships the destination slice's `README.md` (same 5-section template as Q0) in the same PR, as its own commit — the move and its slice doc are one phase's work, not two phases. When a unit targets a slice whose README already exists (batch 6 into `feature/sync/`), the unit updates that README's key-files/state-owner sections instead of adding a new file.
-- **Frozen-store update is part of every G1 commit** (Q0 retro; corrected by batches 1–2). The frozen `java.io.File` rule scopes to `..feature..`/`..ui..` only, so a ViewModel sitting in `app/` is *not* in the store: moving it **adds** entries rather than rekeying them, and the store's line count grows. Regenerate by running the ArchUnit test once with `freeze.refreeze=true` in `app/src/test/resources/archunit.properties`, then restore that file. Include the `app/archunit_store/` edit in the move commit and review it as relocated pre-existing `java.io.File` usage — verify the diff is purely additive and every added FQN is the moved class.
-- **README budget (Q0 retro):** ~45 lines is the working size; spend it on "what not to touch" — the only section not re-derivable from an `ls` of the slice — and keep "key files" terse.
-- **Batches** (retro outcome: **two VMs per PR when slice-coherent**, one where the README needs genuine domain thinking — `todayhub`, `sync`; the slice named in each line owns that unit's README):
-  6. `AppSyncViewModel`, `BinariesViewModel` → `feature/sync/` — the slice README now exists (batch 5), so this unit **updates** its key-files and state-owner sections instead of adding one.
-- **The move unit is the file, not the class** (batch 2): `NoteEditorViewModel.kt` also declares `CreateInboxNoteViewModel`, which moved with it along with its test. Check for co-declared classes before scoping a batch — splitting them would stop being a verbatim move.
-- **Stays in `app/`:** `AppGateViewModel` (launch gate is composition-root behavior by design).
-- **G-type:** G1 per PR. `AppSyncViewModel` touches sync *orchestration wiring* — its PR is still G1 (verbatim move) but flag `App.kt` as yellow-tier in the work order.
-- **Acceptance (end of series):** `ls app/src/main/java/com/eskerra/go/app/*ViewModel*` = `AppGateViewModel.kt` only; **ViewModel counter 10/10 and slice-README counter 6/8** (the six Q1 companions; Q2 backfills the last two and closes it at 8/8); full suite green each PR.
-- **Checks:** every PR — `./scripts/check-module-budgets.sh` && `./scripts/gradle.sh :app:ktlintCheck :app:lintDebug :app:testDebugUnitTest`.
-- **New guardrail on completion:** add an ArchUnit rule "no class named `*ViewModel` resides in `..app..` except `AppGateViewModel`" (G5, maintainer) so the hub cannot re-form.
-- **Shrink rule:** delete each batch line as it lands; delete the phase when the ArchUnit rule merges.
+- **Done 2026-08-08:** all 10 movable ViewModels now live in their slice (`ls app/src/main/java/com/eskerra/go/app/*ViewModel*` = `AppGateViewModel.kt` only, which stays by design). Six batches, each a G1 move plus its slice README as mandated companion, each with the additive `app/archunit_store/` update in the move commit.
+- **Remaining — the guardrail (G5, maintainer, its own PR):** add an ArchUnit rule "no class named `*ViewModel` resides in `..app..` except `AppGateViewModel`" so the hub cannot re-form. It is not a companion of any move, so it never rode along with one.
+- **On merge of that rule:** revisit the dated ADR-001 Consequences note (it currently says the rule is pending rather than enforced), then **delete this phase**.
+- **Checks:** `./scripts/check-module-budgets.sh` && `./scripts/gradle.sh :app:ktlintCheck :app:lintDebug :app:testDebugUnitTest`.
 
 ### Q2 — Slice-README backfill (the slices no move covers)
 
@@ -56,7 +44,7 @@ ViewModels moved into their slice: **8 / 10** (excluded by design: `AppGateViewM
 ### Q3 — Invert `core → data`; kill `AppGateResolver → app`
 
 - **Why:** audit finding #1/#4: 30 concrete `data` imports across 9 `core/usecase` files (grew from 29 — `SyncBinaries` added post-audit), plus the one reverse leak `data/workspace/AppGateResolver.kt:3` importing `app.AppGateState`. Layering is convention-enforced, not compile-enforced.
-- **Gate:** none technically, but schedule **after** Q1 batches 1–4 so review attention isn't split. The old "never alongside parity P1b" hold is released: the always-on-sync work delivered P1b and is closed, so no parity phase competes for these sync use-case files.
+- **Gate:** cleared — the Q1 moves are done, so no move PR competes for these files. The old "never alongside parity P1b" hold is released: the always-on-sync work delivered P1b and is closed, so no parity phase competes for these sync use-case files.
 - **Scope (PR series, smallest first):**
   1. `AppGateResolver`: move `AppGateState` (or an interface for it) into `core`/`data`-appropriate home; delete the `app.` import. Small, self-contained.
   2. Lower-risk (non-G3) dependency inversions — behavior-preserving interface extraction on the use cases outside the G3 trio (`SyncBinaries`, `LoadGitStatusSummary`, `BuildSafeSyncDiagnostic`, `BuildSyncPreflight`, `LoadSyncStatus`, `RefreshRemoteSyncStatus`): introduce `core` interfaces for the `data` concretions they name (`WorkspacePaths`, `CredentialStore`, error mappers…), wire in `app/`.
@@ -69,7 +57,7 @@ ViewModels moved into their slice: **8 / 10** (excluded by design: `AppGateViewM
 ### Q4 — Thin the `app/` shell; localize routing
 
 - **Why:** audit risk #2: routing changes ripple through `App.kt` (344) / `AppNavGraph.kt` (370) / `AppRoute.kt`; `app/` is 48 flat files that are individually clear, collectively unnavigable.
-- **Gate:** Q1 complete (moving VMs first shrinks `app/` for free and clarifies what remains).
+- **Gate:** cleared — the Q1 moves are done (they shrank `app/` for free and clarified what remains).
 - **Scope, deliberately modest — this is a tidy-up, not a framework:**
   1. Sub-group `app/` into packages (`app/shell/`, `app/nav/`, `app/gate/`, root wiring stays top-level). Pure G1 `git mv` series.
   2. **Design note first, then decide** on per-slice route registration: write ≤1 page comparing (a) status quo after sub-grouping, (b) a `NavGraphBuilder.<slice>Routes()` extension per slice (routes declared in `feature/<name>/`, registered by one thin `AppNavGraph`). Adopt (b) only if the note shows it reduces the files touched by "add a screen" from ≥3 to ≤2 without indirection cost. No routing DSL, no reflection, no third option.
@@ -83,7 +71,7 @@ Independent of Q1–Q4; schedule opportunistically. All G5, maintainer-reviewed.
 
 1. **Zone gate in CI:** port the *shape* of notebox's `check-change-safety-zones` — a script + `android-ci.yml` step failing a PR that touches red-tier globs (`data/git/**`, vault-write paths, FTS reconcile, ratchet files, workflows) without a `G3`/`G5` declaration line in the PR body. Mechanism may be agent-built; the glob list is policy (human). This replaces "another prose rewrite" of change-safety.md — the file is fine; it just isn't machine-checked.
 2. **ArchUnit ratchet honesty:** the frozen violation store (`app/archunit_store/`) currently has nothing forcing shrink-only. Add a check mirroring the budget baseline rule: the store may lose lines, never gain (CI diff check). **Sequencing (learned in batches 1–2):** every remaining Q1 move *grows* the store, because moving a ViewModel from `app/` into `feature/` brings pre-existing `java.io.File` usage into the rule's scope. So this item lands **after** Q1 completes, or it ships with an explicit move exemption — otherwise it blocks its own track. Burn-down of the `java.io.File`-in-feature violations is opportunistic only, and only inside a PR already making semantic changes to those files — **never** inside a G1 move PR (burn-down changes signatures) and never as its own mass edit.
-3. **CODEOWNERS:** after Q1 (the audit's own sequencing lesson: ownership needs paths). Keyed to `feature/*`, `data/git/**`, `core/**`, `scripts/**`, `.github/**`. Solo-era value is routing review attention + making red-tier ownership explicit, not enforcement.
+3. **CODEOWNERS:** unblocked — the Q1 moves are done, so the paths ownership keys to are now stable (the audit's own sequencing lesson: ownership needs paths). Keyed to `feature/*`, `data/git/**`, `core/**`, `scripts/**`, `.github/**`. Solo-era value is routing review attention + making red-tier ownership explicit, not enforcement.
 - **Acceptance:** each item = its own small PR with the guardrail's own test (`check-*.test.sh` pattern).
 - **Shrink rule:** delete per item on merge.
 
@@ -110,7 +98,7 @@ Independent of Q1–Q4; schedule opportunistically. All G5, maintainer-reviewed.
 
 - ~~**ADR-001 amendment** after Q1 batch 3~~ *(done — landed with batch 3; the dated Consequences note says the ArchUnit rule is still pending rather than claiming enforcement, and the note must be revisited when the Q1 guardrail merges).*
 - **AGENTS.md broken link** (its own tiny doc PR; it may join another PR only when that PR already edits AGENTS.md or the same documentation surface): `specs/plans/android-vault-notes-rebuild-plan.md` doesn't exist. Recover the FTS index-schema/reconcile/ranker content from git history into `specs/architecture/vault-search.md` (or point at the actual current source) and fix the link.
-- **`SyncSettingsViewModel` has no unit test** (found while moving it in batch 5; it arrived in `feature/sync/` untested, and a G1 move PR is the wrong place to add one). Not a Q6 item — Q6 is test *splits* over 450 LOC. Write it with the next semantic change to that file, or as its own small G4 PR: save / test-connection / clear, plus the rule that a successful save clears `replacementToken`.
+- **`SyncSettingsViewModel` and `BinariesViewModel` have no unit tests** (found while moving them in batches 5 and 6; both arrived in `feature/sync/` untested, and a G1 move PR is the wrong place to add one). Not a Q6 item — Q6 is test *splits* over 450 LOC. Write them with the next semantic change to either file, or as one small G4 PR: for `SyncSettingsViewModel`, save / test-connection / clear plus the rule that a successful save clears `replacementToken`; for `BinariesViewModel`, the list/refresh and sync-failure paths.
 - **AGENTS.md / change-safety.md**: when Q5.1 lands, change-safety.md's tier section gains one line: "machine-checked in CI".
 
 ## Parked (explicitly, with reasons)

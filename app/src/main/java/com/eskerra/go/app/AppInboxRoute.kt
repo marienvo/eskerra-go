@@ -26,6 +26,7 @@ import com.eskerra.go.core.usecase.TouchVaultSearchPaths
 import com.eskerra.go.feature.inbox.InboxScreen
 import com.eskerra.go.feature.inbox.InboxUiState
 import com.eskerra.go.feature.inbox.InboxViewModel
+import com.eskerra.go.feature.sync.AppSyncViewModel
 import com.eskerra.go.feature.todayhub.TodayHubUiState
 import com.eskerra.go.feature.todayhub.TodayHubViewModel
 import com.eskerra.go.ui.markdown.AmbiguousWikiLinkSheet

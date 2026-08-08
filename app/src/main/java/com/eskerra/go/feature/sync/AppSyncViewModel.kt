@@ -1,4 +1,4 @@
-package com.eskerra.go.app
+package com.eskerra.go.feature.sync
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -15,8 +15,6 @@ import com.eskerra.go.core.usecase.LoadSyncStatus
 import com.eskerra.go.core.usecase.ManualSyncNow
 import com.eskerra.go.core.usecase.RecordLastSyncAttempt
 import com.eskerra.go.core.usecase.RefreshRemoteSyncStatus
-import com.eskerra.go.feature.sync.SyncUiState
-import com.eskerra.go.feature.sync.holdTrueAtLeast
 import java.io.File
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
