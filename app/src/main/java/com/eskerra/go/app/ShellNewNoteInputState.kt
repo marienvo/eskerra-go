@@ -8,6 +8,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -18,6 +19,7 @@ import com.eskerra.go.core.usecase.CreateInboxNote
 import com.eskerra.go.core.usecase.TouchVaultSearchPaths
 import com.eskerra.go.feature.editor.CreateInboxNoteViewModel
 import com.eskerra.go.feature.editor.CreateInboxUiState
+import com.eskerra.go.feature.share.ShareIntakeViewModel
 import com.eskerra.go.feature.sync.AppSyncViewModel
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
@@ -44,7 +46,9 @@ internal fun rememberShellNewNoteInputState(
     scope: CoroutineScope,
     currentRoute: String?,
     selectedTopLevelRoute: String?,
-    markInboxNotesChanged: () -> Unit
+    markInboxNotesChanged: () -> Unit,
+    shareIntake: ShareIntake,
+    onSharePrefillApplied: () -> Unit
 ): ShellNewNoteInputState {
     val context = LocalContext.current
     val createInboxNoteViewModel: CreateInboxNoteViewModel = viewModel(
@@ -80,6 +84,30 @@ internal fun rememberShellNewNoteInputState(
                 listOf(noteId.value)
             )
             Toast.makeText(context, "Saved", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    val shareIntakeViewModel: ShareIntakeViewModel = viewModel(
+        key = "share-intake",
+        factory = ShareIntakeViewModel.factory(shareIntake.fetchSharedPageTitle)
+    )
+    val pendingShare = shareIntake.pendingShare
+    LaunchedEffect(pendingShare?.id) {
+        val share = pendingShare ?: return@LaunchedEffect
+        shareIntakeViewModel.offer(share)
+        shareIntake.onShareHandled(share.id)
+    }
+    LaunchedEffect(shareIntakeViewModel, createInboxNoteViewModel) {
+        shareIntakeViewModel.prefills.collect(createInboxNoteViewModel::prefillFromShare)
+    }
+    val navigateForShare by rememberUpdatedState(onSharePrefillApplied)
+    LaunchedEffect(createInboxNoteViewModel) {
+        // Only a prefill the composer actually accepted moves the caret or the user: a deferred
+        // or dropped one must not steal focus or navigate.
+        createInboxNoteViewModel.prefillAppliedEvents.collect { caretOffset ->
+            fieldSignalToken += 1
+            fieldSignal = ShellFieldSignal.PlaceCaret(fieldSignalToken, caretOffset)
+            navigateForShare()
         }
     }
 
