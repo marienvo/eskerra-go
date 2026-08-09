@@ -412,7 +412,10 @@ class BrandIconTest(unittest.TestCase):
         launcher_colors = ElementTree.parse(
             RES_DIR / "values" / "ic_launcher_background.xml"
         ).getroot()
-        self.assertEqual(launcher_colors[0].text.strip(), "#FFFFFF")
+        expected_background = "#{:02X}{:02X}{:02X}".format(
+            *LAUNCHER_BACKGROUND[:3]
+        )
+        self.assertEqual(launcher_colors[0].text.strip(), expected_background)
 
         splash_colors = ElementTree.parse(RES_DIR / "values" / "colors.xml").getroot()
         self.assertEqual(splash_colors[0].text.strip(), "#000000")
