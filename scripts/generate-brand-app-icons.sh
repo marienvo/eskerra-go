@@ -7,8 +7,8 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 RENDER_SCRIPT="$ROOT/scripts/render-logo-e-pngs.sh"
 RES_DIR="$ROOT/app/src/main/res"
 BRAND_DIR="$ROOT/branding"
-# Matches the 3dp elevated note-input surface after the theme-wide brand-red hue shift.
-LAUNCHER_BACKGROUND="#312B2B"
+# Android launcher and Play Store icon background.
+LAUNCHER_BACKGROUND="#4FAFE6"
 LAUNCHER_FOREGROUND="#FFFFFF"
 LOGO_SIZE_DP=58
 ICON_TEMP_DIR=""
