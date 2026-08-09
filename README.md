@@ -1,7 +1,16 @@
-# Eskerra Go
+> [!WARNING]
+> Still in early development.
 
-Eskerra Go is the native Android companion for Eskerra: a Git-first Markdown
-vault app written in Kotlin and Jetpack Compose.
+<p align="center">
+  <img src="./branding/logo-e-brand-red.svg" alt="Eskerra logo" width="120"><br>
+</p>
+
+<h1 align="center">Eskerra Go</h1>
+
+<p align="center">
+  Eskerra Go is the <strong>native Android companion</strong> for Eskerra: a Git-first Markdown
+  vault app written in Kotlin and Jetpack Compose.
+</p>
 
 Migration note: Eskerra Go replaces the React Native mobile app that previously
 lived in the Eskerra Studio desktop repo. Desktop work continues in that sibling

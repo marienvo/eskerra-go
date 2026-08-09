@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import math
+import re
 import shutil
 import struct
 import subprocess
@@ -20,7 +22,10 @@ BRAND_DIR = ROOT / "branding"
 RENDERER = ROOT / "scripts" / "render-logo-e-pngs.sh"
 ANDROID_NS = "http://schemas.android.com/apk/res/android"
 LOGO_SIZE_DP = 58
-LAUNCHER_BACKGROUND = (227, 93, 93, 255)
+LAUNCHER_BACKGROUND = (203, 77, 73, 255)
+APP_ICON_FOREGROUND = (255, 255, 255, 255)
+LOGO_CENTER = (125, 128)
+LOGO_STROKE_WIDTH = 10
 
 DENSITIES = {
     "ldpi": (81, 36),
@@ -29,6 +34,17 @@ DENSITIES = {
     "xhdpi": (216, 96),
     "xxhdpi": (324, 144),
     "xxxhdpi": (432, 192),
+}
+
+# The circular track center is canvas-centered. The e's leftward crossbars make
+# its overall ink bounds intentionally asymmetric; lock those bounds explicitly.
+EXPECTED_FOREGROUND_BOUNDS = {
+    "ldpi": (18, 18, 60, 61),
+    "mdpi": (25, 25, 80, 82),
+    "hdpi": (37, 38, 119, 122),
+    "xhdpi": (50, 52, 160, 163),
+    "xxhdpi": (76, 78, 240, 245),
+    "xxxhdpi": (102, 104, 320, 327),
 }
 
 
@@ -158,39 +174,201 @@ def contains_white_ink(image: PngImage) -> bool:
     return any(
         image.pixel(x, y)[3] > 0
         and image.pixel(x, y)[0] > 180
-        and image.pixel(x, y)[1] > 140
-        and image.pixel(x, y)[2] > 140
-        and abs(image.pixel(x, y)[1] - image.pixel(x, y)[2]) <= 3
+        and image.pixel(x, y)[1] > 220
+        and image.pixel(x, y)[2] > 240
         for y in range(image.height)
         for x in range(image.width)
     )
 
 
-def contains_launcher_red(image: PngImage) -> bool:
+def contains_launcher_background(image: PngImage) -> bool:
     return any(
         image.pixel(x, y)[3] > 0
-        and image.pixel(x, y)[0] > image.pixel(x, y)[1]
-        and image.pixel(x, y)[0] > image.pixel(x, y)[2]
+        and image.pixel(x, y) == LAUNCHER_BACKGROUND
         for y in range(image.height)
         for x in range(image.width)
     )
+
+
+def contains_light_icon_ink(image: PngImage) -> bool:
+    return any(
+        image.pixel(x, y)[3] > 0
+        and image.pixel(x, y)[0] > 200
+        and image.pixel(x, y)[1] > 150
+        and image.pixel(x, y)[2] > 150
+        for y in range(image.height)
+        for x in range(image.width)
+    )
+
+
+def uses_only_app_icon_red_hue_or_neutral(image: PngImage) -> bool:
+    for y in range(image.height):
+        for x in range(image.width):
+            red, green, blue, alpha = image.pixel(x, y)
+            if alpha == 0:
+                continue
+            if not red >= green >= blue:
+                return False
+    return True
+
+
+def point_on_cubic(
+    points: tuple[tuple[float, float], ...],
+    t: float,
+) -> tuple[float, float]:
+    u = 1 - t
+    return (
+        u**3 * points[0][0]
+        + 3 * u**2 * t * points[1][0]
+        + 3 * u * t**2 * points[2][0]
+        + t**3 * points[3][0],
+        u**3 * points[0][1]
+        + 3 * u**2 * t * points[1][1]
+        + 3 * u * t**2 * points[2][1]
+        + t**3 * points[3][1],
+    )
+
+
+def minimum_distance_to_cubic(
+    point: tuple[float, float],
+    cubic: tuple[tuple[float, float], ...],
+) -> float:
+    def distance_squared(t: float) -> float:
+        candidate = point_on_cubic(cubic, t)
+        return (point[0] - candidate[0]) ** 2 + (point[1] - candidate[1]) ** 2
+
+    samples = 1000
+    best_index = min(
+        range(samples + 1),
+        key=lambda index: distance_squared(index / samples),
+    )
+    lower = max(0.0, (best_index - 1) / samples)
+    upper = min(1.0, (best_index + 1) / samples)
+    for _ in range(80):
+        first = lower + (upper - lower) / 3
+        second = upper - (upper - lower) / 3
+        if distance_squared(first) < distance_squared(second):
+            upper = second
+        else:
+            lower = first
+    return math.sqrt(distance_squared((lower + upper) / 2))
 
 
 class BrandIconTest(unittest.TestCase):
-    def test_white_launcher_and_splash_foreground_matches_density_and_safe_zone(self) -> None:
+    def test_launcher_background_uses_brand_red(self) -> None:
+        self.assertEqual(LAUNCHER_BACKGROUND, (203, 77, 73, 255))
+
+    def test_app_icon_foreground_uses_white(self) -> None:
+        self.assertEqual(APP_ICON_FOREGROUND, (255, 255, 255, 255))
+
+    def test_readme_brand_red_logo_matches_editable_geometry(self) -> None:
+        editable = ElementTree.parse(BRAND_DIR / "logo-e.svg").getroot()
+        readme = ElementTree.parse(BRAND_DIR / "logo-e-brand-red.svg").getroot()
+        self.assertEqual(readme.attrib["stroke"], "#cb4d49")
+        self.assertEqual(readme.attrib["viewBox"], editable.attrib["viewBox"])
+        self.assertEqual(
+            [path.attrib["d"] for path in readme],
+            [path.attrib["d"] for path in editable],
+        )
+        root_readme = (ROOT / "README.md").read_text()
+        self.assertIn("./branding/logo-e-brand-red.svg", root_readme)
+
+    def test_editable_e_mark_uses_three_exact_concentric_tracks(self) -> None:
+        root = ElementTree.parse(BRAND_DIR / "logo-e.svg").getroot()
+        self.assertEqual(root.attrib["viewBox"], "35 38 180 180")
+        paths = root.findall("{http://www.w3.org/2000/svg}path")
+        self.assertEqual(len(paths), 3)
+
+        tracks = ((113, 51), (128, 66), (143, 81))
+        path_data: list[str] = []
+        terminals: list[tuple[float, float]] = []
+        for path, (horizontal_y, radius) in zip(paths, tracks, strict=True):
+            data = " ".join(path.attrib["d"].split())
+            path_data.append(data)
+            self.assertRegex(data, rf"^M 42 {horizontal_y} H 162 C ")
+
+            upper = re.search(
+                rf"C (?:[-\d.]+ ){{4}}([-\d.]+) ([-\d.]+) "
+                rf"A {radius} {radius} 0 0 0 ([-\d.]+) 98",
+                data,
+            )
+            self.assertIsNotNone(upper)
+            lower = re.search(
+                rf"M ([-\d.]+) 158 A {radius} {radius} 0 0 0 "
+                rf"([-\d.]+) ([-\d.]+)$",
+                data,
+            )
+            self.assertIsNotNone(lower)
+            assert upper is not None and lower is not None
+
+            points = (
+                (float(upper[1]), float(upper[2])),
+                (float(upper[3]), 98.0),
+                (float(lower[1]), 158.0),
+                (float(lower[2]), float(lower[3])),
+            )
+            for x, y in points:
+                self.assertAlmostEqual(
+                    math.hypot(x - LOGO_CENTER[0], y - LOGO_CENTER[1]),
+                    radius,
+                    delta=0.001,
+                )
+            terminals.append((float(lower[2]), float(lower[3])))
+
+            terminal_angle = math.degrees(
+                math.atan2(
+                    float(lower[3]) - LOGO_CENTER[1],
+                    float(lower[2]) - LOGO_CENTER[0],
+                )
+            )
+            self.assertAlmostEqual(terminal_angle, 35.823, delta=0.001)
+
+        self.assertEqual(
+            [tracks[index][1] - tracks[index - 1][1] for index in range(1, 3)],
+            [15, 15],
+        )
+
+        outer_transition = re.search(
+            r"^M 42 143 H 162 C ([-\d.]+) ([-\d.]+) ([-\d.]+) "
+            r"([-\d.]+) ([-\d.]+) ([-\d.]+)",
+            path_data[2],
+        )
+        self.assertIsNotNone(outer_transition)
+        assert outer_transition is not None
+        outer_transition_points = (
+            (162.0, 143.0),
+            (float(outer_transition[1]), float(outer_transition[2])),
+            (float(outer_transition[3]), float(outer_transition[4])),
+            (float(outer_transition[5]), float(outer_transition[6])),
+        )
+        terminal_clearance = (
+            minimum_distance_to_cubic(terminals[0], outer_transition_points)
+            - LOGO_STROKE_WIDTH
+        )
+        self.assertAlmostEqual(terminal_clearance, 5, delta=0.01)
+
+    def test_launcher_and_splash_foregrounds_match_density_and_safe_zone(self) -> None:
         for density, (adaptive_size, _) in DENSITIES.items():
             with self.subTest(density=density):
-                image = inspect_png(
+                splash = inspect_png(
                     RES_DIR / f"mipmap-{density}" / "ic_launcher_brand_foreground.png"
                 )
-                self.assertEqual((image.width, image.height), (adaptive_size, adaptive_size))
-                left, top, right, bottom = image.alpha_bounds()
+                launcher = inspect_png(
+                    RES_DIR / f"mipmap-{density}" / "ic_launcher_app_foreground.png"
+                )
+                self.assertEqual((splash.width, splash.height), (adaptive_size, adaptive_size))
+                self.assertEqual((launcher.width, launcher.height), (adaptive_size, adaptive_size))
+                left, top, right, bottom = splash.alpha_bounds()
                 safe_size = scaled_safe_size(adaptive_size)
                 self.assertLessEqual(right - left + 1, safe_size)
                 self.assertLessEqual(bottom - top + 1, safe_size)
-                self.assertLessEqual(abs((left + right + 1) - adaptive_size), 2)
-                self.assertLessEqual(abs((top + bottom + 1) - adaptive_size), 2)
-                self.assertTrue(contains_white_ink(image))
+                self.assertEqual(
+                    (left, top, right, bottom),
+                    EXPECTED_FOREGROUND_BOUNDS[density],
+                )
+                self.assertEqual(launcher.alpha_bounds(), (left, top, right, bottom))
+                self.assertTrue(contains_white_ink(splash))
+                self.assertTrue(contains_white_ink(launcher))
 
     def test_legacy_icons_match_density_and_masks(self) -> None:
         for density, (_, legacy_size) in DENSITIES.items():
@@ -199,14 +377,16 @@ class BrandIconTest(unittest.TestCase):
                     image = inspect_png(RES_DIR / f"mipmap-{density}" / filename)
                     self.assertEqual((image.width, image.height), (legacy_size, legacy_size))
                     self.assertEqual(image.pixel(0, 0)[3], 0)
-                    self.assertTrue(contains_launcher_red(image))
-                    self.assertTrue(contains_white_ink(image))
+                    self.assertTrue(contains_launcher_background(image))
+                    self.assertTrue(uses_only_app_icon_red_hue_or_neutral(image))
+                    self.assertTrue(contains_light_icon_ink(image))
 
     def test_store_and_web_exports_have_expected_geometry(self) -> None:
         play_store = inspect_png(BRAND_DIR / "playstore-icon.png")
         self.assertEqual((play_store.width, play_store.height), (512, 512))
         self.assertEqual(play_store.pixel(0, 0), LAUNCHER_BACKGROUND)
-        self.assertTrue(contains_white_ink(play_store))
+        self.assertTrue(uses_only_app_icon_red_hue_or_neutral(play_store))
+        self.assertTrue(contains_light_icon_ink(play_store))
         self.assertLess((BRAND_DIR / "playstore-icon.png").stat().st_size, 1024 * 1024)
 
         web = inspect_png(BRAND_DIR / "ic_launcher-web.png")
@@ -219,8 +399,8 @@ class BrandIconTest(unittest.TestCase):
     def test_adaptive_xml_and_backgrounds_stay_aligned(self) -> None:
         expected_layers = {
             "background": "@color/ic_launcher_background",
-            "foreground": "@mipmap/ic_launcher_brand_foreground",
-            "monochrome": "@mipmap/ic_launcher_brand_foreground",
+            "foreground": "@mipmap/ic_launcher_app_foreground",
+            "monochrome": "@mipmap/ic_launcher_app_foreground",
         }
         for filename in ("ic_launcher.xml", "ic_launcher_round.xml"):
             root = ElementTree.parse(RES_DIR / "mipmap-anydpi-v26" / filename).getroot()
@@ -232,7 +412,10 @@ class BrandIconTest(unittest.TestCase):
         launcher_colors = ElementTree.parse(
             RES_DIR / "values" / "ic_launcher_background.xml"
         ).getroot()
-        self.assertEqual(launcher_colors[0].text.strip(), "#E35D5D")
+        expected_background = "#{:02X}{:02X}{:02X}".format(
+            *LAUNCHER_BACKGROUND[:3]
+        )
+        self.assertEqual(launcher_colors[0].text.strip(), expected_background)
 
         splash_colors = ElementTree.parse(RES_DIR / "values" / "colors.xml").getroot()
         self.assertEqual(splash_colors[0].text.strip(), "#000000")

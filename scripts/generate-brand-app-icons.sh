@@ -7,8 +7,10 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 RENDER_SCRIPT="$ROOT/scripts/render-logo-e-pngs.sh"
 RES_DIR="$ROOT/app/src/main/res"
 BRAND_DIR="$ROOT/branding"
-LAUNCHER_BACKGROUND="#E35D5D"
+# Android launcher and Play Store icon colors.
+LAUNCHER_BACKGROUND="#CB4D49"
 LAUNCHER_FOREGROUND="#FFFFFF"
+SPLASH_FOREGROUND="#FFFFFF"
 LOGO_SIZE_DP=58
 ICON_TEMP_DIR=""
 
@@ -38,10 +40,11 @@ normalize_png() {
   magick "$source" -define png:color-type=6 -depth 8 -strip "$destination"
 }
 
-make_white_mark() {
+make_mark() {
   local source="$1"
-  local destination="$2"
-  magick "$source" -fill "$LAUNCHER_FOREGROUND" -colorize 100 \
+  local color="$2"
+  local destination="$3"
+  magick "$source" -fill "$color" -colorize 100 \
     -define png:color-type=6 -depth 8 -strip \
     "$destination"
 }
@@ -70,14 +73,14 @@ make_legacy_icon() {
   if [[ "$shape" == "round" ]]; then
     magick -size "${canvas}x${canvas}" xc:none \
       -fill "$LAUNCHER_BACKGROUND" -draw "circle $center,$center $center,0" \
-      "$WHITE_PNG_DIR/logo-e-${mark_size}.png" -gravity center -composite \
+      "$LAUNCHER_PNG_DIR/logo-e-${mark_size}.png" -gravity center -composite \
       -define png:color-type=6 -depth 8 -strip \
       "$destination"
   else
     magick -size "${canvas}x${canvas}" xc:none \
       -fill "$LAUNCHER_BACKGROUND" \
       -draw "roundrectangle 0,0 $edge,$edge $radius,$radius" \
-      "$WHITE_PNG_DIR/logo-e-${mark_size}.png" -gravity center -composite \
+      "$LAUNCHER_PNG_DIR/logo-e-${mark_size}.png" -gravity center -composite \
       -define png:color-type=6 -depth 8 -strip \
       "$destination"
   fi
@@ -130,14 +133,20 @@ main() {
 
   ICON_TEMP_DIR="$(mktemp -d)"
   PNG_DIR="$ICON_TEMP_DIR/png"
-  WHITE_PNG_DIR="$ICON_TEMP_DIR/white-png"
+  LAUNCHER_PNG_DIR="$ICON_TEMP_DIR/launcher-png"
+  SPLASH_PNG_DIR="$ICON_TEMP_DIR/splash-png"
   OUTPUT_DIR="$ICON_TEMP_DIR/output"
-  mkdir -p "$OUTPUT_DIR" "$WHITE_PNG_DIR"
+  mkdir -p "$OUTPUT_DIR" "$LAUNCHER_PNG_DIR" "$SPLASH_PNG_DIR"
   "$RENDER_SCRIPT" "$PNG_DIR" "${render_sizes[@]}"
   for mark_size in "${render_sizes[@]}"; do
-    make_white_mark \
+    make_mark \
       "$PNG_DIR/logo-e-${mark_size}.png" \
-      "$WHITE_PNG_DIR/logo-e-${mark_size}.png"
+      "$LAUNCHER_FOREGROUND" \
+      "$LAUNCHER_PNG_DIR/logo-e-${mark_size}.png"
+    make_mark \
+      "$PNG_DIR/logo-e-${mark_size}.png" \
+      "$SPLASH_FOREGROUND" \
+      "$SPLASH_PNG_DIR/logo-e-${mark_size}.png"
   done
 
   for spec in "${density_specs[@]}"; do
@@ -147,11 +156,18 @@ main() {
     mkdir -p "$output_dir"
 
     make_foreground \
-      "$WHITE_PNG_DIR" \
+      "$LAUNCHER_PNG_DIR" \
+      "$adaptive_size" \
+      "$mark_size" \
+      "$output_dir/ic_launcher_app_foreground.png"
+    make_foreground \
+      "$SPLASH_PNG_DIR" \
       "$adaptive_size" \
       "$mark_size" \
       "$output_dir/ic_launcher_brand_foreground.png"
+    validate_dimensions "$output_dir/ic_launcher_app_foreground.png" "$adaptive_size"
     validate_dimensions "$output_dir/ic_launcher_brand_foreground.png" "$adaptive_size"
+    validate_foreground_bounds "$output_dir/ic_launcher_app_foreground.png" "$mark_size"
     validate_foreground_bounds "$output_dir/ic_launcher_brand_foreground.png" "$mark_size"
 
     mark_size="$(scaled_size "$legacy_size")"
@@ -171,7 +187,7 @@ main() {
 
   store_mark_size="$(scaled_size 512)"
   magick -size 512x512 "xc:$LAUNCHER_BACKGROUND" \
-    "$WHITE_PNG_DIR/logo-e-${store_mark_size}.png" -gravity center -composite \
+    "$LAUNCHER_PNG_DIR/logo-e-${store_mark_size}.png" -gravity center -composite \
     -define png:color-type=6 -depth 8 -strip \
     "$OUTPUT_DIR/playstore-icon.png"
   normalize_png "$PNG_DIR/logo-e-512.png" "$OUTPUT_DIR/ic_launcher-web.png"
@@ -185,6 +201,9 @@ main() {
     install -m 0644 \
       "$OUTPUT_DIR/mipmap-$density/ic_launcher.png" \
       "$output_dir/ic_launcher.png"
+    install -m 0644 \
+      "$OUTPUT_DIR/mipmap-$density/ic_launcher_app_foreground.png" \
+      "$output_dir/ic_launcher_app_foreground.png"
     install -m 0644 \
       "$OUTPUT_DIR/mipmap-$density/ic_launcher_brand_foreground.png" \
       "$output_dir/ic_launcher_brand_foreground.png"
