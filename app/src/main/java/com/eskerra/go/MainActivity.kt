@@ -3,6 +3,7 @@ package com.eskerra.go
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
@@ -18,7 +19,6 @@ import coil.memory.MemoryCache
 import com.eskerra.go.app.AppRoot
 import com.eskerra.go.app.ShareIntake
 import com.eskerra.go.core.repository.PodcastPlayerDriver
-import com.eskerra.go.core.share.PendingShare
 import com.eskerra.go.core.usecase.BuildSafeSyncDiagnostic
 import com.eskerra.go.core.usecase.BuildSyncPreflight
 import com.eskerra.go.core.usecase.ClearRemoteSyncSettings
@@ -97,9 +97,9 @@ import okhttp3.OkHttpClient
 class MainActivity : ComponentActivity() {
     private var podcastPlayerDriver: PodcastPlayerDriver? = null
 
-    /** Read inside setContent, so a share arriving while the app runs recomposes the shell. */
-    private val pendingShare = mutableStateOf<PendingShare?>(null)
-    private var shareSequence = 0L
+    private val shareConsumer = ShareIntentConsumer { message ->
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()
@@ -255,7 +255,7 @@ class MainActivity : ComponentActivity() {
         )
         // Only on a cold start: on rotation the same intent is redelivered and must not re-apply.
         if (savedInstanceState == null) {
-            consumeShareIntent(intent)
+            shareConsumer.consume(intent)
         }
 
         val okHttpClient = OkHttpClient()
@@ -339,15 +339,11 @@ class MainActivity : ComponentActivity() {
                 catalogSnapshotStore = catalogSnapshotStore,
                 podcastShellStateWiring = podcastComposition.podcastShellStateWiring,
                 shareIntake = ShareIntake(
-                    pendingShare = pendingShare.value,
+                    pendingShare = shareConsumer.pending.value,
                     fetchSharedPageTitle = FetchSharedPageTitle(
                         OkHttpPageTitleFetcher(okHttpClient)
                     ),
-                    onShareHandled = { handledId ->
-                        if (pendingShare.value?.id == handledId) {
-                            pendingShare.value = null
-                        }
-                    }
+                    onShareHandled = shareConsumer::handled
                 ),
                 onLaunchSettled = {
                     if (keepSplashOnScreen) {
@@ -361,15 +357,7 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        consumeShareIntent(intent)
-    }
-
-    private fun consumeShareIntent(intent: Intent?) {
-        val content = SharedIntentReader.read(intent) ?: return
-        // Belt and braces against any later re-read of the same intent.
-        intent?.putExtra(SharedIntentReader.EXTRA_CONSUMED, true)
-        shareSequence += 1
-        pendingShare.value = PendingShare(shareSequence, content)
+        shareConsumer.consume(intent)
     }
 
     override fun onDestroy() {
