@@ -20,6 +20,7 @@ BRAND_DIR = ROOT / "branding"
 RENDERER = ROOT / "scripts" / "render-logo-e-pngs.sh"
 ANDROID_NS = "http://schemas.android.com/apk/res/android"
 LOGO_SIZE_DP = 58
+LAUNCHER_BACKGROUND = (227, 93, 93, 255)
 
 DENSITIES = {
     "ldpi": (81, 36),
@@ -153,21 +154,48 @@ def contains_blue_ink(image: PngImage) -> bool:
     )
 
 
+def contains_white_ink(image: PngImage) -> bool:
+    return any(
+        image.pixel(x, y)[3] > 0
+        and image.pixel(x, y)[0] > 180
+        and image.pixel(x, y)[1] > 140
+        and image.pixel(x, y)[2] > 140
+        and abs(image.pixel(x, y)[1] - image.pixel(x, y)[2]) <= 3
+        for y in range(image.height)
+        for x in range(image.width)
+    )
+
+
+def contains_launcher_red(image: PngImage) -> bool:
+    return any(
+        image.pixel(x, y)[3] > 0
+        and image.pixel(x, y)[0] > image.pixel(x, y)[1]
+        and image.pixel(x, y)[0] > image.pixel(x, y)[2]
+        for y in range(image.height)
+        for x in range(image.width)
+    )
+
+
 class BrandIconTest(unittest.TestCase):
-    def test_adaptive_foregrounds_match_density_and_safe_zone(self) -> None:
+    def test_launcher_and_splash_foregrounds_match_density_and_safe_zone(self) -> None:
         for density, (adaptive_size, _) in DENSITIES.items():
             with self.subTest(density=density):
-                image = inspect_png(
+                launcher = inspect_png(
+                    RES_DIR / f"mipmap-{density}" / "ic_launcher_brand_foreground.png"
+                )
+                splash = inspect_png(
                     RES_DIR / f"mipmap-{density}" / "ic_launcher_foreground.png"
                 )
-                self.assertEqual((image.width, image.height), (adaptive_size, adaptive_size))
-                left, top, right, bottom = image.alpha_bounds()
-                safe_size = scaled_safe_size(adaptive_size)
-                self.assertLessEqual(right - left + 1, safe_size)
-                self.assertLessEqual(bottom - top + 1, safe_size)
-                self.assertLessEqual(abs((left + right + 1) - adaptive_size), 2)
-                self.assertLessEqual(abs((top + bottom + 1) - adaptive_size), 2)
-                self.assertTrue(contains_blue_ink(image))
+                for image in (launcher, splash):
+                    self.assertEqual((image.width, image.height), (adaptive_size, adaptive_size))
+                    left, top, right, bottom = image.alpha_bounds()
+                    safe_size = scaled_safe_size(adaptive_size)
+                    self.assertLessEqual(right - left + 1, safe_size)
+                    self.assertLessEqual(bottom - top + 1, safe_size)
+                    self.assertLessEqual(abs((left + right + 1) - adaptive_size), 2)
+                    self.assertLessEqual(abs((top + bottom + 1) - adaptive_size), 2)
+                self.assertTrue(contains_white_ink(launcher))
+                self.assertTrue(contains_blue_ink(splash))
 
     def test_legacy_icons_match_density_and_masks(self) -> None:
         for density, (_, legacy_size) in DENSITIES.items():
@@ -176,13 +204,14 @@ class BrandIconTest(unittest.TestCase):
                     image = inspect_png(RES_DIR / f"mipmap-{density}" / filename)
                     self.assertEqual((image.width, image.height), (legacy_size, legacy_size))
                     self.assertEqual(image.pixel(0, 0)[3], 0)
-                    self.assertTrue(contains_blue_ink(image))
+                    self.assertTrue(contains_launcher_red(image))
+                    self.assertTrue(contains_white_ink(image))
 
     def test_store_and_web_exports_have_expected_geometry(self) -> None:
         play_store = inspect_png(BRAND_DIR / "playstore-icon.png")
         self.assertEqual((play_store.width, play_store.height), (512, 512))
-        self.assertEqual(play_store.pixel(0, 0), (0, 0, 0, 255))
-        self.assertTrue(contains_blue_ink(play_store))
+        self.assertEqual(play_store.pixel(0, 0), LAUNCHER_BACKGROUND)
+        self.assertTrue(contains_white_ink(play_store))
         self.assertLess((BRAND_DIR / "playstore-icon.png").stat().st_size, 1024 * 1024)
 
         web = inspect_png(BRAND_DIR / "ic_launcher-web.png")
@@ -195,8 +224,8 @@ class BrandIconTest(unittest.TestCase):
     def test_adaptive_xml_and_backgrounds_stay_aligned(self) -> None:
         expected_layers = {
             "background": "@color/ic_launcher_background",
-            "foreground": "@mipmap/ic_launcher_foreground",
-            "monochrome": "@mipmap/ic_launcher_foreground",
+            "foreground": "@mipmap/ic_launcher_brand_foreground",
+            "monochrome": "@mipmap/ic_launcher_brand_foreground",
         }
         for filename in ("ic_launcher.xml", "ic_launcher_round.xml"):
             root = ElementTree.parse(RES_DIR / "mipmap-anydpi-v26" / filename).getroot()
@@ -205,13 +234,13 @@ class BrandIconTest(unittest.TestCase):
             }
             self.assertEqual(layers, expected_layers)
 
-        for filename, resource_name in (
-            ("ic_launcher_background.xml", "ic_launcher_background"),
-            ("colors.xml", "splash_background"),
-        ):
-            root = ElementTree.parse(RES_DIR / "values" / filename).getroot()
-            colors = {child.attrib["name"]: (child.text or "").strip() for child in root}
-            self.assertEqual(colors[resource_name], "#000000")
+        launcher_colors = ElementTree.parse(
+            RES_DIR / "values" / "ic_launcher_background.xml"
+        ).getroot()
+        self.assertEqual(launcher_colors[0].text.strip(), "#E35D5D")
+
+        splash_colors = ElementTree.parse(RES_DIR / "values" / "colors.xml").getroot()
+        self.assertEqual(splash_colors[0].text.strip(), "#000000")
 
         splash = ElementTree.parse(RES_DIR / "drawable" / "ic_splash_logo.xml").getroot()
         self.assertEqual(splash.attrib[f"{{{ANDROID_NS}}}drawable"], "@mipmap/ic_launcher_foreground")
