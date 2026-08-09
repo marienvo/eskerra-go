@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import math
+import re
 import shutil
 import struct
 import subprocess
@@ -21,6 +23,7 @@ RENDERER = ROOT / "scripts" / "render-logo-e-pngs.sh"
 ANDROID_NS = "http://schemas.android.com/apk/res/android"
 LOGO_SIZE_DP = 58
 LAUNCHER_BACKGROUND = (227, 93, 93, 255)
+LOGO_CENTER = (125, 128)
 
 DENSITIES = {
     "ldpi": (81, 36),
@@ -29,6 +32,17 @@ DENSITIES = {
     "xhdpi": (216, 96),
     "xxhdpi": (324, 144),
     "xxxhdpi": (432, 192),
+}
+
+# The circular track center is canvas-centered. The e's leftward crossbars make
+# its overall ink bounds intentionally asymmetric; lock those bounds explicitly.
+EXPECTED_FOREGROUND_BOUNDS = {
+    "ldpi": (18, 18, 60, 61),
+    "mdpi": (25, 25, 80, 82),
+    "hdpi": (37, 38, 119, 122),
+    "xhdpi": (50, 52, 160, 163),
+    "xxhdpi": (76, 78, 240, 245),
+    "xxxhdpi": (102, 104, 320, 327),
 }
 
 
@@ -177,6 +191,57 @@ def contains_launcher_red(image: PngImage) -> bool:
 
 
 class BrandIconTest(unittest.TestCase):
+    def test_editable_e_mark_uses_three_exact_concentric_tracks(self) -> None:
+        root = ElementTree.parse(BRAND_DIR / "logo-e.svg").getroot()
+        self.assertEqual(root.attrib["viewBox"], "35 38 180 180")
+        paths = root.findall("{http://www.w3.org/2000/svg}path")
+        self.assertEqual(len(paths), 3)
+
+        tracks = ((113, 51), (128, 66), (143, 81))
+        for path, (horizontal_y, radius) in zip(paths, tracks, strict=True):
+            data = " ".join(path.attrib["d"].split())
+            self.assertRegex(data, rf"^M 42 {horizontal_y} H 162 C ")
+
+            upper = re.search(
+                rf"C (?:[-\d.]+ ){{4}}([-\d.]+) ([-\d.]+) "
+                rf"A {radius} {radius} 0 0 0 ([-\d.]+) 98",
+                data,
+            )
+            self.assertIsNotNone(upper)
+            lower = re.search(
+                rf"M ([-\d.]+) 158 A {radius} {radius} 0 0 0 "
+                rf"([-\d.]+) ([-\d.]+)$",
+                data,
+            )
+            self.assertIsNotNone(lower)
+            assert upper is not None and lower is not None
+
+            points = (
+                (float(upper[1]), float(upper[2])),
+                (float(upper[3]), 98.0),
+                (float(lower[1]), 158.0),
+                (float(lower[2]), float(lower[3])),
+            )
+            for x, y in points:
+                self.assertAlmostEqual(
+                    math.hypot(x - LOGO_CENTER[0], y - LOGO_CENTER[1]),
+                    radius,
+                    delta=0.001,
+                )
+
+            terminal_angle = math.degrees(
+                math.atan2(
+                    float(lower[3]) - LOGO_CENTER[1],
+                    float(lower[2]) - LOGO_CENTER[0],
+                )
+            )
+            self.assertAlmostEqual(terminal_angle, 30, delta=0.001)
+
+        self.assertEqual(
+            [tracks[index][1] - tracks[index - 1][1] for index in range(1, 3)],
+            [15, 15],
+        )
+
     def test_white_launcher_and_splash_foreground_matches_density_and_safe_zone(self) -> None:
         for density, (adaptive_size, _) in DENSITIES.items():
             with self.subTest(density=density):
@@ -188,8 +253,10 @@ class BrandIconTest(unittest.TestCase):
                 safe_size = scaled_safe_size(adaptive_size)
                 self.assertLessEqual(right - left + 1, safe_size)
                 self.assertLessEqual(bottom - top + 1, safe_size)
-                self.assertLessEqual(abs((left + right + 1) - adaptive_size), 2)
-                self.assertLessEqual(abs((top + bottom + 1) - adaptive_size), 2)
+                self.assertEqual(
+                    (left, top, right, bottom),
+                    EXPECTED_FOREGROUND_BOUNDS[density],
+                )
                 self.assertTrue(contains_white_ink(image))
 
     def test_legacy_icons_match_density_and_masks(self) -> None:
