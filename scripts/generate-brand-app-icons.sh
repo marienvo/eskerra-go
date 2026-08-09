@@ -8,6 +8,7 @@ RENDER_SCRIPT="$ROOT/scripts/render-logo-e-pngs.sh"
 RES_DIR="$ROOT/app/src/main/res"
 BRAND_DIR="$ROOT/branding"
 ICON_BACKGROUND="#000000"
+LOGO_SIZE_DP=58
 ICON_TEMP_DIR=""
 
 cleanup() {
@@ -27,7 +28,7 @@ require_command() {
 
 scaled_size() {
   local canvas="$1"
-  echo $(((canvas * 66 + 54) / 108))
+  echo $(((canvas * LOGO_SIZE_DP + 54) / 108))
 }
 
 normalize_png() {
@@ -97,7 +98,7 @@ validate_foreground_bounds() {
 }
 
 main() {
-  local spec density adaptive_size legacy_size mark_size output_dir
+  local spec density adaptive_size legacy_size mark_size output_dir store_mark_size
   local -a density_specs=(
     "ldpi:81:36"
     "mdpi:108:48"
@@ -106,7 +107,7 @@ main() {
     "xxhdpi:324:144"
     "xxxhdpi:432:192"
   )
-  local -a render_sizes=(50 66 99 132 198 264 22 29 44 59 88 117 313 512)
+  local -a render_sizes=(44 58 87 116 174 232 19 26 39 52 77 103 275 512)
 
   require_command magick
   require_command identify
@@ -151,8 +152,9 @@ main() {
     validate_dimensions "$output_dir/ic_launcher_round.png" "$legacy_size"
   done
 
+  store_mark_size="$(scaled_size 512)"
   magick -size 512x512 "xc:$ICON_BACKGROUND" \
-    "$PNG_DIR/logo-e-313.png" -gravity center -composite \
+    "$PNG_DIR/logo-e-${store_mark_size}.png" -gravity center -composite \
     -define png:color-type=6 -depth 8 -strip \
     "$OUTPUT_DIR/playstore-icon.png"
   normalize_png "$PNG_DIR/logo-e-512.png" "$OUTPUT_DIR/ic_launcher-web.png"

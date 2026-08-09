@@ -19,6 +19,7 @@ RES_DIR = ROOT / "app" / "src" / "main" / "res"
 BRAND_DIR = ROOT / "branding"
 RENDERER = ROOT / "scripts" / "render-logo-e-pngs.sh"
 ANDROID_NS = "http://schemas.android.com/apk/res/android"
+LOGO_SIZE_DP = 58
 
 DENSITIES = {
     "ldpi": (81, 36),
@@ -140,7 +141,7 @@ def inspect_png(path: Path) -> PngImage:
 
 
 def scaled_safe_size(canvas: int) -> int:
-    return (canvas * 66 + 54) // 108
+    return (canvas * LOGO_SIZE_DP + 54) // 108
 
 
 def contains_blue_ink(image: PngImage) -> bool:
