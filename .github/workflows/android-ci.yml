@@ -35,6 +35,9 @@ jobs:
       - name: Test release automation scripts
         run: ./scripts/release-version-automation.test.sh
 
+      - name: Test generated brand icon assets
+        run: python3 scripts/generate-brand-app-icons.test.py
+
       - name: Set up JDK
         uses: actions/setup-java@v5
         with:

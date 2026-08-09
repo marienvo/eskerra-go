@@ -20,3 +20,7 @@ The generator updates every launcher density, the splash foreground used by the
 app, and the 512px Play Store and transparent web exports. Replace `logo-e.svg`
 and rerun this command after changing the mark. Do not add a link or copy step to
 another repository.
+
+CI validates the committed PNG geometry and Android resource references with
+Python's standard library, so it does not require ImageMagick. The live SVG
+renderer smoke test runs when ImageMagick is available and is skipped otherwise.
