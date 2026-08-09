@@ -2,6 +2,8 @@
 
 `logo-e.svg` is the editable source for the Android app logo. It is a local copy:
 this repository does not read from or link to another Eskerra codebase.
+`logo-e-brand-red.svg` is its geometry-identical `#FFBCBC` presentation variant
+for the root README only.
 
 Render transparent PNGs at arbitrary sizes with:
 

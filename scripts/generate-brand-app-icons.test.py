@@ -257,6 +257,18 @@ class BrandIconTest(unittest.TestCase):
     def test_launcher_background_uses_white(self) -> None:
         self.assertEqual(LAUNCHER_BACKGROUND, (255, 255, 255, 255))
 
+    def test_readme_brand_red_logo_matches_editable_geometry(self) -> None:
+        editable = ElementTree.parse(BRAND_DIR / "logo-e.svg").getroot()
+        readme = ElementTree.parse(BRAND_DIR / "logo-e-brand-red.svg").getroot()
+        self.assertEqual(readme.attrib["stroke"], "#ffbcbc")
+        self.assertEqual(readme.attrib["viewBox"], editable.attrib["viewBox"])
+        self.assertEqual(
+            [path.attrib["d"] for path in readme],
+            [path.attrib["d"] for path in editable],
+        )
+        root_readme = (ROOT / "README.md").read_text()
+        self.assertIn("./branding/logo-e-brand-red.svg", root_readme)
+
     def test_editable_e_mark_uses_three_exact_concentric_tracks(self) -> None:
         root = ElementTree.parse(BRAND_DIR / "logo-e.svg").getroot()
         self.assertEqual(root.attrib["viewBox"], "35 38 180 180")
