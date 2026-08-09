@@ -24,6 +24,7 @@ ANDROID_NS = "http://schemas.android.com/apk/res/android"
 LOGO_SIZE_DP = 58
 LAUNCHER_BACKGROUND = (227, 93, 93, 255)
 LOGO_CENTER = (125, 128)
+LOGO_STROKE_WIDTH = 10
 
 DENSITIES = {
     "ldpi": (81, 36),
@@ -190,6 +191,48 @@ def contains_launcher_red(image: PngImage) -> bool:
     )
 
 
+def point_on_cubic(
+    points: tuple[tuple[float, float], ...],
+    t: float,
+) -> tuple[float, float]:
+    u = 1 - t
+    return (
+        u**3 * points[0][0]
+        + 3 * u**2 * t * points[1][0]
+        + 3 * u * t**2 * points[2][0]
+        + t**3 * points[3][0],
+        u**3 * points[0][1]
+        + 3 * u**2 * t * points[1][1]
+        + 3 * u * t**2 * points[2][1]
+        + t**3 * points[3][1],
+    )
+
+
+def minimum_distance_to_cubic(
+    point: tuple[float, float],
+    cubic: tuple[tuple[float, float], ...],
+) -> float:
+    def distance_squared(t: float) -> float:
+        candidate = point_on_cubic(cubic, t)
+        return (point[0] - candidate[0]) ** 2 + (point[1] - candidate[1]) ** 2
+
+    samples = 1000
+    best_index = min(
+        range(samples + 1),
+        key=lambda index: distance_squared(index / samples),
+    )
+    lower = max(0.0, (best_index - 1) / samples)
+    upper = min(1.0, (best_index + 1) / samples)
+    for _ in range(80):
+        first = lower + (upper - lower) / 3
+        second = upper - (upper - lower) / 3
+        if distance_squared(first) < distance_squared(second):
+            upper = second
+        else:
+            lower = first
+    return math.sqrt(distance_squared((lower + upper) / 2))
+
+
 class BrandIconTest(unittest.TestCase):
     def test_editable_e_mark_uses_three_exact_concentric_tracks(self) -> None:
         root = ElementTree.parse(BRAND_DIR / "logo-e.svg").getroot()
@@ -198,8 +241,11 @@ class BrandIconTest(unittest.TestCase):
         self.assertEqual(len(paths), 3)
 
         tracks = ((113, 51), (128, 66), (143, 81))
+        path_data: list[str] = []
+        terminals: list[tuple[float, float]] = []
         for path, (horizontal_y, radius) in zip(paths, tracks, strict=True):
             data = " ".join(path.attrib["d"].split())
+            path_data.append(data)
             self.assertRegex(data, rf"^M 42 {horizontal_y} H 162 C ")
 
             upper = re.search(
@@ -228,6 +274,7 @@ class BrandIconTest(unittest.TestCase):
                     radius,
                     delta=0.001,
                 )
+            terminals.append((float(lower[2]), float(lower[3])))
 
             terminal_angle = math.degrees(
                 math.atan2(
@@ -235,12 +282,31 @@ class BrandIconTest(unittest.TestCase):
                     float(lower[2]) - LOGO_CENTER[0],
                 )
             )
-            self.assertAlmostEqual(terminal_angle, 30, delta=0.001)
+            self.assertAlmostEqual(terminal_angle, 35.823, delta=0.001)
 
         self.assertEqual(
             [tracks[index][1] - tracks[index - 1][1] for index in range(1, 3)],
             [15, 15],
         )
+
+        outer_transition = re.search(
+            r"^M 42 143 H 162 C ([-\d.]+) ([-\d.]+) ([-\d.]+) "
+            r"([-\d.]+) ([-\d.]+) ([-\d.]+)",
+            path_data[2],
+        )
+        self.assertIsNotNone(outer_transition)
+        assert outer_transition is not None
+        outer_transition_points = (
+            (162.0, 143.0),
+            (float(outer_transition[1]), float(outer_transition[2])),
+            (float(outer_transition[3]), float(outer_transition[4])),
+            (float(outer_transition[5]), float(outer_transition[6])),
+        )
+        terminal_clearance = (
+            minimum_distance_to_cubic(terminals[0], outer_transition_points)
+            - LOGO_STROKE_WIDTH
+        )
+        self.assertAlmostEqual(terminal_clearance, 5, delta=0.01)
 
     def test_white_launcher_and_splash_foreground_matches_density_and_safe_zone(self) -> None:
         for density, (adaptive_size, _) in DENSITIES.items():
