@@ -13,6 +13,8 @@ import com.eskerra.go.core.model.SaveNoteError
 import com.eskerra.go.core.model.SaveNoteException
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.ActiveTodayHubStore
+import com.eskerra.go.core.share.SharePrefill
+import com.eskerra.go.core.share.SharePrefillMerge
 import com.eskerra.go.core.todayhub.TodayHubDiscovery
 import com.eskerra.go.core.usecase.CreateInboxNote
 import com.eskerra.go.core.usecase.LoadEditableNote
@@ -208,7 +210,66 @@ class CreateInboxNoteViewModel(
     private val _savedNoteEvents = Channel<NoteId>(Channel.BUFFERED)
     val savedNoteEvents = _savedNoteEvents.receiveAsFlow()
 
+    /** Caret offset of a prefill that actually landed. Nothing is emitted for a dropped one. */
+    private val _prefillAppliedEvents = Channel<Int>(Channel.BUFFERED)
+    val prefillAppliedEvents = _prefillAppliedEvents.receiveAsFlow()
+
     private var saveJob: Job? = null
+
+    /** A share that arrived mid-save; replayed once the save settles, either way. */
+    private var pendingPrefill: SharePrefill? = null
+
+    /** Token and exact text of the last share prefill that took the draft over. */
+    private var lastShareImmediate: Pair<Long, String>? = null
+
+    /**
+     * Seeds the draft from a share. A share never destroys what the user typed: it takes a blank
+     * draft, or appends below existing text. A late [SharePrefill.Stage.TitleUpgrade] is applied
+     * only while the draft is still exactly the text this ViewModel wrote for that same share —
+     * one keystroke, one save, or a newer share drops it silently.
+     */
+    fun prefillFromShare(prefill: SharePrefill) {
+        val current = _uiState.value as? CreateInboxUiState.Content ?: return
+        if (current.isSaving) {
+            pendingPrefill = prefill
+            return
+        }
+        when (prefill.stage) {
+            SharePrefill.Stage.Immediate -> applyImmediatePrefill(current, prefill)
+            SharePrefill.Stage.TitleUpgrade -> applyTitleUpgrade(current, prefill)
+        }
+    }
+
+    private fun applyImmediatePrefill(current: CreateInboxUiState.Content, prefill: SharePrefill) {
+        val merged = SharePrefillMerge.mergeImmediate(current.draft, prefill)
+        _uiState.value = current.copy(
+            draft = merged.text,
+            canSave = InboxNoteDraft.hasNonBlankTitle(merged.text),
+            errorMessage = null
+        )
+        lastShareImmediate = if (merged.replacedDraft) prefill.token to merged.text else null
+        _prefillAppliedEvents.trySend(merged.caretOffset)
+    }
+
+    private fun applyTitleUpgrade(current: CreateInboxUiState.Content, prefill: SharePrefill) {
+        val applied = lastShareImmediate ?: return
+        if (applied.first != prefill.token || applied.second != current.draft) {
+            return
+        }
+        _uiState.value = current.copy(
+            draft = prefill.text,
+            canSave = InboxNoteDraft.hasNonBlankTitle(prefill.text),
+            errorMessage = null
+        )
+        lastShareImmediate = prefill.token to prefill.text
+        _prefillAppliedEvents.trySend(prefill.caretOffset)
+    }
+
+    private fun replayPendingPrefill() {
+        val pending = pendingPrefill ?: return
+        pendingPrefill = null
+        prefillFromShare(pending)
+    }
 
     fun updateDraft(draft: String) {
         val current = _uiState.value
@@ -220,6 +281,8 @@ class CreateInboxNoteViewModel(
             canSave = InboxNoteDraft.hasNonBlankTitle(draft),
             errorMessage = null
         )
+        // Line 1 is the user's now; a pending title upgrade for this share no longer applies.
+        lastShareImmediate = null
     }
 
     fun save() {
@@ -242,7 +305,9 @@ class CreateInboxNoteViewModel(
                         canSave = false,
                         errorMessage = null
                     )
+                    lastShareImmediate = null
                     _savedNoteEvents.trySend(result.note.id)
+                    replayPendingPrefill()
                 },
                 onFailure = { error ->
                     val failed = _uiState.value as? CreateInboxUiState.Content ?: current
@@ -250,6 +315,7 @@ class CreateInboxNoteViewModel(
                         isSaving = false,
                         errorMessage = mapCreateFailure(error)
                     )
+                    replayPendingPrefill()
                 }
             )
         }

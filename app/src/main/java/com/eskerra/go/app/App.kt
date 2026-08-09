@@ -112,6 +112,7 @@ fun App(
     syncPodcastVaultRefresh: SyncPodcastVaultRefresh,
     catalogSnapshotStore: PodcastCatalogSnapshotStore,
     podcastShellStateWiring: PodcastShellStateWiring,
+    shareIntake: ShareIntake,
     onConfigUpdated: (WorkspaceConfig) -> Unit,
     onInboxUiStateChanged: (InboxUiState) -> Unit = {},
     onTodayHubUiStateChanged: (TodayHubUiState) -> Unit = {},
@@ -192,7 +193,7 @@ fun App(
     val syncIndicator = rememberShellSyncIndicator(appSyncViewModel, remoteConfigured)
     val selectedTopLevelRoute = destinationTopLevelRoute ?: currentTopLevelRoute
     val inPodcastMode = selectedTopLevelRoute == AppRoute.PODCASTS_GRAPH
-    val newNoteInputState = rememberShellNewNoteInputState(
+    val shellInputState = rememberShellInput(
         currentConfig = currentConfig,
         filesDir = filesDir,
         createInboxNote = createInboxNote,
@@ -202,17 +203,12 @@ fun App(
         scope = scope,
         currentRoute = currentRoute,
         selectedTopLevelRoute = selectedTopLevelRoute,
-        markInboxNotesChanged = markInboxNotesChanged
-    )
-    val shellInputState = rememberAppShellInputState(
-        currentConfig = currentConfig,
-        filesDir = filesDir,
+        markInboxNotesChanged = markInboxNotesChanged,
         searchVault = searchVault,
         maintainVaultSearchIndex = maintainVaultSearchIndex,
         repairVaultSearchIndex = repairVaultSearchIndex,
         navController = navController,
-        currentRoute = currentRoute,
-        newNoteInputState = newNoteInputState
+        shareIntake = shareIntake
     )
     val podcastShellBridge = remember { PodcastShellBridge() }
     val miniPlayerMount = rememberAppShellMiniPlayerMount(
@@ -237,6 +233,7 @@ fun App(
         playlistPollingHost = playlistPollingHost,
         bridge = podcastShellBridge,
         currentDestination = currentDestination,
+        hasPendingShare = shareIntake.pendingShare != null,
         onPodcastFirstLaunchChanged = onPodcastFirstLaunchChanged
     )
     AppShell(

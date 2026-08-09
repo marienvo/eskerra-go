@@ -124,6 +124,7 @@ fun AppRoot(
     syncPodcastVaultRefresh: SyncPodcastVaultRefresh,
     catalogSnapshotStore: PodcastCatalogSnapshotStore,
     podcastShellStateWiring: PodcastShellStateWiring,
+    shareIntake: ShareIntake,
     onLaunchSettled: () -> Unit = {}
 ) {
     EskerraGoTheme(darkTheme = true) {
@@ -244,6 +245,9 @@ fun AppRoot(
                         syncPodcastVaultRefresh = syncPodcastVaultRefresh,
                         catalogSnapshotStore = catalogSnapshotStore,
                         podcastShellStateWiring = podcastShellStateWiring,
+                        // Only handed over once the workspace is ready; until then the share
+                        // simply waits in the Activity and arrives when App mounts.
+                        shareIntake = shareIntake,
                         onConfigUpdated = gateViewModel::updateReadyConfig,
                         onInboxUiStateChanged = { inboxUiState = it },
                         onTodayHubUiStateChanged = { todayHubUiState = it },

@@ -18,14 +18,28 @@
             android:value="false" />
 
         <!-- adjustResize applies on API 26-29; API 30+ uses edge-to-edge IME insets in Compose. -->
+        <!-- singleTask, not the default: this Activity is the composition root (player, gate,
+             ~60 dependencies built in onCreate), and a share arriving with FLAG_ACTIVITY_NEW_TASK
+             would otherwise create a second instance of all of it. One instance, and onNewIntent
+             is the single warm delivery path. Cost: Back after a share returns to the launcher
+             rather than to the sharing app. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:launchMode="singleTask"
             android:theme="@style/Theme.EskerraGo.Splash"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- Share sheet entry. The label sits on the filter, so the chooser names the action
+                 ("Add note") under the app name while the launcher keeps "Eskerra Go".
+                 text/plain only: ACTION_SEND_MULTIPLE and non-text payloads never reach the app. -->
+            <intent-filter android:label="Add note">
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
             </intent-filter>
         </activity>
 

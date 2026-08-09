@@ -21,6 +21,18 @@ class AppShellInitialRouteTest {
     }
 
     @Test
+    fun pendingShare_beatsResumablePlayback() {
+        assertEquals(
+            AppRoute.HOME_GRAPH,
+            resolveInitialShellRoute(
+                preferredShellMode = AppShellMode.PODCASTS,
+                hasResumablePlayback = true,
+                hasPendingShare = true
+            )
+        )
+    }
+
+    @Test
     fun lastPodcastMode_opensPodcastsWithoutResumablePlayback() {
         assertEquals(
             AppRoute.PODCASTS_GRAPH,
