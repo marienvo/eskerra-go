@@ -7,7 +7,8 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 RENDER_SCRIPT="$ROOT/scripts/render-logo-e-pngs.sh"
 RES_DIR="$ROOT/app/src/main/res"
 BRAND_DIR="$ROOT/branding"
-LAUNCHER_BACKGROUND="#E35D5D"
+# Note-input background #2D2B31 with only its HSB hue shifted to brand red (0 degrees).
+LAUNCHER_BACKGROUND="#312B2B"
 LAUNCHER_FOREGROUND="#FFFFFF"
 LOGO_SIZE_DP=58
 ICON_TEMP_DIR=""

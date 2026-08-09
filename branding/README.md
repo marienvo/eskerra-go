@@ -17,7 +17,8 @@ launcher, splash, and store assets are regenerated with:
 ```
 
 The generator updates every launcher density and the 512px Play Store and
-transparent web exports. The launcher uses a white e-logo on `#E35D5D`; its
+transparent web exports. The launcher uses a white e-logo on `#312B2B`: the
+note-input background's HSB saturation and brightness with the brand-red hue. Its
 separate `ic_launcher_brand_foreground` also provides the splash's white e-logo
 on its unchanged black background. Replace `logo-e.svg` and rerun this command
 after changing the mark. Do not add a link or copy step to another repository.
