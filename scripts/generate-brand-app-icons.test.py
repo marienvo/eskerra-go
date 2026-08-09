@@ -23,6 +23,7 @@ RENDERER = ROOT / "scripts" / "render-logo-e-pngs.sh"
 ANDROID_NS = "http://schemas.android.com/apk/res/android"
 LOGO_SIZE_DP = 58
 LAUNCHER_BACKGROUND = (255, 255, 255, 255)
+APP_ICON_FOREGROUND = (203, 77, 73, 255)
 LOGO_CENTER = (125, 128)
 LOGO_STROKE_WIDTH = 10
 
@@ -189,24 +190,24 @@ def contains_launcher_background(image: PngImage) -> bool:
     )
 
 
-def contains_black_ink(image: PngImage) -> bool:
+def contains_app_icon_red(image: PngImage) -> bool:
     return any(
         image.pixel(x, y)[3] > 0
-        and image.pixel(x, y)[0] < 60
-        and image.pixel(x, y)[1] < 60
-        and image.pixel(x, y)[2] < 60
+        and image.pixel(x, y)[0] > 160
+        and image.pixel(x, y)[0] > image.pixel(x, y)[1] + 30
+        and image.pixel(x, y)[0] > image.pixel(x, y)[2] + 30
         for y in range(image.height)
         for x in range(image.width)
     )
 
 
-def uses_only_neutral_ink(image: PngImage) -> bool:
+def uses_only_app_icon_red_hue_or_neutral(image: PngImage) -> bool:
     for y in range(image.height):
         for x in range(image.width):
             red, green, blue, alpha = image.pixel(x, y)
             if alpha == 0:
                 continue
-            if not red == green == blue:
+            if not red >= green >= blue:
                 return False
     return True
 
@@ -257,10 +258,13 @@ class BrandIconTest(unittest.TestCase):
     def test_launcher_background_uses_white(self) -> None:
         self.assertEqual(LAUNCHER_BACKGROUND, (255, 255, 255, 255))
 
+    def test_app_icon_foreground_uses_brand_red(self) -> None:
+        self.assertEqual(APP_ICON_FOREGROUND, (203, 77, 73, 255))
+
     def test_readme_brand_red_logo_matches_editable_geometry(self) -> None:
         editable = ElementTree.parse(BRAND_DIR / "logo-e.svg").getroot()
         readme = ElementTree.parse(BRAND_DIR / "logo-e-brand-red.svg").getroot()
-        self.assertEqual(readme.attrib["stroke"], "#ffbcbc")
+        self.assertEqual(readme.attrib["stroke"], "#cb4d49")
         self.assertEqual(readme.attrib["viewBox"], editable.attrib["viewBox"])
         self.assertEqual(
             [path.attrib["d"] for path in readme],
@@ -364,7 +368,7 @@ class BrandIconTest(unittest.TestCase):
                 )
                 self.assertEqual(launcher.alpha_bounds(), (left, top, right, bottom))
                 self.assertTrue(contains_white_ink(splash))
-                self.assertTrue(contains_black_ink(launcher))
+                self.assertTrue(contains_app_icon_red(launcher))
 
     def test_legacy_icons_match_density_and_masks(self) -> None:
         for density, (_, legacy_size) in DENSITIES.items():
@@ -374,15 +378,15 @@ class BrandIconTest(unittest.TestCase):
                     self.assertEqual((image.width, image.height), (legacy_size, legacy_size))
                     self.assertEqual(image.pixel(0, 0)[3], 0)
                     self.assertTrue(contains_launcher_background(image))
-                    self.assertTrue(uses_only_neutral_ink(image))
-                    self.assertTrue(contains_black_ink(image))
+                    self.assertTrue(uses_only_app_icon_red_hue_or_neutral(image))
+                    self.assertTrue(contains_app_icon_red(image))
 
     def test_store_and_web_exports_have_expected_geometry(self) -> None:
         play_store = inspect_png(BRAND_DIR / "playstore-icon.png")
         self.assertEqual((play_store.width, play_store.height), (512, 512))
         self.assertEqual(play_store.pixel(0, 0), LAUNCHER_BACKGROUND)
-        self.assertTrue(uses_only_neutral_ink(play_store))
-        self.assertTrue(contains_black_ink(play_store))
+        self.assertTrue(uses_only_app_icon_red_hue_or_neutral(play_store))
+        self.assertTrue(contains_app_icon_red(play_store))
         self.assertLess((BRAND_DIR / "playstore-icon.png").stat().st_size, 1024 * 1024)
 
         web = inspect_png(BRAND_DIR / "ic_launcher-web.png")

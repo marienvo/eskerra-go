@@ -2,7 +2,7 @@
 
 `logo-e.svg` is the editable source for the Android app logo. It is a local copy:
 this repository does not read from or link to another Eskerra codebase.
-`logo-e-brand-red.svg` is its geometry-identical `#FFBCBC` presentation variant
+`logo-e-brand-red.svg` is its geometry-identical `#CB4D49` presentation variant
 for the root README only.
 
 Render transparent PNGs at arbitrary sizes with:
@@ -19,10 +19,11 @@ launcher, splash, and store assets are regenerated with:
 ```
 
 The generator updates every launcher density and the 512px Play Store and
-transparent web exports. The launcher uses a black e-logo on white `#FFFFFF`.
-Its separate `ic_launcher_brand_foreground` provides the splash's white e-logo
-on its unchanged black background. Replace `logo-e.svg` and rerun this command
-after changing the mark. Do not add a link or copy step to another repository.
+transparent web exports. The launcher uses a `#CB4D49` e-logo on white
+`#FFFFFF`. Its separate `ic_launcher_brand_foreground` provides the splash's
+white e-logo on its unchanged black background. Replace `logo-e.svg` and rerun
+this command after changing the mark. Do not add a link or copy step to another
+repository.
 
 Launcher and store compositions size the mark to 58dp inside Android's 108dp
 adaptive canvas, leaving deliberate breathing room inside circular masks.
