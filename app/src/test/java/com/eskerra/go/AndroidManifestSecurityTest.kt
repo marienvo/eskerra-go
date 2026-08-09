@@ -32,13 +32,17 @@ class AndroidManifestSecurityTest {
     }
 
     @Test
-    fun shareTarget_acceptsPlainTextOnly() {
+    fun shareTarget_acceptsTextAndImages() {
         val text = File("src/main/AndroidManifest.xml").readText()
         assertTrue(
             "Share sheet entry requires an ACTION_SEND filter",
             text.contains("android.intent.action.SEND")
         )
         assertTrue(text.contains("""<data android:mimeType="text/plain" />"""))
+        assertTrue(
+            "Image shares are accepted for their text extras; the binary is never read",
+            text.contains("""<data android:mimeType="image/*" />""")
+        )
         assertTrue(
             "The chooser label lives on the filter, not the activity",
             text.contains("""<intent-filter android:label="Add note">""")

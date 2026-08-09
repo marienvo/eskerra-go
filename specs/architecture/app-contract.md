@@ -15,7 +15,9 @@ Product behavior and boundaries for the native Android app. Non-obvious rules th
 
 ## Share target (other apps → inbox draft)
 
-Eskerra appears in the Android share sheet for **`text/plain` only** (`ACTION_SEND`; no `ACTION_SEND_MULTIPLE`, no images or other MIME types). The share sheet names the action "Add note" (label on the intent-filter); the launcher stays "Eskerra Go".
+Eskerra appears in the Android share sheet for **`text/plain` and `image/*`** (`ACTION_SEND`; no `ACTION_SEND_MULTIPLE`, no other MIME types). The share sheet names the action "Add note" (label on the intent-filter); the launcher stays "Eskerra Go".
+
+**Images are accepted for their text, never for their bytes.** Some senders package a link as a picture — ChatGPT's thread share is the reason this exists — and still put the URL in `EXTRA_TEXT` and the title in `EXTRA_SUBJECT`. Only those extras build the note; `EXTRA_STREAM` is checked for presence and its URI is never resolved (no content resolver, no permission grant). A share that carries an attachment alongside usable text prefills as usual plus a "Image ignored" toast; a share with **only** binary opens the app with a "Images not supported yet" toast and no draft.
 
 A share prefills the existing compose pill and **never saves by itself** — the user still presses send, exactly as for a note typed by hand.
 
