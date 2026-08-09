@@ -22,8 +22,8 @@ BRAND_DIR = ROOT / "branding"
 RENDERER = ROOT / "scripts" / "render-logo-e-pngs.sh"
 ANDROID_NS = "http://schemas.android.com/apk/res/android"
 LOGO_SIZE_DP = 58
-LAUNCHER_BACKGROUND = (255, 255, 255, 255)
-APP_ICON_FOREGROUND = (203, 77, 73, 255)
+LAUNCHER_BACKGROUND = (203, 77, 73, 255)
+APP_ICON_FOREGROUND = (255, 255, 255, 255)
 LOGO_CENTER = (125, 128)
 LOGO_STROKE_WIDTH = 10
 
@@ -190,12 +190,12 @@ def contains_launcher_background(image: PngImage) -> bool:
     )
 
 
-def contains_app_icon_red(image: PngImage) -> bool:
+def contains_light_icon_ink(image: PngImage) -> bool:
     return any(
         image.pixel(x, y)[3] > 0
-        and image.pixel(x, y)[0] > 160
-        and image.pixel(x, y)[0] > image.pixel(x, y)[1] + 30
-        and image.pixel(x, y)[0] > image.pixel(x, y)[2] + 30
+        and image.pixel(x, y)[0] > 200
+        and image.pixel(x, y)[1] > 150
+        and image.pixel(x, y)[2] > 150
         for y in range(image.height)
         for x in range(image.width)
     )
@@ -255,11 +255,11 @@ def minimum_distance_to_cubic(
 
 
 class BrandIconTest(unittest.TestCase):
-    def test_launcher_background_uses_white(self) -> None:
-        self.assertEqual(LAUNCHER_BACKGROUND, (255, 255, 255, 255))
+    def test_launcher_background_uses_brand_red(self) -> None:
+        self.assertEqual(LAUNCHER_BACKGROUND, (203, 77, 73, 255))
 
-    def test_app_icon_foreground_uses_brand_red(self) -> None:
-        self.assertEqual(APP_ICON_FOREGROUND, (203, 77, 73, 255))
+    def test_app_icon_foreground_uses_white(self) -> None:
+        self.assertEqual(APP_ICON_FOREGROUND, (255, 255, 255, 255))
 
     def test_readme_brand_red_logo_matches_editable_geometry(self) -> None:
         editable = ElementTree.parse(BRAND_DIR / "logo-e.svg").getroot()
@@ -368,7 +368,7 @@ class BrandIconTest(unittest.TestCase):
                 )
                 self.assertEqual(launcher.alpha_bounds(), (left, top, right, bottom))
                 self.assertTrue(contains_white_ink(splash))
-                self.assertTrue(contains_app_icon_red(launcher))
+                self.assertTrue(contains_white_ink(launcher))
 
     def test_legacy_icons_match_density_and_masks(self) -> None:
         for density, (_, legacy_size) in DENSITIES.items():
@@ -379,14 +379,14 @@ class BrandIconTest(unittest.TestCase):
                     self.assertEqual(image.pixel(0, 0)[3], 0)
                     self.assertTrue(contains_launcher_background(image))
                     self.assertTrue(uses_only_app_icon_red_hue_or_neutral(image))
-                    self.assertTrue(contains_app_icon_red(image))
+                    self.assertTrue(contains_light_icon_ink(image))
 
     def test_store_and_web_exports_have_expected_geometry(self) -> None:
         play_store = inspect_png(BRAND_DIR / "playstore-icon.png")
         self.assertEqual((play_store.width, play_store.height), (512, 512))
         self.assertEqual(play_store.pixel(0, 0), LAUNCHER_BACKGROUND)
         self.assertTrue(uses_only_app_icon_red_hue_or_neutral(play_store))
-        self.assertTrue(contains_app_icon_red(play_store))
+        self.assertTrue(contains_light_icon_ink(play_store))
         self.assertLess((BRAND_DIR / "playstore-icon.png").stat().st_size, 1024 * 1024)
 
         web = inspect_png(BRAND_DIR / "ic_launcher-web.png")
