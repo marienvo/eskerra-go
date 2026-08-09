@@ -8,7 +8,7 @@
 <h1 align="center">Eskerra Go</h1>
 
 <p align="center">
-  Eskerra Go is the <strong>native Android companion</strong> for [Eskerra Studio](https://github.com/marienvo/eskerra-studio): a Git-first Markdown
+  Eskerra Go is the <strong>native Android companion</strong> for <a href="https://github.com/marienvo/eskerra-studio">Eskerra Studio</a>: a Git-first Markdown
   vault app written in Kotlin and Jetpack Compose.
 </p>
 
