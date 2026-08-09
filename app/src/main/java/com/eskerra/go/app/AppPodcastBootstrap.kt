@@ -34,6 +34,7 @@ internal fun AppPodcastBootstrap(
     playlistPollingHost: PlaylistR2PollingHost?,
     bridge: PodcastShellBridge,
     currentDestination: NavDestination?,
+    hasPendingShare: Boolean,
     onPodcastFirstLaunchChanged: (Boolean) -> Unit
 ) {
     AppPodcastPlaylistEffects(
@@ -69,7 +70,8 @@ internal fun AppPodcastBootstrap(
         )
         val initialRoute = resolveInitialShellRoute(
             preferredShellMode = restore.preferredShellMode,
-            hasResumablePlayback = restore.hydrated
+            hasResumablePlayback = restore.hydrated,
+            hasPendingShare = hasPendingShare
         )
         onPodcastFirstLaunchChanged(shouldDismissSplashWithoutInbox(initialRoute))
         if (!initialNavigationDone && currentRoute != initialRoute) {

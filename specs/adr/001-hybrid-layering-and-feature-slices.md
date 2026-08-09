@@ -27,7 +27,7 @@ We use the **hybrid** approach:
 com.eskerra.go/
 ├── core/        domain: model, repository interfaces, use cases, wikilink
 ├── data/        infrastructure: git, notes, credentials, workspace, r2
-├── feature/     slices: inbox, note, editor, search, sync, setup, menu, podcasts, todayhub
+├── feature/     slices: inbox, note, editor, search, sync, setup, menu, podcasts, todayhub, share
 ├── ui/          theme, shared UI
 └── app/         composition root
 ```

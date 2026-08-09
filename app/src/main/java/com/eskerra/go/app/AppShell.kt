@@ -117,6 +117,7 @@ fun AppShell(
                     submitEnabled = shellInput.submitEnabled,
                     isSaving = shellInput.isSaving,
                     errorMessage = shellInput.errorMessage,
+                    fieldSignal = shellInput.fieldSignal,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .navigationBarsPadding()

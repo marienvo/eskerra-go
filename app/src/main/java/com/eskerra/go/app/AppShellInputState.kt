@@ -21,7 +21,8 @@ data class ShellInputPresentation(
     val onSubmit: () -> Unit,
     val submitEnabled: Boolean,
     val isSaving: Boolean,
-    val errorMessage: String?
+    val errorMessage: String?,
+    val fieldSignal: ShellFieldSignal?
 )
 
 internal data class AppShellInputState(
@@ -93,7 +94,9 @@ internal fun buildShellInputPresentation(
         onSubmit = onSearchSubmit,
         submitEnabled = searchQuery.isNotBlank(),
         isSaving = false,
-        errorMessage = null
+        errorMessage = null,
+        // Search never receives focus/caret instructions: a share must never land in the query.
+        fieldSignal = null
     )
 } else {
     ShellInputPresentation(
@@ -105,6 +108,7 @@ internal fun buildShellInputPresentation(
         onSubmit = newNoteInputState.onSave,
         submitEnabled = newNoteInputState.canSave && !newNoteInputState.isSaving,
         isSaving = newNoteInputState.isSaving,
-        errorMessage = newNoteInputState.errorMessage
+        errorMessage = newNoteInputState.errorMessage,
+        fieldSignal = newNoteInputState.fieldSignal
     )
 }

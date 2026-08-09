@@ -1,5 +1,6 @@
 package com.eskerra.go
 
+import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -15,18 +16,16 @@ import coil.ImageLoader
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import com.eskerra.go.app.AppRoot
-import com.eskerra.go.app.PodcastPlaylistWiring
-import com.eskerra.go.app.PodcastShellStateWiring
+import com.eskerra.go.app.ShareIntake
 import com.eskerra.go.core.repository.PodcastPlayerDriver
+import com.eskerra.go.core.share.PendingShare
 import com.eskerra.go.core.usecase.BuildSafeSyncDiagnostic
 import com.eskerra.go.core.usecase.BuildSyncPreflight
-import com.eskerra.go.core.usecase.ClearPlaylist
-import com.eskerra.go.core.usecase.ClearPodcastPlaybackSnapshot
 import com.eskerra.go.core.usecase.ClearRemoteSyncSettings
 import com.eskerra.go.core.usecase.CreateInboxNote
 import com.eskerra.go.core.usecase.DeleteInboxNotes
 import com.eskerra.go.core.usecase.EnsureDeviceInstanceId
-import com.eskerra.go.core.usecase.LoadDownloadedBinaries
+import com.eskerra.go.core.usecase.FetchSharedPageTitle
 import com.eskerra.go.core.usecase.LoadEditableNote
 import com.eskerra.go.core.usecase.LoadGitStatusSummary
 import com.eskerra.go.core.usecase.LoadInboxSummaries
@@ -43,29 +42,22 @@ import com.eskerra.go.core.usecase.LoadVaultSettings
 import com.eskerra.go.core.usecase.MaintainVaultSearchIndex
 import com.eskerra.go.core.usecase.ManualSyncNow
 import com.eskerra.go.core.usecase.MarkPodcastEpisodesPlayed
-import com.eskerra.go.core.usecase.PersistAppShellMode
-import com.eskerra.go.core.usecase.PersistPodcastPlaybackSnapshot
-import com.eskerra.go.core.usecase.PodcastPlaylistSync
 import com.eskerra.go.core.usecase.PrefetchLinkedNotes
-import com.eskerra.go.core.usecase.ReadPlaylist
 import com.eskerra.go.core.usecase.ReconcileWorkspaceSyncBranch
 import com.eskerra.go.core.usecase.RecordLastSyncAttempt
 import com.eskerra.go.core.usecase.RefreshRemoteSyncStatus
 import com.eskerra.go.core.usecase.RepairVaultSearchIndex
-import com.eskerra.go.core.usecase.RestorePodcastPlayback
 import com.eskerra.go.core.usecase.SaveLocalSettings
 import com.eskerra.go.core.usecase.SaveNote
 import com.eskerra.go.core.usecase.SaveRemoteSyncSettings
 import com.eskerra.go.core.usecase.SaveVaultSettings
 import com.eskerra.go.core.usecase.SearchVault
-import com.eskerra.go.core.usecase.SyncBinaries
 import com.eskerra.go.core.usecase.SyncPodcastChange
 import com.eskerra.go.core.usecase.SyncPodcastChangesViaVaultSync
 import com.eskerra.go.core.usecase.SyncPodcastVaultRefresh
 import com.eskerra.go.core.usecase.TestRemoteConnection
 import com.eskerra.go.core.usecase.TouchVaultSearchPaths
 import com.eskerra.go.core.usecase.UpdateSyncToken
-import com.eskerra.go.core.usecase.WritePlaylist
 import com.eskerra.go.data.credentials.AndroidKeystoreTokenCipher
 import com.eskerra.go.data.credentials.EncryptedCredentialStore
 import com.eskerra.go.data.git.GitSyncMutex
@@ -87,14 +79,8 @@ import com.eskerra.go.data.podcast.FilePodcastFileRepository
 import com.eskerra.go.data.podcast.artwork.FilePodcastArtworkRepository
 import com.eskerra.go.data.podcast.rss.FilePodcastRssVaultSync
 import com.eskerra.go.data.podcast.rss.OkHttpRssFeedFetcher
-import com.eskerra.go.data.r2.BinaryManifestStore
-import com.eskerra.go.data.r2.DefaultBinarySyncRepository
-import com.eskerra.go.data.r2.PlaylistR2ConditionalFetch
-import com.eskerra.go.data.r2.R2BinaryObjectClient
-import com.eskerra.go.data.r2.R2PlaylistConditionalClient
-import com.eskerra.go.data.r2.R2PlaylistObjectClient
-import com.eskerra.go.data.r2.R2PlaylistSyncRepository
 import com.eskerra.go.data.search.SqliteVaultSearchRepository
+import com.eskerra.go.data.share.OkHttpPageTitleFetcher
 import com.eskerra.go.data.todayhub.DataStoreActiveTodayHubStore
 import com.eskerra.go.data.todayhub.FileTodayHubSnapshotStore
 import com.eskerra.go.data.vault.DataStoreLocalSettingsStore
@@ -110,6 +96,10 @@ import okhttp3.OkHttpClient
 /** Single entry point. Hosts the Compose UI and nothing else. */
 class MainActivity : ComponentActivity() {
     private var podcastPlayerDriver: PodcastPlayerDriver? = null
+
+    /** Read inside setContent, so a share arriving while the app runs recomposes the shell. */
+    private val pendingShare = mutableStateOf<PendingShare?>(null)
+    private var shareSequence = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()
@@ -263,6 +253,11 @@ class MainActivity : ComponentActivity() {
         val syncRefreshChange = SyncPodcastChangesViaVaultSync(
             runVaultSync = { cfg, files -> manualSyncNow(cfg, files) }
         )
+        // Only on a cold start: on rotation the same intent is redelivered and must not re-apply.
+        if (savedInstanceState == null) {
+            consumeShareIntent(intent)
+        }
+
         val okHttpClient = OkHttpClient()
         installImageLoader(okHttpClient)
         val rssFeedFetcher = OkHttpRssFeedFetcher(okHttpClient)
@@ -282,54 +277,15 @@ class MainActivity : ComponentActivity() {
         val podcastPlayerDriver = Media3PodcastPlayerDriver(applicationContext)
             .also { this.podcastPlayerDriver = it }
 
-        val r2HttpClient = okHttpClient
-        val r2PlaylistObjectClient = R2PlaylistObjectClient(r2HttpClient)
-        val binarySyncRepository = DefaultBinarySyncRepository(
-            objectClient = R2BinaryObjectClient(r2HttpClient),
-            manifestStore = BinaryManifestStore(filesDir)
-        )
-        val syncBinaries = SyncBinaries(binarySyncRepository, loadVaultSettings)
-        val loadDownloadedBinaries = LoadDownloadedBinaries(binarySyncRepository)
-        val playlistSyncRepository = R2PlaylistSyncRepository(
-            settingsRepository = vaultSettingsRepository,
+        val podcastComposition = buildPodcastCompositionRoot(
+            okHttpClient = okHttpClient,
+            filesDir = filesDir,
+            vaultSettingsRepository = vaultSettingsRepository,
             localSettingsStore = localSettingsStore,
-            r2Client = r2PlaylistObjectClient
-        )
-        val readPlaylist = ReadPlaylist(playlistSyncRepository)
-        val writePlaylist = WritePlaylist(playlistSyncRepository)
-        val clearPlaylist = ClearPlaylist(playlistSyncRepository)
-        val podcastPlaylistSync = PodcastPlaylistSync(
-            readPlaylist = readPlaylist,
-            writePlaylist = writePlaylist,
-            clearPlaylist = clearPlaylist,
             loadVaultSettings = loadVaultSettings,
-            ensureDeviceInstanceId = ensureDeviceInstanceId
-        )
-        val playlistR2ConditionalFetch = PlaylistR2ConditionalFetch(
-            loadVaultSettings = loadVaultSettings,
-            conditionalClient = R2PlaylistConditionalClient(r2HttpClient)
-        )
-
-        val podcastPlaylistWiring = PodcastPlaylistWiring(
-            sync = podcastPlaylistSync,
-            repository = playlistSyncRepository,
-            conditionalFetch = playlistR2ConditionalFetch
-        )
-        val restorePodcastPlayback = RestorePodcastPlayback(
+            ensureDeviceInstanceId = ensureDeviceInstanceId,
             loadPodcastCatalog = loadPodcastCatalog,
-            podcastPlaylistSync = podcastPlaylistSync,
-            localSettingsStore = localSettingsStore,
             podcastPlayerDriver = podcastPlayerDriver
-        )
-        val persistAppShellMode = PersistAppShellMode(localSettingsStore)
-        val persistPodcastPlaybackSnapshot = PersistPodcastPlaybackSnapshot(localSettingsStore)
-        val clearPodcastPlaybackSnapshot = ClearPodcastPlaybackSnapshot(localSettingsStore)
-
-        val podcastShellStateWiring = PodcastShellStateWiring(
-            restorePodcastPlayback = restorePodcastPlayback,
-            persistAppShellMode = persistAppShellMode,
-            persistPodcastPlaybackSnapshot = persistPodcastPlaybackSnapshot,
-            clearPodcastPlaybackSnapshot = clearPodcastPlaybackSnapshot
         )
 
         setContent {
@@ -368,20 +324,31 @@ class MainActivity : ComponentActivity() {
                 loadLocalSettings = loadLocalSettings,
                 saveLocalSettings = saveLocalSettings,
                 ensureDeviceInstanceId = ensureDeviceInstanceId,
-                syncBinaries = syncBinaries,
-                loadDownloadedBinaries = loadDownloadedBinaries,
+                syncBinaries = podcastComposition.syncBinaries,
+                loadDownloadedBinaries = podcastComposition.loadDownloadedBinaries,
                 searchVault = searchVault,
                 maintainVaultSearchIndex = maintainVaultSearchIndex,
                 repairVaultSearchIndex = repairVaultSearchIndex,
                 touchVaultSearchPaths = touchVaultSearchPaths,
                 loadPodcastCatalog = loadPodcastCatalog,
                 markPodcastEpisodesPlayed = markPodcastEpisodesPlayed,
-                podcastPlaylistWiring = podcastPlaylistWiring,
+                podcastPlaylistWiring = podcastComposition.podcastPlaylistWiring,
                 loadPodcastArtwork = loadPodcastArtwork,
                 podcastPlayerDriver = podcastPlayerDriver,
                 syncPodcastVaultRefresh = syncPodcastVaultRefresh,
                 catalogSnapshotStore = catalogSnapshotStore,
-                podcastShellStateWiring = podcastShellStateWiring,
+                podcastShellStateWiring = podcastComposition.podcastShellStateWiring,
+                shareIntake = ShareIntake(
+                    pendingShare = pendingShare.value,
+                    fetchSharedPageTitle = FetchSharedPageTitle(
+                        OkHttpPageTitleFetcher(okHttpClient)
+                    ),
+                    onShareHandled = { handledId ->
+                        if (pendingShare.value?.id == handledId) {
+                            pendingShare.value = null
+                        }
+                    }
+                ),
                 onLaunchSettled = {
                     if (keepSplashOnScreen) {
                         keepSplashOnScreen = false
@@ -389,6 +356,20 @@ class MainActivity : ComponentActivity() {
                 }
             )
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        consumeShareIntent(intent)
+    }
+
+    private fun consumeShareIntent(intent: Intent?) {
+        val content = SharedIntentReader.read(intent) ?: return
+        // Belt and braces against any later re-read of the same intent.
+        intent?.putExtra(SharedIntentReader.EXTRA_CONSUMED, true)
+        shareSequence += 1
+        pendingShare.value = PendingShare(shareSequence, content)
     }
 
     override fun onDestroy() {
