@@ -22,7 +22,7 @@ BRAND_DIR = ROOT / "branding"
 RENDERER = ROOT / "scripts" / "render-logo-e-pngs.sh"
 ANDROID_NS = "http://schemas.android.com/apk/res/android"
 LOGO_SIZE_DP = 58
-NOTE_INPUT_BACKGROUND = (45, 43, 49, 255)
+NOTE_INPUT_BACKGROUND = (49, 43, 43, 255)
 LAUNCHER_BACKGROUND = (49, 43, 43, 255)
 LOGO_CENTER = (125, 128)
 LOGO_STROKE_WIDTH = 10
@@ -246,13 +246,10 @@ def minimum_distance_to_cubic(
 
 
 class BrandIconTest(unittest.TestCase):
-    def test_launcher_background_preserves_note_input_saturation_and_brightness(self) -> None:
-        note_input_rgb = NOTE_INPUT_BACKGROUND[:3]
-        launcher_rgb = LAUNCHER_BACKGROUND[:3]
-        self.assertEqual(max(launcher_rgb), max(note_input_rgb))
-        self.assertEqual(min(launcher_rgb), min(note_input_rgb))
-        self.assertGreater(launcher_rgb[0], launcher_rgb[1])
-        self.assertEqual(launcher_rgb[1], launcher_rgb[2])
+    def test_launcher_background_matches_brand_tinted_note_input(self) -> None:
+        self.assertEqual(LAUNCHER_BACKGROUND, NOTE_INPUT_BACKGROUND)
+        self.assertGreater(LAUNCHER_BACKGROUND[0], LAUNCHER_BACKGROUND[1])
+        self.assertEqual(LAUNCHER_BACKGROUND[1], LAUNCHER_BACKGROUND[2])
 
     def test_editable_e_mark_uses_three_exact_concentric_tracks(self) -> None:
         root = ElementTree.parse(BRAND_DIR / "logo-e.svg").getroot()
