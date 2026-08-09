@@ -87,7 +87,7 @@ The debounced `showRefreshIndicator` (~300 ms) stays off when revalidation finis
 
 ## Launch UX
 
-Cold start keeps the Android splash screen (inset foreground via `drawable/ic_splash_logo`, on `#281943`) until launch is **settled**, then dismisses in one step to shell + content.
+Cold start keeps the Android splash screen (inset foreground via `drawable/ic_splash_logo`, on `#000000`) until launch is **settled**, then dismisses in one step to shell + content.
 
 **Launch settled** means:
 

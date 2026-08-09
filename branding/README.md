@@ -10,5 +10,13 @@ Render transparent PNGs at arbitrary sizes with:
 ```
 
 The renderer requires ImageMagick 7 (`magick` and `identify`). App-specific
-launcher, splash, and store assets are generated separately by the Android icon
-generator.
+launcher, splash, and store assets are regenerated with:
+
+```bash
+./scripts/generate-brand-app-icons.sh
+```
+
+The generator updates every launcher density, the splash foreground used by the
+app, and the 512px Play Store and transparent web exports. Replace `logo-e.svg`
+and rerun this command after changing the mark. Do not add a link or copy step to
+another repository.
