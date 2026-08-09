@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Regenerate Android launcher, splash-source, and store icons from branding/logo-e.svg.
+# Regenerate Android launcher and store icons from branding/logo-e.svg.
 # Run from the eskerra-go repo root: ./scripts/generate-brand-app-icons.sh
 set -euo pipefail
 
@@ -147,14 +147,6 @@ main() {
     mkdir -p "$output_dir"
 
     make_foreground \
-      "$PNG_DIR" \
-      "$adaptive_size" \
-      "$mark_size" \
-      "$output_dir/ic_launcher_foreground.png"
-    validate_dimensions "$output_dir/ic_launcher_foreground.png" "$adaptive_size"
-    validate_foreground_bounds "$output_dir/ic_launcher_foreground.png" "$mark_size"
-
-    make_foreground \
       "$WHITE_PNG_DIR" \
       "$adaptive_size" \
       "$mark_size" \
@@ -194,9 +186,6 @@ main() {
       "$OUTPUT_DIR/mipmap-$density/ic_launcher.png" \
       "$output_dir/ic_launcher.png"
     install -m 0644 \
-      "$OUTPUT_DIR/mipmap-$density/ic_launcher_foreground.png" \
-      "$output_dir/ic_launcher_foreground.png"
-    install -m 0644 \
       "$OUTPUT_DIR/mipmap-$density/ic_launcher_brand_foreground.png" \
       "$output_dir/ic_launcher_brand_foreground.png"
     install -m 0644 \
@@ -207,7 +196,7 @@ main() {
   install -m 0644 "$OUTPUT_DIR/playstore-icon.png" "$BRAND_DIR/playstore-icon.png"
   install -m 0644 "$OUTPUT_DIR/ic_launcher-web.png" "$BRAND_DIR/ic_launcher-web.png"
 
-  echo "Done. Android launcher icons regenerated; the blue splash foreground is preserved."
+  echo "Done. Android launcher icons regenerated; the splash keeps its black background."
 }
 
 main "$@"

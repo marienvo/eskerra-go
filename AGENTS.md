@@ -100,9 +100,9 @@ Launcher mipmaps live under `app/src/main/res/mipmap-*` (adaptive foreground PNG
 When the logo changes, replace `branding/logo-e.svg` and run `./scripts/generate-brand-app-icons.sh`. The SVG and generator are local to this repository; do not link them to another codebase. Keep these intentional surfaces separate:
 
 - `values/ic_launcher_background.xml` — `#E35D5D` (launcher background)
-- `mipmap-*/ic_launcher_brand_foreground.png` — white launcher mark
+- `mipmap-*/ic_launcher_brand_foreground.png` — white launcher and splash mark
 - `values/colors.xml` (`splash_background`) — `#000000` (system splash + post-splash window background)
-- `drawable/ic_splash_logo.xml` — splash-only blue logo (35% inset on `ic_launcher_foreground`); launcher uses `ic_launcher_brand_foreground`
+- `drawable/ic_splash_logo.xml` — white logo with 35% inset on `ic_launcher_brand_foreground`
 
 Do not reintroduce a `_android/` staging folder; commit assets directly under `app/src/main/res/`.
 

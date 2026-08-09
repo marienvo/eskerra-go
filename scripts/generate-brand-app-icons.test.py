@@ -177,25 +177,20 @@ def contains_launcher_red(image: PngImage) -> bool:
 
 
 class BrandIconTest(unittest.TestCase):
-    def test_launcher_and_splash_foregrounds_match_density_and_safe_zone(self) -> None:
+    def test_white_launcher_and_splash_foreground_matches_density_and_safe_zone(self) -> None:
         for density, (adaptive_size, _) in DENSITIES.items():
             with self.subTest(density=density):
-                launcher = inspect_png(
+                image = inspect_png(
                     RES_DIR / f"mipmap-{density}" / "ic_launcher_brand_foreground.png"
                 )
-                splash = inspect_png(
-                    RES_DIR / f"mipmap-{density}" / "ic_launcher_foreground.png"
-                )
-                for image in (launcher, splash):
-                    self.assertEqual((image.width, image.height), (adaptive_size, adaptive_size))
-                    left, top, right, bottom = image.alpha_bounds()
-                    safe_size = scaled_safe_size(adaptive_size)
-                    self.assertLessEqual(right - left + 1, safe_size)
-                    self.assertLessEqual(bottom - top + 1, safe_size)
-                    self.assertLessEqual(abs((left + right + 1) - adaptive_size), 2)
-                    self.assertLessEqual(abs((top + bottom + 1) - adaptive_size), 2)
-                self.assertTrue(contains_white_ink(launcher))
-                self.assertTrue(contains_blue_ink(splash))
+                self.assertEqual((image.width, image.height), (adaptive_size, adaptive_size))
+                left, top, right, bottom = image.alpha_bounds()
+                safe_size = scaled_safe_size(adaptive_size)
+                self.assertLessEqual(right - left + 1, safe_size)
+                self.assertLessEqual(bottom - top + 1, safe_size)
+                self.assertLessEqual(abs((left + right + 1) - adaptive_size), 2)
+                self.assertLessEqual(abs((top + bottom + 1) - adaptive_size), 2)
+                self.assertTrue(contains_white_ink(image))
 
     def test_legacy_icons_match_density_and_masks(self) -> None:
         for density, (_, legacy_size) in DENSITIES.items():
@@ -243,7 +238,10 @@ class BrandIconTest(unittest.TestCase):
         self.assertEqual(splash_colors[0].text.strip(), "#000000")
 
         splash = ElementTree.parse(RES_DIR / "drawable" / "ic_splash_logo.xml").getroot()
-        self.assertEqual(splash.attrib[f"{{{ANDROID_NS}}}drawable"], "@mipmap/ic_launcher_foreground")
+        self.assertEqual(
+            splash.attrib[f"{{{ANDROID_NS}}}drawable"],
+            "@mipmap/ic_launcher_brand_foreground",
+        )
         self.assertEqual(splash.attrib[f"{{{ANDROID_NS}}}inset"], "35%")
 
     def test_pipeline_is_local_and_ci_runs_this_guardrail(self) -> None:

@@ -18,9 +18,9 @@ launcher, splash, and store assets are regenerated with:
 
 The generator updates every launcher density and the 512px Play Store and
 transparent web exports. The launcher uses a white e-logo on `#E35D5D`; its
-separate `ic_launcher_brand_foreground` leaves the splash's blue e-logo on black
-unchanged. Replace `logo-e.svg` and rerun this command after changing the mark.
-Do not add a link or copy step to another repository.
+separate `ic_launcher_brand_foreground` also provides the splash's white e-logo
+on its unchanged black background. Replace `logo-e.svg` and rerun this command
+after changing the mark. Do not add a link or copy step to another repository.
 
 Launcher and store compositions size the mark to 58dp inside Android's 108dp
 adaptive canvas, leaving deliberate breathing room inside circular masks.
