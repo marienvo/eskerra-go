@@ -3,7 +3,7 @@
 <!-- AUTO-SYNCED from notebox — do not edit here. Canonical: notebox/scripts/shared-conventions/skills-README.sibling.md -->
 
 **Source of truth:** notebox `.cursor/skills/` (subset).  
-`.claude/skills` is a **symlink** to `.cursor/skills` so Claude Code and Cursor load the same files.
+`.claude/skills` and `.agents/skills` are **symlinks** to `.cursor/skills` so Claude Code, Cursor, and Codex load the same files.
 
 Re-sync from notebox:
 

@@ -43,14 +43,19 @@ Follow the loop in order; do not skip the logbook step before starting the next 
 
 Prefer cheap, repeatable measurements over one-off profiler sessions.
 
-- **Cold-start / launch latency** — the primary metric. `adb shell am start -W -n com.eskerra.go/.MainActivity`
-  (TotalTime / WaitTime), run several times after `adb shell am force-stop com.eskerra.go`. Cross-check
-  against **launch-settled** ([AppLaunchSettled.kt](../../../app/src/main/java/com/eskerra/go/app/AppLaunchSettled.kt)),
+- **Cold-start / launch latency** — the primary metric. Use
+  [`scripts/measure-cold-start.sh`](../../../scripts/measure-cold-start.sh) `[runs] [label]`, which
+  drives the force-stop / settle / clear-logcat / `am start -W` loop, discards runs that are not
+  `LaunchState: COLD` or that produced no launch-settled marker, prints the median launch-settled
+  and TotalTime, and writes the per-run phase breakdown to `.perf/cold-start-<label>.log`. Always
+  cross-check against **launch-settled** ([AppLaunchSettled.kt](../../../app/src/main/java/com/eskerra/go/app/AppLaunchSettled.kt)),
   not just first-frame — the splash holds past first frame by design.
-- **Where the boot time goes** — the app gate's three layers (DataStore read → local gate on
-  `Dispatchers.IO` → optimistic fingerprint) and the note-registry cache (in-memory → persisted
-  snapshot → incremental scan). Add temporary timing logs around these seams; confirm the
-  optimistic-fingerprint fast path is actually hit (warm start) vs. forced full scans (cold miss).
+- **Where the boot time goes** — [`ColdStartTrace`](../../../app/src/main/java/com/eskerra/go/data/perf/ColdStartTrace.kt)
+  already instruments the seams permanently and logs them under the `BootTrace` tag in debug
+  builds (`adb logcat -s BootTrace`). The phases are: process→onCreate, DI build, compose→gate,
+  gate resolve, snapshot read, first scan, settle tail. It also records `fingerprintHit`,
+  `snapshotHit` and `hadMemoBase`, so you can see directly whether the optimistic fast path was
+  hit or the launch degenerated into a full rescan. Do not re-add ad-hoc timing logs for these.
 - **Compose jank / recomposition** — Perfetto/`systrace` for frame timing; composition tracing or
   Layout Inspector recomposition counts for unstable/over-recomposing composables. Reproduce the
   janky interaction (scroll, note switch, link tap) deterministically.
@@ -64,6 +69,48 @@ Build/run with the repo commands: `./scripts/gradle.sh :app:assembleDebug`,
 `./scripts/install-debug.sh` (build, install, launch). Keep the quality gate green
 (`./scripts/gradle.sh :app:ktlintCheck :app:lintDebug`, and `:app:testDebugUnitTest` when logic
 changed) for any change you keep.
+
+## Reading the weekly telemetry (for `plan-next-pr` triage)
+
+The app reports an aggregate to Sentry at most once a week — event `perf.cold_start.weekly`,
+level `info`, fingerprint `perf-cold-start-weekly`, tag `perf.report=cold_start_weekly`. The
+contract is in [specs/observability/README.md](../../../specs/observability/README.md). Every
+phase above appears as `<phase>_median_ms` and `<phase>_p90_ms`, alongside `sample_count`,
+`median_note_count` and the three hit rates.
+
+Fetch it with the Sentry Web API (org `personal-133`, project `eskerra-go`, per
+[sentry.properties](../../../sentry.properties)), authenticating with `SENTRY_AUTH_TOKEN` from
+the environment:
+
+```bash
+curl -sS -H "Authorization: Bearer $SENTRY_AUTH_TOKEN" \
+  "https://sentry.io/api/0/projects/personal-133/eskerra-go/events/?query=perf.report%3Acold_start_weekly&statsPeriod=90d"
+```
+
+**If `SENTRY_AUTH_TOKEN` is not set, or the request fails, stop and record the check under
+`Triage not checked`.** Never guess at a trend, and never present an unfetched number as
+evidence. Most planning sessions will land here.
+
+### Regression thresholds
+
+Compare the newest report against the previous one. It is a regression when **either** holds:
+
+- **Relative:** `total_median_ms` is more than **20%** worse than the previous report.
+- **Absolute:** `total_median_ms` exceeds the budget of **2500 ms**.
+
+Both, because they catch different failures: a purely relative rule never fires on 5%-per-week
+drift that doubles over a year, and a purely absolute rule misses a jump from 1200 to 2400 ms.
+
+The budget is a target, not the status quo. The recorded baseline is a median of **3269 ms**
+(7 cold runs, 1161-note vault, debug build) — see
+[specs/performance/cold-start-debug-logbook.md](../../../specs/performance/cold-start-debug-logbook.md)
+and `.perf/cold-start-before.log`. So the budget is expected to be exceeded until that work is
+done, which is the intent: performance is core functionality, not opportunistic cleanup.
+
+On a detected regression, `plan-next-pr` asks the user whether they actually feel the app is
+slow. On "yes" it becomes T1 and hands over to this skill, with the per-phase breakdown from
+the report as the input to step 1 — the phase whose median moved most is the first hypothesis
+to consider. On "no" it stays a `Warnings` line.
 
 ## Rules
 

@@ -72,6 +72,7 @@ import com.eskerra.go.data.notes.FileNoteWriteRepository
 import com.eskerra.go.data.notes.NoteContentCache
 import com.eskerra.go.data.notes.NoteRegistryCache
 import com.eskerra.go.data.notes.ParsedMarkdownCache
+import com.eskerra.go.data.perf.ColdStartTrace
 import com.eskerra.go.data.player.Media3PodcastPlayerDriver
 import com.eskerra.go.data.podcast.FilePodcastCatalogRepository
 import com.eskerra.go.data.podcast.FilePodcastCatalogSnapshotStore
@@ -104,6 +105,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
+        ColdStartTrace.markActivityOnCreate()
         var keepSplashOnScreen by mutableStateOf(true)
         splashScreen.setKeepOnScreenCondition { keepSplashOnScreen }
         enableEdgeToEdge(
@@ -288,6 +290,7 @@ class MainActivity : ComponentActivity() {
             podcastPlayerDriver = podcastPlayerDriver
         )
 
+        ColdStartTrace.markDiBuilt()
         setContent {
             AppRoot(
                 workspaceStore = workspaceStore,
@@ -319,6 +322,7 @@ class MainActivity : ComponentActivity() {
                 clearRemoteSyncSettings = clearRemoteSyncSettings,
                 testRemoteConnection = testRemoteConnection,
                 reconcileWorkspaceSyncBranch = reconcileWorkspaceSyncBranch,
+                reportWeeklyPerformance = buildWeeklyPerformanceReporting(applicationContext),
                 loadVaultSettings = loadVaultSettings,
                 saveVaultSettings = saveVaultSettings,
                 loadLocalSettings = loadLocalSettings,
@@ -347,6 +351,7 @@ class MainActivity : ComponentActivity() {
                 ),
                 onLaunchSettled = {
                     if (keepSplashOnScreen) {
+                        ColdStartTrace.markSettled()
                         keepSplashOnScreen = false
                     }
                 }

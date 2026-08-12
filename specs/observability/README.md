@@ -23,12 +23,57 @@ configured DSN), and the whole init call is wrapped in `runCatching` — a failu
 
 ## Events
 
-- **Automatic crash/ANR capture** — the only source of events today. No custom
-  `Sentry.captureMessage` / `captureException` / `setFingerprint` calls exist anywhere in
-  the app.
+- **Automatic crash/ANR capture** — level `error`, no custom fingerprint.
+- **One custom event**: `perf.cold_start.weekly` (see below), level `info`.
 - **One breadcrumb**: `"app.start"`, added after a successful SDK init. Breadcrumbs attach
   to whatever event fires next in the session; this one exists to confirm in a crash
   report that Sentry itself came up cleanly.
+
+`data/observability/SentryPerformanceReporter` is the only place outside
+`EskerraGoApplication` that touches the Sentry SDK. Everything else reports through the
+`PerformanceReporter` port in `core/repository`. Enforced by the
+`sentryIsAccessedOnlyFromObservability` rule in `ArchitectureLayerRulesTest`.
+
+## Custom event: `perf.cold_start.weekly`
+
+The one place this app sends something that is not a crash. Cold-start performance is a
+core-experience metric, so the app aggregates it locally and reports a summary at most
+once a week.
+
+| Property | Value |
+| --- | --- |
+| Message | `perf.cold_start.weekly` |
+| Level | `info` — the only non-error event the app sends |
+| Fingerprint | `perf-cold-start-weekly`, fixed |
+| Tag | `perf.report = "cold_start_weekly"` |
+| Context | `cold_start` (fields below) |
+
+The fingerprint is deliberately fixed so every weekly report groups into a single issue
+and the trend across weeks reads as one timeline rather than a new issue each week.
+
+**When it fires.** There is no scheduler in this app (no WorkManager or AlarmManager, by
+design), so "weekly" is a check on launch: the first launch after 7 days have passed since
+the last report carries it, and only when the window holds at least 5 samples. It runs
+from `AppBootEffects` behind the same `launchSettled` + one-frame gate as the boot sync —
+telemetry about the launch must never become part of the launch.
+
+**Payload.** Durations in milliseconds, counts, and rates in `[0.0, 1.0]`. Each phase is
+reported as `<phase>_median_ms` and `<phase>_p90_ms`; median and p90 rather than a mean,
+because launch times are skewed and a mean hides the bad launches.
+
+- Phases: `total`, `process_to_activity`, `di_build`, `to_gate_start`, `gate_resolve`,
+  `snapshot_read`, `first_scan`, `settle_tail`
+- `sample_count`, `window_days`, `median_note_count`
+- `fingerprint_hit_rate`, `snapshot_hit_rate`, `memo_base_rate` — how often the workspace
+  fingerprint still matched, the registry snapshot was usable, and the scan had a memo base
+
+**No vault content.** The payload is durations and counts only: no note titles, paths,
+remote URIs, or file contents can reach it, because `ColdStartSample` has nowhere to put
+them. `DataStoreColdStartStatsStore.NON_SECRET_PREFERENCE_KEY_NAMES` records every key the
+local window writes, the same audit pattern `DataStoreWorkspaceStore` uses.
+
+Nothing is sent when the SDK never initialised (empty `SENTRY_DSN`, the normal local
+case), and the whole send is wrapped in `runCatching`.
 
 ## Build-time (Gradle plugin)
 
@@ -45,6 +90,7 @@ updates this file **in the same change** (see `AGENTS.md`).
 
 ## Out of scope today
 
-No custom events, no user feedback capture, no session-replay, no performance
-transactions. If any of these are added, this file gets a new section in that change —
-not before.
+No user feedback capture, no session-replay, and no performance *transactions* — the
+weekly report above is a plain event, so it needs neither `tracesSampleRate` nor the
+Gradle plugin's tracing instrumentation, both of which stay off. If any of these are
+added, this file gets a new section in that change — not before.

@@ -34,18 +34,6 @@ fun reconcilePodcastPlaybackSources(
     return null
 }
 
-fun hasResumablePodcastPlayback(
-    catalog: PodcastCatalog?,
-    localSnapshot: PodcastPlaybackSnapshot?,
-    remoteEntry: PlaylistEntry?,
-    nativeSession: PodcastNativeSessionSnapshot?
-): Boolean = reconcilePodcastPlaybackSources(
-    catalog = catalog,
-    localSnapshot = localSnapshot,
-    remoteEntry = remoteEntry,
-    nativeSession = nativeSession
-) != null
-
 private fun hydrationFromNativeSession(
     catalog: PodcastCatalog,
     native: PodcastNativeSessionSnapshot

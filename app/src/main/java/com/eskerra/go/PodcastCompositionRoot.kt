@@ -11,7 +11,6 @@ import com.eskerra.go.core.usecase.EnsureDeviceInstanceId
 import com.eskerra.go.core.usecase.LoadDownloadedBinaries
 import com.eskerra.go.core.usecase.LoadPodcastCatalog
 import com.eskerra.go.core.usecase.LoadVaultSettings
-import com.eskerra.go.core.usecase.PersistAppShellMode
 import com.eskerra.go.core.usecase.PersistPodcastPlaybackSnapshot
 import com.eskerra.go.core.usecase.PodcastPlaylistSync
 import com.eskerra.go.core.usecase.ReadPlaylist
@@ -90,13 +89,11 @@ fun buildPodcastCompositionRoot(
         localSettingsStore = localSettingsStore,
         podcastPlayerDriver = podcastPlayerDriver
     )
-    val persistAppShellMode = PersistAppShellMode(localSettingsStore)
     val persistPodcastPlaybackSnapshot = PersistPodcastPlaybackSnapshot(localSettingsStore)
     val clearPodcastPlaybackSnapshot = ClearPodcastPlaybackSnapshot(localSettingsStore)
 
     val podcastShellStateWiring = PodcastShellStateWiring(
         restorePodcastPlayback = restorePodcastPlayback,
-        persistAppShellMode = persistAppShellMode,
         persistPodcastPlaybackSnapshot = persistPodcastPlaybackSnapshot,
         clearPodcastPlaybackSnapshot = clearPodcastPlaybackSnapshot
     )

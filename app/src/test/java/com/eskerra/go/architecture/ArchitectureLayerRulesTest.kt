@@ -52,6 +52,17 @@ class ArchitectureLayerRulesTest {
             .because("JGit access lives only in data/git; the rest goes through repositories")
 
     @ArchTest
+    val sentryIsAccessedOnlyFromObservability: ArchRule =
+        noClasses()
+            .that().resideOutsideOfPackage("..data.observability..")
+            .and().haveSimpleNameNotEndingWith("Application")
+            .should().dependOnClassesThat().resideInAnyPackage("io.sentry..")
+            .because(
+                "telemetry goes through PerformanceReporter; only data/observability and the " +
+                    "Application (which initialises the SDK) touch Sentry directly"
+            )
+
+    @ArchTest
     val uiDoesNotDependOnDataGit: ArchRule =
         noClasses()
             .that().resideInAnyPackage("..feature..", "..ui..")

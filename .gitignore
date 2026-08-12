@@ -16,3 +16,4 @@ build/
 local.properties
 /report-*.md
 /.me
+/.perf/

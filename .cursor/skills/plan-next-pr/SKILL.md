@@ -26,7 +26,7 @@ Priority classes (these are priority labels for the work doc, **not** change-typ
 unrelated to any T1–T9 / G1–G5 change taxonomy):
 
 - **T0 — interrupt now:** security vulnerability, credible data-loss/corruption risk, or failing CI on the default branch.
-- **T1 — unblock now:** release blocker, or work blocking multiple active planned phases.
+- **T1 — unblock now:** release blocker, work blocking multiple active planned phases, or a confirmed regression in a metric the project treats as core to the experience.
 - **T2 — planned next:** the lowest unblocked item in `specs/plans/README.md`. The default.
 - **T3 — opportunistic:** non-blocking cleanup, documentation, or maintenance. Never chosen over T2 by this skill; it exists to label work the user explicitly pulls forward.
 
@@ -37,6 +37,7 @@ Cheap **global** scan (minutes, not an audit) — signals that need no candidate
 - security or committed-secret findings, and credible persistence/corruption/data-loss risks already visible in repository state (a red default-branch suite, a tampered guardrail baseline, a secret in the tree);
 - release blockers visible without opening plan files;
 - **globally** documented time-sensitive dependencies (e.g. a dated cross-repo coordination deadline stated in the plans README or AGENTS.md).
+- published performance telemetry, when the project reports it and it is readable from this environment — compare the newest reporting period against the previous one, and against any budget the project states.
 
 Candidate-specific signals (gates, file drift, PR/worktree overlap, danger zones) are **not**
 checked here — they belong to Step 2, after Step 1 has named the provisional candidate.
@@ -45,6 +46,12 @@ checked here — they belong to Step 2, after Step 1 has named the provisional c
 evidence in the work doc's `Why now`. When a signal (CI, PR state, external service) cannot
 be inspected from the available environment, record it under `Triage not checked` — never
 guess, and never present an unverified signal as evidence.
+
+A telemetry regression becomes T1 only once the user confirms they actually feel it — numbers
+alone do not reorder the stack. Ask that single question here, during triage; it does not count
+against Step 3's two-question budget. On "yes", the regression is the candidate and the work doc
+carries the per-phase breakdown from the report as context. On "no", record it under `Warnings`
+rather than as an override, so the signal survives without hijacking the plan.
 
 ## Step 1 — Read the stack, in this order
 
@@ -81,7 +88,7 @@ Ask **nothing** when the README order dictates one obvious next step. Ask **one 
 
 ## Step 4 — Write the work document
 
-Path: `.claude/plans/pr-current.md`. **Never `git add` this file** — it must not appear in any commit or the PR diff. Format:
+Path: `./pr-current.md`. **Never `git add` this file** — it must not appear in any commit or the PR diff. Format:
 
 ```markdown
 # PR work doc — <branch> — <date>

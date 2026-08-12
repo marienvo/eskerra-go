@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Pull a debug session NDJSON log from a connected device into .cursor/debug-<session>.log.
+# Pull a debug session NDJSON log from a connected device into .perf/debug-<session>.log.
 # Usage: ./scripts/pull-debug-log.sh <session-id>
 set -euo pipefail
 
@@ -20,7 +20,7 @@ if [[ ! "$SESSION_ID" =~ ^[0-9a-fA-F]{4,16}$ ]]; then
 fi
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-OUT="$ROOT/.cursor/debug-${SESSION_ID}.log"
+OUT="$ROOT/.perf/debug-${SESSION_ID}.log"
 PKG="com.eskerra.go"
 DEVICE_LOG="files/debug-${SESSION_ID}.log"
 LOGCAT_TAG="Debug${SESSION_ID}"
