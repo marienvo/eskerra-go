@@ -18,12 +18,19 @@ internal object NoteRegistrySnapshotCodec {
 
     fun readFingerprint(raw: String): GateFingerprint = SnapshotNoteJsonCodec.readFingerprint(raw)
 
-    fun decode(raw: String, expectedFingerprint: GateFingerprint): NoteRegistry =
-        NoteRegistry.fromNotes(
-            SnapshotNoteJsonCodec.decodeNotesArray(
-                raw = raw,
-                expectedFingerprint = expectedFingerprint,
-                notesArrayKey = NOTES_ARRAY_KEY
-            )
+    fun decode(raw: String, expectedFingerprint: GateFingerprint): NoteRegistry {
+        val notes = SnapshotNoteJsonCodec.decodeNotesArray(
+            raw = raw,
+            expectedFingerprint = expectedFingerprint,
+            notesArrayKey = NOTES_ARRAY_KEY
         )
+        return if (notes.isSortedById()) NoteRegistry(notes) else NoteRegistry.fromNotes(notes)
+    }
+
+    private fun List<com.eskerra.go.core.model.NoteSummary>.isSortedById(): Boolean {
+        for (index in 1 until size) {
+            if (this[index - 1].id.value > this[index].id.value) return false
+        }
+        return true
+    }
 }

@@ -5,6 +5,7 @@ import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NoteRegistry
 import com.eskerra.go.core.model.NoteSummary
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class NoteRegistrySnapshotCodecTest {
@@ -133,5 +134,38 @@ class NoteRegistrySnapshotCodecTest {
 
         assertEquals(true, raw.contains("\"notes\":["))
         assertEquals(false, raw.contains("\"summaries\":["))
+    }
+
+    @Test
+    fun encodeAndDecode_roundTripsLiteralBackslash() {
+        val fingerprint = GateFingerprint("abc123")
+        val note = inboxNote.copy(snippet = "C:\\vault\\note.md")
+        val registry = NoteRegistry.fromNotes(listOf(note))
+
+        val raw = NoteRegistrySnapshotCodec.encode(fingerprint, 99L, registry)
+
+        assertEquals(registry, NoteRegistrySnapshotCodec.decode(raw, fingerprint))
+    }
+
+    @Test
+    fun decode_rejectsUnterminatedString() {
+        val fingerprint = GateFingerprint("abc123")
+        val raw =
+            """{"workspaceFingerprint":"abc123","savedAtEpochMs":99,"notes":[{"id":"broken}]}"""
+
+        val failure = runCatching { NoteRegistrySnapshotCodec.decode(raw, fingerprint) }
+
+        assertTrue(failure.isFailure)
+    }
+
+    @Test
+    fun decode_sortsHandWrittenUnsortedRegistry() {
+        val fingerprint = GateFingerprint("abc123")
+        val unsorted = listOf(vaultNote, inboxNote)
+        val raw = SnapshotNoteJsonCodec.encodeEnvelope(fingerprint, 99L, "notes", unsorted)
+
+        val decoded = NoteRegistrySnapshotCodec.decode(raw, fingerprint)
+
+        assertEquals(listOf(inboxNote, vaultNote), decoded.notes)
     }
 }

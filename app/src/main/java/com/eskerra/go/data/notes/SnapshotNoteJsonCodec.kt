@@ -10,6 +10,13 @@ import com.eskerra.go.core.model.NoteSummary
  */
 internal object SnapshotNoteJsonCodec {
 
+    private const val ID_TOKEN = "\"id\":\""
+    private const val TITLE_TOKEN = ",\"title\":\""
+    private const val SNIPPET_TOKEN = ",\"snippet\":\""
+    private const val IS_INBOX_TOKEN = ",\"isInbox\":"
+    private const val LAST_MODIFIED_TOKEN = ",\"lastModifiedEpochMillis\":"
+    private const val SIZE_BYTES_TOKEN = ",\"sizeBytes\":"
+
     fun readFingerprint(raw: String): GateFingerprint =
         GateFingerprint(readQuotedValue(raw, "workspaceFingerprint"))
 
@@ -46,13 +53,7 @@ internal object SnapshotNoteJsonCodec {
         val arrayStart = raw.indexOf(arrayToken)
         require(arrayStart >= 0) { "missing $notesArrayKey" }
         val contentStart = arrayStart + arrayToken.length
-        val contentEnd = raw.lastIndexOf(']')
-        require(contentEnd >= contentStart) { "invalid $notesArrayKey array" }
-        val body = raw.substring(contentStart, contentEnd).trim()
-        if (body.isEmpty()) {
-            return emptyList()
-        }
-        return splitTopLevelObjects(body, notesArrayKey).map(::parseSummary)
+        return NotesArrayCursor(raw, contentStart, notesArrayKey).parse()
     }
 
     private fun encodeNoteObject(summary: NoteSummary): String = buildString {
@@ -66,117 +67,164 @@ internal object SnapshotNoteJsonCodec {
         append('}')
     }
 
-    /** Splits a JSON array body into top-level `{...}` objects, respecting quoted strings. */
-    private fun splitTopLevelObjects(body: String, notesArrayKey: String): List<String> {
-        if (body.isEmpty()) {
-            return emptyList()
-        }
-        val objects = mutableListOf<String>()
-        var depth = 0
-        var inString = false
-        var escaped = false
-        var start = -1
-        body.forEachIndexed { index, char ->
-            when {
-                escaped -> escaped = false
-                inString && char == '\\' -> escaped = true
-                char == '"' -> inString = !inString
-                inString -> Unit
-                char == '{' -> {
-                    if (depth == 0) {
-                        start = index
-                    }
-                    depth += 1
-                }
-                char == '}' -> {
-                    depth -= 1
-                    if (depth == 0 && start >= 0) {
-                        objects.add(body.substring(start, index + 1))
-                        start = -1
-                    }
-                }
-            }
-        }
-        require(depth == 0 && objects.isNotEmpty()) { "invalid $notesArrayKey array" }
-        return objects
-    }
-
-    private fun parseSummary(raw: String): NoteSummary = NoteSummary(
-        id = NoteId(readQuotedValue(raw, "id")),
-        title = readQuotedValue(raw, "title"),
-        snippet = readQuotedValue(raw, "snippet"),
-        isInbox = readBoolean(raw, "isInbox"),
-        lastModifiedEpochMillis = readLong(raw, "lastModifiedEpochMillis"),
-        sizeBytes = readOptionalLong(raw, "sizeBytes")
-    )
-
     private fun readQuotedValue(raw: String, key: String): String {
         val token = "\"$key\":\""
         val start = raw.indexOf(token)
         require(start >= 0) { "missing $key" }
         var index = start + token.length
-        val builder = StringBuilder()
+        val valueStart = index
+        var firstEscape = -1
         while (index < raw.length) {
             when {
                 raw[index] == '\\' && index + 1 < raw.length -> {
-                    builder.append(
-                        when (raw[index + 1]) {
-                            '\\' -> '\\'
-                            '"' -> '"'
-                            'n' -> '\n'
-                            'r' -> '\r'
-                            't' -> '\t'
-                            else -> raw[index + 1]
-                        }
-                    )
+                    if (firstEscape < 0) firstEscape = index
                     index += 2
                 }
-                raw[index] == '"' -> break
-                else -> {
-                    builder.append(raw[index])
-                    index += 1
+                raw[index] == '"' ->
+                    return if (firstEscape < 0) {
+                        raw.substring(valueStart, index)
+                    } else {
+                        unescape(raw, valueStart, index)
+                    }
+                else -> index += 1
+            }
+        }
+        error("unterminated $key")
+    }
+
+    private fun unescape(raw: String, start: Int, end: Int): String = buildString(end - start) {
+        var index = start
+        while (index < end) {
+            if (raw[index] != '\\') {
+                append(raw[index++])
+                continue
+            }
+            require(index + 1 < end) { "unterminated escape" }
+            append(
+                when (raw[index + 1]) {
+                    '\\' -> '\\'
+                    '"' -> '"'
+                    'n' -> '\n'
+                    'r' -> '\r'
+                    't' -> '\t'
+                    else -> raw[index + 1]
+                }
+            )
+            index += 2
+        }
+    }
+
+    private class NotesArrayCursor(
+        private val raw: String,
+        start: Int,
+        private val notesArrayKey: String
+    ) {
+        private var index = start
+
+        fun parse(): List<NoteSummary> {
+            val notes = ArrayList<NoteSummary>()
+            skipWhitespace()
+            if (take(']')) return notes
+            while (true) {
+                notes += parseSummary()
+                skipWhitespace()
+                when {
+                    take(',') -> skipWhitespace()
+                    take(']') -> return notes
+                    else -> invalidArray()
                 }
             }
         }
-        return builder.toString()
-    }
 
-    private fun readLong(raw: String, key: String): Long {
-        val token = "\"$key\":"
-        val start = raw.indexOf(token)
-        require(start >= 0) { "missing $key" }
-        val valueStart = start + token.length
-        val valueEnd = raw.indexOf(',', valueStart).let { comma ->
-            if (comma == -1) raw.indexOf('}', valueStart) else comma
+        private fun parseSummary(): NoteSummary {
+            expect('{')
+            expect(ID_TOKEN, "id")
+            val id = readString("id")
+            expect(TITLE_TOKEN, "title")
+            val title = readString("title")
+            expect(SNIPPET_TOKEN, "snippet")
+            val snippet = readString("snippet")
+            expect(IS_INBOX_TOKEN, "isInbox")
+            val isInbox = readBoolean()
+            expect(LAST_MODIFIED_TOKEN, "lastModifiedEpochMillis")
+            val lastModified = readLong()
+            val sizeBytes = if (matches(SIZE_BYTES_TOKEN)) {
+                index += SIZE_BYTES_TOKEN.length
+                readLong()
+            } else {
+                0L
+            }
+            expect('}')
+            return NoteSummary(
+                id = NoteId(id),
+                title = title,
+                snippet = snippet,
+                isInbox = isInbox,
+                lastModifiedEpochMillis = lastModified,
+                sizeBytes = sizeBytes
+            )
         }
-        require(valueEnd > valueStart) { "invalid $key" }
-        return raw.substring(valueStart, valueEnd).trim().toLong()
-    }
 
-    private fun readOptionalLong(raw: String, key: String, default: Long = 0L): Long {
-        val token = "\"$key\":"
-        val start = raw.indexOf(token)
-        if (start < 0) {
-            return default
+        private fun readString(key: String): String {
+            val start = index
+            var firstEscape = -1
+            while (index < raw.length) {
+                when {
+                    raw[index] == '\\' -> {
+                        if (firstEscape < 0) firstEscape = index
+                        index += 2
+                    }
+                    raw[index] == '"' -> {
+                        val end = index++
+                        return if (firstEscape < 0) {
+                            raw.substring(start, end)
+                        } else {
+                            unescape(raw, start, end)
+                        }
+                    }
+                    else -> index += 1
+                }
+            }
+            error("unterminated $key")
         }
-        val valueStart = start + token.length
-        val valueEnd = raw.indexOf(',', valueStart).let { comma ->
-            if (comma == -1) raw.indexOf('}', valueStart) else comma
-        }
-        require(valueEnd > valueStart) { "invalid $key" }
-        return raw.substring(valueStart, valueEnd).trim().toLong()
-    }
 
-    private fun readBoolean(raw: String, key: String): Boolean {
-        val token = "\"$key\":"
-        val start = raw.indexOf(token)
-        require(start >= 0) { "missing $key" }
-        val valueStart = start + token.length
-        val valueEnd = raw.indexOf(',', valueStart).let { comma ->
-            if (comma == -1) raw.indexOf('}', valueStart) else comma
+        private fun readBoolean(): Boolean = when {
+            matches("true") -> true.also { index += 4 }
+            matches("false") -> false.also { index += 5 }
+            else -> invalidArray()
         }
-        require(valueEnd > valueStart) { "invalid $key" }
-        return raw.substring(valueStart, valueEnd).trim().toBooleanStrict()
+
+        private fun readLong(): Long {
+            val start = index
+            if (index < raw.length && raw[index] == '-') index += 1
+            while (index < raw.length && raw[index].isDigit()) index += 1
+            require(index > start && !(index == start + 1 && raw[start] == '-')) {
+                "invalid $notesArrayKey array"
+            }
+            return raw.substring(start, index).toLong()
+        }
+
+        private fun skipWhitespace() {
+            while (index < raw.length && raw[index].isWhitespace()) index += 1
+        }
+
+        private fun take(char: Char): Boolean =
+            (index < raw.length && raw[index] == char).also { matched ->
+                if (matched) index += 1
+            }
+
+        private fun expect(char: Char) {
+            if (!take(char)) invalidArray()
+        }
+
+        private fun expect(token: String, key: String) {
+            require(matches(token)) { "missing $key" }
+            index += token.length
+        }
+
+        private fun matches(token: String): Boolean = raw.startsWith(token, index)
+
+        private fun invalidArray(): Nothing = error("invalid $notesArrayKey array")
     }
 
     private fun escape(value: String): String = buildString(value.length) {
