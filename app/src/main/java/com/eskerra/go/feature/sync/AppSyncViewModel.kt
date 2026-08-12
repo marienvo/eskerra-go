@@ -22,7 +22,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /** App-scoped sync state for the shell indicator and sync screen. */
@@ -54,8 +53,10 @@ class AppSyncViewModel(
     private val _uiState = MutableStateFlow<SyncUiState>(SyncUiState.Loading)
     val uiState: StateFlow<SyncUiState> = _uiState.asStateFlow()
 
-    /** True while a sync is running, held true for [SYNC_SPINNER_HOLD_MS] after it ends so a fast
-     * sync does not flash the shell's sync spinner on and off. */
+    /** Shell-only spinner intent. Automatic no-op fetches remain quiet until they find work. */
+    private val syncSpinnerRequested = MutableStateFlow(false)
+
+    /** Held true for [SYNC_SPINNER_HOLD_MS] after requested work ends to avoid a shell flash. */
     private val _syncSpinnerVisible = MutableStateFlow(false)
     val syncSpinnerVisible: StateFlow<Boolean> = _syncSpinnerVisible.asStateFlow()
 
@@ -69,7 +70,7 @@ class AppSyncViewModel(
 
     init {
         viewModelScope.launch {
-            uiState.map { it is SyncUiState.Syncing }
+            syncSpinnerRequested
                 .holdTrueAtLeast(SYNC_SPINNER_HOLD_MS)
                 .collect { _syncSpinnerVisible.value = it }
         }
@@ -158,11 +159,17 @@ class AppSyncViewModel(
             pendingAutoSync = true
             return
         }
-        startSync(SyncTrigger.Automatic)
+        startSync(
+            trigger = SyncTrigger.Automatic,
+            showSpinnerImmediately = preflight.hasKnownSyncWork()
+        )
     }
 
-    private fun startSync(trigger: SyncTrigger) {
+    private fun startSync(trigger: SyncTrigger, showSpinnerImmediately: Boolean = true) {
         loadJob?.cancel()
+        if (showSpinnerImmediately) {
+            syncSpinnerRequested.value = true
+        }
         val job = viewModelScope.launch(start = CoroutineStart.LAZY) {
             try {
                 var outcome = runSync(trigger)
@@ -188,6 +195,8 @@ class AppSyncViewModel(
                 syncJob = null
                 if (runFollowUp) {
                     processAutoSyncRequest()
+                } else {
+                    syncSpinnerRequested.value = false
                 }
             }
         }
@@ -209,6 +218,9 @@ class AppSyncViewModel(
         )
 
         return syncRunner(config, filesDir) { step ->
+            if (trigger == SyncTrigger.Automatic && step.startsVisibleAutomaticWork()) {
+                syncSpinnerRequested.value = true
+            }
             _uiState.value = SyncUiState.Syncing(
                 status = currentStatus,
                 step = step
@@ -262,6 +274,16 @@ class AppSyncViewModel(
                 SyncRunOutcome.Completed
             }
         )
+    }
+
+    private fun com.eskerra.go.core.model.SyncPreflightSummary.hasKnownSyncWork(): Boolean =
+        inboxChangeCount + nonInboxChangeCount > 0 || aheadCount > 0 || behindCount > 0
+
+    private fun SyncProgressStep.startsVisibleAutomaticWork(): Boolean = when (this) {
+        SyncProgressStep.CommittingInboxChanges,
+        SyncProgressStep.IntegratingRemote,
+        SyncProgressStep.PushingLocalCommits -> true
+        else -> false
     }
 
     private suspend fun emitReadyState(status: com.eskerra.go.core.model.SyncStatusSummary) {
