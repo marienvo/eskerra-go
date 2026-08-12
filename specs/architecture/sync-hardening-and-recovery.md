@@ -151,6 +151,11 @@ Rules:
 - **Failures are silent.** An automatic sync that fails records the attempt and sets
   `SyncUiState.Error`, which surfaces only as the `"!"` shell badge plus detail on the sync screen.
   No toasts, no dialogs. Manual sync keeps its own messaging.
+- **Shell spinner visibility:** manual sync shows the shell spinner from the start, including remote
+  fetch. Automatic sync starts it immediately only when preflight already knows of local changes,
+  local-ahead commits, or remote-behind commits; an otherwise clean automatic fetch remains quiet
+  until it starts committing, integrating remote changes, or pushing. The sync screen still shows
+  progress for every running sync.
 
 Feedback-loop safety: a successful sync calls `markInboxNotesChanged`, which the inbox route answers
 with `refresh()`. `InboxViewModel.refresh()` must therefore never invoke `onInboxMutated` (which is a
