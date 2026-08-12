@@ -60,6 +60,7 @@ import com.eskerra.go.core.usecase.TouchVaultSearchPaths
 import com.eskerra.go.core.usecase.UpdateSyncToken
 import com.eskerra.go.data.credentials.AndroidKeystoreTokenCipher
 import com.eskerra.go.data.credentials.EncryptedCredentialStore
+import com.eskerra.go.data.debug.BootTrace
 import com.eskerra.go.data.git.GitSyncMutex
 import com.eskerra.go.data.git.JGitRemoteSyncRepository
 import com.eskerra.go.data.git.JGitWorkspaceRepository
@@ -104,6 +105,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
+        BootTrace.mark("activity.onCreate")
         var keepSplashOnScreen by mutableStateOf(true)
         splashScreen.setKeepOnScreenCondition { keepSplashOnScreen }
         enableEdgeToEdge(
@@ -288,6 +290,7 @@ class MainActivity : ComponentActivity() {
             podcastPlayerDriver = podcastPlayerDriver
         )
 
+        BootTrace.mark("di.built")
         setContent {
             AppRoot(
                 workspaceStore = workspaceStore,
@@ -347,6 +350,7 @@ class MainActivity : ComponentActivity() {
                 ),
                 onLaunchSettled = {
                     if (keepSplashOnScreen) {
+                        BootTrace.mark("launch-settled")
                         keepSplashOnScreen = false
                     }
                 }

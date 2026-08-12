@@ -5,6 +5,7 @@ import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.NoteRegistryCachePort
 import com.eskerra.go.core.repository.NoteRegistryRepository
 import com.eskerra.go.core.repository.NoteRegistrySnapshotStore
+import com.eskerra.go.data.debug.BootTrace
 import java.io.File
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -45,10 +46,17 @@ class NoteRegistryCache(
      */
     override suspend fun current(config: WorkspaceConfig, filesDir: File): NoteRegistry? {
         _registry.value?.let { return it }
+        val startedAtMs = BootTrace.sinceStartMs()
         return mutex.withLock {
             _registry.value ?: snapshotStore?.read(config, filesDir)?.also { snapshot ->
                 _registry.value = snapshot
             }
+        }.also { resolved ->
+            BootTrace.markSince(
+                "registry.current",
+                startedAtMs,
+                "snapshotHit=${resolved != null} notes=${resolved?.notes?.size ?: 0}"
+            )
         }
     }
 
@@ -60,9 +68,19 @@ class NoteRegistryCache(
      */
     override suspend fun refresh(config: WorkspaceConfig, filesDir: File): Result<NoteRegistry> =
         mutex.withLock {
-            repository.refresh(config, filesDir, _registry.value).onSuccess { fresh ->
+            val startedAtMs = BootTrace.sinceStartMs()
+            val memoBase = _registry.value
+            repository.refresh(config, filesDir, memoBase).onSuccess { fresh ->
                 _registry.value = fresh
                 runCatching { snapshotStore?.save(config, filesDir, fresh) }
+            }.also {
+                // hadMemoBase=false means the incremental scan degenerated into a full re-read of
+                // every note, which is the cold-start cost this round is chasing.
+                BootTrace.markSince(
+                    "registry.refresh",
+                    startedAtMs,
+                    "hadMemoBase=${memoBase != null} memoNotes=${memoBase?.notes?.size ?: 0}"
+                )
             }
         }
 
