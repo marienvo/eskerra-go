@@ -42,7 +42,10 @@ internal fun AppPodcastBootstrap(
         podcastPlayerDriver = podcastPlayerDriver
     )
     val scope = rememberCoroutineScope()
-    var initialNavigationDone by remember(currentConfig) { mutableStateOf(false) }
+    // Deliberately not keyed on currentConfig: boot branch reconciliation pushes a new config
+    // shortly after launch, and re-keying here re-ran the restore and yanked the user from Home
+    // to Episodes mid-session. The initial tab is decided once per composition, not per config.
+    var initialNavigationDone by remember { mutableStateOf(false) }
     val playerState by podcastPlayerDriver.state.collectAsState()
 
     LaunchedEffect(currentConfig, filesDir) {
@@ -68,18 +71,21 @@ internal fun AppPodcastBootstrap(
             filesDir,
             workspaceRoot
         )
+        if (initialNavigationDone) {
+            return@LaunchedEffect
+        }
         val initialRoute = resolveInitialShellRoute(
-            preferredShellMode = restore.preferredShellMode,
-            hasResumablePlayback = restore.hydrated,
+            isActivelyPlaying = restore.isActivelyPlaying,
             hasPendingShare = hasPendingShare
         )
         onPodcastFirstLaunchChanged(shouldDismissSplashWithoutInbox(initialRoute))
-        if (!initialNavigationDone && currentRoute != initialRoute) {
+        // The NavHost already starts on the Home graph, and currentRoute is a stale capture that
+        // is still null this early, so comparing against it would navigate redundantly on every
+        // launch. Only an Episodes decision needs to move the back stack.
+        if (initialRoute != AppRoute.HOME_GRAPH) {
             navController.navigateTab(currentRoute, initialRoute) {}
-            initialNavigationDone = true
-        } else {
-            initialNavigationDone = true
         }
+        initialNavigationDone = true
     }
 
     LaunchedEffect(currentDestination) {

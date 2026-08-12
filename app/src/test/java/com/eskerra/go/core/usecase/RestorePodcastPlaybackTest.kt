@@ -1,6 +1,5 @@
 package com.eskerra.go.core.usecase
 
-import com.eskerra.go.core.model.AppShellMode
 import com.eskerra.go.core.model.EskerraLocalSettings
 import com.eskerra.go.core.model.EskerraSettings
 import com.eskerra.go.core.model.PlaylistEntry
@@ -22,6 +21,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -66,7 +66,6 @@ class RestorePodcastPlaybackTest {
             podcastPlaylistSync = restorePodcastPlaylistSync(),
             localSettingsStore = MutableLocalSettingsStore(
                 EskerraLocalSettings(
-                    lastShellMode = AppShellMode.HOME,
                     podcastEpisodeId = episode.id,
                     podcastMp3Url = episode.mp3Url,
                     podcastPositionMs = 12_000L,
@@ -84,10 +83,87 @@ class RestorePodcastPlaybackTest {
         )
 
         assertTrue(result.hydrated)
-        assertEquals(AppShellMode.PODCASTS, result.preferredShellMode)
+        assertTrue(result.isActivelyPlaying)
         assertEquals(PodcastPlaybackPhase.PLAYING, driver.state.value.phase)
         assertEquals(42_000L, driver.state.value.positionMs)
         assertEquals(episode.id, driver.state.value.activeEpisode?.id)
+    }
+
+    /**
+     * The resume snapshot survives pause and app close by design, so it must prime the mini
+     * player without reporting active playback — otherwise every cold start lands on Episodes.
+     */
+    @Test
+    fun savedSnapshotWithoutLiveSession_hydratesButIsNotPlaying() = runTest {
+        val episode = sampleEpisode()
+        val driver = RestorePodcastPlayerDriver(
+            initialState = PodcastPlaybackState(),
+            nativeSession = null
+        )
+        val restore = RestorePodcastPlayback(
+            loadPodcastCatalog = LoadPodcastCatalog(
+                StaticPodcastCatalogRepository(
+                    PodcastCatalog(allEpisodes = listOf(episode), sections = emptyList())
+                )
+            ),
+            podcastPlaylistSync = restorePodcastPlaylistSync(),
+            localSettingsStore = MutableLocalSettingsStore(
+                EskerraLocalSettings(
+                    podcastEpisodeId = episode.id,
+                    podcastMp3Url = episode.mp3Url,
+                    podcastPositionMs = 12_000L,
+                    podcastDurationMs = 60_000L,
+                    podcastSnapshotUpdatedAtMs = 1_700_000_000_000L
+                )
+            ),
+            podcastPlayerDriver = driver
+        )
+
+        val result = restore(
+            config = config,
+            filesDir = temp.newFolder("files"),
+            workspaceRoot = null
+        )
+
+        assertTrue(result.hydrated)
+        assertFalse(result.isActivelyPlaying)
+        assertEquals(PodcastPlaybackPhase.PRIMED, driver.state.value.phase)
+        assertEquals(episode.id, driver.state.value.activeEpisode?.id)
+    }
+
+    /** A paused native session is a live session, but still must not open Episodes. */
+    @Test
+    fun pausedNativeSession_hydratesButIsNotPlaying() = runTest {
+        val episode = sampleEpisode()
+        val driver = RestorePodcastPlayerDriver(
+            initialState = PodcastPlaybackState(),
+            nativeSession = PodcastNativeSessionSnapshot(
+                episodeId = episode.id,
+                positionMs = 42_000L,
+                durationMs = 60_000L,
+                isPlaying = false
+            )
+        )
+        val restore = RestorePodcastPlayback(
+            loadPodcastCatalog = LoadPodcastCatalog(
+                StaticPodcastCatalogRepository(
+                    PodcastCatalog(allEpisodes = listOf(episode), sections = emptyList())
+                )
+            ),
+            podcastPlaylistSync = restorePodcastPlaylistSync(),
+            localSettingsStore = MutableLocalSettingsStore(EskerraLocalSettings()),
+            podcastPlayerDriver = driver
+        )
+
+        val result = restore(
+            config = config,
+            filesDir = temp.newFolder("files"),
+            workspaceRoot = null
+        )
+
+        assertTrue(result.hydrated)
+        assertFalse(result.isActivelyPlaying)
+        assertEquals(PodcastPlaybackPhase.PAUSED, driver.state.value.phase)
     }
 
     private fun restorePodcastPlaylistSync(): PodcastPlaylistSync {

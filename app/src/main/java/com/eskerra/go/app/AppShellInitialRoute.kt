@@ -4,16 +4,19 @@ import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hierarchy
 import com.eskerra.go.core.model.AppShellMode
 
+/**
+ * Home is the default landing tab. Only audio that is genuinely playing at launch (continued in
+ * the background, or opened from the notification) may start the app on Episodes; a merely
+ * resumable episode stays in the mini player and does not move the user off Home.
+ */
 internal fun resolveInitialShellRoute(
-    preferredShellMode: AppShellMode,
-    hasResumablePlayback: Boolean,
+    isActivelyPlaying: Boolean,
     hasPendingShare: Boolean = false
 ): String = when {
-    // A share was the reason the app opened: it wins over resumable playback, because the
+    // A share was the reason the app opened: it wins over active playback, because the
     // compose pill only exists in the Home graph.
     hasPendingShare -> AppRoute.HOME_GRAPH
-    hasResumablePlayback -> AppRoute.PODCASTS_GRAPH
-    preferredShellMode == AppShellMode.PODCASTS -> AppRoute.PODCASTS_GRAPH
+    isActivelyPlaying -> AppRoute.PODCASTS_GRAPH
     else -> AppRoute.HOME_GRAPH
 }
 

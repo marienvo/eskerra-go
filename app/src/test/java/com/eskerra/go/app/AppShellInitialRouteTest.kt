@@ -10,47 +10,30 @@ import org.junit.Test
 class AppShellInitialRouteTest {
 
     @Test
-    fun resumablePlayback_opensPodcasts() {
+    fun activePlayback_opensPodcasts() {
         assertEquals(
             AppRoute.PODCASTS_GRAPH,
-            resolveInitialShellRoute(
-                preferredShellMode = AppShellMode.HOME,
-                hasResumablePlayback = true
-            )
+            resolveInitialShellRoute(isActivelyPlaying = true)
         )
     }
 
     @Test
-    fun pendingShare_beatsResumablePlayback() {
+    fun pendingShare_beatsActivePlayback() {
         assertEquals(
             AppRoute.HOME_GRAPH,
             resolveInitialShellRoute(
-                preferredShellMode = AppShellMode.PODCASTS,
-                hasResumablePlayback = true,
+                isActivelyPlaying = true,
                 hasPendingShare = true
             )
         )
     }
 
+    /** A paused-but-resumable episode must not steal the launch away from Notes. */
     @Test
-    fun lastPodcastMode_opensPodcastsWithoutResumablePlayback() {
-        assertEquals(
-            AppRoute.PODCASTS_GRAPH,
-            resolveInitialShellRoute(
-                preferredShellMode = AppShellMode.PODCASTS,
-                hasResumablePlayback = false
-            )
-        )
-    }
-
-    @Test
-    fun defaultHome_opensInbox() {
+    fun resumableButNotPlaying_opensHome() {
         assertEquals(
             AppRoute.HOME_GRAPH,
-            resolveInitialShellRoute(
-                preferredShellMode = AppShellMode.HOME,
-                hasResumablePlayback = false
-            )
+            resolveInitialShellRoute(isActivelyPlaying = false)
         )
     }
 
