@@ -79,17 +79,31 @@ phase above appears as `<phase>_median_ms` and `<phase>_p90_ms`, alongside `samp
 `median_note_count` and the three hit rates.
 
 Fetch it with the Sentry Web API (org `personal-133`, project `eskerra-go`, per
-[sentry.properties](../../../sentry.properties)), authenticating with `SENTRY_AUTH_TOKEN` from
-the environment:
+[sentry.properties](../../../sentry.properties)), authenticating with `SENTRY_AUTH_TOKEN`. The
+token needs `org:read`, `project:read` and `event:read`.
+
+Because the event carries a fixed fingerprint, every weekly report groups into **one** issue, so
+this is a two-step fetch — find the issue, then read its events:
 
 ```bash
+# 1. the single issue holding every weekly report (verified: 200, [] until the first report)
 curl -sS -H "Authorization: Bearer $SENTRY_AUTH_TOKEN" \
-  "https://sentry.io/api/0/projects/personal-133/eskerra-go/events/?query=perf.report%3Acold_start_weekly&statsPeriod=90d"
+  "https://sentry.io/api/0/projects/personal-133/eskerra-go/issues/?query=perf.report%3Acold_start_weekly"
+
+# 2. the reports themselves; the phase numbers are in contexts.cold_start of each event
+curl -sS -H "Authorization: Bearer $SENTRY_AUTH_TOKEN" \
+  "https://sentry.io/api/0/issues/<issue-id>/events/?full=true"
 ```
 
-**If `SENTRY_AUTH_TOKEN` is not set, or the request fails, stop and record the check under
+The two newest events are the week-over-week comparison. Do not use the project `events/`
+endpoint with a `query` parameter — its tag filtering is unreliable; the issues search above is
+the supported path.
+
+**If `SENTRY_AUTH_TOKEN` is not set, or either request fails, stop and record the check under
 `Triage not checked`.** Never guess at a trend, and never present an unfetched number as
-evidence. Most planning sessions will land here.
+evidence. Note that `SENTRY_AUTH_TOKEN` may be exported from `~/.zshrc.local`, which zsh only
+loads for interactive shells — an agent shell is not interactive, so the variable can be absent
+even though it works in a terminal. Treat that as "not checked", not as "no telemetry".
 
 ### Regression thresholds
 
