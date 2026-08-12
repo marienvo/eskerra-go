@@ -27,7 +27,7 @@ if ! adb devices | awk 'NR > 1 && $2 == "device" { found = 1 } END { exit !found
   exit 1
 fi
 
-OUT_DIR="$ROOT/.cursor"
+OUT_DIR="$ROOT/.perf"
 mkdir -p "$OUT_DIR"
 TRACE_LOG="$OUT_DIR/cold-start-${LABEL}.log"
 : >"$TRACE_LOG"
