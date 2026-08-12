@@ -322,6 +322,7 @@ class MainActivity : ComponentActivity() {
                 clearRemoteSyncSettings = clearRemoteSyncSettings,
                 testRemoteConnection = testRemoteConnection,
                 reconcileWorkspaceSyncBranch = reconcileWorkspaceSyncBranch,
+                reportWeeklyPerformance = buildWeeklyPerformanceReporting(applicationContext),
                 loadVaultSettings = loadVaultSettings,
                 saveVaultSettings = saveVaultSettings,
                 loadLocalSettings = loadLocalSettings,

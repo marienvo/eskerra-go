@@ -11,6 +11,8 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ProcessLifecycleOwner
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.usecase.ReconcileWorkspaceSyncBranch
+import com.eskerra.go.core.usecase.ReportWeeklyPerformance
+import com.eskerra.go.data.perf.ColdStartTrace
 import com.eskerra.go.feature.sync.AppSyncViewModel
 import java.io.File
 
@@ -21,9 +23,22 @@ internal fun AppBootEffects(
     launchSettled: Boolean,
     reconcileWorkspaceSyncBranch: ReconcileWorkspaceSyncBranch,
     appSyncViewModel: AppSyncViewModel,
+    reportWeeklyPerformance: ReportWeeklyPerformance,
     onConfigUpdated: (WorkspaceConfig) -> Unit,
     onConfigChanged: (WorkspaceConfig) -> Unit
 ) {
+    // Own effect, so recording never delays the boot sync. Gated on the same launchSettled +
+    // one-frame invariant: telemetry about the launch must not be part of the launch.
+    val perfReported = remember { mutableStateOf(false) }
+    LaunchedEffect(launchSettled) {
+        if (!launchSettled || perfReported.value) {
+            return@LaunchedEffect
+        }
+        perfReported.value = true
+        withFrameNanos { }
+        reportWeeklyPerformance(ColdStartTrace.consumeSample())
+    }
+
     // Keyed to the ViewModel: AppSyncViewModel is recreated when remoteUri/branch changes
     // (syncViewModelKey). A composition-lifetime flag would leave the new instance stuck in
     // SyncUiState.Loading with no automatic status advance.
