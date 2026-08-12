@@ -5,7 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.BootCacheStore
-import com.eskerra.go.data.debug.BootTrace
+import com.eskerra.go.data.perf.ColdStartTrace
 import com.eskerra.go.data.workspace.GateFingerprintComputer
 import com.eskerra.go.data.workspace.WorkspaceStore
 import com.eskerra.go.data.workspace.resolveAppGateState
@@ -44,8 +44,8 @@ class AppGateViewModel(
     }
 
     private suspend fun resolveGate() {
-        BootTrace.mark("gate.start")
-        val stored = workspaceStore.read().also { BootTrace.mark("gate.storeRead") } ?: run {
+        ColdStartTrace.markGateStart()
+        val stored = workspaceStore.read().also { ColdStartTrace.log("gate.storeRead") } ?: run {
             _gateState.value = withContext(ioDispatcher) {
                 resolveAppGateState(null, filesDir)
             }
@@ -55,13 +55,12 @@ class AppGateViewModel(
         val computedFingerprint = withContext(ioDispatcher) {
             GateFingerprintComputer.compute(stored, filesDir)
         }
-        BootTrace.mark("gate.fingerprintComputed")
+        ColdStartTrace.log("gate.fingerprintComputed")
         val cachedFingerprint = bootCacheStore.readFingerprint()
-        BootTrace.mark("gate.fingerprintRead", "hit=${cachedFingerprint == computedFingerprint}")
 
         if (cachedFingerprint != null && cachedFingerprint == computedFingerprint) {
             _gateState.value = AppGateState.Ready(stored)
-            BootTrace.mark("gate.ready", "path=fingerprintHit")
+            ColdStartTrace.markGateReady(fingerprintHit = true, path = "fingerprintHit")
             startBackgroundValidation(stored)
             return
         }
@@ -70,7 +69,10 @@ class AppGateViewModel(
             resolveAppGateState(stored, filesDir)
         }
         _gateState.value = localState
-        BootTrace.mark("gate.ready", "path=fullResolve state=${localState::class.simpleName}")
+        ColdStartTrace.markGateReady(
+            fingerprintHit = false,
+            path = "fullResolve/${localState::class.simpleName}"
+        )
         if (localState is AppGateState.Ready) {
             bootCacheStore.saveFingerprint(computedFingerprint)
             startBackgroundValidation(stored)

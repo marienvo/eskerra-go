@@ -60,7 +60,6 @@ import com.eskerra.go.core.usecase.TouchVaultSearchPaths
 import com.eskerra.go.core.usecase.UpdateSyncToken
 import com.eskerra.go.data.credentials.AndroidKeystoreTokenCipher
 import com.eskerra.go.data.credentials.EncryptedCredentialStore
-import com.eskerra.go.data.debug.BootTrace
 import com.eskerra.go.data.git.GitSyncMutex
 import com.eskerra.go.data.git.JGitRemoteSyncRepository
 import com.eskerra.go.data.git.JGitWorkspaceRepository
@@ -73,6 +72,7 @@ import com.eskerra.go.data.notes.FileNoteWriteRepository
 import com.eskerra.go.data.notes.NoteContentCache
 import com.eskerra.go.data.notes.NoteRegistryCache
 import com.eskerra.go.data.notes.ParsedMarkdownCache
+import com.eskerra.go.data.perf.ColdStartTrace
 import com.eskerra.go.data.player.Media3PodcastPlayerDriver
 import com.eskerra.go.data.podcast.FilePodcastCatalogRepository
 import com.eskerra.go.data.podcast.FilePodcastCatalogSnapshotStore
@@ -105,7 +105,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
-        BootTrace.mark("activity.onCreate")
+        ColdStartTrace.markActivityOnCreate()
         var keepSplashOnScreen by mutableStateOf(true)
         splashScreen.setKeepOnScreenCondition { keepSplashOnScreen }
         enableEdgeToEdge(
@@ -290,7 +290,7 @@ class MainActivity : ComponentActivity() {
             podcastPlayerDriver = podcastPlayerDriver
         )
 
-        BootTrace.mark("di.built")
+        ColdStartTrace.markDiBuilt()
         setContent {
             AppRoot(
                 workspaceStore = workspaceStore,
@@ -350,7 +350,7 @@ class MainActivity : ComponentActivity() {
                 ),
                 onLaunchSettled = {
                     if (keepSplashOnScreen) {
-                        BootTrace.mark("launch-settled")
+                        ColdStartTrace.markSettled()
                         keepSplashOnScreen = false
                     }
                 }

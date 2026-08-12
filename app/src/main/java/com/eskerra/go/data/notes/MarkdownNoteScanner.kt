@@ -8,7 +8,7 @@ import com.eskerra.go.core.model.NotePath
 import com.eskerra.go.core.model.NoteRegistry
 import com.eskerra.go.core.model.NoteSummary
 import com.eskerra.go.core.vault.VaultVisibility
-import com.eskerra.go.data.debug.BootTrace
+import com.eskerra.go.data.perf.ColdStartTrace
 import java.io.File
 import java.nio.file.FileVisitResult
 import java.nio.file.Files
@@ -33,7 +33,7 @@ class MarkdownNoteScanner : NoteWorkspaceScanner {
         val root = workspaceDir.canonicalFile
         val summaries = mutableListOf<NoteSummary>()
         val previousByPath = previousRegistry?.notes?.associateBy { it.id.value } ?: emptyMap()
-        val scanStartedAtMs = BootTrace.sinceStartMs()
+        val scanStartedAtMs = ColdStartTrace.sinceStartMs()
         var reReadCount = 0
 
         try {
@@ -107,10 +107,10 @@ class MarkdownNoteScanner : NoteWorkspaceScanner {
             )
         }
 
-        BootTrace.markSince(
-            "scanner.scan",
-            scanStartedAtMs,
-            "visited=${summaries.size} reRead=$reReadCount memoHits=${summaries.size - reReadCount}"
+        ColdStartTrace.markScan(
+            tookMs = ColdStartTrace.sinceStartMs() - scanStartedAtMs,
+            visited = summaries.size,
+            reRead = reReadCount
         )
         return Result.success(NoteRegistry.fromNotes(summaries))
     }
