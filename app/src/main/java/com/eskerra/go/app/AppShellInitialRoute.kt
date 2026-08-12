@@ -20,9 +20,6 @@ internal fun resolveInitialShellRoute(
     else -> AppRoute.HOME_GRAPH
 }
 
-internal fun shellModeForDestination(destination: NavDestination?): AppShellMode? =
-    shellModeForRouteHierarchy(destination?.hierarchy?.map { it.route }.orEmpty())
-
 internal fun topLevelGraphRouteForDestination(destination: NavDestination?): String? =
     topLevelGraphRouteForHierarchy(destination?.hierarchy?.map { it.route }.orEmpty())
 

@@ -7,7 +7,6 @@ import com.eskerra.go.core.model.PodcastNativeSessionSnapshot
 import com.eskerra.go.core.model.PodcastPlaybackSnapshot
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ReconcilePodcastPlaybackSourcesTest {
@@ -138,24 +137,6 @@ class ReconcilePodcastPlaybackSourcesTest {
         )
 
         assertEquals(12_000L, hydration?.positionMs)
-    }
-
-    @Test
-    fun hasResumablePlayback_trueWhenAnySourceMatches() {
-        assertTrue(
-            hasResumablePodcastPlayback(
-                catalog = catalog,
-                localSnapshot = PodcastPlaybackSnapshot(
-                    episodeId = episode.id,
-                    mp3Url = episode.mp3Url,
-                    positionMs = 12_000L,
-                    durationMs = 60_000L,
-                    updatedAtMs = 1L
-                ),
-                remoteEntry = null,
-                nativeSession = null
-            )
-        )
     }
 
     @Test

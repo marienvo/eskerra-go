@@ -7,7 +7,6 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import com.eskerra.go.core.model.AppShellMode
 import com.eskerra.go.core.model.EskerraLocalSettings
 import com.eskerra.go.core.repository.LocalSettingsStore
 import kotlinx.coroutines.flow.first
@@ -23,7 +22,6 @@ private object Keys {
     val deviceInstanceId = stringPreferencesKey("device_instance_id")
     val playlistKnownUpdatedAtMs = longPreferencesKey("playlist_known_updated_at_ms")
     val playlistKnownControlRevision = longPreferencesKey("playlist_known_control_revision")
-    val lastShellMode = stringPreferencesKey("last_shell_mode")
     val podcastEpisodeId = stringPreferencesKey("podcast_episode_id")
     val podcastMp3Url = stringPreferencesKey("podcast_mp3_url")
     val podcastPositionMs = longPreferencesKey("podcast_position_ms")
@@ -48,7 +46,6 @@ class DataStoreLocalSettingsStore(private val dataStore: DataStore<Preferences>)
                 ?.takeIf { it != NULL_LONG },
             playlistKnownControlRevision = prefs[Keys.playlistKnownControlRevision]
                 ?.takeIf { it != NULL_LONG },
-            lastShellMode = AppShellMode.fromStored(prefs[Keys.lastShellMode]),
             podcastEpisodeId = prefs[Keys.podcastEpisodeId],
             podcastMp3Url = prefs[Keys.podcastMp3Url],
             podcastPositionMs = prefs[Keys.podcastPositionMs]?.takeIf { it != NULL_LONG },
@@ -67,7 +64,6 @@ class DataStoreLocalSettingsStore(private val dataStore: DataStore<Preferences>)
                 settings.playlistKnownUpdatedAtMs ?: NULL_LONG
             prefs[Keys.playlistKnownControlRevision] =
                 settings.playlistKnownControlRevision ?: NULL_LONG
-            prefs[Keys.lastShellMode] = settings.lastShellMode.name
             if (settings.podcastEpisodeId == null) {
                 prefs.remove(Keys.podcastEpisodeId)
                 prefs.remove(Keys.podcastMp3Url)

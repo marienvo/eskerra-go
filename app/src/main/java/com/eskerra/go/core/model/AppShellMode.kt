@@ -1,12 +1,7 @@
 package com.eskerra.go.core.model
 
-/** Last selected top-level shell tab. Per-device only; never synced via git. */
+/** Which top-level shell tab the current destination belongs to. Not persisted. */
 enum class AppShellMode {
     HOME,
-    PODCASTS;
-
-    companion object {
-        fun fromStored(value: String?): AppShellMode =
-            entries.firstOrNull { it.name == value } ?: HOME
-    }
+    PODCASTS
 }

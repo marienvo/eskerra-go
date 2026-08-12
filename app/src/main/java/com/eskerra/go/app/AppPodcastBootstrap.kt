@@ -9,7 +9,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.navigation.NavDestination
 import androidx.navigation.NavHostController
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.playlist.toPersistedSnapshot
@@ -33,7 +32,6 @@ internal fun AppPodcastBootstrap(
     loadPodcastArtwork: LoadPodcastArtwork,
     playlistPollingHost: PlaylistR2PollingHost?,
     bridge: PodcastShellBridge,
-    currentDestination: NavDestination?,
     hasPendingShare: Boolean,
     onPodcastFirstLaunchChanged: (Boolean) -> Unit
 ) {
@@ -86,12 +84,6 @@ internal fun AppPodcastBootstrap(
             navController.navigateTab(currentRoute, initialRoute) {}
         }
         initialNavigationDone = true
-    }
-
-    LaunchedEffect(currentDestination) {
-        shellModeForDestination(currentDestination)?.let {
-            podcastShellStateWiring.persistAppShellMode(it)
-        }
     }
 
     // Persist-only. Never clear the snapshot reactively: on launch this effect first runs against

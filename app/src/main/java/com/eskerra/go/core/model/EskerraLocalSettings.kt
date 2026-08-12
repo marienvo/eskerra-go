@@ -7,7 +7,6 @@ data class EskerraLocalSettings(
     val deviceInstanceId: String = "",
     val playlistKnownUpdatedAtMs: Long? = null,
     val playlistKnownControlRevision: Long? = null,
-    val lastShellMode: AppShellMode = AppShellMode.HOME,
     val podcastEpisodeId: String? = null,
     val podcastMp3Url: String? = null,
     val podcastPositionMs: Long? = null,

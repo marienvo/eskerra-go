@@ -232,7 +232,6 @@ fun App(
         loadPodcastArtwork = loadPodcastArtwork,
         playlistPollingHost = playlistPollingHost,
         bridge = podcastShellBridge,
-        currentDestination = currentDestination,
         hasPendingShare = shareIntake.pendingShare != null,
         onPodcastFirstLaunchChanged = onPodcastFirstLaunchChanged
     )
