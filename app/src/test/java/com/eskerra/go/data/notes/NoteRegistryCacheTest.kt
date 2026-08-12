@@ -68,9 +68,12 @@ class NoteRegistryCacheTest {
     fun refresh_publishesResult_andPersistsSnapshot() = runTest {
         val fresh = registryOf("Fresh")
         val store = FakeSnapshotStore()
-        val cache = NoteRegistryCache(repositoryReturning(fresh), store)
+        val cache = NoteRegistryCache(repositoryReturning(fresh), store, this)
 
         val result = cache.refresh(config, filesDir)
+
+        assertEquals(0, store.saveCount)
+        advanceUntilIdle()
 
         assertEquals(fresh, result.getOrThrow())
         assertEquals(fresh, cache.registry.value)
@@ -100,9 +103,10 @@ class NoteRegistryCacheTest {
             listOf(Result.success(good), Result.failure(RuntimeException("boom")))
         )
         val store = FakeSnapshotStore()
-        val cache = NoteRegistryCache(repository, store)
+        val cache = NoteRegistryCache(repository, store, this)
 
         cache.refresh(config, filesDir)
+        advanceUntilIdle()
         val failed = cache.refresh(config, filesDir)
 
         assertTrue(failed.isFailure)
@@ -116,9 +120,10 @@ class NoteRegistryCacheTest {
     fun refresh_succeedsWhenSnapshotSaveFails() = runTest {
         val fresh = registryOf("Fresh")
         val store = FailingSnapshotStore()
-        val cache = NoteRegistryCache(repositoryReturning(fresh), store)
+        val cache = NoteRegistryCache(repositoryReturning(fresh), store, this)
 
         val result = cache.refresh(config, filesDir)
+        advanceUntilIdle()
 
         assertEquals(fresh, result.getOrThrow())
         assertEquals(fresh, cache.registry.value)
@@ -128,8 +133,9 @@ class NoteRegistryCacheTest {
     @Test
     fun invalidate_dropsInMemoryAndSnapshot() = runTest {
         val store = FakeSnapshotStore()
-        val cache = NoteRegistryCache(repositoryReturning(registryOf("A")), store)
+        val cache = NoteRegistryCache(repositoryReturning(registryOf("A")), store, this)
         cache.refresh(config, filesDir)
+        advanceUntilIdle()
         assertEquals(1, store.saveCount)
 
         cache.invalidate(config, filesDir)
@@ -138,6 +144,35 @@ class NoteRegistryCacheTest {
         assertNull(store.stored)
         assertEquals(1, store.clearCount)
         assertNull(cache.current(config, filesDir))
+    }
+
+    @Test
+    fun refresh_doesNotPersistRegistryUnchangedFromSnapshot() = runTest {
+        val unchanged = registryOf("Unchanged")
+        val store = FakeSnapshotStore(stored = unchanged)
+        val cache = NoteRegistryCache(repositoryReturning(unchanged), store, this)
+        cache.current(config, filesDir)
+
+        val result = cache.refresh(config, filesDir)
+        advanceUntilIdle()
+
+        assertEquals(unchanged, result.getOrThrow())
+        assertEquals(0, store.saveCount)
+    }
+
+    @Test
+    fun refresh_persistsRegistryChangedFromSnapshot() = runTest {
+        val cached = registryOf("Cached")
+        val fresh = registryOf("Fresh")
+        val store = FakeSnapshotStore(stored = cached)
+        val cache = NoteRegistryCache(repositoryReturning(fresh), store, this)
+        cache.current(config, filesDir)
+
+        cache.refresh(config, filesDir)
+        advanceUntilIdle()
+
+        assertEquals(fresh, store.stored)
+        assertEquals(1, store.saveCount)
     }
 
     @Test

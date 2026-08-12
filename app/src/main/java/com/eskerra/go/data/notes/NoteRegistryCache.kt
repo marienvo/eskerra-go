@@ -7,9 +7,13 @@ import com.eskerra.go.core.repository.NoteRegistryRepository
 import com.eskerra.go.core.repository.NoteRegistrySnapshotStore
 import com.eskerra.go.data.perf.ColdStartTrace
 import java.io.File
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -21,7 +25,8 @@ import kotlinx.coroutines.sync.withLock
  * - [current] serves the cached registry without scanning (in-memory → persisted snapshot → null).
  *   The in-memory hit path is lock-free, so reads stay instant even while a [refresh] is running.
  * - [refresh] incrementally rescans (reusing the cached registry as the memo base via
- *   [NoteRegistryRepository.refresh]), publishes to [registry], and persists a snapshot.
+ *   [NoteRegistryRepository.refresh]), publishes to [registry], and persists changed snapshots
+ *   asynchronously.
  * - [invalidate] marks the cache out of date after a known local mutation.
  *
  * A [Mutex] serializes refresh / cold-load / invalidate so concurrent callers never trigger
@@ -31,7 +36,8 @@ import kotlinx.coroutines.sync.withLock
  */
 class NoteRegistryCache(
     private val repository: NoteRegistryRepository,
-    private val snapshotStore: NoteRegistrySnapshotStore? = null
+    private val snapshotStore: NoteRegistrySnapshotStore? = null,
+    private val snapshotScope: CoroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 ) : NoteRegistryCachePort {
 
     private val mutex = Mutex()
@@ -61,10 +67,10 @@ class NoteRegistryCache(
     }
 
     /**
-     * Incrementally rescans the workspace, publishes the result to [registry], and persists a
-     * snapshot. A failed revalidation leaves the previously cached value intact (stale-while-
-     * revalidate). Concurrent calls are serialized; the later one rescans against the now-fresh
-     * registry, so it remains an incremental (cheap) pass.
+     * Incrementally rescans the workspace, publishes the result to [registry], and asynchronously
+     * persists a changed snapshot. A failed revalidation leaves the previously cached value intact
+     * (stale-while-revalidate). Concurrent calls are serialized; the later one rescans against the
+     * now-fresh registry, so it remains an incremental (cheap) pass.
      */
     override suspend fun refresh(config: WorkspaceConfig, filesDir: File): Result<NoteRegistry> =
         mutex.withLock {
@@ -72,7 +78,11 @@ class NoteRegistryCache(
             val memoBase = _registry.value
             repository.refresh(config, filesDir, memoBase).onSuccess { fresh ->
                 _registry.value = fresh
-                runCatching { snapshotStore?.save(config, filesDir, fresh) }
+                if (memoBase == null || fresh != memoBase) {
+                    snapshotScope.launch {
+                        runCatching { snapshotStore?.save(config, filesDir, fresh) }
+                    }
+                }
             }.also {
                 // hadMemoBase=false means the incremental scan degenerated into a full re-read of
                 // every note, which is the most expensive shape a cold start can take.

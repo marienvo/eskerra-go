@@ -33,6 +33,10 @@ source of truth for sync progress and the shell's spinner, and `app/` keeps
 only the composition-root wiring that constructs it. Do not introduce a second
 holder of sync progress anywhere.
 
+The sync screen reflects every `SyncUiState.Syncing` transition. The shell spinner is deliberately
+narrower: manual sync starts it immediately, while automatic sync keeps a clean fetch quiet until
+known or newly discovered local/remote work needs committing, integration, or pushing.
+
 **Settings slice decision (2026-08-08):** there is deliberately **no
 `feature/settings/`**. Settings today are sync-centric — remote, token, R2,
 device name — so they live with the sync UI. Revisit only when parity P2
