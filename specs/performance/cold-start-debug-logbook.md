@@ -149,3 +149,62 @@ worth removing.
 Note that the pre-measurement favourite (the `current()`/`refresh()` mutex race deciding whether the
 scan gets a memo base) turned out to be real but secondary: it only bites on fingerprint-miss runs,
 which `H05` addresses more directly.
+
+---
+
+## 2026-08-12 — H04: skip and defer registry snapshot writes
+
+**H04.** An unchanged incremental scan rewrites the same registry snapshot synchronously before
+launch can settle. Skipping identical registries and launching changed snapshot saves on a
+supervised I/O scope should remove almost all of `registry.refresh − scanner.scan` from unchanged
+cold starts without changing the registry published to readers.
+
+**Change ready for measurement.** Commit `d506107` compares the fresh registry with the memo base,
+skips identical saves, and runs required saves outside the refresh critical path. Tests cover an
+unchanged snapshot, changed and absent memo bases, deferred execution, and an isolated save failure.
+
+**Conditions.** The before data is the 2026-08-12 physical-device/debug-build baseline above: 1161
+notes, 7 valid cold starts, with write attribution available for 5 fingerprint-hit runs in
+`.perf/cold-start-before.log`. No after run could be collected in this session: `adb devices -l`
+reported no connected device, and no local Android emulator/AVD was available.
+
+| Metric | Before | N before | After | N after |
+|---|---:|---:|---:|---:|
+| launch-settled median | 3269 ms | 7 | Pending | 0 |
+| snapshot write (`registry.refresh − scanner.scan`) median | 648 ms | 5 | Pending | 0 |
+
+**Classification: Pending.**
+
+**Conclusion.** The implementation and full quality gate are complete, but its startup effect is
+not yet established. Install commit `d506107` or later on the same device and run
+`scripts/measure-cold-start.sh 7 after-snapshot`; do not treat the expected write reduction as a
+measured result.
+
+## 2026-08-12 — H05: decode the snapshot with one cursor
+
+**H05.** The shared snapshot decoder performs repeated whole-object searches, copies one substring
+per note object, and always allocates builders while unescaping. A single advancing cursor with a
+no-escape fast path should reduce `registry.current` while preserving the exact registry/inbox wire
+format and legacy snapshots without `sizeBytes`.
+
+**Change ready for measurement.** Commit `880ea28` parses fixed-order note fields directly from the
+source string, uses constant field tokens and a substring fast path for unescaped values, and skips
+registry sorting after an O(n) sortedness check. All registry/inbox codec and corrupt-file store
+tests pass, including literal-backslash, unterminated-string, legacy, delimiter-in-snippet, and
+hand-written unsorted-registry cases.
+
+**Conditions.** Same intended A/B conditions as H04. The before data is the 2026-08-12
+physical-device/debug-build baseline (1161 notes, 7 valid cold starts). The after measurement is
+blocked by the same absent Android device/emulator, so no substitute benchmark is presented as cold
+start evidence.
+
+| Metric | Before | N before | After | N after |
+|---|---:|---:|---:|---:|
+| launch-settled median | 3269 ms | 7 | Pending | 0 |
+| registry snapshot read median | 743 ms | 7 | Pending | 0 |
+
+**Classification: Pending.**
+
+**Conclusion.** Format compatibility and failure handling are verified, but the decoder's cold-JIT
+device cost remains unknown. Complete the shared seven-run after measurement before updating the
+boot architecture spec or classifying either H04 or H05 as significant.
