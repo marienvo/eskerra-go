@@ -1,6 +1,7 @@
 package com.eskerra.go.core.inbox
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class InboxMarkdownFileNameTest {
@@ -29,10 +30,31 @@ class InboxMarkdownFileNameTest {
     }
 
     @Test
-    fun sanitizeFileName_fallsBackToTimestampWhenBlank() {
+    fun sanitizeFileName_fallsBackToPortableNameWhenBlank() {
         assertEquals(
-            "note-123",
+            "untitled",
             InboxMarkdownFileName.sanitizeFileName("   ", nowEpochMillis = 123)
         )
+    }
+
+    @Test
+    fun sanitizeFileName_isPortableAcrossWindowsAndMacos() {
+        assertEquals("_CON", InboxMarkdownFileName.sanitizeFileName(" CON. "))
+        assertEquals("RoadMap", InboxMarkdownFileName.sanitizeFileName("Road/Map"))
+        assertEquals("caf\u00e9", InboxMarkdownFileName.sanitizeFileName("cafe\u0301"))
+        assertEquals("quotes", InboxMarkdownFileName.sanitizeFileName("'\u201Cquotes\u201D`"))
+    }
+
+    @Test
+    fun pickNextInboxMarkdownFileName_usesPortableCollisionKeyAndByteBudget() {
+        assertEquals(
+            "Cafe-2.md",
+            InboxMarkdownFileName.pickNextInboxMarkdownFileName("Cafe", setOf("cafe.md"))
+        )
+        val fileName = InboxMarkdownFileName.pickNextInboxMarkdownFileName(
+            "\uD83D\uDE00".repeat(100),
+            emptySet()
+        )
+        assertTrue(fileName.toByteArray().size <= 255)
     }
 }
