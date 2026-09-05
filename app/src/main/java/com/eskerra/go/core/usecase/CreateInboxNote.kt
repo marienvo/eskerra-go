@@ -86,9 +86,16 @@ class CreateInboxNote(
         hubFolder: String
     ): Result<NotePath> {
         val inboxPrefix = InboxNotePath.inboxPrefixFor(hubFolder)
+        val templatePath = NotePath.fromRelativePath(
+            inboxPrefix + InboxMarkdownFileName.markdownFileNameForStem(stem)
+        ).getOrElse {
+            return Result.failure(CreateNoteException(CreateNoteError.WriteFailed(it.message)))
+        }
+        val occupiedNames = writeRepository.listSiblingNames(config, filesDir, templatePath)
+            .getOrElse { error -> return Result.failure(mapWriteFailure(error)) }
+            .toMutableSet()
         for (attempt in 1..maxCollisionAttempts) {
-            val suffix = if (attempt == 1) "" else "-$attempt"
-            val filename = InboxMarkdownFileName.markdownFileNameForStem(stem, suffix)
+            val filename = InboxMarkdownFileName.pickNextInboxMarkdownFileName(stem, occupiedNames)
             val candidatePath = inboxPrefix + filename
 
             val notePath = NotePath.fromRelativePath(candidatePath).getOrElse {
@@ -112,6 +119,7 @@ class CreateInboxNote(
             if (!exists) {
                 return Result.success(notePath)
             }
+            occupiedNames += filename
         }
 
         return Result.failure(
