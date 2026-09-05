@@ -1,5 +1,6 @@
 package com.eskerra.go.core.usecase
 
+import com.eskerra.go.core.inbox.InboxMarkdownFileName
 import com.eskerra.go.core.inbox.InboxNotePath
 import com.eskerra.go.core.model.CreateInboxNoteResult
 import com.eskerra.go.core.model.CreateNoteError
@@ -85,14 +86,10 @@ class CreateInboxNote(
         hubFolder: String
     ): Result<NotePath> {
         val inboxPrefix = InboxNotePath.inboxPrefixFor(hubFolder)
-        val basePath = "$inboxPrefix$stem$MARKDOWN_SUFFIX"
-
         for (attempt in 1..maxCollisionAttempts) {
-            val candidatePath = if (attempt == 1) {
-                basePath
-            } else {
-                "$inboxPrefix$stem-$attempt$MARKDOWN_SUFFIX"
-            }
+            val suffix = if (attempt == 1) "" else "-$attempt"
+            val filename = InboxMarkdownFileName.markdownFileNameForStem(stem, suffix)
+            val candidatePath = inboxPrefix + filename
 
             val notePath = NotePath.fromRelativePath(candidatePath).getOrElse {
                 return Result.failure(

@@ -57,7 +57,7 @@ class InboxNoteDraftTest {
     }
 
     @Test
-    fun toFilenameStem_fallsBackToTimestampWhenBlank() {
-        assertEquals("note-999", InboxNoteDraft.toFilenameStem("   ", nowEpochMillis = 999))
+    fun toFilenameStem_fallsBackToPortableNameWhenBlank() {
+        assertEquals("untitled", InboxNoteDraft.toFilenameStem("   ", nowEpochMillis = 999))
     }
 }
