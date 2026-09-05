@@ -23,6 +23,7 @@ class FakeNoteWriteRepository(
     var deleteCount: Int = 0
         private set
     private var deleteResult: Result<Unit> = Result.success(Unit)
+    private var siblingNamesResult: Result<Set<String>> = Result.success(emptySet())
     var lastConfig: WorkspaceConfig? = null
         private set
     var lastFilesDir: File? = null
@@ -43,6 +44,16 @@ class FakeNoteWriteRepository(
     fun setDeleteResult(result: Result<Unit>) {
         deleteResult = result
     }
+
+    fun setSiblingNamesResult(result: Result<Set<String>>) {
+        siblingNamesResult = result
+    }
+
+    override suspend fun listSiblingNames(
+        config: WorkspaceConfig,
+        filesDir: File,
+        notePath: NotePath
+    ): Result<Set<String>> = siblingNamesResult
 
     override suspend fun write(
         config: WorkspaceConfig,
