@@ -134,6 +134,27 @@ class CreateInboxNoteTest {
     }
 
     @Test
+    fun avoidsCaseAndUnicodeEquivalentFilenameCollisions() = runTest {
+        val filesDir = temp.newFolder("files")
+        val workspaceDir = gitWorkspace(filesDir)
+        File(workspaceDir, "Inbox").mkdirs()
+        File(workspaceDir, "Inbox/Note.md").writeText("# Existing")
+        File(workspaceDir, "Inbox/Cafe\u0301.md").writeText("# Existing")
+        val gitRepository = JGitWorkspaceRepository()
+        val useCase = CreateInboxNote(
+            writeRepository = FileNoteWriteRepository(gitRepository),
+            registryCache = NoteRegistryCache(FileNoteRegistryRepository()),
+            loadGitStatusSummary = LoadGitStatusSummary(gitRepository)
+        )
+
+        val caseResult = useCase(config, filesDir, "note").getOrThrow()
+        val unicodeResult = useCase(config, filesDir, "Café").getOrThrow()
+
+        assertEquals("Inbox/note-2.md", caseResult.note.path.value)
+        assertEquals("Inbox/Café-2.md", unicodeResult.note.path.value)
+    }
+
+    @Test
     fun refreshesRegistryAfterCreate() = runTest {
         val filesDir = temp.newFolder("files")
         gitWorkspace(filesDir)

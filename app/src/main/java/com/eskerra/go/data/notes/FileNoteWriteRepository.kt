@@ -16,6 +16,39 @@ import kotlinx.coroutines.withContext
 class FileNoteWriteRepository(private val gitRepository: WorkspaceGitRepository) :
     NoteWriteRepository {
 
+    override suspend fun listSiblingNames(
+        config: WorkspaceConfig,
+        filesDir: File,
+        notePath: NotePath
+    ): Result<Set<String>> = withContext(Dispatchers.IO) {
+        val workspaceDir = resolveWorkspace(config, filesDir).getOrElse {
+            return@withContext Result.failure(it)
+        }
+        val parent = File(workspaceDir, notePath.value).parentFile
+            ?: return@withContext Result.failure(
+                NoteWriteException(NoteWriteError.InvalidNotePath)
+            )
+        val canonicalParent = try {
+            parent.canonicalFile
+        } catch (error: Exception) {
+            return@withContext Result.failure(
+                NoteWriteException(NoteWriteError.WriteFailed(error.message))
+            )
+        }
+        val canonicalWorkspace = workspaceDir.canonicalFile
+        val insideWorkspace = FileNoteContentRepository.isStrictlyInsideWorkspace(
+            canonicalWorkspace,
+            canonicalParent
+        )
+        if (!insideWorkspace) {
+            return@withContext Result.failure(
+                NoteWriteException(NoteWriteError.InvalidNotePath)
+            )
+        }
+        val names = canonicalParent.listFiles()?.mapTo(linkedSetOf()) { it.name } ?: emptySet()
+        Result.success(names)
+    }
+
     override suspend fun write(
         config: WorkspaceConfig,
         filesDir: File,
