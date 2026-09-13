@@ -19,6 +19,15 @@ Metric definitions used throughout:
 
 ---
 
+## 2026-09-13 — H10a: lazy Media3 connection
+
+**Change.** `Media3PodcastPlayerDriver` no longer binds `PodcastPlaybackService` in its
+constructor. It connects only for a controller action or an explicit live-session check.
+
+**Measurement status: Pending.** Device comparison remains unavailable in this sandbox.
+
+---
+
 ## 2026-09-13 — H09: input-first splash dismissal
 
 **Hypothesis.** The inbox composer has no startup I/O dependency, but the splash waited for inbox
