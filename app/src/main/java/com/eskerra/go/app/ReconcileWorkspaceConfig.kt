@@ -8,5 +8,7 @@ import java.io.File
 suspend fun reconcileWorkspaceConfig(
     config: WorkspaceConfig,
     filesDir: File,
-    reconcileWorkspaceSyncBranch: ReconcileWorkspaceSyncBranch
-): WorkspaceConfig = reconcileWorkspaceSyncBranch(config, filesDir).getOrNull() ?: config
+    reconcileWorkspaceSyncBranch: ReconcileWorkspaceSyncBranch,
+    fetchIfNeeded: Boolean = true
+): WorkspaceConfig =
+    reconcileWorkspaceSyncBranch(config, filesDir, fetchIfNeeded).getOrNull() ?: config

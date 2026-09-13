@@ -5,11 +5,13 @@ import com.eskerra.go.core.model.SyncError
 import com.eskerra.go.core.model.SyncException
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.data.credentials.FakeCredentialStore
+import com.eskerra.go.data.git.GitSyncMutex
 import com.eskerra.go.data.git.JGitRemoteSyncRepository
 import com.eskerra.go.data.git.JGitWorkspaceRepository
 import com.eskerra.go.data.git.TestGitRepos
 import com.eskerra.go.data.workspace.FakeWorkspaceStore
 import com.eskerra.go.data.workspace.WorkspacePaths
+import com.eskerra.go.feature.sync.FakeRemoteSyncRepository
 import java.io.File
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -54,7 +56,8 @@ class ReconcileWorkspaceSyncBranchTest {
         val result = ReconcileWorkspaceSyncBranch(
             workspaceStore = store,
             credentialStore = FakeCredentialStore(),
-            remoteSyncRepository = remoteSync
+            remoteSyncRepository = remoteSync,
+            gitSyncMutex = GitSyncMutex()
         )(config, filesDir)
 
         assertTrue(result.isSuccess)
@@ -81,13 +84,42 @@ class ReconcileWorkspaceSyncBranchTest {
         val result = ReconcileWorkspaceSyncBranch(
             workspaceStore = store,
             credentialStore = FakeCredentialStore(),
-            remoteSyncRepository = remoteSync
+            remoteSyncRepository = remoteSync,
+            gitSyncMutex = GitSyncMutex()
         )(config, filesDir)
 
         assertTrue(result.isFailure)
         assertTrue(
             (result.exceptionOrNull() as SyncException).error is SyncError.MissingCredential
         )
+    }
+
+    @Test
+    fun invoke_canAlignWithoutFetchingWhenRemoteRefsAreAlreadyFresh() = runTest {
+        val filesDir = temp.newFolder("files")
+        val workspaceDir = File(filesDir, WorkspacePaths.DEFAULT_RELATIVE_PATH)
+        workspaceDir.mkdirs()
+        gitRepo.initOrOpen(workspaceDir).getOrThrow()
+        val credentials = FakeCredentialStore()
+        credentials.saveToken(WorkspacePaths.DEFAULT_RELATIVE_PATH, "token")
+        val remote = FakeRemoteSyncRepository()
+        val config = WorkspaceConfig(
+            name = "Notes",
+            relativePath = WorkspacePaths.DEFAULT_RELATIVE_PATH,
+            remoteUri = "https://github.com/example/notes.git",
+            branch = "main",
+            setupCompletedAtEpochMs = 0L
+        )
+
+        val result = ReconcileWorkspaceSyncBranch(
+            workspaceStore = store,
+            credentialStore = credentials,
+            remoteSyncRepository = remote,
+            gitSyncMutex = GitSyncMutex()
+        )(config, filesDir, fetchIfNeeded = false)
+
+        assertTrue(result.isSuccess)
+        assertEquals(false, remote.lastEnsureLocalBranchFetchIfNeeded)
     }
 
     private data class PreparedRemote(val remoteUri: String, val branch: String)

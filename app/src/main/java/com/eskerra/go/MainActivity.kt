@@ -195,12 +195,13 @@ class MainActivity : ComponentActivity() {
             lastSyncStatusStore = workspaceStore
         )
         val recordLastSyncAttempt = RecordLastSyncAttempt(workspaceStore)
+        val gitSyncMutex = GitSyncMutex()
         val reconcileWorkspaceSyncBranch = ReconcileWorkspaceSyncBranch(
             workspaceStore = workspaceStore,
             credentialStore = credentialStore,
-            remoteSyncRepository = remoteSyncRepository
+            remoteSyncRepository = remoteSyncRepository,
+            gitSyncMutex = gitSyncMutex
         )
-        val gitSyncMutex = GitSyncMutex()
         val manualSyncNow = ManualSyncNow(
             remoteSyncRepository = remoteSyncRepository,
             credentialStore = credentialStore,

@@ -19,6 +19,27 @@ Metric definitions used throughout:
 
 ---
 
+## 2026-09-13 — H07: defer branch reconciliation until after content settlement
+
+**Hypothesis.** Reconciliation was launched at composition time and could fetch from the network
+while registry restore and scanning still owned the splash path. Starting it only after
+`launchSettled` and one rendered frame should remove that contention.
+
+**Change.** The boot effect now gates reconciliation on settlement plus `withFrameNanos`; its
+alignment uses already-fetched refs (`fetchIfNeeded = false`). Reconciliation takes the same
+process-wide `GitSyncMutex` as every other checkout/fetch/push mutation. The immediately following
+full auto-sync remains responsible for fetching remote refs.
+
+**Measurement status: Pending.** A same-device seven-run before/after comparison cannot run in
+this sandbox because ADB cannot start. Run `scripts/measure-cold-start.sh 7 after-h07` against the
+baseline-input-ready build on the normal physical device; confirm in `BootTrace` that no branch
+alignment or fetch occurs before `launch-settled`.
+
+**Conclusion.** The ordering and no-fetch contracts are covered by unit tests; performance impact
+is intentionally unclaimed until the device comparison is recorded.
+
+---
+
 ## 2026-09-13 — telemetry baseline and input-ready milestone
 
 **Change.** Added the `input_ready` cold-start phase from the first laid-out shell input through
