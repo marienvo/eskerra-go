@@ -87,7 +87,10 @@ The debounced `showRefreshIndicator` (~300 ms) stays off when revalidation finis
 
 ## Launch UX
 
-Cold start keeps the Android splash screen (inset foreground via `drawable/ic_splash_logo`, on `#000000`) until launch is **settled**, then dismisses in one step to shell + content.
+Cold start dismisses the Android splash screen (inset foreground via `drawable/ic_splash_logo`, on
+`#000000`) when the `ShellNewNoteInput` has completed its first layout. The input is ready for the
+first tap but deliberately does not autofocus. Inbox and Today Hub then paint from their snapshots
+or quiet placeholders while **launch settled** continues to gate deferred work.
 
 **Launch settled** means:
 
@@ -98,11 +101,11 @@ Cold start keeps the Android splash screen (inset foreground via `drawable/ic_sp
 
 Implementation:
 
-- [MainActivity.kt](app/src/main/java/com/eskerra/go/MainActivity.kt) — `setKeepOnScreenCondition` until [AppLaunchSettled.kt](app/src/main/java/com/eskerra/go/app/AppLaunchSettled.kt) fires.
-- [TodayHubViewModel.restoreSnapshot()](app/src/main/java/com/eskerra/go/feature/todayhub/TodayHubViewModel.kt) uses `registryCache.current()` (persisted snapshot) instead of bailing when the in-memory registry is null; background revalidation stays silent when a snapshot is already shown.
+- [MainActivity.kt](app/src/main/java/com/eskerra/go/MainActivity.kt) — `setKeepOnScreenCondition` releases at the input-ready trace mark; setup still releases through launch settlement.
+- [TodayHubViewModel.restoreSnapshot()](app/src/main/java/com/eskerra/go/feature/todayhub/TodayHubViewModel.kt) paints a persisted Today Hub snapshot even when the note registry has not restored yet; it uses an empty temporary registry until background revalidation supplies link-resolution data.
 - Gate `Loading` renders an empty surface (no spinner); splash covers it.
 - Shell sync FAB maps `SyncUiState.Loading` to no indicator (quiet shell refresh per [sync-hardening-and-recovery.md](sync-hardening-and-recovery.md)).
-- Inbox background rescan uses debounced `showRefreshIndicator` (~300ms) so fast cache-hit refreshes stay silent.
+- Inbox background rescan uses debounced `showRefreshIndicator` (~300ms) so fast cache-hit refreshes stay silent. “No reflow” holds only when the relevant snapshots exist.
 
 ## Out of scope
 

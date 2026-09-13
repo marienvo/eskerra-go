@@ -91,6 +91,9 @@ object ColdStartTrace {
         log("input-ready")
     }
 
+    /** True after the shell input's first layout, which is the splash-dismissal milestone. */
+    fun isInputReady(): Boolean = inputReadyMs != UNSET
+
     fun markSnapshotRead(tookMs: Long, hit: Boolean, notes: Int) {
         if (!settled && !snapshotReadSeen) {
             snapshotReadSeen = true

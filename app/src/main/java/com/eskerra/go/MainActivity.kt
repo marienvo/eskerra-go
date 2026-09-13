@@ -107,12 +107,13 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         ColdStartTrace.markActivityOnCreate()
         var keepSplashOnScreen by mutableStateOf(true)
-        splashScreen.setKeepOnScreenCondition { keepSplashOnScreen }
+        splashScreen.setKeepOnScreenCondition {
+            keepSplashOnScreen && !ColdStartTrace.isInputReady()
+        }
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT)
         )
-
         val workspaceStore = DataStoreWorkspaceStore(applicationContext)
         val bootCacheStore = workspaceStore
         val credentialStore = EncryptedCredentialStore(

@@ -19,6 +19,25 @@ Metric definitions used throughout:
 
 ---
 
+## 2026-09-13 — H09: input-first splash dismissal
+
+**Hypothesis.** The inbox composer has no startup I/O dependency, but the splash waited for inbox
+and Today Hub loading to settle. Releasing at its first layout should make typing available before
+the vault-derived content is finished.
+
+**Change.** The splash condition now releases at the first `ShellNewNoteInput` layout trace mark.
+Today Hub snapshots paint without waiting for a registry cache, using an empty temporary registry
+until revalidation provides wiki-link resolution.
+
+**Measurement status: Pending.** Compare seven cold starts on the usual device with
+`scripts/measure-cold-start.sh 7 after-h09`; manually verify immediate tap/type, share-intent
+prefill, Episodes-first startup, and NeedsSetup.
+
+**Conclusion.** The snapshot fallback is regression-tested. Device validation remains required
+for the actual input-ready result and route-specific behavior.
+
+---
+
 ## 2026-09-13 — H08: defer vault-search index maintenance
 
 **Hypothesis.** The initial FTS maintenance opens SQLite and walks the vault at composition time,

@@ -153,9 +153,6 @@ class TodayHubViewModelTest {
             ),
             refreshDelayMs = 1_000L
         )
-        val cachedRegistry = com.eskerra.go.core.model.NoteRegistry.fromNotes(
-            listOf(note("Daily/Today.md", "Daily hub"), note("Daily/2026-04-06.md"))
-        )
         val snapshotStore = FakeTodayHubSnapshotStore()
         snapshotStore.save(config, filesDir, snapshot(rowBody = "cached row"))
 
@@ -166,8 +163,7 @@ class TodayHubViewModelTest {
             ),
             registry = registry,
             filesDir = filesDir,
-            snapshotStore = snapshotStore,
-            cachedRegistry = cachedRegistry
+            snapshotStore = snapshotStore
         )
         dispatcher.scheduler.runCurrent()
 
@@ -175,6 +171,7 @@ class TodayHubViewModelTest {
         assertEquals("Daily hub", state.folderLabel)
         assertEquals(listOf("cached row", ""), state.row?.columns)
         assertFalse(state.rowLoading)
+        assertTrue(state.registry.notes.isEmpty())
     }
 
     @Test
