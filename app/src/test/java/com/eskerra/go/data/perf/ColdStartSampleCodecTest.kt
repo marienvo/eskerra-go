@@ -14,6 +14,7 @@ class ColdStartSampleCodecTest {
             diBuildMs = 155,
             toGateStartMs = 270,
             gateResolveMs = 114,
+            inputReadyMs = 900,
             snapshotReadMs = 743,
             firstScanMs = 2100,
             settleTailMs = 608,
@@ -31,13 +32,13 @@ class ColdStartSampleCodecTest {
     fun rejectsRowsThatDoNotParse() {
         assertNull(ColdStartSampleCodec.decode(""))
         assertNull(ColdStartSampleCodec.decode("1|2|3"))
-        assertNull(ColdStartSampleCodec.decode((1..12).joinToString("|") { "x" }))
+        assertNull(ColdStartSampleCodec.decode((1..13).joinToString("|") { "x" }))
     }
 
     /** A row from an older field layout is dropped, not crashed on. */
     @Test
     fun rejectsRowsWithADifferentFieldCount() {
-        assertNull(ColdStartSampleCodec.decode((1..13).joinToString("|")))
+        assertNull(ColdStartSampleCodec.decode((1..14).joinToString("|")))
         assertNull(ColdStartSampleCodec.decode((1..11).joinToString("|")))
     }
 }

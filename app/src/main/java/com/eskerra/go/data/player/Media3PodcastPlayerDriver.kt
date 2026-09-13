@@ -73,10 +73,6 @@ class Media3PodcastPlayerDriver(context: Context) : PodcastPlayerDriver {
         }
     }
 
-    init {
-        connect()
-    }
-
     override fun play(episode: PodcastEpisode, startPositionMs: Long) {
         playRequestGeneration += 1
         val generation = playRequestGeneration
@@ -163,6 +159,7 @@ class Media3PodcastPlayerDriver(context: Context) : PodcastPlayerDriver {
     }
 
     override suspend fun awaitConnection() {
+        ensureConnected()
         if (controller != null) return
         val future = controllerFuture ?: return
         withTimeoutOrNull(CONNECT_TIMEOUT_MS) {
@@ -254,7 +251,8 @@ class Media3PodcastPlayerDriver(context: Context) : PodcastPlayerDriver {
         publishNativeSnapshot(mediaController)
     }
 
-    private fun connect() {
+    private fun ensureConnected() {
+        if (controller != null || controllerFuture != null) return
         val serviceComponent = ComponentName(
             appContext,
             PodcastPlaybackService::class.java
@@ -286,6 +284,7 @@ class Media3PodcastPlayerDriver(context: Context) : PodcastPlayerDriver {
             action(mediaController)
         } else {
             pendingAction = action
+            ensureConnected()
         }
     }
 

@@ -5,6 +5,7 @@ import com.eskerra.go.core.model.SyncException
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.RemoteSyncRepository
 import com.eskerra.go.data.credentials.CredentialStore
+import com.eskerra.go.data.git.GitSyncMutex
 import com.eskerra.go.data.git.SyncGitErrorMapper
 import com.eskerra.go.data.workspace.RemoteUriSecurity
 import com.eskerra.go.data.workspace.WorkspacePaths
@@ -12,6 +13,7 @@ import com.eskerra.go.data.workspace.WorkspaceStore
 import java.io.File
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /**
@@ -22,17 +24,22 @@ class ReconcileWorkspaceSyncBranch(
     private val workspaceStore: WorkspaceStore,
     private val credentialStore: CredentialStore,
     private val remoteSyncRepository: RemoteSyncRepository,
+    private val gitSyncMutex: GitSyncMutex,
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO
 ) {
 
-    suspend operator fun invoke(config: WorkspaceConfig, filesDir: File): Result<WorkspaceConfig> =
-        withContext(dispatcher) {
-            reconcile(config, filesDir)
-        }
+    suspend operator fun invoke(
+        config: WorkspaceConfig,
+        filesDir: File,
+        fetchIfNeeded: Boolean = true
+    ): Result<WorkspaceConfig> = withContext(dispatcher) {
+        gitSyncMutex.mutex.withLock { reconcile(config, filesDir, fetchIfNeeded) }
+    }
 
     private suspend fun reconcile(
         config: WorkspaceConfig,
-        filesDir: File
+        filesDir: File,
+        fetchIfNeeded: Boolean
     ): Result<WorkspaceConfig> {
         val remoteUri = config.remoteUri?.trim().orEmpty()
         if (remoteUri.isBlank()) {
@@ -58,7 +65,7 @@ class ReconcileWorkspaceSyncBranch(
         }
 
         val effectiveBranch = remoteSyncRepository
-            .ensureLocalBranch(workspaceDir, branch, httpsToken)
+            .ensureLocalBranch(workspaceDir, branch, httpsToken, fetchIfNeeded)
             .getOrElse { error ->
                 return Result.failure(SyncGitErrorMapper.mapFailure(error, branch))
             }

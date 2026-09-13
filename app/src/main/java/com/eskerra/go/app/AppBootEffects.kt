@@ -54,11 +54,18 @@ internal fun AppBootEffects(
         appSyncViewModel.requestAutoSync()
     }
 
-    LaunchedEffect(config) {
+    LaunchedEffect(launchSettled, config) {
+        if (!shouldReconcileAfterLaunchSettled(launchSettled)) {
+            return@LaunchedEffect
+        }
+        // Branch alignment mutates the checkout. Wait until content has reached a frame, then
+        // rely on the full auto-sync to fetch remote refs immediately afterwards.
+        withFrameNanos { }
         val reconciled = reconcileWorkspaceConfig(
             config = config,
             filesDir = filesDir,
-            reconcileWorkspaceSyncBranch = reconcileWorkspaceSyncBranch
+            reconcileWorkspaceSyncBranch = reconcileWorkspaceSyncBranch,
+            fetchIfNeeded = false
         )
         if (reconciled != config) {
             onConfigChanged(reconciled)
@@ -97,3 +104,6 @@ internal fun shouldAutoSyncOnLifecycleEvent(event: Lifecycle.Event, accepting: B
  */
 internal fun shouldTriggerBootSync(launchSettled: Boolean, alreadyRequested: Boolean): Boolean =
     launchSettled && !alreadyRequested
+
+/** Branch reconciliation is checkout-mutating work and therefore starts only after settle. */
+internal fun shouldReconcileAfterLaunchSettled(launchSettled: Boolean): Boolean = launchSettled

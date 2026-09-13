@@ -16,6 +16,8 @@ data class ColdStartSample(
     val toGateStartMs: Long,
     /** Gate resolution, including the workspace fingerprint check. */
     val gateResolveMs: Long,
+    /** Process start until the new-inbox-note input has been laid out. */
+    val inputReadyMs: Long,
     /** Reading and decoding the persisted note-registry snapshot. */
     val snapshotReadMs: Long,
     /** The first vault scan, the one that blocks the splash. */

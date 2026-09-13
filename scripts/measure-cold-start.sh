@@ -33,6 +33,7 @@ TRACE_LOG="$OUT_DIR/cold-start-${LABEL}.log"
 : >"$TRACE_LOG"
 
 settled_times=()
+input_ready_times=()
 total_times=()
 discards=0
 run=0
@@ -66,18 +67,20 @@ while [ "${#settled_times[@]}" -lt "$RUNS" ]; do
   sleep 6
   trace="$(adb logcat -d -s BootTrace 2>/dev/null | tr -d '\r' || true)"
   settled="$(printf '%s\n' "$trace" | sed -n 's/.*[^0-9]\([0-9][0-9]*\)ms launch-settled.*/\1/p' | tail -1)"
+  input_ready="$(printf '%s\n' "$trace" | sed -n 's/.*[^0-9]\([0-9][0-9]*\)ms input-ready.*/\1/p' | tail -1)"
 
-  if [ "$launch_state" != "COLD" ] || [ -z "$settled" ]; then
+  if [ "$launch_state" != "COLD" ] || [ -z "$settled" ] || [ -z "$input_ready" ]; then
     discards=$((discards + 1))
-    echo "run ${run}: discarded (LaunchState=${launch_state:-none} settled=${settled:-none})"
+    echo "run ${run}: discarded (LaunchState=${launch_state:-none} input-ready=${input_ready:-none} settled=${settled:-none})"
     continue
   fi
 
   settled_times+=("$settled")
+  input_ready_times+=("$input_ready")
   total_times+=("$total")
-  echo "run ${run}: settled=${settled}ms total=${total}ms"
+  echo "run ${run}: input-ready=${input_ready}ms settled=${settled}ms total=${total}ms"
   {
-    echo "=== run ${run} (label=${LABEL}) settled=${settled}ms total=${total}ms ==="
+    echo "=== run ${run} (label=${LABEL}) input-ready=${input_ready}ms settled=${settled}ms total=${total}ms ==="
     printf '%s\n' "$trace"
     echo
   } >>"$TRACE_LOG"
@@ -92,5 +95,6 @@ median() {
 echo
 echo "measure-cold-start: label=${LABEL} good=${#settled_times[@]} discarded=${discards}"
 echo "  launch-settled median: $(median "${settled_times[@]}") ms"
+echo "  input-ready median:    $(median "${input_ready_times[@]}") ms"
 echo "  TotalTime median:      $(median "${total_times[@]}") ms"
 echo "  per-run traces:        ${TRACE_LOG}"

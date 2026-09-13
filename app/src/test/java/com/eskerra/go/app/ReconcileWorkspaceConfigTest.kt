@@ -3,6 +3,7 @@ package com.eskerra.go.app
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.usecase.ReconcileWorkspaceSyncBranch
 import com.eskerra.go.data.credentials.FakeCredentialStore
+import com.eskerra.go.data.git.GitSyncMutex
 import com.eskerra.go.data.workspace.FakeWorkspaceStore
 import com.eskerra.go.data.workspace.WorkspacePaths
 import com.eskerra.go.feature.sync.FakeRemoteSyncRepository
@@ -31,7 +32,8 @@ class ReconcileWorkspaceConfigTest {
         val reconcile = ReconcileWorkspaceSyncBranch(
             workspaceStore = FakeWorkspaceStore(),
             credentialStore = FakeCredentialStore(),
-            remoteSyncRepository = FakeRemoteSyncRepository()
+            remoteSyncRepository = FakeRemoteSyncRepository(),
+            gitSyncMutex = GitSyncMutex()
         )
 
         val result = reconcileWorkspaceConfig(

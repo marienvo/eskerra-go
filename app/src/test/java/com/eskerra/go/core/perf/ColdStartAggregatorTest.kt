@@ -59,6 +59,7 @@ class ColdStartAggregatorTest {
         assertEquals(3269L, summary.total.medianMs)
         assertEquals(4962L, summary.total.p90Ms)
         assertEquals(817L, summary.snapshotRead.medianMs)
+        assertEquals(900L, summary.inputReady.medianMs)
         assertEquals(5.0 / 7.0, summary.fingerprintHitRate, 0.0001)
         assertEquals(1.0, summary.snapshotHitRate, 0.0001)
         assertEquals(1161, summary.medianNoteCount)
@@ -69,6 +70,7 @@ class ColdStartAggregatorTest {
         diBuildMs = 155,
         toGateStartMs = 270,
         gateResolveMs = 114,
+        inputReadyMs = 900,
         snapshotReadMs = snapshotRead,
         firstScanMs = 367,
         settleTailMs = 608,

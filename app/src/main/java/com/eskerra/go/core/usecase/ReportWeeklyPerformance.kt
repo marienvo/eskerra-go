@@ -6,7 +6,8 @@ import com.eskerra.go.core.repository.ColdStartStatsStore
 import com.eskerra.go.core.repository.PerformanceReporter
 
 /**
- * Records the cold start that just finished and, once a week has passed, reports the window.
+ * Records the cold start that just finished, reports the first five-sample window, then reports
+ * subsequent windows weekly.
  *
  * There is no scheduler in this app (no WorkManager or AlarmManager, by design), so "weekly" is a
  * check performed on launch: the first launch after the window elapses carries the report.
@@ -26,13 +27,7 @@ class ReportWeeklyPerformance(
 
         val nowMs = now()
         val lastReportedAtMs = statsStore.readLastReportedAtMs()
-        if (lastReportedAtMs == null) {
-            // First ever launch: start the window rather than reporting a single sample as if it
-            // were a week's worth of data.
-            statsStore.resetWindow(nowMs)
-            return false
-        }
-        if (nowMs - lastReportedAtMs < WINDOW_MS) {
+        if (lastReportedAtMs != null && nowMs - lastReportedAtMs < WINDOW_MS) {
             return false
         }
 
@@ -43,7 +38,10 @@ class ReportWeeklyPerformance(
             return false
         }
 
-        val summary = ColdStartAggregator.summarize(window, windowDays = WINDOW_DAYS)
+        val summary = ColdStartAggregator.summarize(
+            window,
+            windowDays = if (lastReportedAtMs == null) 0 else WINDOW_DAYS
+        )
             ?: return false
         reporter.reportWeeklyColdStart(summary)
         statsStore.resetWindow(nowMs)

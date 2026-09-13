@@ -33,6 +33,8 @@ object ColdStartTrace {
 
     @Volatile private var gateReadyMs = UNSET
 
+    @Volatile private var inputReadyMs = UNSET
+
     @Volatile private var fingerprintHit = false
 
     @Volatile private var snapshotReadSeen = false
@@ -83,6 +85,15 @@ object ColdStartTrace {
         log("gate.ready", "path=$path fingerprintHit=$fingerprintHit")
     }
 
+    /** Marks the first laid-out inbox input; later recompositions must not move this milestone. */
+    fun markInputReady() {
+        if (inputReadyMs == UNSET) inputReadyMs = sinceStartMs()
+        log("input-ready")
+    }
+
+    /** True after the shell input's first layout, which is the splash-dismissal milestone. */
+    fun isInputReady(): Boolean = inputReadyMs != UNSET
+
     fun markSnapshotRead(tookMs: Long, hit: Boolean, notes: Int) {
         if (!settled && !snapshotReadSeen) {
             snapshotReadSeen = true
@@ -131,6 +142,7 @@ object ColdStartTrace {
             diBuildMs = (diBuiltMs - activityOnCreateMs).coerceAtLeast(0),
             toGateStartMs = (gateStartMs - diBuiltMs).coerceAtLeast(0),
             gateResolveMs = (gateReadyMs - gateStartMs).coerceAtLeast(0),
+            inputReadyMs = if (inputReadyMs == UNSET) 0L else inputReadyMs,
             snapshotReadMs = snapshotReadMs,
             firstScanMs = if (firstScanMs == UNSET) 0L else firstScanMs,
             settleTailMs = (totalMs - scanEnd).coerceAtLeast(0),

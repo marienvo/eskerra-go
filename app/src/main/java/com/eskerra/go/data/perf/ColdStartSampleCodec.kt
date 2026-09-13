@@ -10,13 +10,14 @@ import com.eskerra.go.core.model.ColdStartSample
 internal object ColdStartSampleCodec {
 
     private const val FIELD_SEPARATOR = "|"
-    private const val FIELD_COUNT = 12
+    private const val FIELD_COUNT = 13
 
     fun encode(sample: ColdStartSample): String = listOf(
         sample.processToActivityMs,
         sample.diBuildMs,
         sample.toGateStartMs,
         sample.gateResolveMs,
+        sample.inputReadyMs,
         sample.snapshotReadMs,
         sample.firstScanMs,
         sample.settleTailMs,
@@ -36,14 +37,15 @@ internal object ColdStartSampleCodec {
             diBuildMs = numbers[1],
             toGateStartMs = numbers[2],
             gateResolveMs = numbers[3],
-            snapshotReadMs = numbers[4],
-            firstScanMs = numbers[5],
-            settleTailMs = numbers[6],
-            totalMs = numbers[7],
-            noteCount = numbers[8].toInt(),
-            fingerprintHit = numbers[9] == 1L,
-            snapshotHit = numbers[10] == 1L,
-            hadMemoBase = numbers[11] == 1L
+            inputReadyMs = numbers[4],
+            snapshotReadMs = numbers[5],
+            firstScanMs = numbers[6],
+            settleTailMs = numbers[7],
+            totalMs = numbers[8],
+            noteCount = numbers[9].toInt(),
+            fingerprintHit = numbers[10] == 1L,
+            snapshotHit = numbers[11] == 1L,
+            hadMemoBase = numbers[12] == 1L
         )
     }
 }

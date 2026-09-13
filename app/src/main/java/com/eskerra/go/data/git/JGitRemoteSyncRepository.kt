@@ -23,25 +23,19 @@ import org.eclipse.jgit.revwalk.RevWalk
 import org.eclipse.jgit.transport.RemoteRefUpdate
 import org.eclipse.jgit.treewalk.TreeWalk
 
-/**
- * JGit-backed [RemoteSyncRepository] for manual sync.
- *
- * Network operations accept an optional in-memory [httpsToken]; when null, the
- * default [transportConfigCallback] from [gitRepository] is used (for `file://`).
+/** JGit-backed [RemoteSyncRepository] for manual sync.
+ * Network operations accept an optional in-memory [httpsToken]; when null, the default
+ * [transportConfigCallback] from [gitRepository] is used (for `file://`).
  */
 class JGitRemoteSyncRepository(
     private val gitRepository: WorkspaceGitRepository = JGitWorkspaceRepository()
 ) : RemoteSyncRepository {
-
     override fun status(workingDir: File): Result<GitWorkspaceStatus> =
         gitRepository.status(workingDir)
-
     override fun readStagedPaths(workingDir: File): Result<Set<String>> =
         GitIndexInspector.readStagedPaths(workingDir)
-
     override fun requiresManualIntervention(workingDir: File): Boolean =
         GitRepoStateInspector.requiresManualIntervention(workingDir)
-
     override fun partitionChanges(changedPaths: Set<String>): SyncChangePartition =
         SyncPathClassifier.partition(changedPaths)
 
@@ -214,8 +208,14 @@ class JGitRemoteSyncRepository(
     override fun ensureLocalBranch(
         workingDir: File,
         branch: String,
-        httpsToken: String?
-    ): Result<String> = GitLocalBranchAlignment.ensure(workingDir, branch, httpsToken)
+        httpsToken: String?,
+        fetchIfNeeded: Boolean
+    ): Result<String> = GitLocalBranchAlignment.ensure(
+        workingDir,
+        branch,
+        httpsToken,
+        fetchIfNeeded
+    )
 
     override fun compareWithRemote(
         workingDir: File,

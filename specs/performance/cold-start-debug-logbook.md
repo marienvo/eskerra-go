@@ -13,6 +13,114 @@ Metric definitions used throughout:
   in `MainActivity.onLaunchSettled`, applied identically to both builds and reverted afterwards.
 - **TotalTime** — `adb shell am start -W` TotalTime, i.e. to first frame (the splash frame).
 
+- **input-ready** — process start to the first layout of the persistent “Write a new inbox
+  note…” input. This is the input-first milestone; it is separate from launch-settled, which
+  continues to govern deferred work.
+
+---
+
+## 2026-09-13 — H11: installable optimized profile build
+
+**Change.** Added a debug-signed `profile` build type with the production application ID,
+resource shrinking and R8 enabled, Profile Installer, `scripts/install-profile.sh`, and a checked-in
+input-ready baseline profile. The profile variant builds successfully with R8. JGit's desktop-only management/Kerberos integrations
+are explicitly excluded from Android shrinker analysis; JGit, Media3, Sentry and serialization
+metadata remain kept.
+
+**Startup design review.** The new Profile Installer dependency and profile build type are needed
+to measure the optimized build used on the phone. Neither creates startup work; Profile Installer
+applies packaged profile data ahead of normal app execution. The expected performance gain is less
+interpreter/JIT work and resource/code shrinking; compare debug and profile on the same vault with
+seven cold starts.
+
+**Measurement status: Pending.** The APK is built, but no device is available to install and
+compare it in this environment.
+
+---
+
+## 2026-09-13 — H10a: lazy Media3 connection
+
+**Change.** `Media3PodcastPlayerDriver` no longer binds `PodcastPlaybackService` in its
+constructor. It connects only for a controller action or an explicit live-session check.
+
+**Measurement status: Pending.** Device comparison remains unavailable in this sandbox.
+
+---
+
+## 2026-09-13 — H09: input-first splash dismissal
+
+**Hypothesis.** The inbox composer has no startup I/O dependency, but the splash waited for inbox
+and Today Hub loading to settle. Releasing at its first layout should make typing available before
+the vault-derived content is finished.
+
+**Change.** The splash condition now releases at the first `ShellNewNoteInput` layout trace mark.
+Today Hub snapshots paint without waiting for a registry cache, using an empty temporary registry
+until revalidation provides wiki-link resolution.
+
+**Measurement status: Pending.** Compare seven cold starts on the usual device with
+`scripts/measure-cold-start.sh 7 after-h09`; manually verify immediate tap/type, share-intent
+prefill, Episodes-first startup, and NeedsSetup.
+
+**Conclusion.** The snapshot fallback is regression-tested. Device validation remains required
+for the actual input-ready result and route-specific behavior.
+
+---
+
+## 2026-09-13 — H08: defer vault-search index maintenance
+
+**Hypothesis.** The initial FTS maintenance opens SQLite and walks the vault at composition time,
+contending with snapshot decode and the registry scan that determine when content settles.
+
+**Change.** Initial maintenance and the existing five-minute foreground loop now begin only after
+`launchSettled` plus one rendered frame. The loop cadence is otherwise unchanged.
+
+**Measurement status: Pending.** ADB is unavailable in this sandbox. Compare
+`scripts/measure-cold-start.sh 7 after-h08` against the previous build on the same device and
+confirm from `BootTrace` that index work starts after `launch-settled`.
+
+**Conclusion.** The startup ordering is unit-tested; the timing result remains unclaimed pending
+the physical-device measurement.
+
+---
+
+## 2026-09-13 — H07: defer branch reconciliation until after content settlement
+
+**Hypothesis.** Reconciliation was launched at composition time and could fetch from the network
+while registry restore and scanning still owned the splash path. Starting it only after
+`launchSettled` and one rendered frame should remove that contention.
+
+**Change.** The boot effect now gates reconciliation on settlement plus `withFrameNanos`; its
+alignment uses already-fetched refs (`fetchIfNeeded = false`). Reconciliation takes the same
+process-wide `GitSyncMutex` as every other checkout/fetch/push mutation. The immediately following
+full auto-sync remains responsible for fetching remote refs.
+
+**Measurement status: Pending.** A same-device seven-run before/after comparison cannot run in
+this sandbox because ADB cannot start. Run `scripts/measure-cold-start.sh 7 after-h07` against the
+baseline-input-ready build on the normal physical device; confirm in `BootTrace` that no branch
+alignment or fetch occurs before `launch-settled`.
+
+**Conclusion.** The ordering and no-fetch contracts are covered by unit tests; performance impact
+is intentionally unclaimed until the device comparison is recorded.
+
+---
+
+## 2026-09-13 — telemetry baseline and input-ready milestone
+
+**Change.** Added the `input_ready` cold-start phase from the first laid-out shell input through
+the persisted sample, aggregate, Sentry payload, and measurement script. The first telemetry
+window now reports as soon as it has five samples; later windows remain weekly. Existing
+serialized samples are intentionally discarded because their older field layout cannot represent
+the new phase.
+
+**Measurement status: Pending.** This environment has no usable device connection: `adb` cannot
+start its daemon under the sandbox. `SENTRY_AUTH_TOKEN` is also absent, so the project key could
+not be fetched and no event-arrival check was attempted. Run `scripts/measure-cold-start.sh 7
+baseline-input-ready` on the usual physical device after placing the active project DSN in the
+gitignored `local.properties`; then record the raw results here.
+
+**Conclusion.** The instrumentation and its unit tests are ready, but there is deliberately no
+claimed performance result until the same-device baseline is collected.
+
 ---
 
 ## 2026-08-02 — H01: boot's forced remote fetch sits on the startup path

@@ -107,12 +107,13 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         ColdStartTrace.markActivityOnCreate()
         var keepSplashOnScreen by mutableStateOf(true)
-        splashScreen.setKeepOnScreenCondition { keepSplashOnScreen }
+        splashScreen.setKeepOnScreenCondition {
+            keepSplashOnScreen && !ColdStartTrace.isInputReady()
+        }
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT)
         )
-
         val workspaceStore = DataStoreWorkspaceStore(applicationContext)
         val bootCacheStore = workspaceStore
         val credentialStore = EncryptedCredentialStore(
@@ -195,12 +196,13 @@ class MainActivity : ComponentActivity() {
             lastSyncStatusStore = workspaceStore
         )
         val recordLastSyncAttempt = RecordLastSyncAttempt(workspaceStore)
+        val gitSyncMutex = GitSyncMutex()
         val reconcileWorkspaceSyncBranch = ReconcileWorkspaceSyncBranch(
             workspaceStore = workspaceStore,
             credentialStore = credentialStore,
-            remoteSyncRepository = remoteSyncRepository
+            remoteSyncRepository = remoteSyncRepository,
+            gitSyncMutex = gitSyncMutex
         )
-        val gitSyncMutex = GitSyncMutex()
         val manualSyncNow = ManualSyncNow(
             remoteSyncRepository = remoteSyncRepository,
             credentialStore = credentialStore,

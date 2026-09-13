@@ -224,7 +224,10 @@ class TodayHubViewModel(
 
     private suspend fun restoreSnapshot() {
         val snapshot = todayHubSnapshotStore.read(config, filesDir) ?: return
-        val registry = loadTodayHub.currentRegistry(config, filesDir) ?: return
+        // A Today Hub snapshot contains all display data needed for its first paint. Wiki-link
+        // resolution can use an empty registry until the asynchronous registry refresh arrives.
+        val registry = loadTodayHub.currentRegistry(config, filesDir)
+            ?: NoteRegistry.fromNotes(emptyList())
         applySnapshot(snapshot, registry)
     }
 

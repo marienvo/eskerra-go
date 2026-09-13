@@ -17,6 +17,7 @@ data class ColdStartSummary(
     val diBuild: PhaseStat,
     val toGateStart: PhaseStat,
     val gateResolve: PhaseStat,
+    val inputReady: PhaseStat,
     val snapshotRead: PhaseStat,
     val firstScan: PhaseStat,
     val settleTail: PhaseStat,
