@@ -19,6 +19,25 @@ Metric definitions used throughout:
 
 ---
 
+## 2026-09-13 — H11: installable optimized profile build
+
+**Change.** Added a debug-signed `profile` build type with the production application ID,
+resource shrinking and R8 enabled, Profile Installer, `scripts/install-profile.sh`, and a checked-in
+input-ready baseline profile. The profile variant builds successfully with R8. JGit's desktop-only management/Kerberos integrations
+are explicitly excluded from Android shrinker analysis; JGit, Media3, Sentry and serialization
+metadata remain kept.
+
+**Startup design review.** The new Profile Installer dependency and profile build type are needed
+to measure the optimized build used on the phone. Neither creates startup work; Profile Installer
+applies packaged profile data ahead of normal app execution. The expected performance gain is less
+interpreter/JIT work and resource/code shrinking; compare debug and profile on the same vault with
+seven cold starts.
+
+**Measurement status: Pending.** The APK is built, but no device is available to install and
+compare it in this environment.
+
+---
+
 ## 2026-09-13 — H10a: lazy Media3 connection
 
 **Change.** `Media3PodcastPlayerDriver` no longer binds `PodcastPlaybackService` in its
