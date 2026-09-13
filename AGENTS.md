@@ -87,6 +87,22 @@ up: `review-markdown-integrity-data-loss-prevention` (any Markdown/vault write p
 `review-state-consistency-coroutine-safety` (ViewModels, `StateFlow`, coroutine races), and
 `review-architecture-drift-responsibility-boundaries` (layer seams, god modules, ownership).
 
+## Execution persistence
+
+When a user asks an agent to implement a plan or complete work, the task is not complete until
+every authorized, executable step is done. A blocker applies only to the operation that actually
+needs the missing input, access, hardware, or approval; it must not silently end independent work.
+
+- A missing device, credential, telemetry result, or external response blocks only that validation
+  or external operation. Record it precisely as pending, then continue code, tests, documentation,
+  and other plan steps that do not depend on it.
+- Before a final answer, inventory the remaining plan steps. Continue whenever an authorized step
+  is still executable; do not present partial progress as a completed plan.
+- Ask the user only when a choice materially changes the outcome, or when a destructive or external
+  action needs new authority. Complete all already-authorized work first.
+- If a skill appears to require a pause or a stop, name its exact instruction and apply it no more
+  broadly than its stated scope. A scoped verification stop does not cancel the wider task.
+
 ## Observability
 
 Sentry conventions (what is actually sent today: SDK init, tags, the one breadcrumb) live

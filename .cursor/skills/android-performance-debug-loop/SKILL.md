@@ -99,11 +99,13 @@ The two newest events are the week-over-week comparison. Do not use the project 
 endpoint with a `query` parameter — its tag filtering is unreliable; the issues search above is
 the supported path.
 
-**If `SENTRY_AUTH_TOKEN` is not set, or either request fails, stop and record the check under
-`Triage not checked`.** Never guess at a trend, and never present an unfetched number as
-evidence. Note that `SENTRY_AUTH_TOKEN` may be exported from `~/.zshrc.local`, which zsh only
-loads for interactive shells — an agent shell is not interactive, so the variable can be absent
-even though it works in a terminal. Treat that as "not checked", not as "no telemetry".
+**If `SENTRY_AUTH_TOKEN` is not set, or either request fails, stop only the Sentry telemetry
+check and record it under `Triage not checked`.** Never guess at a trend, and never present an
+unfetched number as evidence. Continue every independently executable implementation, test,
+documentation, and plan step; the unavailable telemetry check is pending rather than a reason to
+end the wider task. Note that `SENTRY_AUTH_TOKEN` may be exported from `~/.zshrc.local`, which zsh
+only loads for interactive shells — an agent shell is not interactive, so the variable can be
+absent even though it works in a terminal. Treat that as "not checked", not as "no telemetry".
 
 ### Regression thresholds
 
@@ -129,6 +131,10 @@ to consider. On "no" it stays a `Warnings` line.
 ## Rules
 
 - **One hypothesis per step** — do not combine multiple optimizations or unrelated fixes.
+- **Scope unavailable measurements precisely** — unavailable device measurements prevent evaluating
+  that hypothesis and selecting a new evidence-led hypothesis, but do not prevent completion of
+  independently specified and authorized plan steps. Record the measurement as `Pending` before
+  continuing; do not claim the investigation is complete while it remains pending.
 - **No unrelated refactors** — keep diffs scoped to the measurement. Respect the module-size budget
   (`./scripts/check-module-budgets.sh`) and layer boundaries (UI never reads files or calls Git).
 - **Preserve measurement clarity** — same procedure; note conditions (device/emulator, debug vs
