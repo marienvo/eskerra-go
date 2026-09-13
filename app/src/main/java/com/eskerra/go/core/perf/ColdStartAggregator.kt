@@ -17,6 +17,7 @@ object ColdStartAggregator {
             diBuild = samples.phaseStat { it.diBuildMs },
             toGateStart = samples.phaseStat { it.toGateStartMs },
             gateResolve = samples.phaseStat { it.gateResolveMs },
+            inputReady = samples.phaseStat { it.inputReadyMs },
             snapshotRead = samples.phaseStat { it.snapshotReadMs },
             firstScan = samples.phaseStat { it.firstScanMs },
             settleTail = samples.phaseStat { it.settleTailMs },

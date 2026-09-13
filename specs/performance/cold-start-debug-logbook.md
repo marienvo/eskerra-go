@@ -13,6 +13,29 @@ Metric definitions used throughout:
   in `MainActivity.onLaunchSettled`, applied identically to both builds and reverted afterwards.
 - **TotalTime** — `adb shell am start -W` TotalTime, i.e. to first frame (the splash frame).
 
+- **input-ready** — process start to the first layout of the persistent “Write a new inbox
+  note…” input. This is the input-first milestone; it is separate from launch-settled, which
+  continues to govern deferred work.
+
+---
+
+## 2026-09-13 — telemetry baseline and input-ready milestone
+
+**Change.** Added the `input_ready` cold-start phase from the first laid-out shell input through
+the persisted sample, aggregate, Sentry payload, and measurement script. The first telemetry
+window now reports as soon as it has five samples; later windows remain weekly. Existing
+serialized samples are intentionally discarded because their older field layout cannot represent
+the new phase.
+
+**Measurement status: Pending.** This environment has no usable device connection: `adb` cannot
+start its daemon under the sandbox. `SENTRY_AUTH_TOKEN` is also absent, so the project key could
+not be fetched and no event-arrival check was attempted. Run `scripts/measure-cold-start.sh 7
+baseline-input-ready` on the usual physical device after placing the active project DSN in the
+gitignored `local.properties`; then record the raw results here.
+
+**Conclusion.** The instrumentation and its unit tests are ready, but there is deliberately no
+claimed performance result until the same-device baseline is collected.
+
 ---
 
 ## 2026-08-02 — H01: boot's forced remote fetch sits on the startup path

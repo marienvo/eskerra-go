@@ -16,14 +16,16 @@ class ReportWeeklyPerformanceTest {
     private val weekMs = 7L * 24 * 60 * 60 * 1000
 
     @Test
-    fun firstEverLaunchStartsTheWindowInsteadOfReporting() = runTest {
+    fun firstFiveSamplesReportWithoutWaitingAWeek() = runTest {
         val store = FakeStatsStore(lastReportedAtMs = null)
         val reporter = FakeReporter()
 
+        repeat(4) { store.record(sample()) }
         val reported = report(store, reporter, nowMs = 1_000L)(sample())
 
-        assertFalse(reported)
-        assertNull(reporter.lastSummary)
+        assertTrue(reported)
+        assertEquals(5, reporter.lastSummary?.sampleCount)
+        assertEquals(0, reporter.lastSummary?.windowDays)
         assertEquals(1_000L, store.lastReportedAtMs)
     }
 
@@ -89,6 +91,7 @@ class ReportWeeklyPerformanceTest {
         diBuildMs = 155,
         toGateStartMs = 270,
         gateResolveMs = 114,
+        inputReadyMs = 900,
         snapshotReadMs = 743,
         firstScanMs = 367,
         settleTailMs = 608,
