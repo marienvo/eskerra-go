@@ -19,6 +19,23 @@ Metric definitions used throughout:
 
 ---
 
+## 2026-09-13 — H08: defer vault-search index maintenance
+
+**Hypothesis.** The initial FTS maintenance opens SQLite and walks the vault at composition time,
+contending with snapshot decode and the registry scan that determine when content settles.
+
+**Change.** Initial maintenance and the existing five-minute foreground loop now begin only after
+`launchSettled` plus one rendered frame. The loop cadence is otherwise unchanged.
+
+**Measurement status: Pending.** ADB is unavailable in this sandbox. Compare
+`scripts/measure-cold-start.sh 7 after-h08` against the previous build on the same device and
+confirm from `BootTrace` that index work starts after `launch-settled`.
+
+**Conclusion.** The startup ordering is unit-tested; the timing result remains unclaimed pending
+the physical-device measurement.
+
+---
+
 ## 2026-09-13 — H07: defer branch reconciliation until after content settlement
 
 **Hypothesis.** Reconciliation was launched at composition time and could fetch from the network

@@ -68,4 +68,14 @@ class AppBootEffectsTest {
     fun branchReconcile_runsAfterLaunchSettles() {
         assertTrue(shouldReconcileAfterLaunchSettled(launchSettled = true))
     }
+
+    @Test
+    fun searchIndexMaintenance_doesNotRunBeforeLaunchSettles() {
+        assertFalse(shouldMaintainSearchIndex(launchSettled = false))
+    }
+
+    @Test
+    fun searchIndexMaintenance_runsAfterLaunchSettles() {
+        assertTrue(shouldMaintainSearchIndex(launchSettled = true))
+    }
 }
