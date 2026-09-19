@@ -129,7 +129,6 @@ fun PodcastsScreen(
                 PullToRefreshDefaults.Indicator(
                     state = pullRefreshState,
                     isRefreshing = refreshState.active,
-                    color = PodcastUiTokens.Accent,
                     modifier = Modifier
                         .align(Alignment.TopCenter)
                         .padding(top = chrome.top)
@@ -222,10 +221,7 @@ private fun LoadingContent(modifier: Modifier = Modifier) {
 
 @Composable
 private fun EmptyContent(modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier,
-        contentAlignment = Alignment.Center
-    ) {
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
         Text(
             text = "No unplayed podcast episodes found in vault root.",
             color = PodcastUiTokens.MutedMeta,
@@ -366,7 +362,11 @@ private fun PodcastsHeaderBar(
             )
             IconButton(onClick = onMarkSelected, enabled = !markInFlight) {
                 if (markInFlight) {
-                    CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        strokeWidth = 2.dp,
+                        color = Color.White
+                    )
                 } else {
                     Icon(
                         imageVector = Icons.Outlined.Archive,

@@ -43,6 +43,7 @@ import com.eskerra.go.ui.theme.EskerraChromeTokens
 fun AppShell(
     selectedTopLevelRoute: String?,
     syncIndicator: ShellSyncIndicatorState?,
+    pullToRefreshActive: Boolean = false,
     miniPlayerVisible: Boolean = false,
     miniPlayer: (@Composable () -> Unit)? = null,
     shellInput: ShellInputPresentation? = null,
@@ -97,7 +98,9 @@ fun AppShell(
                     badge = {
                         val badgeText = syncIndicator?.badgeText
                         if (syncIndicator?.spinning == true) {
-                            Badge { SyncSpinner(modifier = Modifier.size(8.dp)) }
+                            if (!pullToRefreshActive) {
+                                Badge { SyncSpinner(modifier = Modifier.size(8.dp)) }
+                            }
                         } else if (badgeText != null) {
                             Badge { Text(badgeText) }
                         }

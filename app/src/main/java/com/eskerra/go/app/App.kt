@@ -140,9 +140,7 @@ fun App(
     val destinationTopLevelRoute = topLevelGraphRouteForDestination(currentDestination)
     var currentTopLevelRoute by remember { mutableStateOf(AppRoute.HOME_GRAPH) }
     LaunchedEffect(destinationTopLevelRoute) {
-        if (destinationTopLevelRoute != null) {
-            currentTopLevelRoute = destinationTopLevelRoute
-        }
+        if (destinationTopLevelRoute != null) currentTopLevelRoute = destinationTopLevelRoute
     }
     // Bumped on each Home tap while already on the inbox; the inbox route reacts (it owns the Today
     // Hub state and decides whether to snap to the current week). A route change can't carry this
@@ -240,9 +238,12 @@ fun App(
         hasPendingShare = shareIntake.pendingShare != null,
         onPodcastFirstLaunchChanged = onPodcastFirstLaunchChanged
     )
+    val onInbox = currentRoute == AppRoute.INBOX ||
+        (currentRoute == null && selectedTopLevelRoute == AppRoute.HOME_GRAPH)
     AppShell(
         selectedTopLevelRoute = selectedTopLevelRoute,
         syncIndicator = syncIndicator,
+        pullToRefreshActive = onInbox && syncIndicator?.spinning == true,
         miniPlayerVisible = miniPlayerMount.visible,
         miniPlayer = miniPlayerMount.content,
         shellInput = shellInputState.presentation,
