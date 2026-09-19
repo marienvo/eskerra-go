@@ -2,10 +2,18 @@ package com.eskerra.go
 
 import android.app.Application
 import android.util.Log
+import androidx.work.Configuration
 import io.sentry.Sentry
 import io.sentry.android.core.SentryAndroid
 
-class EskerraGoApplication : Application() {
+class EskerraGoApplication :
+    Application(),
+    Configuration.Provider {
+
+    override val workManagerConfiguration: Configuration
+        get() = Configuration.Builder()
+            .setMinimumLoggingLevel(if (BuildConfig.DEBUG) Log.DEBUG else Log.INFO)
+            .build()
 
     override fun onCreate() {
         super.onCreate()
