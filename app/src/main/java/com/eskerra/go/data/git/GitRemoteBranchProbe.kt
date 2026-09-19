@@ -10,15 +10,13 @@ internal object GitRemoteBranchProbe {
     fun resolveRemoteBranch(
         remoteUri: String,
         branch: String,
-        httpsToken: String?
+        httpsToken: String?,
+        transportTimeoutSeconds: Int = DEFAULT_GIT_TRANSPORT_TIMEOUT_SECONDS
     ): Result<String> = runCatching {
         validateFileRemoteExists(remoteUri)
-        val lsRemote = Git.lsRemoteRepository().setRemote(remoteUri)
-        httpsToken?.let { token ->
-            lsRemote.setTransportConfigCallback(
-                HttpsTokenCredentialsProviderFactory.transportConfigCallback(token)
-            )
-        }
+        val lsRemote = Git.lsRemoteRepository()
+            .setRemote(remoteUri)
+            .configureSyncTransport(httpsToken, timeoutSeconds = transportTimeoutSeconds)
         val remoteBranches = lsRemote.call().mapNotNull { ref ->
             ref.name.removePrefix("refs/heads/").takeIf { it != ref.name }
         }.toSet()

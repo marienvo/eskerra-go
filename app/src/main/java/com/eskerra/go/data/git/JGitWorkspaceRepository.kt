@@ -31,7 +31,8 @@ import org.eclipse.jgit.transport.URIish
  */
 class JGitWorkspaceRepository(
     private val identity: PersonIdent = PersonIdent("Eskerra Go Spike", "spike@eskerra.local"),
-    private val transportConfigCallback: TransportConfigCallback? = null
+    private val transportConfigCallback: TransportConfigCallback? = null,
+    private val transportTimeoutSeconds: Int = DEFAULT_GIT_TRANSPORT_TIMEOUT_SECONDS
 ) : WorkspaceGitRepository,
     WorkspaceGitStatusRepository {
 
@@ -81,10 +82,11 @@ class JGitWorkspaceRepository(
             if (!branch.isNullOrBlank()) {
                 clone.setBranch(branch)
             }
-            val callback = httpsToken?.let {
-                HttpsTokenCredentialsProviderFactory.transportConfigCallback(it)
-            } ?: transportConfigCallback
-            callback?.let { clone.setTransportConfigCallback(it) }
+            clone.configureSyncTransport(
+                httpsToken = httpsToken,
+                fallbackCallback = transportConfigCallback,
+                timeoutSeconds = transportTimeoutSeconds
+            )
             clone.call().close()
         }
     }
@@ -93,7 +95,12 @@ class JGitWorkspaceRepository(
         remoteUri: String,
         branch: String,
         httpsToken: String?
-    ): Result<String> = GitRemoteBranchProbe.resolveRemoteBranch(remoteUri, branch, httpsToken)
+    ): Result<String> = GitRemoteBranchProbe.resolveRemoteBranch(
+        remoteUri,
+        branch,
+        httpsToken,
+        transportTimeoutSeconds
+    )
 
     override fun status(workingDir: File): Result<GitWorkspaceStatus> = runCatching {
         Git.open(workingDir).use { git ->
@@ -267,10 +274,11 @@ class JGitWorkspaceRepository(
         addAll(status.untracked)
     }
 
-    private fun <C : TransportCommand<*, *>> C.withTransportConfig(): C {
-        transportConfigCallback?.let { setTransportConfigCallback(it) }
-        return this
-    }
+    private fun <C : TransportCommand<*, *>> C.withTransportConfig(): C = configureSyncTransport(
+        httpsToken = null,
+        fallbackCallback = transportConfigCallback,
+        timeoutSeconds = transportTimeoutSeconds
+    )
 
     private companion object {
         const val ORIGIN = "origin"

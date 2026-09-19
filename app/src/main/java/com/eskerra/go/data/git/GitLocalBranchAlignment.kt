@@ -3,7 +3,6 @@ package com.eskerra.go.data.git
 import java.io.File
 import org.eclipse.jgit.api.CreateBranchCommand
 import org.eclipse.jgit.api.Git
-import org.eclipse.jgit.api.TransportCommand
 
 /**
  * Aligns the local checkout with a configured sync branch using JGit only.
@@ -19,14 +18,15 @@ internal object GitLocalBranchAlignment {
         workingDir: File,
         branch: String,
         httpsToken: String?,
-        fetchIfNeeded: Boolean = true
+        fetchIfNeeded: Boolean = true,
+        transportTimeoutSeconds: Int = DEFAULT_GIT_TRANSPORT_TIMEOUT_SECONDS
     ): Result<String> = runCatching {
         Git.open(workingDir).use { git ->
             val repository = git.repository
             if (fetchIfNeeded) {
                 git.fetch()
                     .setRemote(ORIGIN_REMOTE)
-                    .withTransport(httpsToken)
+                    .configureSyncTransport(httpsToken, timeoutSeconds = transportTimeoutSeconds)
                     .call()
             }
 
@@ -59,13 +59,5 @@ internal object GitLocalBranchAlignment {
                 .call()
             effectiveBranch
         }
-    }
-
-    private fun <C : TransportCommand<*, *>> C.withTransport(httpsToken: String?): C {
-        val callback = httpsToken?.let {
-            HttpsTokenCredentialsProviderFactory.transportConfigCallback(it)
-        }
-        callback?.let { setTransportConfigCallback(it) }
-        return this
     }
 }

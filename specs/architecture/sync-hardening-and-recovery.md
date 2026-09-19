@@ -19,6 +19,8 @@ Manual HTTPS sync works after Step 9 Slices 1–3. Slice 4 hardens behavior befo
 - Commit message: `Sync local changes from Eskerra Go`.
 - Integration: fast-forward when purely behind remote; **auto-merge** when histories diverged, writing sidecar copies `path (conflict yyyy-MM-dd HH.mm.ss).ext` where remote wins the canonical file. Returned in `SyncResult.conflictCopies`.
 - Push: retry up to three integrate+push cycles when the remote rejects a racing push.
+- Every JGit network command has a 30-second transport timeout. A stalled remote must fail the
+  attempt and release the shared mutex; it may never pin the app in `Syncing` indefinitely.
 - **Recovery before sync:** if merge, cherry-pick, revert, or rebase is in progress, vault sync calls `abortInProgressOperation` (rebase abort; otherwise `reset --hard` to HEAD) and continues. **Trade-off:** in-progress conflict-resolution work on disk may be lost rather than leaving the user blocked.
 
 ### Git sync channels
@@ -151,6 +153,9 @@ Rules:
 - **Failures are silent.** An automatic sync that fails records the attempt and sets
   `SyncUiState.Error`, which surfaces only as the `"!"` shell badge plus detail on the sync screen.
   No toasts, no dialogs. Manual sync keeps its own messaging.
+- **Terminal UI state:** an unexpected exception is converted to `SyncUiState.Error` before trigger
+  bookkeeping is released. Every attempt therefore leaves `Syncing`, and a later manual or
+  automatic trigger can retry.
 - **Shell spinner visibility:** manual sync shows the shell spinner from the start, including remote
   fetch. Automatic sync starts it immediately only when preflight already knows of local changes,
   local-ahead commits, or remote-behind commits; an otherwise clean automatic fetch remains quiet

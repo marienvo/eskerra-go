@@ -16,6 +16,7 @@ import com.eskerra.go.core.usecase.ManualSyncNow
 import com.eskerra.go.core.usecase.RecordLastSyncAttempt
 import com.eskerra.go.core.usecase.RefreshRemoteSyncStatus
 import java.io.File
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -189,14 +190,17 @@ class AppSyncViewModel(
                     // next trigger — any write, or the next foreground return — syncs again.
                     emitReadyStateNow(loadSyncStatus(config, filesDir))
                 }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                emitUnexpectedSyncFailure()
             } finally {
                 val runFollowUp = pendingAutoSync
                 pendingAutoSync = false
                 syncJob = null
+                syncSpinnerRequested.value = false
                 if (runFollowUp) {
                     processAutoSyncRequest()
-                } else {
-                    syncSpinnerRequested.value = false
                 }
             }
         }
@@ -291,6 +295,17 @@ class AppSyncViewModel(
             return
         }
         emitReadyStateNow(status)
+    }
+
+    private suspend fun emitUnexpectedSyncFailure() {
+        val syncError = SyncError.GitFailed(GENERIC_ERROR_MESSAGE)
+        val status = (_uiState.value as? SyncUiState.Syncing)?.status
+        _uiState.value = SyncUiState.Error(
+            status = status,
+            message = GENERIC_ERROR_MESSAGE,
+            recoveryAction = SyncRecoveryGuidance.forError(syncError)
+        )
+        runCatching { recordLastSyncAttempt.recordFailure(syncError) }
     }
 
     /** Emits Ready even while [SyncUiState.Syncing] — only for the owner of the running sync. */
