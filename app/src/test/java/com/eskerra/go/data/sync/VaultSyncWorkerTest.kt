@@ -258,4 +258,25 @@ class VaultSyncWorkerTest {
         val record = stateRepo.getRecord()
         assertTrue(record.status is DurableSyncStatus.Synced)
     }
+
+    @Test
+    fun cancelledSync_resetsDurableStatusToPending() = runTest {
+        val (runtime, stateRepo, _) = cloneSeededWorkspace()
+
+        try {
+            VaultSyncWorker.performSync(
+                syncRuntime = runtime,
+                setForegroundInfo = {},
+                syncRunner = { _, _, _ ->
+                    throw kotlinx.coroutines.CancellationException("Worker stopped by system")
+                }
+            )
+            org.junit.Assert.fail("Expected CancellationException")
+        } catch (_: kotlinx.coroutines.CancellationException) {
+            // Expected
+        }
+
+        val record = stateRepo.getRecord()
+        assertEquals(DurableSyncStatus.Pending, record.status)
+    }
 }

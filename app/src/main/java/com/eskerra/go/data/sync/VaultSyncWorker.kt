@@ -11,8 +11,11 @@ import com.eskerra.go.core.model.SyncProgressStep
 import com.eskerra.go.core.model.SyncResult
 import com.eskerra.go.core.model.WorkspaceConfig
 import java.io.File
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class VaultSyncWorker(context: Context, params: WorkerParameters) :
     CoroutineWorker(context, params) {
@@ -79,66 +82,73 @@ class VaultSyncWorker(context: Context, params: WorkerParameters) :
                 return@coroutineScope Result.failure()
             }
 
-            val startedAt = System.currentTimeMillis()
-            syncRuntime.syncStateRepository.updateStatus(
-                DurableSyncStatus.Running(
-                    step = SyncProgressStep.ValidatingWorkspace.name,
-                    startedAtEpochMs = startedAt
-                )
-            )
-
-            val syncResult = syncRunner(
-                config,
-                syncRuntime.filesDir
-            ) { step ->
-                launch {
-                    syncRuntime.syncStateRepository.updateRunningStep(step.name)
-                }
-            }
-
-            syncResult.fold(
-                onSuccess = { result: SyncResult ->
-                    result.updatedConfig?.let { updated ->
-                        syncRuntime.workspaceStore.save(updated)
-                    }
-                    syncRuntime.recordLastSyncAttempt.recordSuccess(result)
-                    val completedAt = System.currentTimeMillis()
-                    syncRuntime.syncStateRepository.markGenerationCompleted(
-                        snapshot = snapshotGeneration,
-                        completedAtEpochMs = completedAt
+            try {
+                val startedAt = System.currentTimeMillis()
+                syncRuntime.syncStateRepository.updateStatus(
+                    DurableSyncStatus.Running(
+                        step = SyncProgressStep.ValidatingWorkspace.name,
+                        startedAtEpochMs = startedAt
                     )
+                )
 
-                    // If newer generations arrived while syncing, trigger next round
-                    val latest = syncRuntime.syncStateRepository.getRecord()
-                    if (latest.requestedGeneration > snapshotGeneration) {
-                        syncRuntime.vaultSyncScheduler.scheduleSync()
-                    }
-                    Result.success()
-                },
-                onFailure = { throwable ->
-                    val syncError = when (throwable) {
-                        is SyncException -> throwable.error
-                        else -> SyncError.GitFailed(throwable.message ?: "Sync failed.")
-                    }
-                    syncRuntime.recordLastSyncAttempt.recordFailure(syncError)
-
-                    if (isTransient(syncError) && attempt < MAX_RETRY_ATTEMPTS) {
-                        val backoffMs = calculateBackoffMs(attempt)
-                        syncRuntime.syncStateRepository.updateStatus(
-                            DurableSyncStatus.Retrying(
-                                reason = syncError.message(),
-                                nextAttemptAtEpochMs = System.currentTimeMillis() + backoffMs
-                            )
-                        )
-                        Result.retry()
-                    } else {
-                        syncRuntime.syncStateRepository.updateStatus(
-                            DurableSyncStatus.Blocked(reason = syncError.message())
-                        )
-                        Result.failure()
+                val syncResult = syncRunner(
+                    config,
+                    syncRuntime.filesDir
+                ) { step ->
+                    launch {
+                        syncRuntime.syncStateRepository.updateRunningStep(step.name)
                     }
                 }
-            )
+
+                syncResult.fold(
+                    onSuccess = { result: SyncResult ->
+                        result.updatedConfig?.let { updated ->
+                            syncRuntime.workspaceStore.save(updated)
+                        }
+                        syncRuntime.recordLastSyncAttempt.recordSuccess(result)
+                        val completedAt = System.currentTimeMillis()
+                        syncRuntime.syncStateRepository.markGenerationCompleted(
+                            snapshot = snapshotGeneration,
+                            completedAtEpochMs = completedAt
+                        )
+
+                        // If newer generations arrived while syncing, trigger next round
+                        val latest = syncRuntime.syncStateRepository.getRecord()
+                        if (latest.requestedGeneration > snapshotGeneration) {
+                            syncRuntime.vaultSyncScheduler.scheduleSync()
+                        }
+                        Result.success()
+                    },
+                    onFailure = { throwable ->
+                        val syncError = when (throwable) {
+                            is SyncException -> throwable.error
+                            else -> SyncError.GitFailed(throwable.message ?: "Sync failed.")
+                        }
+                        syncRuntime.recordLastSyncAttempt.recordFailure(syncError)
+
+                        if (isTransient(syncError) && attempt < MAX_RETRY_ATTEMPTS) {
+                            val backoffMs = calculateBackoffMs(attempt)
+                            syncRuntime.syncStateRepository.updateStatus(
+                                DurableSyncStatus.Retrying(
+                                    reason = syncError.message(),
+                                    nextAttemptAtEpochMs = System.currentTimeMillis() + backoffMs
+                                )
+                            )
+                            Result.retry()
+                        } else {
+                            syncRuntime.syncStateRepository.updateStatus(
+                                DurableSyncStatus.Blocked(reason = syncError.message())
+                            )
+                            Result.failure()
+                        }
+                    }
+                )
+            } catch (e: CancellationException) {
+                withContext(NonCancellable) {
+                    syncRuntime.syncStateRepository.updateStatus(DurableSyncStatus.Pending)
+                }
+                throw e
+            }
         }
 
         fun isTransient(error: SyncError): Boolean = when (error) {
