@@ -13,7 +13,6 @@ import org.eclipse.jgit.api.MergeCommand
 import org.eclipse.jgit.api.MergeResult
 import org.eclipse.jgit.api.RebaseCommand
 import org.eclipse.jgit.api.ResetCommand
-import org.eclipse.jgit.api.TransportCommand
 import org.eclipse.jgit.lib.ObjectId
 import org.eclipse.jgit.lib.Ref
 import org.eclipse.jgit.lib.Repository
@@ -28,7 +27,8 @@ import org.eclipse.jgit.treewalk.TreeWalk
  * [transportConfigCallback] from [gitRepository] is used (for `file://`).
  */
 class JGitRemoteSyncRepository(
-    private val gitRepository: WorkspaceGitRepository = JGitWorkspaceRepository()
+    private val gitRepository: WorkspaceGitRepository = JGitWorkspaceRepository(),
+    private val transportTimeoutSeconds: Int = DEFAULT_GIT_TRANSPORT_TIMEOUT_SECONDS
 ) : RemoteSyncRepository {
     override fun status(workingDir: File): Result<GitWorkspaceStatus> =
         gitRepository.status(workingDir)
@@ -200,7 +200,7 @@ class JGitRemoteSyncRepository(
         Git.open(workingDir).use { git ->
             git.fetch()
                 .setRemote(ORIGIN)
-                .withTransport(httpsToken)
+                .configureSyncTransport(httpsToken, timeoutSeconds = transportTimeoutSeconds)
                 .call()
         }
     }
@@ -214,7 +214,8 @@ class JGitRemoteSyncRepository(
         workingDir,
         branch,
         httpsToken,
-        fetchIfNeeded
+        fetchIfNeeded,
+        transportTimeoutSeconds = transportTimeoutSeconds
     )
 
     override fun compareWithRemote(
@@ -253,7 +254,7 @@ class JGitRemoteSyncRepository(
                 val results = git.push()
                     .setRemote(ORIGIN)
                     .add(branch)
-                    .withTransport(httpsToken)
+                    .configureSyncTransport(httpsToken, timeoutSeconds = transportTimeoutSeconds)
                     .call()
                 for (pushResult in results) {
                     for (update in pushResult.remoteUpdates) {
@@ -278,7 +279,9 @@ class JGitRemoteSyncRepository(
         branch: String,
         httpsToken: String?
     ): Result<Unit> = runCatching {
-        GitRemoteBranchProbe.resolveRemoteBranch(remoteUri, branch, httpsToken).getOrThrow()
+        GitRemoteBranchProbe
+            .resolveRemoteBranch(remoteUri, branch, httpsToken, transportTimeoutSeconds)
+            .getOrThrow()
     }
 
     override fun clearSanitizedOrigin(workingDir: File): Result<Unit> =
@@ -437,14 +440,6 @@ class JGitRemoteSyncRepository(
     private fun requireRemoteRef(repository: Repository, branch: String): Ref =
         repository.exactRef("refs/remotes/$ORIGIN/$branch")
             ?: error("remote tracking branch not found: origin/$branch")
-
-    private fun <C : TransportCommand<*, *>> C.withTransport(httpsToken: String?): C {
-        val callback = httpsToken?.let {
-            HttpsTokenCredentialsProviderFactory.transportConfigCallback(it)
-        }
-        callback?.let { setTransportConfigCallback(it) }
-        return this
-    }
 
     private companion object {
         const val ORIGIN = "origin"
