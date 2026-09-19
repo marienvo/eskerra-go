@@ -1,6 +1,7 @@
 package com.eskerra.go.data.sync
 
 import android.content.Context
+import com.eskerra.go.core.repository.BootCacheStore
 import com.eskerra.go.core.repository.SyncStateRepository
 import com.eskerra.go.core.repository.VaultSyncScheduler
 import com.eskerra.go.core.usecase.BuildSafeSyncDiagnostic
@@ -23,6 +24,7 @@ import com.eskerra.go.data.notes.FileNoteRegistrySnapshotStore
 import com.eskerra.go.data.notes.NoteContentCache
 import com.eskerra.go.data.notes.NoteRegistryCache
 import com.eskerra.go.data.workspace.DataStoreWorkspaceStore
+import com.eskerra.go.data.workspace.WorkspaceStore
 import java.io.File
 
 interface SyncRuntimeProvider {
@@ -30,8 +32,10 @@ interface SyncRuntimeProvider {
 }
 
 class SyncRuntime(
-    val context: Context,
-    val workspaceStore: DataStoreWorkspaceStore,
+    val context: Context? = null,
+    val filesDir: File,
+    val workspaceStore: WorkspaceStore,
+    val bootCacheStore: BootCacheStore,
     val credentialStore: CredentialStore,
     val gitSyncMutex: GitSyncMutex,
     val syncStateRepository: SyncStateRepository,
@@ -106,7 +110,9 @@ class SyncRuntime(
 
             return SyncRuntime(
                 context = context,
+                filesDir = filesDir,
                 workspaceStore = workspaceStore,
+                bootCacheStore = workspaceStore,
                 credentialStore = credentialStore,
                 gitSyncMutex = gitSyncMutex,
                 syncStateRepository = syncStateRepository,

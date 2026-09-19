@@ -36,6 +36,14 @@ class ReconcileWorkspaceSyncBranch(
         gitSyncMutex.mutex.withLock { reconcile(config, filesDir, fetchIfNeeded) }
     }
 
+    suspend fun reconcileWithoutLock(
+        config: WorkspaceConfig,
+        filesDir: File,
+        fetchIfNeeded: Boolean = true
+    ): Result<WorkspaceConfig> = withContext(dispatcher) {
+        reconcile(config, filesDir, fetchIfNeeded)
+    }
+
     private suspend fun reconcile(
         config: WorkspaceConfig,
         filesDir: File,

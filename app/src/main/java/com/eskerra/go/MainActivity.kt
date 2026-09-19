@@ -99,7 +99,7 @@ class MainActivity : ComponentActivity() {
         )
         val syncRuntime = (applicationContext as SyncRuntimeProvider).syncRuntime
         val workspaceStore = syncRuntime.workspaceStore
-        val bootCacheStore = workspaceStore
+        val bootCacheStore = syncRuntime.bootCacheStore
         val credentialStore = syncRuntime.credentialStore
         val gitRepository = JGitWorkspaceRepository()
         val setupCompletion = DefaultWorkspaceSetupCompletion(
