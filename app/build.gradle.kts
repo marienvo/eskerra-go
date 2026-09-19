@@ -51,8 +51,8 @@ android {
         applicationId = "com.eskerra.go"
         minSdk = 26
         targetSdk = 35
-        versionCode = 14
-        versionName = "0.14.0"
+        versionCode = 15
+        versionName = "0.15.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "SENTRY_DSN", stringBuildConfigField(sentryDsn.get()))
