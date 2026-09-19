@@ -115,6 +115,7 @@ fun App(
     catalogSnapshotStore: PodcastCatalogSnapshotStore,
     podcastShellStateWiring: PodcastShellStateWiring,
     shareIntake: ShareIntake,
+    readConfig: suspend () -> WorkspaceConfig? = { null },
     onConfigUpdated: (WorkspaceConfig) -> Unit,
     onInboxUiStateChanged: (InboxUiState) -> Unit = {},
     onTodayHubUiStateChanged: (TodayHubUiState) -> Unit = {},
@@ -165,10 +166,11 @@ fun App(
             buildSafeSyncDiagnostic = { cfg -> buildSafeSyncDiagnostic(cfg, filesDir) },
             syncStateRepository = syncStateRepository,
             vaultSyncScheduler = vaultSyncScheduler,
+            readConfig = readConfig,
             onSyncSuccess = markInboxNotesChanged,
-            onConfigUpdated = { updated ->
-                currentConfig = updated
-                onConfigUpdated(updated)
+            onConfigUpdated = {
+                currentConfig = it
+                onConfigUpdated(it)
             }
         )
     )
@@ -183,7 +185,7 @@ fun App(
         appSyncViewModel = appSyncViewModel,
         reportWeeklyPerformance = reportWeeklyPerformance,
         onConfigUpdated = onConfigUpdated,
-        onConfigChanged = { updated -> currentConfig = updated }
+        onConfigChanged = { currentConfig = it }
     )
     AppSearchIndexEffects(
         config = currentConfig,
@@ -250,9 +252,7 @@ fun App(
                 currentRoute = currentRoute,
                 currentTopLevelRoute = destinationTopLevelRoute ?: currentTopLevelRoute,
                 targetRoute = route
-            ) {
-                homeReselectSignal++
-            }
+            ) { homeReselectSignal++ }
         }
     ) { contentModifier ->
         val navGraphContext = AppNavGraphContext(

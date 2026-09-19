@@ -247,11 +247,52 @@ class AppSyncViewModelTest {
         }
     }
 
+    @Test
+    fun transitionToSynced_withUpdatedConfig_callsOnConfigUpdated() = runTest {
+        val ioDispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            var updatedConfigReceived: WorkspaceConfig? = null
+            val syncStateRepo = FakeSyncStateRepository()
+            val scheduler = FakeVaultSyncScheduler(syncStateRepo)
+
+            val initialConfig = testConfig()
+            val newConfig = initialConfig.copy(branch = "synced-branch")
+
+            val viewModel = createViewModel(
+                ioDispatcher = ioDispatcher,
+                syncStateRepository = syncStateRepo,
+                vaultSyncScheduler = scheduler,
+                readConfig = { newConfig },
+                onConfigUpdated = { updatedConfigReceived = it }
+            )
+
+            // Start in running state
+            syncStateRepo.updateStatus(
+                DurableSyncStatus.Running("Pushing", 1000L)
+            )
+            testScheduler.runCurrent()
+
+            // Transition to Synced
+            syncStateRepo.updateStatus(
+                DurableSyncStatus.Synced(2000L)
+            )
+            advanceUntilIdle()
+
+            assertEquals("synced-branch", updatedConfigReceived?.branch)
+            assertTrue(viewModel.uiState.value is SyncUiState.Success)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
     private fun createViewModel(
         ioDispatcher: CoroutineDispatcher,
         syncStateRepository: SyncStateRepository = FakeSyncStateRepository(),
         vaultSyncScheduler: VaultSyncScheduler = FakeVaultSyncScheduler(syncStateRepository),
+        readConfig: suspend () -> WorkspaceConfig? = { null },
         onSyncSuccess: () -> Unit = {},
+        onConfigUpdated: (WorkspaceConfig) -> Unit = {},
         clock: () -> Long = { 0L },
         remoteSyncRepository: com.eskerra.go.core.repository.RemoteSyncRepository? = null,
         lastSyncStore: LastSyncStatusStore = FakeWorkspaceStore()
@@ -286,7 +327,9 @@ class AppSyncViewModelTest {
             buildSafeSyncDiagnostic = { cfg -> buildDiagnostic(cfg, filesDir) },
             syncStateRepository = syncStateRepository,
             vaultSyncScheduler = vaultSyncScheduler,
+            readConfig = readConfig,
             onSyncSuccess = onSyncSuccess,
+            onConfigUpdated = onConfigUpdated,
             refreshDebounceMs = 30_000L,
             clock = clock
         )

@@ -251,6 +251,7 @@ fun AppRoot(
                         // Only handed over once the workspace is ready; until then the share
                         // simply waits in the Activity and arrives when App mounts.
                         shareIntake = shareIntake,
+                        readConfig = workspaceStore::read,
                         onConfigUpdated = gateViewModel::updateReadyConfig,
                         onInboxUiStateChanged = { inboxUiState = it },
                         onTodayHubUiStateChanged = { todayHubUiState = it },

@@ -28,6 +28,7 @@ class AppSyncViewModel(
     private val buildSafeSyncDiagnostic: suspend (WorkspaceConfig) -> SafeSyncDiagnostic,
     private val syncStateRepository: SyncStateRepository,
     private val vaultSyncScheduler: VaultSyncScheduler,
+    private val readConfig: suspend () -> WorkspaceConfig? = { null },
     private val onSyncSuccess: () -> Unit = {},
     private val onConfigUpdated: (WorkspaceConfig) -> Unit = {},
     private val refreshDebounceMs: Long = DEFAULT_REFRESH_DEBOUNCE_MS,
@@ -97,6 +98,11 @@ class AppSyncViewModel(
                 if (prevStatus is DurableSyncStatus.Running ||
                     prevStatus is DurableSyncStatus.Pending
                 ) {
+                    val updated = readConfig()
+                    if (updated != null && updated != config) {
+                        this.config = updated
+                        onConfigUpdated(updated)
+                    }
                     onSyncSuccess()
                     _uiState.value = SyncUiState.Success(
                         status = freshSummary,
@@ -258,6 +264,7 @@ class AppSyncViewModel(
             buildSafeSyncDiagnostic: suspend (WorkspaceConfig) -> SafeSyncDiagnostic,
             syncStateRepository: SyncStateRepository,
             vaultSyncScheduler: VaultSyncScheduler,
+            readConfig: suspend () -> WorkspaceConfig? = { null },
             onSyncSuccess: () -> Unit = {},
             onConfigUpdated: (WorkspaceConfig) -> Unit = {}
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
@@ -270,6 +277,7 @@ class AppSyncViewModel(
                 buildSafeSyncDiagnostic = buildSafeSyncDiagnostic,
                 syncStateRepository = syncStateRepository,
                 vaultSyncScheduler = vaultSyncScheduler,
+                readConfig = readConfig,
                 onSyncSuccess = onSyncSuccess,
                 onConfigUpdated = onConfigUpdated
             ) as T
