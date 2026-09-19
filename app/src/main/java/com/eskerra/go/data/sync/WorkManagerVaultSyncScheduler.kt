@@ -5,6 +5,7 @@ import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequest
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
@@ -16,7 +17,23 @@ import java.util.concurrent.TimeUnit
 class WorkManagerVaultSyncScheduler(
     private val context: Context,
     private val syncStateRepository: SyncStateRepository,
-    private val workManagerProvider: () -> WorkManager = { WorkManager.getInstance(context) }
+    private val enqueueWork: (
+        name: String,
+        policy: ExistingWorkPolicy,
+        request: OneTimeWorkRequest
+    ) -> Unit = { name, policy, request ->
+        WorkManager.getInstance(context).enqueueUniqueWork(name, policy, request)
+    },
+    private val cancelWork: (name: String) -> Unit = { name ->
+        WorkManager.getInstance(context).cancelUniqueWork(name)
+    },
+    private val getActiveWorkInfos: suspend (name: String) -> List<WorkInfo> = { name ->
+        try {
+            WorkManager.getInstance(context).getWorkInfosForUniqueWork(name).get()
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
 ) : VaultSyncScheduler {
 
     override fun scheduleSync() {
@@ -34,24 +51,20 @@ class WorkManagerVaultSyncScheduler(
             .addTag(TAG_VAULT_SYNC)
             .build()
 
-        workManagerProvider().enqueueUniqueWork(
+        enqueueWork(
             WORK_NAME_VAULT_SYNC,
-            ExistingWorkPolicy.KEEP,
+            ExistingWorkPolicy.APPEND_OR_REPLACE,
             request
         )
     }
 
     override fun cancelSync() {
-        workManagerProvider().cancelUniqueWork(WORK_NAME_VAULT_SYNC)
+        cancelWork(WORK_NAME_VAULT_SYNC)
     }
 
     override suspend fun reconcile() {
         val record = syncStateRepository.getRecord()
-        val workInfos = try {
-            workManagerProvider().getWorkInfosForUniqueWork(WORK_NAME_VAULT_SYNC).get()
-        } catch (_: Exception) {
-            emptyList()
-        }
+        val workInfos = getActiveWorkInfos(WORK_NAME_VAULT_SYNC)
         val isWorkerActive = workInfos.any {
             it.state == WorkInfo.State.RUNNING || it.state == WorkInfo.State.ENQUEUED
         }

@@ -143,7 +143,7 @@ class AppSyncViewModelTest {
     }
 
     @Test
-    fun doubleSyncNow_schedulesOnlyOneSync() = runTest {
+    fun syncNow_whileSyncing_incrementsGenerationAndSchedulesFollowUp() = runTest {
         val ioDispatcher = StandardTestDispatcher(testScheduler)
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         try {
@@ -164,7 +164,8 @@ class AppSyncViewModelTest {
             viewModel.syncNow()
             advanceUntilIdle()
 
-            assertEquals(1, scheduler.scheduledCount)
+            assertEquals(2, scheduler.scheduledCount)
+            assertEquals(2L, syncStateRepo.getRecord().requestedGeneration)
         } finally {
             Dispatchers.resetMain()
         }

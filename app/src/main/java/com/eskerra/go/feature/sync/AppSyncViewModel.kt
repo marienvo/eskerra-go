@@ -200,9 +200,6 @@ class AppSyncViewModel(
 
     fun syncNow() {
         viewModelScope.launch {
-            if (_uiState.value is SyncUiState.Syncing) {
-                return@launch
-            }
             if (config.remoteUri.isNullOrBlank()) {
                 refreshLocalStatusQuietly()
                 return@launch
