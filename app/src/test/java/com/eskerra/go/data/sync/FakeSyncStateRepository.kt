@@ -54,6 +54,22 @@ class FakeSyncStateRepository(initialRecord: DurableSyncRecord = DurableSyncReco
         _record.update { it.copy(status = status) }
     }
 
+    override suspend fun updateRunningStep(step: String) {
+        _record.update { current ->
+            val running = current.status as? DurableSyncStatus.Running
+            if (running != null) {
+                current.copy(
+                    status = DurableSyncStatus.Running(
+                        step = step,
+                        startedAtEpochMs = running.startedAtEpochMs
+                    )
+                )
+            } else {
+                current
+            }
+        }
+    }
+
     override suspend fun reconcileOrphanedRunning(hasActiveWorker: Boolean) {
         _record.update { current ->
             if (current.status is DurableSyncStatus.Running && !hasActiveWorker) {

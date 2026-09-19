@@ -5,6 +5,7 @@ import com.eskerra.go.core.inbox.InboxNotePath
 import com.eskerra.go.core.model.DurableSyncRecord
 import com.eskerra.go.core.model.DurableSyncStatus
 import com.eskerra.go.core.model.SyncError
+import com.eskerra.go.core.model.SyncProgressStep
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.usecase.BuildSafeSyncDiagnostic
 import com.eskerra.go.core.usecase.BuildSyncPreflight
@@ -233,5 +234,28 @@ class VaultSyncWorkerTest {
         assertEquals(40_000L, VaultSyncWorker.calculateBackoffMs(2))
         assertEquals(640_000L, VaultSyncWorker.calculateBackoffMs(6))
         assertEquals(640_000L, VaultSyncWorker.calculateBackoffMs(10)) // capped at 2^6
+    }
+
+    @Test
+    fun lateProgressUpdate_doesNotOverwriteSyncedStatus() = runTest {
+        val (runtime, stateRepo, _) = cloneSeededWorkspace()
+
+        var capturedProgressCallback: ((SyncProgressStep) -> Unit)? = null
+        val result = VaultSyncWorker.performSync(
+            syncRuntime = runtime,
+            setForegroundInfo = {},
+            syncRunner = { config, filesDir, onProgress ->
+                capturedProgressCallback = onProgress
+                runtime.manualSyncNow(config, filesDir, onProgress)
+            }
+        )
+        assertEquals(Result.success(), result)
+        assertTrue(stateRepo.getRecord().status is DurableSyncStatus.Synced)
+
+        // Late progress update arrives after sync has already completed
+        capturedProgressCallback?.invoke(SyncProgressStep.PushingLocalCommits)
+
+        val record = stateRepo.getRecord()
+        assertTrue(record.status is DurableSyncStatus.Synced)
     }
 }

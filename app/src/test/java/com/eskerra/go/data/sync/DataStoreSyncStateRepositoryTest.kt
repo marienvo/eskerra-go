@@ -139,4 +139,29 @@ class DataStoreSyncStateRepositoryTest {
         assertTrue(blocked is DurableSyncStatus.Blocked)
         assertEquals("Auth failed", (blocked as DurableSyncStatus.Blocked).reason)
     }
+
+    @Test
+    fun updateRunningStep_updatesStepWhenRunning() = runTest {
+        val repository = createRepository()
+        repository.updateStatus(DurableSyncStatus.Running("Fetching", 1000L))
+
+        repository.updateRunningStep("Merging")
+
+        val status = repository.getRecord().status
+        assertTrue(status is DurableSyncStatus.Running)
+        assertEquals("Merging", (status as DurableSyncStatus.Running).step)
+        assertEquals(1000L, status.startedAtEpochMs)
+    }
+
+    @Test
+    fun updateRunningStep_noOpOutsideRunning() = runTest {
+        val repository = createRepository()
+        repository.updateStatus(DurableSyncStatus.Synced(2000L))
+
+        repository.updateRunningStep("Pushing")
+
+        val status = repository.getRecord().status
+        assertTrue(status is DurableSyncStatus.Synced)
+        assertEquals(2000L, (status as DurableSyncStatus.Synced).completedAtEpochMs)
+    }
 }

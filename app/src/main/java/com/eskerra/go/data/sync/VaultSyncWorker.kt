@@ -92,12 +92,7 @@ class VaultSyncWorker(context: Context, params: WorkerParameters) :
                 syncRuntime.filesDir
             ) { step ->
                 launch {
-                    syncRuntime.syncStateRepository.updateStatus(
-                        DurableSyncStatus.Running(
-                            step = step.name,
-                            startedAtEpochMs = startedAt
-                        )
-                    )
+                    syncRuntime.syncStateRepository.updateRunningStep(step.name)
                 }
             }
 

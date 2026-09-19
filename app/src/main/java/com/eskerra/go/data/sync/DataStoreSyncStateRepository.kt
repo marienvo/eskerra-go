@@ -68,6 +68,15 @@ class DataStoreSyncStateRepository(private val dataStore: DataStore<Preferences>
         }
     }
 
+    override suspend fun updateRunningStep(step: String) {
+        dataStore.edit { prefs ->
+            val currentStatus = prefs.toDurableSyncRecord().status
+            if (currentStatus is DurableSyncStatus.Running) {
+                prefs[KEY_STATUS_PARAM_STRING] = step
+            }
+        }
+    }
+
     override suspend fun reconcileOrphanedRunning(hasActiveWorker: Boolean) {
         dataStore.edit { prefs ->
             val currentRecord = prefs.toDurableSyncRecord()

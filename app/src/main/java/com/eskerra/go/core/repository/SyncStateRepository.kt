@@ -31,6 +31,12 @@ interface SyncStateRepository {
     suspend fun updateStatus(status: DurableSyncStatus)
 
     /**
+     * Updates the running step text if and only if the current status is Running.
+     * No-op if current status is not Running (e.g. Synced, Blocked, Retrying, Pending).
+     */
+    suspend fun updateRunningStep(step: String)
+
+    /**
      * Reconciles orphaned Running status on app start:
      * If status is Running and [hasActiveWorker] is false, transitions to Pending.
      */
