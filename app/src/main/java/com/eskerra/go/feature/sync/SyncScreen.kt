@@ -46,7 +46,7 @@ fun SyncScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text(
-            text = "Sync",
+            text = "Sync status",
             style = MaterialTheme.typography.headlineMedium
         )
 
