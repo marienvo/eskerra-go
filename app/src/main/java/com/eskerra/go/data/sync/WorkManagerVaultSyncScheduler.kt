@@ -6,12 +6,16 @@ import androidx.work.Constraints
 import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import com.eskerra.go.core.model.DurableSyncStatus
+import com.eskerra.go.core.repository.SyncStateRepository
 import com.eskerra.go.core.repository.VaultSyncScheduler
 import java.util.concurrent.TimeUnit
 
 class WorkManagerVaultSyncScheduler(
     private val context: Context,
+    private val syncStateRepository: SyncStateRepository,
     private val workManagerProvider: () -> WorkManager = { WorkManager.getInstance(context) }
 ) : VaultSyncScheduler {
 
@@ -39,6 +43,29 @@ class WorkManagerVaultSyncScheduler(
 
     override fun cancelSync() {
         workManagerProvider().cancelUniqueWork(WORK_NAME_VAULT_SYNC)
+    }
+
+    override suspend fun reconcile() {
+        val record = syncStateRepository.getRecord()
+        val workInfos = try {
+            workManagerProvider().getWorkInfosForUniqueWork(WORK_NAME_VAULT_SYNC).get()
+        } catch (_: Exception) {
+            emptyList()
+        }
+        val isWorkerActive = workInfos.any {
+            it.state == WorkInfo.State.RUNNING || it.state == WorkInfo.State.ENQUEUED
+        }
+        if (!isWorkerActive) {
+            if (record.status is DurableSyncStatus.Running) {
+                syncStateRepository.updateStatus(DurableSyncStatus.Pending)
+                scheduleSync()
+            } else if (record.requestedGeneration > record.completedGeneration) {
+                if (record.status !is DurableSyncStatus.Blocked) {
+                    syncStateRepository.updateStatus(DurableSyncStatus.Pending)
+                    scheduleSync()
+                }
+            }
+        }
     }
 
     companion object {

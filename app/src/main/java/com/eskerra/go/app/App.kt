@@ -19,7 +19,9 @@ import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.ActiveTodayHubStore
 import com.eskerra.go.core.repository.PodcastCatalogSnapshotStore
 import com.eskerra.go.core.repository.PodcastPlayerDriver
+import com.eskerra.go.core.repository.SyncStateRepository
 import com.eskerra.go.core.repository.TodayHubSnapshotStore
+import com.eskerra.go.core.repository.VaultSyncScheduler
 import com.eskerra.go.core.usecase.BuildSafeSyncDiagnostic
 import com.eskerra.go.core.usecase.BuildSyncPreflight
 import com.eskerra.go.core.usecase.ClearRemoteSyncSettings
@@ -40,11 +42,9 @@ import com.eskerra.go.core.usecase.LoadTodayHub
 import com.eskerra.go.core.usecase.LoadTodayHubRow
 import com.eskerra.go.core.usecase.LoadVaultSettings
 import com.eskerra.go.core.usecase.MaintainVaultSearchIndex
-import com.eskerra.go.core.usecase.ManualSyncNow
 import com.eskerra.go.core.usecase.MarkPodcastEpisodesPlayed
 import com.eskerra.go.core.usecase.PrefetchLinkedNotes
 import com.eskerra.go.core.usecase.ReconcileWorkspaceSyncBranch
-import com.eskerra.go.core.usecase.RecordLastSyncAttempt
 import com.eskerra.go.core.usecase.RefreshRemoteSyncStatus
 import com.eskerra.go.core.usecase.RepairVaultSearchIndex
 import com.eskerra.go.core.usecase.ReportWeeklyPerformance
@@ -86,8 +86,8 @@ fun App(
     refreshRemoteSyncStatus: RefreshRemoteSyncStatus,
     buildSyncPreflight: BuildSyncPreflight,
     buildSafeSyncDiagnostic: BuildSafeSyncDiagnostic,
-    manualSyncNow: ManualSyncNow,
-    recordLastSyncAttempt: RecordLastSyncAttempt,
+    syncStateRepository: SyncStateRepository,
+    vaultSyncScheduler: VaultSyncScheduler,
     loadRemoteSyncSettings: LoadRemoteSyncSettings,
     saveRemoteSyncSettings: SaveRemoteSyncSettings,
     updateSyncToken: UpdateSyncToken,
@@ -159,13 +159,12 @@ fun App(
         key = currentConfig.syncViewModelKey(),
         factory = AppSyncViewModel.factory(
             config = currentConfig,
-            filesDir = filesDir,
-            loadSyncStatus = loadSyncStatus,
-            refreshRemoteSyncStatus = refreshRemoteSyncStatus,
-            buildSyncPreflight = buildSyncPreflight,
-            buildSafeSyncDiagnostic = buildSafeSyncDiagnostic,
-            manualSyncNow = manualSyncNow,
-            recordLastSyncAttempt = recordLastSyncAttempt,
+            loadSyncStatus = { cfg -> loadSyncStatus(cfg, filesDir) },
+            refreshRemoteSyncStatus = { cfg -> refreshRemoteSyncStatus(cfg, filesDir) },
+            buildSyncPreflight = { cfg -> buildSyncPreflight(cfg, filesDir) },
+            buildSafeSyncDiagnostic = { cfg -> buildSafeSyncDiagnostic(cfg, filesDir) },
+            syncStateRepository = syncStateRepository,
+            vaultSyncScheduler = vaultSyncScheduler,
             onSyncSuccess = markInboxNotesChanged,
             onConfigUpdated = { updated ->
                 currentConfig = updated

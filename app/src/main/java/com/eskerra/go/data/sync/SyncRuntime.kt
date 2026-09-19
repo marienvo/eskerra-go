@@ -106,7 +106,10 @@ class SyncRuntime(
                 gitSyncMutex = gitSyncMutex
             )
 
-            val vaultSyncScheduler = WorkManagerVaultSyncScheduler(context)
+            val vaultSyncScheduler = WorkManagerVaultSyncScheduler(
+                context = context,
+                syncStateRepository = syncStateRepository
+            )
 
             return SyncRuntime(
                 context = context,
