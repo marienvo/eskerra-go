@@ -3,12 +3,19 @@ package com.eskerra.go
 import android.app.Application
 import android.util.Log
 import androidx.work.Configuration
+import com.eskerra.go.data.sync.SyncRuntime
+import com.eskerra.go.data.sync.SyncRuntimeProvider
 import io.sentry.Sentry
 import io.sentry.android.core.SentryAndroid
 
 class EskerraGoApplication :
     Application(),
-    Configuration.Provider {
+    Configuration.Provider,
+    SyncRuntimeProvider {
+
+    override val syncRuntime: SyncRuntime by lazy {
+        SyncRuntime.create(this)
+    }
 
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()

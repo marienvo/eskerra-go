@@ -19,8 +19,6 @@ import coil.memory.MemoryCache
 import com.eskerra.go.app.AppRoot
 import com.eskerra.go.app.ShareIntake
 import com.eskerra.go.core.repository.PodcastPlayerDriver
-import com.eskerra.go.core.usecase.BuildSafeSyncDiagnostic
-import com.eskerra.go.core.usecase.BuildSyncPreflight
 import com.eskerra.go.core.usecase.ClearRemoteSyncSettings
 import com.eskerra.go.core.usecase.CreateInboxNote
 import com.eskerra.go.core.usecase.DeleteInboxNotes
@@ -35,17 +33,12 @@ import com.eskerra.go.core.usecase.LoadNoteForReading
 import com.eskerra.go.core.usecase.LoadPodcastArtwork
 import com.eskerra.go.core.usecase.LoadPodcastCatalog
 import com.eskerra.go.core.usecase.LoadRemoteSyncSettings
-import com.eskerra.go.core.usecase.LoadSyncStatus
 import com.eskerra.go.core.usecase.LoadTodayHub
 import com.eskerra.go.core.usecase.LoadTodayHubRow
 import com.eskerra.go.core.usecase.LoadVaultSettings
 import com.eskerra.go.core.usecase.MaintainVaultSearchIndex
-import com.eskerra.go.core.usecase.ManualSyncNow
 import com.eskerra.go.core.usecase.MarkPodcastEpisodesPlayed
 import com.eskerra.go.core.usecase.PrefetchLinkedNotes
-import com.eskerra.go.core.usecase.ReconcileWorkspaceSyncBranch
-import com.eskerra.go.core.usecase.RecordLastSyncAttempt
-import com.eskerra.go.core.usecase.RefreshRemoteSyncStatus
 import com.eskerra.go.core.usecase.RepairVaultSearchIndex
 import com.eskerra.go.core.usecase.SaveLocalSettings
 import com.eskerra.go.core.usecase.SaveNote
@@ -58,19 +51,9 @@ import com.eskerra.go.core.usecase.SyncPodcastVaultRefresh
 import com.eskerra.go.core.usecase.TestRemoteConnection
 import com.eskerra.go.core.usecase.TouchVaultSearchPaths
 import com.eskerra.go.core.usecase.UpdateSyncToken
-import com.eskerra.go.data.credentials.AndroidKeystoreTokenCipher
-import com.eskerra.go.data.credentials.EncryptedCredentialStore
-import com.eskerra.go.data.git.GitSyncMutex
-import com.eskerra.go.data.git.JGitRemoteSyncRepository
 import com.eskerra.go.data.git.JGitWorkspaceRepository
-import com.eskerra.go.data.notes.CoalescingNoteRegistryRepository
 import com.eskerra.go.data.notes.FileInboxSnapshotStore
-import com.eskerra.go.data.notes.FileNoteContentRepository
-import com.eskerra.go.data.notes.FileNoteRegistryRepository
-import com.eskerra.go.data.notes.FileNoteRegistrySnapshotStore
 import com.eskerra.go.data.notes.FileNoteWriteRepository
-import com.eskerra.go.data.notes.NoteContentCache
-import com.eskerra.go.data.notes.NoteRegistryCache
 import com.eskerra.go.data.notes.ParsedMarkdownCache
 import com.eskerra.go.data.perf.ColdStartTrace
 import com.eskerra.go.data.player.Media3PodcastPlayerDriver
@@ -82,11 +65,11 @@ import com.eskerra.go.data.podcast.rss.FilePodcastRssVaultSync
 import com.eskerra.go.data.podcast.rss.OkHttpRssFeedFetcher
 import com.eskerra.go.data.search.SqliteVaultSearchRepository
 import com.eskerra.go.data.share.OkHttpPageTitleFetcher
+import com.eskerra.go.data.sync.SyncRuntimeProvider
 import com.eskerra.go.data.todayhub.DataStoreActiveTodayHubStore
 import com.eskerra.go.data.todayhub.FileTodayHubSnapshotStore
 import com.eskerra.go.data.vault.DataStoreLocalSettingsStore
 import com.eskerra.go.data.vault.FileVaultSettingsRepository
-import com.eskerra.go.data.workspace.DataStoreWorkspaceStore
 import com.eskerra.go.data.workspace.DefaultRemoteSyncSettingsRepository
 import com.eskerra.go.data.workspace.DefaultWorkspaceSetupCompletion
 import com.eskerra.go.data.workspace.DefaultWorkspaceSetupRepository
@@ -114,12 +97,10 @@ class MainActivity : ComponentActivity() {
             statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT)
         )
-        val workspaceStore = DataStoreWorkspaceStore(applicationContext)
+        val syncRuntime = (applicationContext as SyncRuntimeProvider).syncRuntime
+        val workspaceStore = syncRuntime.workspaceStore
         val bootCacheStore = workspaceStore
-        val credentialStore = EncryptedCredentialStore(
-            filesDir = filesDir,
-            tokenCipher = AndroidKeystoreTokenCipher()
-        )
+        val credentialStore = syncRuntime.credentialStore
         val gitRepository = JGitWorkspaceRepository()
         val setupCompletion = DefaultWorkspaceSetupCompletion(
             setupRepository = DefaultWorkspaceSetupRepository(gitRepository),
@@ -127,17 +108,13 @@ class MainActivity : ComponentActivity() {
             credentialStore = credentialStore
         )
 
-        val fileNoteRegistryRepository = FileNoteRegistryRepository()
-        val noteRegistryRepository = CoalescingNoteRegistryRepository(fileNoteRegistryRepository)
-        val noteContentCache = NoteContentCache(FileNoteContentRepository())
+        val noteRegistryRepository = syncRuntime.noteRegistryRepository
+        val noteContentCache = syncRuntime.noteContentCache
         val parsedMarkdownCache = ParsedMarkdownCache()
         val noteWriteRepository = FileNoteWriteRepository(gitRepository)
         val loadGitStatusSummary = LoadGitStatusSummary(gitRepository)
 
-        val noteRegistryCache = NoteRegistryCache(
-            repository = noteRegistryRepository,
-            snapshotStore = FileNoteRegistrySnapshotStore()
-        )
+        val noteRegistryCache = syncRuntime.noteRegistryCache
         val loadInboxSummaries = LoadInboxSummariesCached(
             delegate = LoadInboxSummaries(noteRegistryCache),
             snapshotStore = FileInboxSnapshotStore(),
@@ -180,38 +157,15 @@ class MainActivity : ComponentActivity() {
         val activeTodayHubStore = DataStoreActiveTodayHubStore(applicationContext)
         val todayHubSnapshotStore = FileTodayHubSnapshotStore()
 
-        val remoteSyncRepository = JGitRemoteSyncRepository(gitRepository)
-        val loadSyncStatus = LoadSyncStatus(remoteSyncRepository)
-        val refreshRemoteSyncStatus = RefreshRemoteSyncStatus(
-            remoteSyncRepository = remoteSyncRepository,
-            credentialStore = credentialStore,
-            loadSyncStatus = loadSyncStatus
-        )
-        val buildSyncPreflight = BuildSyncPreflight(
-            remoteSyncRepository = remoteSyncRepository,
-            credentialStore = credentialStore
-        )
-        val buildSafeSyncDiagnostic = BuildSafeSyncDiagnostic(
-            buildSyncPreflight = buildSyncPreflight,
-            lastSyncStatusStore = workspaceStore
-        )
-        val recordLastSyncAttempt = RecordLastSyncAttempt(workspaceStore)
-        val gitSyncMutex = GitSyncMutex()
-        val reconcileWorkspaceSyncBranch = ReconcileWorkspaceSyncBranch(
-            workspaceStore = workspaceStore,
-            credentialStore = credentialStore,
-            remoteSyncRepository = remoteSyncRepository,
-            gitSyncMutex = gitSyncMutex
-        )
-        val manualSyncNow = ManualSyncNow(
-            remoteSyncRepository = remoteSyncRepository,
-            credentialStore = credentialStore,
-            registryCache = noteRegistryCache,
-            contentCache = noteContentCache,
-            loadSyncStatus = loadSyncStatus,
-            reconcileWorkspaceSyncBranch = reconcileWorkspaceSyncBranch,
-            gitSyncMutex = gitSyncMutex
-        )
+        val remoteSyncRepository = syncRuntime.remoteSyncRepository
+        val loadSyncStatus = syncRuntime.loadSyncStatus
+        val refreshRemoteSyncStatus = syncRuntime.refreshRemoteSyncStatus
+        val buildSyncPreflight = syncRuntime.buildSyncPreflight
+        val buildSafeSyncDiagnostic = syncRuntime.buildSafeSyncDiagnostic
+        val recordLastSyncAttempt = syncRuntime.recordLastSyncAttempt
+        val gitSyncMutex = syncRuntime.gitSyncMutex
+        val reconcileWorkspaceSyncBranch = syncRuntime.reconcileWorkspaceSyncBranch
+        val manualSyncNow = syncRuntime.manualSyncNow
 
         val localSettingsStore = DataStoreLocalSettingsStore(applicationContext)
         val vaultSettingsRepository = FileVaultSettingsRepository(
