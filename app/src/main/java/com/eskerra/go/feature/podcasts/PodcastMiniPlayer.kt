@@ -120,8 +120,9 @@ fun PodcastMiniPlayer(
                     IconButton(onClick = onArchiveActiveEpisode, enabled = !markInFlight) {
                         if (markInFlight) {
                             CircularProgressIndicator(
-                                modifier = Modifier.size(22.dp),
-                                strokeWidth = 2.dp
+                                modifier = Modifier.size(24.dp),
+                                strokeWidth = 2.dp,
+                                color = Color.White
                             )
                         } else {
                             Icon(Icons.Outlined.Archive, contentDescription = "Archive episode")
