@@ -184,8 +184,9 @@ class AppSyncViewModelTest {
                 syncStateRepository = syncStateRepo,
                 vaultSyncScheduler = scheduler
             )
-
+            viewModel.reconcileOnBoot()
             advanceUntilIdle()
+
             syncStateRepo.updateStatus(
                 DurableSyncStatus.Retrying(
                     reason = "Remote unavailable",
@@ -248,6 +249,36 @@ class AppSyncViewModelTest {
     }
 
     @Test
+    fun init_doesNotCallLoadSyncStatusBeforeReconcileOnBoot() = runTest {
+        val ioDispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            val syncStateRepo = FakeSyncStateRepository()
+            val scheduler = FakeVaultSyncScheduler(syncStateRepo)
+
+            val viewModel = createViewModel(
+                ioDispatcher = ioDispatcher,
+                syncStateRepository = syncStateRepo,
+                vaultSyncScheduler = scheduler
+            )
+
+            // Let any coroutines in init settle
+            advanceUntilIdle()
+
+            // Verification: no Git work / observation started in init
+            assertEquals(SyncUiState.Loading, viewModel.uiState.value)
+
+            // Once boot reconcile runs after launch settles:
+            viewModel.reconcileOnBoot()
+            advanceUntilIdle()
+
+            assertTrue(viewModel.uiState.value is SyncUiState.Ready)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
     fun transitionToSynced_withUpdatedConfig_callsOnConfigUpdated() = runTest {
         val ioDispatcher = StandardTestDispatcher(testScheduler)
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
@@ -266,6 +297,8 @@ class AppSyncViewModelTest {
                 readConfig = { newConfig },
                 onConfigUpdated = { updatedConfigReceived = it }
             )
+            viewModel.reconcileOnBoot()
+            testScheduler.runCurrent()
 
             // Start in running state
             syncStateRepo.updateStatus(

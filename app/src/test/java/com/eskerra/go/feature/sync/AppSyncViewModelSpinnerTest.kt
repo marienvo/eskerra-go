@@ -60,6 +60,8 @@ class AppSyncViewModelSpinnerTest {
                 syncStateRepository = syncStateRepo,
                 vaultSyncScheduler = scheduler
             )
+            viewModel.reconcileOnBoot()
+            testScheduler.runCurrent()
 
             syncStateRepo.updateStatus(
                 DurableSyncStatus.Running(
@@ -94,6 +96,8 @@ class AppSyncViewModelSpinnerTest {
                 syncStateRepository = syncStateRepo,
                 vaultSyncScheduler = scheduler
             )
+            viewModel.reconcileOnBoot()
+            testScheduler.runCurrent()
 
             syncStateRepo.updateStatus(
                 DurableSyncStatus.Running(
@@ -126,6 +130,8 @@ class AppSyncViewModelSpinnerTest {
                 syncStateRepository = syncStateRepo,
                 vaultSyncScheduler = scheduler
             )
+            viewModel.reconcileOnBoot()
+            testScheduler.runCurrent()
 
             syncStateRepo.updateStatus(
                 DurableSyncStatus.Running(

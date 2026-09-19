@@ -49,6 +49,7 @@ class AppSyncViewModel(
     private var lastRemoteRefreshAtMs: Long = -1L
     private var lastStatusSummary: SyncStatusSummary? = null
     private var previousDurableStatus: DurableSyncStatus? = null
+    private var observeJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -56,9 +57,14 @@ class AppSyncViewModel(
                 .holdTrueAtLeast(SYNC_SPINNER_HOLD_MS)
                 .collect { _syncSpinnerVisible.value = it }
         }
-        viewModelScope.launch {
-            syncStateRepository.record.collect { record ->
-                handleDurableSyncRecord(record)
+    }
+
+    private fun ensureObservingDurableState() {
+        if (observeJob == null) {
+            observeJob = viewModelScope.launch {
+                syncStateRepository.record.collect { record ->
+                    handleDurableSyncRecord(record)
+                }
             }
         }
     }
@@ -149,6 +155,7 @@ class AppSyncViewModel(
         lastStatusSummary ?: loadSyncStatus(config).also { lastStatusSummary = it }
 
     fun refreshRemoteStatus(force: Boolean = false) {
+        ensureObservingDurableState()
         if (_uiState.value is SyncUiState.Syncing) {
             return
         }
@@ -172,6 +179,7 @@ class AppSyncViewModel(
     }
 
     fun refreshLocalStatus() {
+        ensureObservingDurableState()
         if (_uiState.value is SyncUiState.Syncing) {
             return
         }
@@ -186,6 +194,7 @@ class AppSyncViewModel(
     }
 
     fun refreshLocalStatusQuietly() {
+        ensureObservingDurableState()
         if (_uiState.value is SyncUiState.Syncing) {
             return
         }
@@ -199,12 +208,14 @@ class AppSyncViewModel(
     }
 
     fun reconcileOnBoot() {
+        ensureObservingDurableState()
         viewModelScope.launch {
             vaultSyncScheduler.reconcile()
         }
     }
 
     fun syncNow() {
+        ensureObservingDurableState()
         viewModelScope.launch {
             if (config.remoteUri.isNullOrBlank()) {
                 refreshLocalStatusQuietly()
@@ -217,6 +228,7 @@ class AppSyncViewModel(
 
     /** Sole entry point for current and future foreground automatic sync triggers. */
     fun requestAutoSync() {
+        ensureObservingDurableState()
         viewModelScope.launch {
             if (config.remoteUri.isNullOrBlank()) {
                 refreshLocalStatusQuietly()
