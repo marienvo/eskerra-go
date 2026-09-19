@@ -129,7 +129,6 @@ fun PodcastsScreen(
                 PullToRefreshDefaults.Indicator(
                     state = pullRefreshState,
                     isRefreshing = refreshState.active,
-                    color = PodcastUiTokens.Accent,
                     modifier = Modifier
                         .align(Alignment.TopCenter)
                         .padding(top = chrome.top)
