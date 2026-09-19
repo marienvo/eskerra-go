@@ -15,6 +15,7 @@ Manual HTTPS sync works after Step 9 Slices 1–3. Slice 4 hardens behavior befo
 ### Manual vault sync
 
 - App-initiated manual sync (`ManualSyncNow`) commits **all safe local working-tree changes**, not only `Inbox/`.
+- Vault sync runs as an expedited/foreground task via WorkManager (`VaultSyncWorker`) with a foreground service notification (`FOREGROUND_SERVICE_TYPE_DATA_SYNC`), guaranteeing completion even if the user background-switches or leaves the app during a sync.
 - The only hard stop before commit: unsafe paths (`.git` internals, `..`).
 - Commit message: `Sync local changes from Eskerra Go`.
 - Integration: fast-forward when purely behind remote; **auto-merge** when histories diverged, writing sidecar copies `path (conflict yyyy-MM-dd HH.mm.ss).ext` where remote wins the canonical file. Returned in `SyncResult.conflictCopies`.
@@ -25,10 +26,10 @@ Manual HTTPS sync works after Step 9 Slices 1–3. Slice 4 hardens behavior befo
 
 ### Git sync channels
 
-All JGit mutations share one process-wide **mutex** so vault sync and podcast auto-sync never overlap (the working tree is a single fragile resource).
+All JGit mutations share one process-wide **mutex** (`GitSyncMutex`) so vault sync and podcast auto-sync never overlap (the working tree is a single fragile resource).
 
 | Channel | Trigger | Stage | Integration | Push |
-| --- | --- | --- | --- | --- |
+| --- | --- | --- | --- | --- | --- |
 | Vault sync | User taps sync, **or any note write** (see [Automatic vault sync triggers](#automatic-vault-sync-triggers)) | All safe local changes | FF when behind; auto-merge on divergence | Yes, with retry |
 | Podcast RSS refresh | Pull-to-refresh | RSS writes `General/`; then delegates to `ManualSyncNow` | Same as vault sync | Same as vault sync |
 | Podcast mark-as-played | Checkbox | Changed podcast paths under `General/` only | **Fast-forward only** | Best-effort; `pendingPush` on divergence/offline |
@@ -65,13 +66,14 @@ Podcast auto-sync is **foreground work** tied to user actions, not a background 
 - **Podcast mark-as-played:** fast-forward only; divergence leaves a local commit with `pendingPush`.
 - **Shell status indicator:** may show `Diverged` before the user syncs; vault sync resolves divergence on the next successful run.
 
-## Reentrancy
+## Reentrancy and durable execution
 
-- **UI/ViewModel:** ignore duplicate `syncNow()` while a sync job is active or `SyncUiState.Syncing`. Do not cancel and restart an in-flight sync on double-tap.
-- **UI/ViewModel:** starting a sync cancels any in-flight status `loadJob` first so a completing refresh cannot overwrite `SyncUiState.Syncing`.
-- **Use case:** `ManualSyncNow` holds the shared git mutex. A concurrent invoke returns `SyncError.SyncAlreadyRunning`.
-- **Editor/save:** local editing and saving remain allowed during sync (no global UI lock).
-- **Trigger state** (`syncJob`, `pendingAutoSync`) is owned exclusively by `viewModelScope`/Main. Public entry points marshal onto that scope, so it needs no locks or `@Volatile`. The sync job is created with `CoroutineStart.LAZY` and started only after `syncJob` is assigned, so a second caller cannot slip past the guard before the field is set.
+- **WorkManager scheduler:** Vault sync is scheduled via `VaultSyncScheduler` (`WorkManagerVaultSyncScheduler`) using unique work (`WORK_NAME_VAULT_SYNC`) and `ExistingWorkPolicy.KEEP`. An in-flight sync is not interrupted by new requests; incoming triggers increment `requestedGeneration` so the worker or follow-up loop picks them up.
+- **Durable generation tracking:** `SyncStateRepository` persists `requestedGeneration` and `completedGeneration` monotonically in DataStore. Every write trigger or sync request increments `requestedGeneration`. `VaultSyncWorker` reads the generation snapshot at start, performs the sync, and on success advances `completedGeneration` to that snapshot. If `requestedGeneration > completedGeneration`, status returns to `Pending` and a follow-up run is enqueued.
+- **Single status source of truth:** UI (`AppSyncViewModel`) observes `SyncStateRepository.record` directly: `Pending`, `Running(step, startedAt)`, `Retrying(reason, nextAttemptAt)`, `Synced(completedAt)`, `Blocked(reason)`. The UI state machine maps these durable statuses to `SyncUiState` without maintaining independent transient flags.
+- **Shared Git mutex:** `GitSyncMutex` in `data/git` is shared lazily across the application runtime, ensuring that `VaultSyncWorker` and foreground podcast operations never execute concurrent Git commands.
+- **UI double-tap safety:** duplicate `syncNow()` calls while a worker is running or `SyncUiState.Syncing` do not restart the worker.
+- **Editor/save concurrency:** local note editing and saving remain fully allowed during sync; new saves atomically increment `requestedGeneration` and ensure a pending run.
 
 ## Staged index safety (vault sync)
 
@@ -143,13 +145,9 @@ Rules:
 - **Blocked preflight** (`!preflight.canSync`, e.g. unsafe local paths) → do **not** sync; run a quiet
   local status refresh so the shell badge still tells the truth. A blocked preflight is not an error
   state and is not retried.
-- **Sync already in flight** → coalesce: mark one follow-up and run it when the current sync
-  finishes. N requests during one sync collapse to exactly one follow-up, never a queue.
-- **`SyncError.SyncAlreadyRunning`** (a podcast channel holds the shared git mutex) is **not a
-  failure**: record no attempt, emit no error, and retry after a short delay. Retries are capped
-  (`MAX_AUTO_SYNC_CONTENTION_RETRIES`); on exhaustion give up quietly and clear `SyncUiState.Syncing`
-  so the shell unblocks. Leaving it uncapped would pin the shell on `Syncing` — which every status
-  refresh early-returns on — and wedge auto-sync entirely if that channel ever hung.
+- **Sync already in flight** → coalesced durably: incoming requests increment `requestedGeneration` and ensure a pending worker execution exists. Multiple concurrent requests cleanly collapse onto monotonic generation milestones rather than an unbounded work queue.
+- **WorkManager resilience & retry**: transient errors (network loss, transport timeouts, git mutex contention) trigger WorkManager's exponential backoff policy without wedging the UI. Permanent errors (authentication failure, invalid credentials, unsafe paths) transition to `Blocked(reason)` and stop retrying.
+- **Boot and foreground reconciliation**: on launch settle and on foreground resume, `reconcile()` reconciles any orphaned `Running` state (e.g. process termination) to `Pending` if no active worker is executing, and schedules sync if pending generations remain (`requestedGeneration > completedGeneration`).
 - **Failures are silent.** An automatic sync that fails records the attempt and sets
   `SyncUiState.Error`, which surfaces only as the `"!"` shell badge plus detail on the sync screen.
   No toasts, no dialogs. Manual sync keeps its own messaging.
@@ -174,4 +172,4 @@ Pinned by `InboxViewModelRegistryObservationTest`.
 
 ## Out of scope
 
-WorkManager/AlarmManager scheduled sync, SSH, interactive conflict-resolution UI, full sync history, note deletion/move/rename (inbox delete is implemented separately).
+Periodic polling sync (no periodic WorkManager or AlarmManager timer/alarms; WorkManager is used solely for durable execution of event-triggered syncs), SSH, interactive conflict-resolution UI, full sync history, note deletion/move/rename (inbox delete is implemented separately).

@@ -21,7 +21,9 @@ import com.eskerra.go.core.repository.ActiveTodayHubStore
 import com.eskerra.go.core.repository.BootCacheStore
 import com.eskerra.go.core.repository.PodcastCatalogSnapshotStore
 import com.eskerra.go.core.repository.PodcastPlayerDriver
+import com.eskerra.go.core.repository.SyncStateRepository
 import com.eskerra.go.core.repository.TodayHubSnapshotStore
+import com.eskerra.go.core.repository.VaultSyncScheduler
 import com.eskerra.go.core.usecase.BuildSafeSyncDiagnostic
 import com.eskerra.go.core.usecase.BuildSyncPreflight
 import com.eskerra.go.core.usecase.ClearRemoteSyncSettings
@@ -42,11 +44,9 @@ import com.eskerra.go.core.usecase.LoadTodayHub
 import com.eskerra.go.core.usecase.LoadTodayHubRow
 import com.eskerra.go.core.usecase.LoadVaultSettings
 import com.eskerra.go.core.usecase.MaintainVaultSearchIndex
-import com.eskerra.go.core.usecase.ManualSyncNow
 import com.eskerra.go.core.usecase.MarkPodcastEpisodesPlayed
 import com.eskerra.go.core.usecase.PrefetchLinkedNotes
 import com.eskerra.go.core.usecase.ReconcileWorkspaceSyncBranch
-import com.eskerra.go.core.usecase.RecordLastSyncAttempt
 import com.eskerra.go.core.usecase.RefreshRemoteSyncStatus
 import com.eskerra.go.core.usecase.RepairVaultSearchIndex
 import com.eskerra.go.core.usecase.ReportWeeklyPerformance
@@ -98,8 +98,8 @@ fun AppRoot(
     refreshRemoteSyncStatus: RefreshRemoteSyncStatus,
     buildSyncPreflight: BuildSyncPreflight,
     buildSafeSyncDiagnostic: BuildSafeSyncDiagnostic,
-    manualSyncNow: ManualSyncNow,
-    recordLastSyncAttempt: RecordLastSyncAttempt,
+    syncStateRepository: SyncStateRepository,
+    vaultSyncScheduler: VaultSyncScheduler,
     loadRemoteSyncSettings: LoadRemoteSyncSettings,
     saveRemoteSyncSettings: SaveRemoteSyncSettings,
     updateSyncToken: UpdateSyncToken,
@@ -220,8 +220,8 @@ fun AppRoot(
                         refreshRemoteSyncStatus = refreshRemoteSyncStatus,
                         buildSyncPreflight = buildSyncPreflight,
                         buildSafeSyncDiagnostic = buildSafeSyncDiagnostic,
-                        manualSyncNow = manualSyncNow,
-                        recordLastSyncAttempt = recordLastSyncAttempt,
+                        syncStateRepository = syncStateRepository,
+                        vaultSyncScheduler = vaultSyncScheduler,
                         loadRemoteSyncSettings = loadRemoteSyncSettings,
                         saveRemoteSyncSettings = saveRemoteSyncSettings,
                         updateSyncToken = updateSyncToken,
@@ -251,6 +251,7 @@ fun AppRoot(
                         // Only handed over once the workspace is ready; until then the share
                         // simply waits in the Activity and arrives when App mounts.
                         shareIntake = shareIntake,
+                        readConfig = workspaceStore::read,
                         onConfigUpdated = gateViewModel::updateReadyConfig,
                         onInboxUiStateChanged = { inboxUiState = it },
                         onTodayHubUiStateChanged = { todayHubUiState = it },

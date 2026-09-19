@@ -1,21 +1,21 @@
 package com.eskerra.go.feature.sync
 
-import com.eskerra.go.core.model.LastSyncStatus
+import com.eskerra.go.core.model.DurableSyncStatus
+import com.eskerra.go.core.model.SyncProgressStep
 import com.eskerra.go.core.model.SyncStatusState
 import com.eskerra.go.core.model.SyncStatusSummary
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.LastSyncStatusStore
+import com.eskerra.go.core.repository.SyncStateRepository
+import com.eskerra.go.core.repository.VaultSyncScheduler
 import com.eskerra.go.core.usecase.BuildSafeSyncDiagnostic
 import com.eskerra.go.core.usecase.BuildSyncPreflight
-import com.eskerra.go.core.usecase.FailingNoteRegistryRepository
 import com.eskerra.go.core.usecase.LoadSyncStatus
-import com.eskerra.go.core.usecase.ManualSyncNow
-import com.eskerra.go.core.usecase.RecordLastSyncAttempt
 import com.eskerra.go.core.usecase.RefreshRemoteSyncStatus
 import com.eskerra.go.data.credentials.FakeCredentialStore
 import com.eskerra.go.data.git.JGitWorkspaceRepository
-import com.eskerra.go.data.notes.FakeNoteRegistryRepository
-import com.eskerra.go.data.notes.NoteRegistryCache
+import com.eskerra.go.data.sync.FakeSyncStateRepository
+import com.eskerra.go.data.sync.FakeVaultSyncScheduler
 import com.eskerra.go.data.workspace.FakeWorkspaceStore
 import com.eskerra.go.data.workspace.WorkspacePaths
 import java.io.File
@@ -23,14 +23,13 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -104,7 +103,30 @@ class AppSyncViewModelTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         try {
             var inboxRefreshed = false
-            val viewModel = createViewModel(ioDispatcher, onSyncSuccess = { inboxRefreshed = true })
+            val syncStateRepo = FakeSyncStateRepository()
+            lateinit var scheduler: FakeVaultSyncScheduler
+            scheduler = FakeVaultSyncScheduler(syncStateRepo) {
+                backgroundScope.launch {
+                    val snapshot = syncStateRepo.getRecord().requestedGeneration
+                    syncStateRepo.updateStatus(
+                        DurableSyncStatus.Running(
+                            step = SyncProgressStep.PushingLocalCommits.name,
+                            startedAtEpochMs = System.currentTimeMillis()
+                        )
+                    )
+                    syncStateRepo.markGenerationCompleted(
+                        snapshot = snapshot,
+                        completedAtEpochMs = System.currentTimeMillis()
+                    )
+                }
+            }
+
+            val viewModel = createViewModel(
+                ioDispatcher = ioDispatcher,
+                syncStateRepository = syncStateRepo,
+                vaultSyncScheduler = scheduler,
+                onSyncSuccess = { inboxRefreshed = true }
+            )
 
             viewModel.refreshRemoteStatus(force = true)
             advanceUntilIdle()
@@ -114,49 +136,68 @@ class AppSyncViewModelTest {
 
             assertTrue(viewModel.uiState.value is SyncUiState.Success)
             assertTrue(inboxRefreshed)
+            assertEquals(1, scheduler.scheduledCount)
         } finally {
             Dispatchers.resetMain()
         }
     }
 
     @Test
-    fun doubleSyncNow_startsOnlyOneSync() = runTest {
+    fun syncNow_whileSyncing_incrementsGenerationAndSchedulesFollowUp() = runTest {
         val ioDispatcher = StandardTestDispatcher(testScheduler)
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         try {
-            val slowRegistry = FakeNoteRegistryRepository()
-            slowRegistry.setRefreshDelayMs(1_000)
-            val viewModel = createViewModel(ioDispatcher, registry = slowRegistry)
+            val syncStateRepo = FakeSyncStateRepository()
+            val scheduler = FakeVaultSyncScheduler(syncStateRepo)
+
+            val viewModel = createViewModel(
+                ioDispatcher = ioDispatcher,
+                syncStateRepository = syncStateRepo,
+                vaultSyncScheduler = scheduler
+            )
 
             viewModel.refreshRemoteStatus(force = true)
             advanceUntilIdle()
 
             viewModel.syncNow()
+            testScheduler.runCurrent()
             viewModel.syncNow()
             advanceUntilIdle()
 
-            assertEquals(1, slowRegistry.refreshCount)
+            assertEquals(2, scheduler.scheduledCount)
+            assertEquals(2L, syncStateRepo.getRecord().requestedGeneration)
         } finally {
             Dispatchers.resetMain()
         }
     }
 
     @Test
-    fun registryRefreshFailure_emitsSuccessWithWarning() = runTest {
+    fun durableRetrying_emitsErrorState() = runTest {
         val ioDispatcher = StandardTestDispatcher(testScheduler)
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         try {
-            val failingRegistry = FailingNoteRegistryRepository(FakeNoteRegistryRepository())
-            val viewModel = createViewModel(ioDispatcher, registry = failingRegistry)
+            val syncStateRepo = FakeSyncStateRepository()
+            val scheduler = FakeVaultSyncScheduler(syncStateRepo)
 
-            viewModel.refreshRemoteStatus(force = true)
+            val viewModel = createViewModel(
+                ioDispatcher = ioDispatcher,
+                syncStateRepository = syncStateRepo,
+                vaultSyncScheduler = scheduler
+            )
+            viewModel.reconcileOnBoot()
             advanceUntilIdle()
-            viewModel.syncNow()
+
+            syncStateRepo.updateStatus(
+                DurableSyncStatus.Retrying(
+                    reason = "Remote unavailable",
+                    nextAttemptAtEpochMs = System.currentTimeMillis() + 10_000L
+                )
+            )
             advanceUntilIdle()
 
             val state = viewModel.uiState.value
-            assertTrue(state is SyncUiState.Success)
-            assertNotNull((state as SyncUiState.Success).warningMessage)
+            assertTrue(state is SyncUiState.Error)
+            assertEquals("Remote unavailable", (state as SyncUiState.Error).message)
         } finally {
             Dispatchers.resetMain()
         }
@@ -167,22 +208,21 @@ class AppSyncViewModelTest {
         val ioDispatcher = StandardTestDispatcher(testScheduler)
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         try {
-            val slowRegistry = FakeNoteRegistryRepository()
-            slowRegistry.setRefreshDelayMs(1_000)
+            val syncStateRepo = FakeSyncStateRepository()
+            val scheduler = FakeVaultSyncScheduler(syncStateRepo)
+
             val viewModel = createViewModel(
                 ioDispatcher = ioDispatcher,
-                registry = slowRegistry,
-                lastSyncStore = SlowLastSyncStatusStore(delayMs = 1_000)
+                syncStateRepository = syncStateRepo,
+                vaultSyncScheduler = scheduler
             )
 
             viewModel.refreshRemoteStatus(force = true)
             testScheduler.runCurrent()
             viewModel.syncNow()
             testScheduler.runCurrent()
-            assertTrue(viewModel.uiState.value is SyncUiState.Syncing)
-            advanceUntilIdle()
 
-            assertTrue(viewModel.uiState.value is SyncUiState.Success)
+            assertTrue(viewModel.uiState.value is SyncUiState.Syncing)
         } finally {
             Dispatchers.resetMain()
         }
@@ -208,10 +248,84 @@ class AppSyncViewModelTest {
         }
     }
 
+    @Test
+    fun init_doesNotCallLoadSyncStatusBeforeReconcileOnBoot() = runTest {
+        val ioDispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            val syncStateRepo = FakeSyncStateRepository()
+            val scheduler = FakeVaultSyncScheduler(syncStateRepo)
+
+            val viewModel = createViewModel(
+                ioDispatcher = ioDispatcher,
+                syncStateRepository = syncStateRepo,
+                vaultSyncScheduler = scheduler
+            )
+
+            // Let any coroutines in init settle
+            advanceUntilIdle()
+
+            // Verification: no Git work / observation started in init
+            assertEquals(SyncUiState.Loading, viewModel.uiState.value)
+
+            // Once boot reconcile runs after launch settles:
+            viewModel.reconcileOnBoot()
+            advanceUntilIdle()
+
+            assertTrue(viewModel.uiState.value is SyncUiState.Ready)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun transitionToSynced_withUpdatedConfig_callsOnConfigUpdated() = runTest {
+        val ioDispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            var updatedConfigReceived: WorkspaceConfig? = null
+            val syncStateRepo = FakeSyncStateRepository()
+            val scheduler = FakeVaultSyncScheduler(syncStateRepo)
+
+            val initialConfig = testConfig()
+            val newConfig = initialConfig.copy(branch = "synced-branch")
+
+            val viewModel = createViewModel(
+                ioDispatcher = ioDispatcher,
+                syncStateRepository = syncStateRepo,
+                vaultSyncScheduler = scheduler,
+                readConfig = { newConfig },
+                onConfigUpdated = { updatedConfigReceived = it }
+            )
+            viewModel.reconcileOnBoot()
+            testScheduler.runCurrent()
+
+            // Start in running state
+            syncStateRepo.updateStatus(
+                DurableSyncStatus.Running("Pushing", 1000L)
+            )
+            testScheduler.runCurrent()
+
+            // Transition to Synced
+            syncStateRepo.updateStatus(
+                DurableSyncStatus.Synced(2000L)
+            )
+            advanceUntilIdle()
+
+            assertEquals("synced-branch", updatedConfigReceived?.branch)
+            assertTrue(viewModel.uiState.value is SyncUiState.Success)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
     private fun createViewModel(
         ioDispatcher: CoroutineDispatcher,
-        registry: com.eskerra.go.core.repository.NoteRegistryRepository = FakeRegistryRepository(),
+        syncStateRepository: SyncStateRepository = FakeSyncStateRepository(),
+        vaultSyncScheduler: VaultSyncScheduler = FakeVaultSyncScheduler(syncStateRepository),
+        readConfig: suspend () -> WorkspaceConfig? = { null },
         onSyncSuccess: () -> Unit = {},
+        onConfigUpdated: (WorkspaceConfig) -> Unit = {},
         clock: () -> Long = { 0L },
         remoteSyncRepository: com.eskerra.go.core.repository.RemoteSyncRepository? = null,
         lastSyncStore: LastSyncStatusStore = FakeWorkspaceStore()
@@ -240,20 +354,15 @@ class AppSyncViewModelTest {
         val buildDiagnostic = BuildSafeSyncDiagnostic(buildPreflight, lastSyncStore, ioDispatcher)
         return AppSyncViewModel(
             config = testConfig(),
-            filesDir = filesDir,
-            loadSyncStatus = loadSyncStatus,
-            refreshRemoteSyncStatus = refreshRemoteSyncStatus,
-            buildSyncPreflight = buildPreflight,
-            buildSafeSyncDiagnostic = buildDiagnostic,
-            manualSyncNow = ManualSyncNow(
-                remoteSyncRepository = fakeRemote,
-                credentialStore = credentials,
-                registryCache = NoteRegistryCache(registry),
-                loadSyncStatus = loadSyncStatus,
-                dispatcher = ioDispatcher
-            ),
-            recordLastSyncAttempt = RecordLastSyncAttempt(lastSyncStore),
+            loadSyncStatus = { cfg -> loadSyncStatus(cfg, filesDir) },
+            refreshRemoteSyncStatus = { cfg -> refreshRemoteSyncStatus(cfg, filesDir) },
+            buildSyncPreflight = { cfg -> buildPreflight(cfg, filesDir) },
+            buildSafeSyncDiagnostic = { cfg -> buildDiagnostic(cfg, filesDir) },
+            syncStateRepository = syncStateRepository,
+            vaultSyncScheduler = vaultSyncScheduler,
+            readConfig = readConfig,
             onSyncSuccess = onSyncSuccess,
+            onConfigUpdated = onConfigUpdated,
             refreshDebounceMs = 30_000L,
             clock = clock
         )
@@ -280,17 +389,6 @@ class AppSyncViewModelTest {
         override fun fetch(workingDir: File, httpsToken: String?): Result<Unit> {
             fetchCount.incrementAndGet()
             return inner.fetch(workingDir, httpsToken)
-        }
-    }
-
-    private class SlowLastSyncStatusStore(
-        private val delegate: FakeWorkspaceStore = FakeWorkspaceStore(),
-        private val delayMs: Long
-    ) : LastSyncStatusStore by delegate {
-
-        override suspend fun readLastSyncStatus(): LastSyncStatus? {
-            delay(delayMs)
-            return delegate.readLastSyncStatus()
         }
     }
 }

@@ -1,15 +1,19 @@
 package com.eskerra.go.data.workspace
 
+import com.eskerra.go.core.model.GateFingerprint
 import com.eskerra.go.core.model.LastSyncStatus
 import com.eskerra.go.core.model.WorkspaceConfig
+import com.eskerra.go.core.repository.BootCacheStore
 import com.eskerra.go.core.repository.LastSyncStatusStore
 
-/** In-memory [WorkspaceStore] and [LastSyncStatusStore] for JVM tests. */
+/** In-memory [WorkspaceStore], [LastSyncStatusStore], and [BootCacheStore] for JVM tests. */
 class FakeWorkspaceStore :
     WorkspaceStore,
-    LastSyncStatusStore {
+    LastSyncStatusStore,
+    BootCacheStore {
     private var config: WorkspaceConfig? = null
     private var lastSyncStatus: LastSyncStatus? = null
+    private var fingerprint: GateFingerprint? = null
 
     override suspend fun read(): WorkspaceConfig? = config
 
@@ -26,5 +30,15 @@ class FakeWorkspaceStore :
 
     override suspend fun saveLastSyncStatus(status: LastSyncStatus) {
         lastSyncStatus = status
+    }
+
+    override suspend fun readFingerprint(): GateFingerprint? = fingerprint
+
+    override suspend fun saveFingerprint(fingerprint: GateFingerprint) {
+        this.fingerprint = fingerprint
+    }
+
+    override suspend fun clearFingerprint() {
+        fingerprint = null
     }
 }

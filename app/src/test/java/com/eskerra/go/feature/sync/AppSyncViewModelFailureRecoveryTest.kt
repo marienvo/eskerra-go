@@ -1,27 +1,23 @@
 package com.eskerra.go.feature.sync
 
-import com.eskerra.go.core.model.GitWorkspaceStatus
-import com.eskerra.go.core.model.SyncChangePartition
-import com.eskerra.go.core.model.SyncResult
-import com.eskerra.go.core.model.SyncStatusState
-import com.eskerra.go.core.model.SyncStatusSummary
+import com.eskerra.go.core.model.DurableSyncStatus
+import com.eskerra.go.core.model.SyncProgressStep
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.RemoteSyncRepository
 import com.eskerra.go.core.usecase.BuildSafeSyncDiagnostic
 import com.eskerra.go.core.usecase.BuildSyncPreflight
 import com.eskerra.go.core.usecase.LoadSyncStatus
-import com.eskerra.go.core.usecase.ManualSyncNow
-import com.eskerra.go.core.usecase.RecordLastSyncAttempt
 import com.eskerra.go.core.usecase.RefreshRemoteSyncStatus
 import com.eskerra.go.data.credentials.FakeCredentialStore
 import com.eskerra.go.data.git.JGitWorkspaceRepository
-import com.eskerra.go.data.notes.NoteRegistryCache
+import com.eskerra.go.data.sync.FakeSyncStateRepository
+import com.eskerra.go.data.sync.FakeVaultSyncScheduler
 import com.eskerra.go.data.workspace.FakeWorkspaceStore
 import com.eskerra.go.data.workspace.WorkspacePaths
 import java.io.File
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -40,20 +36,45 @@ class AppSyncViewModelFailureRecoveryTest {
     val temp = TemporaryFolder()
 
     @Test
-    fun unexpectedFailure_exitsSyncingAndAllowsRetry() = runTest {
+    fun failureState_exitsSyncingAndAllowsRetry() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         try {
+            val syncStateRepo = FakeSyncStateRepository()
             var attempts = 0
-            val viewModel = createViewModel { _, _, _ ->
-                attempts++
-                if (attempts == 1) error("unexpected sync failure")
-                Result.success(successResult())
+            lateinit var scheduler: FakeVaultSyncScheduler
+            scheduler = FakeVaultSyncScheduler(syncStateRepo) {
+                backgroundScope.launch {
+                    attempts++
+                    if (attempts == 1) {
+                        syncStateRepo.updateStatus(
+                            DurableSyncStatus.Blocked(reason = "Git push failed")
+                        )
+                    } else {
+                        val snapshot = syncStateRepo.getRecord().requestedGeneration
+                        syncStateRepo.updateStatus(
+                            DurableSyncStatus.Running(
+                                step = SyncProgressStep.PushingLocalCommits.name,
+                                startedAtEpochMs = System.currentTimeMillis()
+                            )
+                        )
+                        syncStateRepo.markGenerationCompleted(
+                            snapshot = snapshot,
+                            completedAtEpochMs = System.currentTimeMillis()
+                        )
+                    }
+                }
             }
+
+            val viewModel = createViewModel(
+                syncStateRepository = syncStateRepo,
+                vaultSyncScheduler = scheduler
+            )
 
             viewModel.syncNow()
             advanceUntilIdle()
 
             assertTrue(viewModel.uiState.value is SyncUiState.Error)
+            assertEquals("Git push failed", (viewModel.uiState.value as SyncUiState.Error).message)
 
             viewModel.syncNow()
             advanceUntilIdle()
@@ -65,39 +86,10 @@ class AppSyncViewModelFailureRecoveryTest {
         }
     }
 
-    @Test
-    fun blockedQueuedAutoSync_releasesSpinner() = runTest {
-        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        try {
-            val finishSync = CompletableDeferred<Unit>()
-            val viewModel = createViewModel(remote = BlockedPreflightRemote()) { _, _, _ ->
-                finishSync.await()
-                Result.success(successResult())
-            }
-
-            viewModel.syncNow()
-            testScheduler.runCurrent()
-            viewModel.requestAutoSync()
-            testScheduler.runCurrent()
-            assertTrue(viewModel.syncSpinnerVisible.value)
-
-            finishSync.complete(Unit)
-            advanceUntilIdle()
-
-            assertTrue(viewModel.uiState.value is SyncUiState.Ready)
-            assertEquals(false, viewModel.syncSpinnerVisible.value)
-        } finally {
-            Dispatchers.resetMain()
-        }
-    }
-
     private fun createViewModel(
         remote: RemoteSyncRepository = FakeRemoteSyncRepository(),
-        syncRunner: suspend (
-            WorkspaceConfig,
-            File,
-            (com.eskerra.go.core.model.SyncProgressStep) -> Unit
-        ) -> Result<SyncResult>
+        syncStateRepository: FakeSyncStateRepository = FakeSyncStateRepository(),
+        vaultSyncScheduler: FakeVaultSyncScheduler = FakeVaultSyncScheduler(syncStateRepository)
     ): AppSyncViewModel {
         val filesDir = temp.newFolder("files")
         val workspaceDir = File(filesDir, WorkspacePaths.DEFAULT_RELATIVE_PATH)
@@ -115,59 +107,25 @@ class AppSyncViewModelFailureRecoveryTest {
             branch = git.status(workspaceDir).getOrThrow().branch,
             setupCompletedAtEpochMs = 0L
         )
+        val refresh = RefreshRemoteSyncStatus(
+            remoteSyncRepository = remote,
+            credentialStore = credentials,
+            loadSyncStatus = status,
+            dispatcher = Dispatchers.Main
+        )
+        val diagnostic = BuildSafeSyncDiagnostic(
+            preflight,
+            store,
+            Dispatchers.Main
+        )
         return AppSyncViewModel(
             config = config,
-            filesDir = filesDir,
-            loadSyncStatus = status,
-            refreshRemoteSyncStatus = RefreshRemoteSyncStatus(
-                remoteSyncRepository = remote,
-                credentialStore = credentials,
-                loadSyncStatus = status,
-                dispatcher = Dispatchers.Main
-            ),
-            buildSyncPreflight = preflight,
-            buildSafeSyncDiagnostic = BuildSafeSyncDiagnostic(
-                preflight,
-                store,
-                Dispatchers.Main
-            ),
-            manualSyncNow = ManualSyncNow(
-                remoteSyncRepository = remote,
-                credentialStore = credentials,
-                registryCache = NoteRegistryCache(FakeRegistryRepository()),
-                loadSyncStatus = status,
-                dispatcher = Dispatchers.Main
-            ),
-            recordLastSyncAttempt = RecordLastSyncAttempt(store),
-            syncRunner = syncRunner
+            loadSyncStatus = { cfg -> status(cfg, filesDir) },
+            refreshRemoteSyncStatus = { cfg -> refresh(cfg, filesDir) },
+            buildSyncPreflight = { cfg -> preflight(cfg, filesDir) },
+            buildSafeSyncDiagnostic = { cfg -> diagnostic(cfg, filesDir) },
+            syncStateRepository = syncStateRepository,
+            vaultSyncScheduler = vaultSyncScheduler
         )
-    }
-
-    private fun successResult() = SyncResult(
-        status = SyncStatusSummary(
-            state = SyncStatusState.Clean,
-            branch = "main",
-            changedCount = 0,
-            aheadCount = 0,
-            behindCount = 0,
-            message = "Up to date."
-        ),
-        committed = false,
-        commitId = null,
-        pushed = false,
-        pulled = false
-    )
-
-    private class BlockedPreflightRemote : RemoteSyncRepository by FakeRemoteSyncRepository() {
-        override fun status(workingDir: File): Result<GitWorkspaceStatus> = Result.success(
-            GitWorkspaceStatus(
-                branch = "main",
-                hasUncommittedChanges = true,
-                changedPaths = setOf(".git/config")
-            )
-        )
-
-        override fun partitionChanges(changedPaths: Set<String>): SyncChangePartition =
-            SyncChangePartition(emptySet(), emptySet(), changedPaths)
     }
 }

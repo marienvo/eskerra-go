@@ -54,7 +54,7 @@ class ManualSyncNow(
         }
         try {
             val resolvedConfig = reconcileWorkspaceSyncBranch
-                ?.invoke(config, filesDir)
+                ?.reconcileWithoutLock(config, filesDir)
                 ?.getOrElse { return@withContext Result.failure(it) }
                 ?: config
             sync(resolvedConfig, filesDir, onProgress).map { result ->

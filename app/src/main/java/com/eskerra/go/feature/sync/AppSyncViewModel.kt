@@ -3,23 +3,17 @@ package com.eskerra.go.feature.sync
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.eskerra.go.core.model.SyncError
-import com.eskerra.go.core.model.SyncException
+import com.eskerra.go.core.model.DurableSyncRecord
+import com.eskerra.go.core.model.DurableSyncStatus
+import com.eskerra.go.core.model.SafeSyncDiagnostic
+import com.eskerra.go.core.model.SyncPreflightSummary
 import com.eskerra.go.core.model.SyncProgressStep
-import com.eskerra.go.core.model.SyncRecoveryGuidance
-import com.eskerra.go.core.model.SyncResult
+import com.eskerra.go.core.model.SyncRecoveryAction
+import com.eskerra.go.core.model.SyncStatusSummary
 import com.eskerra.go.core.model.WorkspaceConfig
-import com.eskerra.go.core.usecase.BuildSafeSyncDiagnostic
-import com.eskerra.go.core.usecase.BuildSyncPreflight
-import com.eskerra.go.core.usecase.LoadSyncStatus
-import com.eskerra.go.core.usecase.ManualSyncNow
-import com.eskerra.go.core.usecase.RecordLastSyncAttempt
-import com.eskerra.go.core.usecase.RefreshRemoteSyncStatus
-import java.io.File
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineStart
+import com.eskerra.go.core.repository.SyncStateRepository
+import com.eskerra.go.core.repository.VaultSyncScheduler
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -28,33 +22,23 @@ import kotlinx.coroutines.launch
 /** App-scoped sync state for the shell indicator and sync screen. */
 class AppSyncViewModel(
     private var config: WorkspaceConfig,
-    private val filesDir: File,
-    private val loadSyncStatus: LoadSyncStatus,
-    private val refreshRemoteSyncStatus: RefreshRemoteSyncStatus,
-    private val buildSyncPreflight: BuildSyncPreflight,
-    private val buildSafeSyncDiagnostic: BuildSafeSyncDiagnostic,
-    private val manualSyncNow: ManualSyncNow,
-    private val recordLastSyncAttempt: RecordLastSyncAttempt,
+    private val loadSyncStatus: suspend (WorkspaceConfig) -> SyncStatusSummary,
+    private val refreshRemoteSyncStatus: suspend (WorkspaceConfig) -> SyncStatusSummary,
+    private val buildSyncPreflight: suspend (WorkspaceConfig) -> SyncPreflightSummary,
+    private val buildSafeSyncDiagnostic: suspend (WorkspaceConfig) -> SafeSyncDiagnostic,
+    private val syncStateRepository: SyncStateRepository,
+    private val vaultSyncScheduler: VaultSyncScheduler,
+    private val readConfig: suspend () -> WorkspaceConfig? = { null },
     private val onSyncSuccess: () -> Unit = {},
     private val onConfigUpdated: (WorkspaceConfig) -> Unit = {},
     private val refreshDebounceMs: Long = DEFAULT_REFRESH_DEBOUNCE_MS,
-    private val clock: () -> Long = System::currentTimeMillis,
-    private val autoSyncRetryDelay: suspend () -> Unit = {
-        delay(DEFAULT_AUTO_SYNC_RETRY_DELAY_MS)
-    },
-    private val syncRunner: suspend (
-        WorkspaceConfig,
-        File,
-        (SyncProgressStep) -> Unit
-    ) -> Result<SyncResult> = { syncConfig, syncFilesDir, onProgress ->
-        manualSyncNow(syncConfig, syncFilesDir, onProgress)
-    }
+    private val clock: () -> Long = System::currentTimeMillis
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<SyncUiState>(SyncUiState.Loading)
     val uiState: StateFlow<SyncUiState> = _uiState.asStateFlow()
 
-    /** Shell-only spinner intent. Automatic no-op fetches remain quiet until they find work. */
+    /** Shell-only spinner intent. */
     private val syncSpinnerRequested = MutableStateFlow(false)
 
     /** Held true for [SYNC_SPINNER_HOLD_MS] after requested work ends to avoid a shell flash. */
@@ -62,12 +46,10 @@ class AppSyncViewModel(
     val syncSpinnerVisible: StateFlow<Boolean> = _syncSpinnerVisible.asStateFlow()
 
     private var loadJob: Job? = null
-
-    // Trigger state is owned exclusively by viewModelScope/Main. Public entry points marshal
-    // onto that scope so syncJob and pendingAutoSync never require locks or volatile access.
-    private var syncJob: Job? = null
-    private var pendingAutoSync = false
     private var lastRemoteRefreshAtMs: Long = -1L
+    private var lastStatusSummary: SyncStatusSummary? = null
+    private var previousDurableStatus: DurableSyncStatus? = null
+    private var observeJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -77,7 +59,103 @@ class AppSyncViewModel(
         }
     }
 
+    private fun ensureObservingDurableState() {
+        if (observeJob == null) {
+            observeJob = viewModelScope.launch {
+                syncStateRepository.record.collect { record ->
+                    handleDurableSyncRecord(record)
+                }
+            }
+        }
+    }
+
+    private suspend fun handleDurableSyncRecord(record: DurableSyncRecord) {
+        val prevStatus = previousDurableStatus
+        previousDurableStatus = record.status
+
+        when (val status = record.status) {
+            is DurableSyncStatus.Running -> {
+                syncSpinnerRequested.value = true
+                val currentSummary = currentOrLoadedSummary()
+                val step = SyncProgressStep.entries.find { it.name == status.step }
+                    ?: SyncProgressStep.ValidatingWorkspace
+                _uiState.value = SyncUiState.Syncing(
+                    status = currentSummary,
+                    step = step
+                )
+            }
+
+            is DurableSyncStatus.Pending -> {
+                syncSpinnerRequested.value = true
+                val currentSummary = currentOrLoadedSummary()
+                if (_uiState.value !is SyncUiState.Syncing) {
+                    _uiState.value = SyncUiState.Syncing(
+                        status = currentSummary,
+                        step = SyncProgressStep.ValidatingWorkspace
+                    )
+                }
+            }
+
+            is DurableSyncStatus.Synced -> {
+                syncSpinnerRequested.value = false
+                val freshSummary = loadSyncStatus(config).also {
+                    lastStatusSummary = it
+                }
+                if (prevStatus is DurableSyncStatus.Running ||
+                    prevStatus is DurableSyncStatus.Pending
+                ) {
+                    val updated = readConfig()
+                    if (updated != null && updated != config) {
+                        this.config = updated
+                        onConfigUpdated(updated)
+                    }
+                    onSyncSuccess()
+                    _uiState.value = SyncUiState.Success(
+                        status = freshSummary,
+                        committed = true,
+                        pushed = true,
+                        pulled = true
+                    )
+                } else if (_uiState.value is SyncUiState.Loading ||
+                    _uiState.value is SyncUiState.Syncing
+                ) {
+                    emitReadyStateNow(freshSummary)
+                }
+            }
+
+            is DurableSyncStatus.Retrying -> {
+                syncSpinnerRequested.value = false
+                val currentSummary = currentOrLoadedSummary()
+                _uiState.value = SyncUiState.Error(
+                    status = currentSummary,
+                    message = status.reason,
+                    recoveryAction = SyncRecoveryAction(
+                        hint = status.reason,
+                        suggestOpenSettings = false
+                    )
+                )
+            }
+
+            is DurableSyncStatus.Blocked -> {
+                syncSpinnerRequested.value = false
+                val currentSummary = currentOrLoadedSummary()
+                _uiState.value = SyncUiState.Error(
+                    status = currentSummary,
+                    message = status.reason,
+                    recoveryAction = SyncRecoveryAction(
+                        hint = status.reason,
+                        suggestOpenSettings = true
+                    )
+                )
+            }
+        }
+    }
+
+    private suspend fun currentOrLoadedSummary(): SyncStatusSummary =
+        lastStatusSummary ?: loadSyncStatus(config).also { lastStatusSummary = it }
+
     fun refreshRemoteStatus(force: Boolean = false) {
+        ensureObservingDurableState()
         if (_uiState.value is SyncUiState.Syncing) {
             return
         }
@@ -93,12 +171,15 @@ class AppSyncViewModel(
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
             _uiState.value = SyncUiState.Loading
-            emitReadyState(refreshRemoteSyncStatus(config, filesDir))
+            val summary = refreshRemoteSyncStatus(config)
+            lastStatusSummary = summary
+            emitReadyState(summary)
             lastRemoteRefreshAtMs = clock()
         }
     }
 
     fun refreshLocalStatus() {
+        ensureObservingDurableState()
         if (_uiState.value is SyncUiState.Syncing) {
             return
         }
@@ -106,212 +187,74 @@ class AppSyncViewModel(
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
             _uiState.value = SyncUiState.Loading
-            emitReadyState(loadSyncStatus(config, filesDir))
+            val summary = loadSyncStatus(config)
+            lastStatusSummary = summary
+            emitReadyState(summary)
         }
     }
 
     fun refreshLocalStatusQuietly() {
+        ensureObservingDurableState()
         if (_uiState.value is SyncUiState.Syncing) {
             return
         }
 
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
-            emitReadyState(loadSyncStatus(config, filesDir))
+            val summary = loadSyncStatus(config)
+            lastStatusSummary = summary
+            emitReadyState(summary)
+        }
+    }
+
+    fun reconcileOnBoot() {
+        ensureObservingDurableState()
+        viewModelScope.launch {
+            vaultSyncScheduler.reconcile()
         }
     }
 
     fun syncNow() {
+        ensureObservingDurableState()
         viewModelScope.launch {
-            if (syncJob?.isActive == true || _uiState.value is SyncUiState.Syncing) {
+            if (config.remoteUri.isNullOrBlank()) {
+                refreshLocalStatusQuietly()
                 return@launch
             }
-            startSync(SyncTrigger.Manual)
+            syncStateRepository.markGenerationRequested()
+            vaultSyncScheduler.scheduleSync()
         }
     }
 
     /** Sole entry point for current and future foreground automatic sync triggers. */
     fun requestAutoSync() {
+        ensureObservingDurableState()
         viewModelScope.launch {
-            processAutoSyncRequest()
-        }
-    }
-
-    private suspend fun processAutoSyncRequest() {
-        if (config.remoteUri.isNullOrBlank()) {
-            // No remote to sync against, but a local-only vault (InitializeLocal setup) still needs
-            // its local status to leave SyncUiState.Loading — otherwise, now that boot/foreground/
-            // write triggers all route through this function, uiState never advances and the Sync
-            // screen's Loading branch (no retry affordance) is stuck forever.
-            refreshLocalStatusQuietly()
-            return
-        }
-        if (syncJob?.isActive == true) {
-            pendingAutoSync = true
-            return
-        }
-
-        val preflight = buildSyncPreflight(config, filesDir)
-        if (!preflight.canSync) {
-            refreshLocalStatusQuietly()
-            return
-        }
-        if (syncJob?.isActive == true) {
-            pendingAutoSync = true
-            return
-        }
-        startSync(
-            trigger = SyncTrigger.Automatic,
-            showSpinnerImmediately = preflight.hasKnownSyncWork()
-        )
-    }
-
-    private fun startSync(trigger: SyncTrigger, showSpinnerImmediately: Boolean = true) {
-        loadJob?.cancel()
-        if (showSpinnerImmediately) {
-            syncSpinnerRequested.value = true
-        }
-        val job = viewModelScope.launch(start = CoroutineStart.LAZY) {
-            try {
-                var outcome = runSync(trigger)
-                var contentionRetries = 0
-                while (trigger == SyncTrigger.Automatic &&
-                    outcome == SyncRunOutcome.RetryAfterContention &&
-                    contentionRetries < MAX_AUTO_SYNC_CONTENTION_RETRIES
-                ) {
-                    contentionRetries++
-                    autoSyncRetryDelay()
-                    outcome = runSync(trigger)
-                }
-                if (outcome == SyncRunOutcome.RetryAfterContention) {
-                    // Another git channel (podcast sync) held the shared mutex for every attempt.
-                    // Giving up is not a failure: record nothing and show no error, but clear the
-                    // Syncing state so the shell stops spinning and status refreshes unblock. The
-                    // next trigger — any write, or the next foreground return — syncs again.
-                    emitReadyStateNow(loadSyncStatus(config, filesDir))
-                }
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (_: Exception) {
-                emitUnexpectedSyncFailure()
-            } finally {
-                val runFollowUp = pendingAutoSync
-                pendingAutoSync = false
-                syncJob = null
-                syncSpinnerRequested.value = false
-                if (runFollowUp) {
-                    processAutoSyncRequest()
-                }
+            if (config.remoteUri.isNullOrBlank()) {
+                refreshLocalStatusQuietly()
+                return@launch
             }
-        }
-        syncJob = job
-        job.start()
-    }
-
-    private suspend fun runSync(trigger: SyncTrigger): SyncRunOutcome {
-        val currentStatus = when (val state = _uiState.value) {
-            is SyncUiState.Ready -> state.status
-            is SyncUiState.Error -> state.status ?: loadSyncStatus(config, filesDir)
-            is SyncUiState.Success -> state.status
-            else -> loadSyncStatus(config, filesDir)
-        }
-
-        _uiState.value = SyncUiState.Syncing(
-            status = currentStatus,
-            step = SyncProgressStep.ValidatingWorkspace
-        )
-
-        return syncRunner(config, filesDir) { step ->
-            if (trigger == SyncTrigger.Automatic && step.startsVisibleAutomaticWork()) {
-                syncSpinnerRequested.value = true
+            val preflight = buildSyncPreflight(config)
+            if (!preflight.canSync) {
+                refreshLocalStatusQuietly()
+                return@launch
             }
-            _uiState.value = SyncUiState.Syncing(
-                status = currentStatus,
-                step = step
-            )
-        }.fold(
-            onSuccess = { result ->
-                result.updatedConfig?.let { updated ->
-                    config = updated
-                    onConfigUpdated(updated)
-                }
-                recordLastSyncAttempt.recordSuccess(result)
-                onSyncSuccess()
-                lastRemoteRefreshAtMs = clock()
-                val warningMessage = if (result.registryRefreshed) {
-                    null
-                } else {
-                    SyncError.RegistryRefreshFailed.message()
-                }
-                _uiState.value = SyncUiState.Success(
-                    status = result.status,
-                    committed = result.committed,
-                    pushed = result.pushed,
-                    pulled = result.pulled,
-                    warningMessage = warningMessage
-                )
-                SyncRunOutcome.Completed
-            },
-            onFailure = { error ->
-                val syncError = when (error) {
-                    is SyncException -> error.error
-                    else -> SyncError.GitFailed(GENERIC_ERROR_MESSAGE)
-                }
-                if (trigger == SyncTrigger.Automatic &&
-                    syncError == SyncError.SyncAlreadyRunning
-                ) {
-                    return@fold SyncRunOutcome.RetryAfterContention
-                }
-                recordLastSyncAttempt.recordFailure(syncError)
-                val message = when (error) {
-                    is SyncException -> error.error.message()
-                    else -> GENERIC_ERROR_MESSAGE
-                }
-                val status = (error as? SyncException)?.let {
-                    loadSyncStatus(config, filesDir)
-                }
-                _uiState.value = SyncUiState.Error(
-                    status = status,
-                    message = message,
-                    recoveryAction = SyncRecoveryGuidance.forError(syncError)
-                )
-                SyncRunOutcome.Completed
-            }
-        )
+            syncStateRepository.markGenerationRequested()
+            vaultSyncScheduler.scheduleSync()
+        }
     }
 
-    private fun com.eskerra.go.core.model.SyncPreflightSummary.hasKnownSyncWork(): Boolean =
-        inboxChangeCount + nonInboxChangeCount > 0 || aheadCount > 0 || behindCount > 0
-
-    private fun SyncProgressStep.startsVisibleAutomaticWork(): Boolean = when (this) {
-        SyncProgressStep.CommittingInboxChanges,
-        SyncProgressStep.IntegratingRemote,
-        SyncProgressStep.PushingLocalCommits -> true
-        else -> false
-    }
-
-    private suspend fun emitReadyState(status: com.eskerra.go.core.model.SyncStatusSummary) {
+    private suspend fun emitReadyState(status: SyncStatusSummary) {
         if (_uiState.value is SyncUiState.Syncing) {
             return
         }
         emitReadyStateNow(status)
     }
 
-    private suspend fun emitUnexpectedSyncFailure() {
-        val syncError = SyncError.GitFailed(GENERIC_ERROR_MESSAGE)
-        val status = (_uiState.value as? SyncUiState.Syncing)?.status
-        _uiState.value = SyncUiState.Error(
-            status = status,
-            message = GENERIC_ERROR_MESSAGE,
-            recoveryAction = SyncRecoveryGuidance.forError(syncError)
-        )
-        runCatching { recordLastSyncAttempt.recordFailure(syncError) }
-    }
-
-    /** Emits Ready even while [SyncUiState.Syncing] — only for the owner of the running sync. */
-    private suspend fun emitReadyStateNow(status: com.eskerra.go.core.model.SyncStatusSummary) {
-        val preflight = buildSyncPreflight(config, filesDir)
-        val diagnostic = buildSafeSyncDiagnostic(config, filesDir)
+    /** Emits Ready state with fresh preflight and diagnostic summaries. */
+    private suspend fun emitReadyStateNow(status: SyncStatusSummary) {
+        val preflight = buildSyncPreflight(config)
+        val diagnostic = buildSafeSyncDiagnostic(config)
         _uiState.value = SyncUiState.Ready(
             status = status,
             remoteUri = config.remoteUri,
@@ -322,54 +265,34 @@ class AppSyncViewModel(
     }
 
     companion object {
-        const val GENERIC_ERROR_MESSAGE = "Sync failed. Local notes are still available."
         const val DEFAULT_REFRESH_DEBOUNCE_MS = 30_000L
         const val SYNC_SPINNER_HOLD_MS = 450L
-        const val DEFAULT_AUTO_SYNC_RETRY_DELAY_MS = 250L
-
-        /**
-         * Bounds the wait for the shared git mutex. Podcast sync holds it across a network
-         * fetch + push, so contention is expected and worth retrying — but an unbounded retry
-         * would spin forever if that channel ever wedges, pinning the shell on Syncing and
-         * blocking every status refresh.
-         */
-        const val MAX_AUTO_SYNC_CONTENTION_RETRIES = 8
 
         fun factory(
             config: WorkspaceConfig,
-            filesDir: File,
-            loadSyncStatus: LoadSyncStatus,
-            refreshRemoteSyncStatus: RefreshRemoteSyncStatus,
-            buildSyncPreflight: BuildSyncPreflight,
-            buildSafeSyncDiagnostic: BuildSafeSyncDiagnostic,
-            manualSyncNow: ManualSyncNow,
-            recordLastSyncAttempt: RecordLastSyncAttempt,
+            loadSyncStatus: suspend (WorkspaceConfig) -> SyncStatusSummary,
+            refreshRemoteSyncStatus: suspend (WorkspaceConfig) -> SyncStatusSummary,
+            buildSyncPreflight: suspend (WorkspaceConfig) -> SyncPreflightSummary,
+            buildSafeSyncDiagnostic: suspend (WorkspaceConfig) -> SafeSyncDiagnostic,
+            syncStateRepository: SyncStateRepository,
+            vaultSyncScheduler: VaultSyncScheduler,
+            readConfig: suspend () -> WorkspaceConfig? = { null },
             onSyncSuccess: () -> Unit = {},
             onConfigUpdated: (WorkspaceConfig) -> Unit = {}
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T = AppSyncViewModel(
-                config,
-                filesDir,
-                loadSyncStatus,
-                refreshRemoteSyncStatus,
-                buildSyncPreflight,
-                buildSafeSyncDiagnostic,
-                manualSyncNow,
-                recordLastSyncAttempt,
-                onSyncSuccess,
-                onConfigUpdated
+                config = config,
+                loadSyncStatus = loadSyncStatus,
+                refreshRemoteSyncStatus = refreshRemoteSyncStatus,
+                buildSyncPreflight = buildSyncPreflight,
+                buildSafeSyncDiagnostic = buildSafeSyncDiagnostic,
+                syncStateRepository = syncStateRepository,
+                vaultSyncScheduler = vaultSyncScheduler,
+                readConfig = readConfig,
+                onSyncSuccess = onSyncSuccess,
+                onConfigUpdated = onConfigUpdated
             ) as T
         }
-    }
-
-    private enum class SyncTrigger {
-        Manual,
-        Automatic
-    }
-
-    private enum class SyncRunOutcome {
-        Completed,
-        RetryAfterContention
     }
 }
