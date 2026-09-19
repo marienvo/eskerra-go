@@ -22,6 +22,8 @@ class FakeRemoteSyncRepository(
     )
 ) : RemoteSyncRepository {
 
+    var lastEnsureLocalBranchFetchIfNeeded: Boolean? = null
+
     override fun status(workingDir: File): Result<GitWorkspaceStatus> = Result.success(
         GitWorkspaceStatus(
             branch = fixedStatus.branch.orEmpty(),
@@ -50,8 +52,12 @@ class FakeRemoteSyncRepository(
     override fun ensureLocalBranch(
         workingDir: File,
         branch: String,
-        httpsToken: String?
-    ): Result<String> = Result.success(branch)
+        httpsToken: String?,
+        fetchIfNeeded: Boolean
+    ): Result<String> {
+        lastEnsureLocalBranchFetchIfNeeded = fetchIfNeeded
+        return Result.success(branch)
+    }
 
     override fun compareWithRemote(
         workingDir: File,

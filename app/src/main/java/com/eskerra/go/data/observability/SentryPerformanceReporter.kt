@@ -40,6 +40,7 @@ class SentryPerformanceReporter : PerformanceReporter {
         putPhase("di_build", diBuild)
         putPhase("to_gate_start", toGateStart)
         putPhase("gate_resolve", gateResolve)
+        putPhase("input_ready", inputReady)
         putPhase("snapshot_read", snapshotRead)
         putPhase("first_scan", firstScan)
         putPhase("settle_tail", settleTail)

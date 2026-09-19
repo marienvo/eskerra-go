@@ -54,7 +54,12 @@ interface RemoteSyncRepository {
      * a tracking branch must be created from [origin]/[branch].
      */
     /** Returns the branch that was checked out (may differ from [branch] after reconciliation). */
-    fun ensureLocalBranch(workingDir: File, branch: String, httpsToken: String?): Result<String>
+    fun ensureLocalBranch(
+        workingDir: File,
+        branch: String,
+        httpsToken: String?,
+        fetchIfNeeded: Boolean = true
+    ): Result<String>
 
     fun compareWithRemote(workingDir: File, branch: String): Result<RemoteBranchComparison>
 

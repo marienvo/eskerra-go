@@ -58,4 +58,24 @@ class AppBootEffectsTest {
         // launchSettled is already true; the composition-lifetime flag must not block it.
         assertTrue(shouldTriggerBootSync(launchSettled = true, alreadyRequested = false))
     }
+
+    @Test
+    fun branchReconcile_doesNotRunBeforeLaunchSettles() {
+        assertFalse(shouldReconcileAfterLaunchSettled(launchSettled = false))
+    }
+
+    @Test
+    fun branchReconcile_runsAfterLaunchSettles() {
+        assertTrue(shouldReconcileAfterLaunchSettled(launchSettled = true))
+    }
+
+    @Test
+    fun searchIndexMaintenance_doesNotRunBeforeLaunchSettles() {
+        assertFalse(shouldMaintainSearchIndex(launchSettled = false))
+    }
+
+    @Test
+    fun searchIndexMaintenance_runsAfterLaunchSettles() {
+        assertTrue(shouldMaintainSearchIndex(launchSettled = true))
+    }
 }

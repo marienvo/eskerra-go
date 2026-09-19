@@ -1,0 +1,11 @@
+Lcom/eskerra/go/MainActivity;
+Lcom/eskerra/go/EskerraGoApplication;
+Lcom/eskerra/go/app/AppRootKt;
+Lcom/eskerra/go/app/AppKt;
+Lcom/eskerra/go/app/AppShellKt;
+Lcom/eskerra/go/app/ShellNewNoteInputKt;
+Lcom/eskerra/go/app/AppGateViewModel;
+Lcom/eskerra/go/app/AppLaunchSettledKt;
+Lcom/eskerra/go/app/ShellInputHostKt;
+Lcom/eskerra/go/app/AppInboxRouteKt;
+Lcom/eskerra/go/feature/editor/CreateInboxNoteViewModel;

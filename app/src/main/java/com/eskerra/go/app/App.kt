@@ -189,6 +189,7 @@ fun App(
     AppSearchIndexEffects(
         config = currentConfig,
         filesDir = filesDir,
+        launchSettled = launchSettled,
         maintainVaultSearchIndex = maintainVaultSearchIndex
     )
     AppForegroundSyncEffect(appSyncViewModel)

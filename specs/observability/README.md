@@ -52,8 +52,9 @@ The fingerprint is deliberately fixed so every weekly report groups into a singl
 and the trend across weeks reads as one timeline rather than a new issue each week.
 
 **When it fires.** There is no scheduler in this app (no WorkManager or AlarmManager, by
-design), so "weekly" is a check on launch: the first launch after 7 days have passed since
-the last report carries it, and only when the window holds at least 5 samples. It runs
+design), so reporting is a check on launch: the first window sends as soon as it reaches 5
+samples; subsequent reports send on the first launch at least 7 days after the prior report,
+again only when the window holds at least 5 samples. It runs
 from `AppBootEffects` behind the same `launchSettled` + one-frame gate as the boot sync —
 telemetry about the launch must never become part of the launch.
 
@@ -62,7 +63,7 @@ reported as `<phase>_median_ms` and `<phase>_p90_ms`; median and p90 rather than
 because launch times are skewed and a mean hides the bad launches.
 
 - Phases: `total`, `process_to_activity`, `di_build`, `to_gate_start`, `gate_resolve`,
-  `snapshot_read`, `first_scan`, `settle_tail`
+  `input_ready`, `snapshot_read`, `first_scan`, `settle_tail`
 - `sample_count`, `window_days`, `median_note_count`
 - `fingerprint_hit_rate`, `snapshot_hit_rate`, `memo_base_rate` — how often the workspace
   fingerprint still matched, the registry snapshot was usable, and the scan had a memo base

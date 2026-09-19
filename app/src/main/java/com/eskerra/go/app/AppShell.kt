@@ -21,7 +21,9 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.dp
+import com.eskerra.go.data.perf.ColdStartTrace
 import com.eskerra.go.feature.sync.SyncSpinner
 import com.eskerra.go.ui.theme.EskerraChromeTokens
 
@@ -121,6 +123,7 @@ fun AppShell(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .navigationBarsPadding()
+                        .onGloballyPositioned { ColdStartTrace.markInputReady() }
                         .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 11.dp)
                 )
             }
