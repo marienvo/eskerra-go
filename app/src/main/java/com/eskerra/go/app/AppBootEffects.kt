@@ -51,6 +51,7 @@ internal fun AppBootEffects(
         // starting Git/network work so sync stays off the first-render path.
         withFrameNanos { }
         bootSyncRequested.value = true
+        appSyncViewModel.reconcileOnBoot()
         appSyncViewModel.requestAutoSync()
     }
 
@@ -83,6 +84,7 @@ internal fun AppForegroundSyncEffect(appSyncViewModel: AppSyncViewModel) {
         var accepting = false
         val observer = LifecycleEventObserver { _, event ->
             if (shouldAutoSyncOnLifecycleEvent(event, accepting)) {
+                appSyncViewModel.reconcileOnBoot()
                 appSyncViewModel.requestAutoSync()
             }
         }
