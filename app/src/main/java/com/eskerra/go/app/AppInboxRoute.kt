@@ -1,5 +1,6 @@
 package com.eskerra.go.app
 
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -9,7 +10,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
@@ -27,6 +30,7 @@ import com.eskerra.go.feature.inbox.InboxScreen
 import com.eskerra.go.feature.inbox.InboxUiState
 import com.eskerra.go.feature.inbox.InboxViewModel
 import com.eskerra.go.feature.sync.AppSyncViewModel
+import com.eskerra.go.feature.todayhub.TodayHubBody
 import com.eskerra.go.feature.todayhub.TodayHubUiState
 import com.eskerra.go.feature.todayhub.TodayHubViewModel
 import com.eskerra.go.ui.markdown.AmbiguousWikiLinkSheet
@@ -95,6 +99,7 @@ internal fun AppInboxRoute(
     val isDeleting by inboxViewModel.isDeleting.collectAsState()
     val deleteError by inboxViewModel.deleteError.collectAsState()
     val todayHubState by todayHubViewModel.uiState.collectAsState()
+    val syncSpinnerVisible by appSyncViewModel.syncSpinnerVisible.collectAsState()
 
     LaunchedEffect(inboxState) {
         onInboxUiStateChanged(inboxState)
@@ -151,6 +156,8 @@ internal fun AppInboxRoute(
         selectedNoteIds = selectedNoteIds,
         isDeleting = isDeleting,
         deleteError = deleteError,
+        isSyncing = syncSpinnerVisible,
+        onPullToRefreshSync = appSyncViewModel::syncNow,
         onRetry = inboxViewModel::refresh,
         onNoteClick = { noteId: NoteId ->
             navController.navigate(AppRoute.note(noteId))
@@ -158,16 +165,24 @@ internal fun AppInboxRoute(
         onAvatarClick = inboxViewModel::toggleSelection,
         onClearSelection = inboxViewModel::clearSelection,
         onDeleteSelected = inboxViewModel::deleteSelected,
-        onPreviousWeek = todayHubViewModel::previousWeek,
-        onNextWeek = todayHubViewModel::nextWeek,
         onSelectHub = todayHubViewModel::selectHub,
-        onRetryTodayHub = todayHubViewModel::retry,
-        onOpenInternalNote = { targetId -> navController.navigate(AppRoute.note(targetId)) },
-        onOpenExternalUrl = { url -> openExternalUrl(context, url) },
-        onAmbiguousWikiLink = { candidates, _ -> ambiguousCandidates = candidates },
-        onNoteNotFound = { message -> showNoteNotFoundToast(context, message) },
-        workspaceRoot = workspaceRoot,
-        scrollToTopSignal = scrollResetSignal
+        scrollToTopSignal = scrollResetSignal,
+        todayHubBody = {
+            TodayHubBody(
+                state = todayHubState,
+                onPreviousWeek = todayHubViewModel::previousWeek,
+                onNextWeek = todayHubViewModel::nextWeek,
+                onRetry = todayHubViewModel::retry,
+                onOpenInternalNote = { targetId ->
+                    navController.navigate(AppRoute.note(targetId))
+                },
+                onOpenExternalUrl = { url -> openExternalUrl(context, url) },
+                onAmbiguousWikiLink = { candidates, _ -> ambiguousCandidates = candidates },
+                onNoteNotFound = { message -> showNoteNotFoundToast(context, message) },
+                workspaceRoot = workspaceRoot,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            )
+        }
     )
 
     val registry = (todayHubState as? TodayHubUiState.Content)?.registry

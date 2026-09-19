@@ -329,13 +329,12 @@ fun App(
 
     if (menuOpen) {
         AppMenuSheet(
-            items = buildMenuEntries(syncIndicator?.changeCount, remoteConfigured),
+            items = buildMenuEntries(),
             onDismiss = { menuOpen = false },
             onItemClick = { id ->
                 when (id) {
-                    MENU_SYNC_NOW -> onMenuSyncClick(syncState, appSyncViewModel, navController)
-                    MENU_SYNC_SETTINGS -> navController.navigate(AppRoute.SYNC)
-                    MENU_SETTINGS -> navController.navigate(AppRoute.SYNC_SETTINGS)
+                    MENU_SYNC_STATUS -> navController.navigate(AppRoute.SYNC)
+                    MENU_SYNC_SETTINGS -> navController.navigate(AppRoute.SYNC_SETTINGS)
                 }
             }
         )

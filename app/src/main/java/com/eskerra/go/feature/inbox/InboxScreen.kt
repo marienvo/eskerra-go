@@ -21,29 +21,32 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.eskerra.go.app.LocalShellChromeInsets
 import com.eskerra.go.app.shellScrollContentPadding
 import com.eskerra.go.core.datetime.RelativeCalendarLabel
 import com.eskerra.go.core.inbox.InboxTileColor
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NoteSummary
-import com.eskerra.go.feature.todayhub.TodayHubBody
 import com.eskerra.go.feature.todayhub.TodayHubHeader
 import com.eskerra.go.feature.todayhub.TodayHubUiState
 import com.eskerra.go.ui.markdown.VaultMarkdownTokens
 import com.eskerra.go.ui.theme.EskerraChromeTokens
 import com.eskerra.go.ui.theme.EskerraHeadingH1
-import java.io.File
 
 /** Fixed height for the shared top row so switching in/out of selection never shifts the list. */
 private val InboxTopBarHeight = 56.dp
@@ -52,6 +55,7 @@ private val InboxTopBarHeight = 56.dp
  * Stateless home screen: inbox list (or empty/error) with Today Hub below.
  * Receives UI state and callbacks only; it knows nothing about where data comes from.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InboxScreen(
     state: InboxUiState,
@@ -59,74 +63,22 @@ fun InboxScreen(
     selectedNoteIds: Set<NoteId>,
     isDeleting: Boolean,
     deleteError: String?,
+    isSyncing: Boolean = false,
+    onPullToRefreshSync: () -> Unit = {},
     onRetry: () -> Unit,
     onNoteClick: (NoteId) -> Unit,
     onAvatarClick: (NoteId) -> Unit,
     onClearSelection: () -> Unit,
     onDeleteSelected: () -> Unit,
-    onPreviousWeek: () -> Unit,
-    onNextWeek: () -> Unit,
     onSelectHub: (NoteId) -> Unit,
-    onRetryTodayHub: () -> Unit,
-    onOpenInternalNote: (NoteId) -> Unit,
-    onOpenExternalUrl: (String) -> Unit,
-    onAmbiguousWikiLink: (List<NoteId>, String) -> Unit,
-    onNoteNotFound: (String) -> Unit = {},
-    workspaceRoot: File? = null,
     scrollToTopSignal: Int = 0,
-    modifier: Modifier = Modifier
-) {
-    InboxScrollBody(
-        state = state,
-        todayHubState = todayHubState,
-        selectedNoteIds = selectedNoteIds,
-        isDeleting = isDeleting,
-        deleteError = deleteError,
-        onNoteClick = onNoteClick,
-        onAvatarClick = onAvatarClick,
-        onClearSelection = onClearSelection,
-        onDeleteSelected = onDeleteSelected,
-        onRetry = onRetry,
-        onPreviousWeek = onPreviousWeek,
-        onNextWeek = onNextWeek,
-        onSelectHub = onSelectHub,
-        onRetryTodayHub = onRetryTodayHub,
-        onOpenInternalNote = onOpenInternalNote,
-        onOpenExternalUrl = onOpenExternalUrl,
-        onAmbiguousWikiLink = onAmbiguousWikiLink,
-        onNoteNotFound = onNoteNotFound,
-        workspaceRoot = workspaceRoot,
-        scrollToTopSignal = scrollToTopSignal,
-        modifier = modifier
-    )
-}
-
-@Composable
-private fun InboxScrollBody(
-    state: InboxUiState,
-    todayHubState: TodayHubUiState,
-    selectedNoteIds: Set<NoteId>,
-    isDeleting: Boolean,
-    deleteError: String?,
-    onNoteClick: (NoteId) -> Unit,
-    onAvatarClick: (NoteId) -> Unit,
-    onClearSelection: () -> Unit,
-    onDeleteSelected: () -> Unit,
-    onRetry: () -> Unit,
-    onPreviousWeek: () -> Unit,
-    onNextWeek: () -> Unit,
-    onSelectHub: (NoteId) -> Unit,
-    onRetryTodayHub: () -> Unit,
-    onOpenInternalNote: (NoteId) -> Unit,
-    onOpenExternalUrl: (String) -> Unit,
-    onAmbiguousWikiLink: (List<NoteId>, String) -> Unit,
-    onNoteNotFound: (String) -> Unit,
-    workspaceRoot: File?,
-    scrollToTopSignal: Int = 0,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    todayHubBody: (@Composable () -> Unit)? = null
 ) {
     val hasSelection = selectedNoteIds.isNotEmpty()
     val listState = rememberLazyListState()
+    val pullRefreshState = rememberPullToRefreshState()
+    val chrome = LocalShellChromeInsets.current
 
     // Home re-selection from a drill-down bumps the signal; jump the list back to the top.
     LaunchedEffect(scrollToTopSignal) {
@@ -135,120 +87,127 @@ private fun InboxScrollBody(
         }
     }
 
-    LazyColumn(
-        state = listState,
+    PullToRefreshBox(
+        isRefreshing = isSyncing,
+        onRefresh = onPullToRefreshSync,
+        state = pullRefreshState,
         modifier = modifier.fillMaxSize(),
-        contentPadding = shellScrollContentPadding()
+        indicator = {
+            PullToRefreshDefaults.Indicator(
+                state = pullRefreshState,
+                isRefreshing = isSyncing,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = chrome.top)
+            )
+        }
     ) {
-        // Top row shares one slot: selection actions while notes are selected, otherwise the hub
-        // chrome (title, hub switcher). Both branches share InboxTopBarHeight so toggling selection
-        // never shifts the list below.
-        item {
-            if (hasSelection) {
-                InboxSelectionBar(
-                    selectedCount = selectedNoteIds.size,
-                    isDeleting = isDeleting,
-                    onClearSelection = onClearSelection,
-                    onDeleteSelected = onDeleteSelected
-                )
-            } else {
-                TodayHubHeader(
-                    state = todayHubState,
-                    onSelectHub = onSelectHub,
-                    modifier = Modifier
-                        .height(InboxTopBarHeight)
-                        .padding(horizontal = 16.dp)
-                )
-            }
-        }
-
-        deleteError?.let { message ->
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = shellScrollContentPadding()
+        ) {
+            // Top row shares one slot: selection actions while notes are selected, otherwise the hub
+            // chrome (title, hub switcher). Both branches share InboxTopBarHeight so toggling selection
+            // never shifts the list below.
             item {
-                Text(
-                    text = message,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
-                )
-            }
-        }
-
-        when (state) {
-            InboxUiState.Loading -> {
-                item {
-                    Box(
+                if (hasSelection) {
+                    InboxSelectionBar(
+                        selectedCount = selectedNoteIds.size,
+                        isDeleting = isDeleting,
+                        onClearSelection = onClearSelection,
+                        onDeleteSelected = onDeleteSelected
+                    )
+                } else {
+                    TodayHubHeader(
+                        state = todayHubState,
+                        onSelectHub = onSelectHub,
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 16.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator()
-                    }
+                            .height(InboxTopBarHeight)
+                            .padding(horizontal = 16.dp)
+                    )
                 }
             }
-            is InboxUiState.Error -> {
+
+            deleteError?.let { message ->
                 item {
-                    Column(
+                    Text(
+                        text = message,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 16.dp, horizontal = 16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = state.message,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Button(
-                            onClick = onRetry,
-                            modifier = Modifier.padding(top = 12.dp)
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                    )
+                }
+            }
+
+            when (state) {
+                InboxUiState.Loading -> {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 16.dp),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Text("Retry")
+                            CircularProgressIndicator()
                         }
                     }
                 }
-            }
-            InboxUiState.Empty -> {
-                item {
-                    Text(
-                        text = "No inbox notes yet. Tap + to add one.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 4.dp, bottom = 12.dp, start = 16.dp, end = 16.dp)
-                    )
+                is InboxUiState.Error -> {
+                    item {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 16.dp, horizontal = 16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = state.message,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Button(
+                                onClick = onRetry,
+                                modifier = Modifier.padding(top = 12.dp)
+                            ) {
+                                Text("Retry")
+                            }
+                        }
+                    }
+                }
+                InboxUiState.Empty -> {
+                    item {
+                        Text(
+                            text = "No inbox notes yet. Tap + to add one.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 4.dp, bottom = 12.dp, start = 16.dp, end = 16.dp)
+                        )
+                    }
+                }
+                is InboxUiState.Content -> {
+                    items(state.notes) { note ->
+                        InboxRow(
+                            note = note,
+                            isSelected = note.id in selectedNoteIds,
+                            isDeleting = isDeleting,
+                            onAvatarClick = { onAvatarClick(note.id) },
+                            onClick = { onNoteClick(note.id) }
+                        )
+                    }
                 }
             }
-            is InboxUiState.Content -> {
-                items(state.notes) { note ->
-                    InboxRow(
-                        note = note,
-                        isSelected = note.id in selectedNoteIds,
-                        isDeleting = isDeleting,
-                        onAvatarClick = { onAvatarClick(note.id) },
-                        onClick = { onNoteClick(note.id) }
-                    )
-                }
-            }
-        }
 
-        if (state !is InboxUiState.Loading || todayHubState is TodayHubUiState.Content) {
-            item {
-                TodayHubBody(
-                    state = todayHubState,
-                    onPreviousWeek = onPreviousWeek,
-                    onNextWeek = onNextWeek,
-                    onRetry = onRetryTodayHub,
-                    onOpenInternalNote = onOpenInternalNote,
-                    onOpenExternalUrl = onOpenExternalUrl,
-                    onAmbiguousWikiLink = onAmbiguousWikiLink,
-                    onNoteNotFound = onNoteNotFound,
-                    workspaceRoot = workspaceRoot,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                )
+            val showTodayHub = todayHubBody != null &&
+                (state !is InboxUiState.Loading || todayHubState is TodayHubUiState.Content)
+            if (showTodayHub) {
+                item {
+                    todayHubBody?.invoke()
+                }
             }
         }
     }
