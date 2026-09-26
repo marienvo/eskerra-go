@@ -10,12 +10,10 @@ internal enum class ShareNavAction {
     NoOp,
 
     /** In search: leave the search route so the pill returns to note mode. */
-    PopSearch,
-
+    PopSearch
 }
 
-internal fun shareNavAction(currentRoute: String?): ShareNavAction =
-    when {
-        AppRoute.isSearchRoute(currentRoute) -> ShareNavAction.PopSearch
-        else -> ShareNavAction.NoOp
-    }
+internal fun shareNavAction(currentRoute: String?): ShareNavAction = when {
+    AppRoute.isSearchRoute(currentRoute) -> ShareNavAction.PopSearch
+    else -> ShareNavAction.NoOp
+}

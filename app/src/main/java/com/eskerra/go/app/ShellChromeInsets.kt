@@ -35,9 +35,7 @@ fun calculateShellChromeInsets(
 )
 
 @Composable
-fun rememberShellChromeInsets(
-    newNoteInputVisible: Boolean = false
-): ShellChromeInsets {
+fun rememberShellChromeInsets(newNoteInputVisible: Boolean = false): ShellChromeInsets {
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val navigationBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     return calculateShellChromeInsets(

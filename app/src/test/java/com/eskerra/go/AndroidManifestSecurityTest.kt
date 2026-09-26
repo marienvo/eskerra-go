@@ -65,5 +65,4 @@ class AndroidManifestSecurityTest {
             text.contains("""android:launchMode="singleTask"""")
         )
     }
-
 }

@@ -38,5 +38,4 @@ class ShellChromeInsetsTest {
         assertEquals(ShellTopChromeHeight, insets.top)
         assertEquals(ShellNewNoteInputHeight, insets.bottom)
     }
-
 }

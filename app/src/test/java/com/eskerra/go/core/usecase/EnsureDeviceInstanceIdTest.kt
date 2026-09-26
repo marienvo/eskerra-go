@@ -66,5 +66,4 @@ class EnsureDeviceInstanceIdTest {
         assertNotNull(id)
         assertTrue(id.length > 10)
     }
-
 }

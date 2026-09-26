@@ -98,7 +98,6 @@ fun AppShell(
                         .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 11.dp)
                 )
             }
-
         }
     }
 }

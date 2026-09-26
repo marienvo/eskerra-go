@@ -1,7 +1,6 @@
 package com.eskerra.go.data.git
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -66,5 +65,4 @@ class SyncPathClassifierTest {
         assertEquals(setOf("Archive/b.md"), partition.nonInboxPaths)
         assertEquals(setOf(".git/HEAD"), partition.unsafePaths)
     }
-
 }
