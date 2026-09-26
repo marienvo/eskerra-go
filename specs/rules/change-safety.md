@@ -32,16 +32,14 @@ A change that cannot answer "which G is this?" in one type is mis-scoped.
 
 - **Green** (agent edits freely within the task's allowlist): everything not listed below.
 - **Yellow** (edit only when the task explicitly targets them): sync orchestration
-  (`core/usecase/ManualSyncNow.kt`, `SyncPodcastChange.kt`, `SyncPodcastVaultRefresh.kt`,
-  `SyncPodcastChangesViaVaultSync.kt`) and `app/App.kt` (the navigation host).
+  (`core/usecase/ManualSyncNow.kt`) and `app/App.kt` (the navigation host).
 - **Red** (extra caution — agent may edit when the task allowlist includes the path;
   required packet = sync/vault specs + write-path inventory + invariant argument for G3,
   or the guardrail's own tests for G5):
   - `data/git/**` (JGit engine internals: `JGitRemoteSyncRepository`, `GitChangeStager`,
     `GitIndexLockRecovery`, `GitLocalBranchAlignment`, `SyncPathClassifier`, `GitSyncMutex`, …)
   - Markdown / vault write paths: `data/notes/FileNoteWriteRepository.kt`,
-    `core/usecase/SaveNote.kt`, `CreateInboxNote.kt`, `DeleteInboxNotes.kt`,
-    `WritePlaylist.kt` + `core/playlist/PlaylistMerge.kt`
+    `core/usecase/SaveNote.kt`, `CreateInboxNote.kt`, `DeleteInboxNotes.kt`
   - FTS reconcile: `data/search/VaultSearchIndexer.kt`,
     `data/search/VaultSearchWorkspaceWalker.kt`, `data/search/SqliteVaultSearchRepository.kt`
   - Guardrail ratchets: `scripts/module-budget-baseline.json`, `app/archunit_store/**`
@@ -79,7 +77,7 @@ DONE tests.
 - The DONE test invocations with their results pasted.
 - **Invariant argument** for G3 (2–5 sentences): name the sync/vault-write invariant the
   change touches (single git mutex, fail-closed on uncertainty, no unscoped stage, no
-  destructive recovery on the podcast channel, byte-preserving writes) and why the diff
+  destructive recovery, byte-preserving writes) and why the diff
   preserves it. A missing or vague argument bounces the change.
 - Assertion-change list if any test bodies changed, each with a reason.
 
@@ -95,6 +93,5 @@ DONE tests.
 - **Never weaken a test to make a suite pass.** Agents do not delete or soften an assertion
   to get to green; a legitimately obsolete assertion is a report item ("assertion X now
   wrong because Y — confirm before I change it"), not a silent edit.
-- **Preserve the fragile specifics.** Do not change the git mutex discipline, the
-  fast-forward-only rule on the podcast mark-as-played channel, or the fail-closed recovery
-  behavior without a spec update in the same change and G3 review.
+- **Preserve the fragile specifics.** Do not change the git mutex discipline or the fail-closed
+  recovery behavior without a spec update in the same change and G3 review.
