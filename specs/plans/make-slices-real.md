@@ -1,5 +1,7 @@
 # Make Slices Real — quality/structure plan
 
+> References to the former `podcasts` slice are historical; the slice was removed.
+
 Date: 2026-08-02
 Status: **active — the quality track's flagship.** Orthogonal to `studio-feature-parity.md` (product track): this plan changes **where code lives and how it is guarded**, never what the app does. A phase here must never share a PR — or a review window on the same files — with a parity contract change.
 

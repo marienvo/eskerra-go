@@ -1,5 +1,7 @@
 # Studio Feature Parity — Eskerra Go plan
 
+> Podcast-related sections are historical: Eskerra Go no longer ships podcast playback, RSS refresh, or playlist synchronization.
+
 Date: 2026-07-12; repo-state facts re-verified 2026-08-02 (§2 corrected — product-level rows still need P0's on-device pass).
 Status: **planning only** (P1b done 2026-08-02 — see §4; everything else still planning). Sequenced **before** the M4B audiobook player: `notebox/specs/plans/m4b-audiobook-player.md` Phase 3 (Go player implementation) is gated on **P1a** completing — a portfolio-sequencing / review-attention gate, not a technical dependency (see §4). The audiobook contract/fixture work (its Phases 0–1) is independent and may run in parallel.
 Companion docs: [`specs/architecture/app-contract.md`](../architecture/app-contract.md) (current product boundaries — this plan proposes changes to it, phase by phase), notebox plan stack (`notebox/specs/plans/README.md`). This is the **product track**; structure work lives in [`make-slices-real.md`](make-slices-real.md) and never shares a PR with a phase here.

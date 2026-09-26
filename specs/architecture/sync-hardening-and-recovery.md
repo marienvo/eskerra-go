@@ -1,175 +1,20 @@
-# Sync hardening and recovery (Step 9 Slice 4)
-
-## Purpose
-
-Manual HTTPS sync works after Step 9 Slices 1–3. Slice 4 hardens behavior before using a valuable personal notes repository: single-flight sync, preflight clarity, staged-index safety, interrupted-Git recovery, partial registry-refresh success, safe diagnostics, and non-secret last-sync persistence.
+# Sync hardening and recovery
 
 ## Product rules
 
-### Write paths
+- Vault sync (`ManualSyncNow`) commits all safe local working-tree changes, fetches and fast-forwards when behind, and auto-merges divergence with conflict sidecars where the remote remains canonical.
+- It is triggered by the sync button, every note write, boot, and foreground return. Requests coalesce; automatic requests fail silently to the shell badge.
+- Boot sync is deferred until launch has settled and is never on the first-render path. No WorkManager or AlarmManager schedules sync.
+- Every JGit mutation shares the process-wide `GitSyncMutex`.
+- Before syncing, an interrupted Git operation is recovered according to the vault-sync recovery policy. Unsafe paths fail closed and are never staged.
+- Sync uses 30-second transport timeouts and retries a rejected push through integrate-and-push cycles. It never exposes credentials or raw transport errors.
 
-- **Inbox notes:** user-editable; persisted to disk on save; committed via manual vault sync.
-- **Podcast markdown under `General/`:** catalog is read-only except checkbox writes (mark-as-played) and native RSS refresh output. Mark-as-played auto-commits changed podcast paths only; RSS refresh writes markdown then delegates to the vault sync engine (see [Git sync channels](#git-sync-channels)).
-- **All other vault paths:** read-only from the app UI (remote integration during vault sync may update them locally).
+## Write boundary
 
-### Manual vault sync
+The app writes only Inbox notes through its note use cases. Other vault content is read-only in the UI; remote integration may update it during vault sync. Vault sync stages all safe changes and never has a special channel for individual generated files.
 
-- App-initiated manual sync (`ManualSyncNow`) commits **all safe local working-tree changes**, not only `Inbox/`.
-- Vault sync runs as an expedited/foreground task via WorkManager (`VaultSyncWorker`) with a foreground service notification (`FOREGROUND_SERVICE_TYPE_DATA_SYNC`), guaranteeing completion even if the user background-switches or leaves the app during a sync.
-- The only hard stop before commit: unsafe paths (`.git` internals, `..`).
-- Commit message: `Sync local changes from Eskerra Go`.
-- Integration: fast-forward when purely behind remote; **auto-merge** when histories diverged, writing sidecar copies `path (conflict yyyy-MM-dd HH.mm.ss).ext` where remote wins the canonical file. Returned in `SyncResult.conflictCopies`.
-- Push: retry up to three integrate+push cycles when the remote rejects a racing push.
-- Every JGit network command has a 30-second transport timeout. A stalled remote must fail the
-  attempt and release the shared mutex; it may never pin the app in `Syncing` indefinitely.
-- **Recovery before sync:** if merge, cherry-pick, revert, or rebase is in progress, vault sync calls `abortInProgressOperation` (rebase abort; otherwise `reset --hard` to HEAD) and continues. **Trade-off:** in-progress conflict-resolution work on disk may be lost rather than leaving the user blocked.
+## Recovery and observability
 
-### Git sync channels
-
-All JGit mutations share one process-wide **mutex** (`GitSyncMutex`) so vault sync and podcast auto-sync never overlap (the working tree is a single fragile resource).
-
-| Channel | Trigger | Stage | Integration | Push |
-| --- | --- | --- | --- | --- | --- |
-| Vault sync | User taps sync, **or any note write** (see [Automatic vault sync triggers](#automatic-vault-sync-triggers)) | All safe local changes | FF when behind; auto-merge on divergence | Yes, with retry |
-| Podcast RSS refresh | Pull-to-refresh | RSS writes `General/`; then delegates to `ManualSyncNow` | Same as vault sync | Same as vault sync |
-| Podcast mark-as-played | Checkbox | Changed podcast paths under `General/` only | **Fast-forward only** | Best-effort; `pendingPush` on divergence/offline |
-
-Commit messages (examples):
-
-| Channel | Commit message (example) |
-| --- | --- |
-| Manual vault sync | `Sync local changes from Eskerra Go` |
-| Podcast mark-as-played | `Mark podcast episodes played` |
-| Podcast RSS refresh | Uses vault sync engine after RSS write (no separate commit message) |
-
-**Podcast mark-as-played flow** (`SyncPodcastChange`):
-
-1. Write markdown to disk.
-2. Acquire shared git mutex.
-3. Stage only the paths changed in this operation.
-4. Commit (skip if nothing to commit).
-5. `fetch` origin; fast-forward local branch if behind.
-6. `push` if ahead of remote.
-7. On offline or non-fast-forward divergence: keep the local commit, record pending push state, retry on the next operation. **Never** auto-merge, rebase, or reset.
-
-**Podcast RSS refresh flow** (`SyncPodcastVaultRefresh` → `SyncPodcastChangesViaVaultSync` → `ManualSyncNow`):
-
-1. Fetch RSS feeds and merge markdown into `General/` on disk.
-2. Acquire shared git mutex via vault sync engine.
-3. Commit all safe pending local changes, integrate remote (FF or auto-merge), push.
-
-Podcast auto-sync is **foreground work** tied to user actions, not a background scheduler.
-
-### Integration policy
-
-- **Vault sync** (manual button and RSS refresh): fast-forward when behind; auto-merge with conflict sidecars when diverged.
-- **Podcast mark-as-played:** fast-forward only; divergence leaves a local commit with `pendingPush`.
-- **Shell status indicator:** may show `Diverged` before the user syncs; vault sync resolves divergence on the next successful run.
-
-## Reentrancy and durable execution
-
-- **WorkManager scheduler:** Vault sync is scheduled via `VaultSyncScheduler` (`WorkManagerVaultSyncScheduler`) using unique work (`WORK_NAME_VAULT_SYNC`) and `ExistingWorkPolicy.KEEP`. An in-flight sync is not interrupted by new requests; incoming triggers increment `requestedGeneration` so the worker or follow-up loop picks them up.
-- **Durable generation tracking:** `SyncStateRepository` persists `requestedGeneration` and `completedGeneration` monotonically in DataStore. Every write trigger or sync request increments `requestedGeneration`. `VaultSyncWorker` reads the generation snapshot at start, performs the sync, and on success advances `completedGeneration` to that snapshot. If `requestedGeneration > completedGeneration`, status returns to `Pending` and a follow-up run is enqueued.
-- **Single status source of truth:** UI (`AppSyncViewModel`) observes `SyncStateRepository.record` directly: `Pending`, `Running(step, startedAt)`, `Retrying(reason, nextAttemptAt)`, `Synced(completedAt)`, `Blocked(reason)`. The UI state machine maps these durable statuses to `SyncUiState` without maintaining independent transient flags.
-- **Shared Git mutex:** `GitSyncMutex` in `data/git` is shared lazily across the application runtime, ensuring that `VaultSyncWorker` and foreground podcast operations never execute concurrent Git commands.
-- **UI double-tap safety:** duplicate `syncNow()` calls while a worker is running or `SyncUiState.Syncing` do not restart the worker.
-- **Editor/save concurrency:** local note editing and saving remain fully allowed during sync; new saves atomically increment `requestedGeneration` and ensure a pending run.
-
-## Staged index safety (vault sync)
-
-Before commit, vault sync stages all safe working-tree changes via `stageAllChanges`. Only unsafe staged paths block sync (`SyncError.UnsafeLocalPath`).
-
-Podcast mark-as-played stages only the podcast paths for that operation and must not leave unrelated paths staged when the mutex is released. Unexpected staged paths outside the operation return `SyncError.UnexpectedStagedChanges`.
-
-## Manual-intervention Git states
-
-- **Vault sync:** recovers automatically via `abortInProgressOperation` before proceeding (see [Manual vault sync](#manual-vault-sync)).
-- **Podcast mark-as-played:** refuses when merge, rebase, cherry-pick, revert, or similar operation is in progress. Returns `SyncError.ManualInterventionRequired`. No auto reset, stash, merge, or rebase.
-
-Preflight may report `repoInterventionRequired = true` as informational when an interrupted Git operation is detected; vault sync is still allowed and will recover.
-
-## Partial registry refresh success
-
-When fetch/push/pull/commit completes but `NoteRegistryRepository.refresh` fails, sync returns **success** with `registryRefreshed = false`. UI shows a warning, not a full failure. Last sync outcome is recorded as `PartialSuccess`. Local notes remain available.
-
-## Last sync persistence
-
-DataStore holds **one** latest attempt only:
-
-- `attemptedAtEpochMs`
-- `outcome`: Success | PartialSuccess | Failed
-- `errorCategory`: safe enum name when failed/partial (e.g. `AuthenticationFailed`), never token or raw exception text
-
-No sync history database.
-
-## Diagnostics
-
-`SafeSyncDiagnostic` may include sanitized host/repo, branch, change counts, ahead/behind, and last safe sync outcome. Must never include token, credential-bearing URL, raw auth headers, raw low-level exceptions, or full local filesystem paths.
-
-## Recovery guidance
-
-Each blocking `SyncError` maps to a short recovery hint via `SyncRecoveryGuidance`. Hints are non-technical and never suggest destructive Git commands.
-
-## Foreground sync-status refresh
-
-Since 2026-08-02 app start and foreground return run a **full auto-sync**, not a read-only remote check
-(see [Automatic vault sync triggers](#automatic-vault-sync-triggers)). What remains of the
-status-refresh path:
-
-- **Local-only reads** (`refreshLocalStatus`, `refreshLocalStatusQuietly`) still serve the shell badge and the sync screen wherever a sync must not or cannot run: no remote configured, blocked preflight, opening the sync screen after Success.
-- Quiet local refreshes must not force `SyncUiState.Loading`, so the sync button stays usable.
-- `refreshRemoteStatus` (debounced, 30 s) remains for an explicit remote status read; there is no quiet shell local→remote combo path anymore (the old `refreshShellStatusQuietly` / `refreshRemoteStatusQuietly` helpers were removed once boot/foreground became full auto-sync).
-- Any refresh that reaches the network is startup-path work if it can run before launch settles — see [boot-optimization.md](boot-optimization.md#boot-sync-is-gated-on-launch-settlement) for the regression that caused.
-- `SyncUiState.Syncing` short-circuits every refresh, which is why auto-sync must never leave that state stuck.
-
-## Automatic vault sync triggers
-
-Every note write, app boot, and foreground return starts a **full vault sync**
-(`AppSyncViewModel.requestAutoSync()`), not merely a status refresh: inbox note create, note editor
-save, inbox delete, boot, and every real foreground `ON_START`. `requestAutoSync()` is the
-sole entry point for automatic triggers and runs the same code path as the manual button.
-
-Boot's trigger waits for `launchSettled` plus one rendered frame and fires once per
-`AppSyncViewModel` instance after settle (`shouldTriggerBootSync`). The flag is keyed to that
-instance: a composition-lifetime flag would leave a ViewModel recreated by branch/remote changes
-stuck in `SyncUiState.Loading`. The foreground observer ignores only the synthetic `ON_START` that
-`LifecycleRegistry` may replay while `addObserver` runs (`shouldAutoSyncOnLifecycleEvent`); every
-later resume syncs. Cold start is boot's job, so the two do not double-fire. Both live in
-[AppBootEffects.kt](app/src/main/java/com/eskerra/go/app/AppBootEffects.kt).
-
-Rules:
-
-- **No remote configured** → do not sync, but still run a quiet **local** status refresh. A pure no-op
-  would strand a local-only vault in `SyncUiState.Loading` forever, since these triggers are now the
-  only thing that advances that state on boot.
-- **Blocked preflight** (`!preflight.canSync`, e.g. unsafe local paths) → do **not** sync; run a quiet
-  local status refresh so the shell badge still tells the truth. A blocked preflight is not an error
-  state and is not retried.
-- **Sync already in flight** → coalesced durably: incoming requests increment `requestedGeneration` and ensure a pending worker execution exists. Multiple concurrent requests cleanly collapse onto monotonic generation milestones rather than an unbounded work queue.
-- **WorkManager resilience & retry**: transient errors (network loss, transport timeouts, git mutex contention) trigger WorkManager's exponential backoff policy without wedging the UI. Permanent errors (authentication failure, invalid credentials, unsafe paths) transition to `Blocked(reason)` and stop retrying.
-- **Boot and foreground reconciliation**: on launch settle and on foreground resume, `reconcile()` reconciles any orphaned `Running` state (e.g. process termination) to `Pending` if no active worker is executing, and schedules sync if pending generations remain (`requestedGeneration > completedGeneration`).
-- **Failures are silent.** An automatic sync that fails records the attempt and sets
-  `SyncUiState.Error`, which surfaces only as the `"!"` shell badge plus detail on the sync screen.
-  No toasts, no dialogs. Manual sync keeps its own messaging.
-- **Terminal UI state:** an unexpected exception is converted to `SyncUiState.Error` before trigger
-  bookkeeping is released. Every attempt therefore leaves `Syncing`, and a later manual or
-  automatic trigger can retry.
-- **Shell spinner visibility:** manual sync shows the shell spinner from the start, including remote
-  fetch. Automatic sync starts it immediately only when preflight already knows of local changes,
-  local-ahead commits, or remote-behind commits; an otherwise clean automatic fetch remains quiet
-  until it starts committing, integrating remote changes, or pushing. The sync screen still shows
-  progress for every running sync.
-
-Feedback-loop safety: a successful sync calls `markInboxNotesChanged`, which the inbox route answers
-with `refresh()`. `InboxViewModel.refresh()` must therefore never invoke `onInboxMutated` (which is a
-write-site trigger), or writes and refreshes would loop. Pinned by
-`InboxViewModelFeedbackLoopTest`.
-
-Inbox UI also observes `NoteRegistryCache.registry` directly. Sync already refreshes that shared
-registry after pull; applying `inboxSummaries` from the flow drops remote deletes even when the
-Compose `inboxRefreshSignal` path is missed (otherwise the row stays until tap → "note not found").
-Pinned by `InboxViewModelRegistryObservationTest`.
-
-## Out of scope
-
-Periodic polling sync (no periodic WorkManager or AlarmManager timer/alarms; WorkManager is used solely for durable execution of event-triggered syncs), SSH, interactive conflict-resolution UI, full sync history, note deletion/move/rename (inbox delete is implemented separately).
+- Divergent Markdown changes create conflict sidecars; the canonical file stays remote-authoritative.
+- A registry refresh failure after successful Git work is a partial success: local notes remain available and UI shows a warning.
+- Persist only the latest sync attempt with a safe error category. Diagnostics may include sanitized host, branch, counts and outcome, never tokens, credential URLs, headers, raw exceptions or absolute paths.

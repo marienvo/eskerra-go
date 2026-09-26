@@ -27,8 +27,6 @@ Architecture style (hybrid layering + feature slices) and placement rules for ne
 - Inbox editability is a domain rule: inbox notes editable, all other notes read-only.
 - **Git sync channels** (see [`specs/architecture/sync-hardening-and-recovery.md`](specs/architecture/sync-hardening-and-recovery.md)):
   - Vault sync (`ManualSyncNow`): commits all safe local changes, auto-merges on divergence with conflict sidecars, recovers interrupted Git ops before proceeding. Triggered by the sync button **and by every note write** (create/save/delete), **on boot**, and **on every foreground return**, via `AppSyncViewModel.requestAutoSync()`, which coalesces concurrent requests and fails silently to the `"!"` badge.
-  - Podcast RSS refresh delegates to `ManualSyncNow` via `SyncPodcastChangesViaVaultSync` after RSS writes `General/`.
-  - Podcast mark-as-played uses `SyncPodcastChange`: stages changed **General/** podcast paths only, fetch + fast-forward + push; no auto-merge/rebase/reset on divergence.
   - All git mutations share one mutex.
   - No WorkManager/AlarmManager scheduled sync. Boot and foreground return run a **full auto-sync**, not a read-only `fetch`; boot's is deferred until after launch settles so no Git or network work sits on the startup path (see [`specs/architecture/boot-optimization.md`](specs/architecture/boot-optimization.md)).
 - Full-text search uses **Android's bundled SQLite FTS5** (`SQLiteOpenHelper`). See [`specs/plans/android-vault-notes-rebuild-plan.md`](specs/plans/android-vault-notes-rebuild-plan.md) (Phase 7) for the index schema, reconcile strategy, and ranker tiers.
@@ -44,14 +42,6 @@ last-known cached state for first paint, then refresh in the background. Nothing
 runs before launch is settled. Authoritative detail:
 [`specs/architecture/boot-optimization.md`](specs/architecture/boot-optimization.md)
 (app gate, note-registry cache, launch-settled conditions).
-
-**Playlist merge (shared vault contract — must match notebox verbatim):** higher
-`controlRevision` wins; if tied, higher `updatedAt` wins; if tied, remote wins. R2 is
-authoritative when configured; the vault-local playlist is the offline fallback. Both
-apps write the same playlist objects, so this ordering may not drift between them.
-Implemented in
-[`PlaylistMerge.kt`](app/src/main/java/com/eskerra/go/core/playlist/PlaylistMerge.kt)
-(`pickNewerPlaylistEntry`), mirroring `packages/eskerra-core/src/playlist.ts` in notebox.
 
 **Releases:** `versionName` and `versionCode` are canonical in `app/build.gradle.kts`. Builds never
 bump them or edit tracked files. After green main CI, each merged non-automation PR gets one

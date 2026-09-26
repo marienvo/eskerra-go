@@ -7,7 +7,7 @@
 
 ## Context
 
-Eskerra Go is an Android Kotlin/Compose app backed by a git-first, vault-based Markdown store. The roadmap includes note browsing, podcast listening, sync (git for notes, Cloudflare R2 for settings and podcast playback state), and possibly audio recording.
+Eskerra Go is an Android Kotlin/Compose app backed by a git-first, vault-based Markdown store. The roadmap includes note browsing, sync (git for notes and Cloudflare R2 for settings and binary downloads), and possibly audio recording.
 
 We needed to decide between three structural approaches:
 
@@ -27,7 +27,7 @@ We use the **hybrid** approach:
 com.eskerra.go/
 ├── core/        domain: model, repository interfaces, use cases, wikilink
 ├── data/        infrastructure: git, notes, credentials, workspace, r2
-├── feature/     slices: inbox, note, editor, search, sync, setup, menu, podcasts, todayhub, share
+├── feature/     slices: inbox, note, editor, search, sync, setup, menu, todayhub, share
 ├── ui/          theme, shared UI
 └── app/         composition root
 ```
@@ -49,7 +49,7 @@ Layering also enables JVM unit tests for domain/data logic (`testDebugUnitTest` 
 
 ### 2026-06..08: the slice rule drifted, and was restored
 
-ViewModels accreted in `app/` contrary to this ADR — the 2026-07-05 audit found 11 of 12 living in the composition root, with only `podcasts` self-contained. They were moved back into their slices over six batches (2026-08-08); `app/` now holds `AppGateViewModel` only, which is app-level by design. **The placement rule stands** — it was never amended, only unobserved.
+ViewModels accreted in `app/` contrary to this ADR. They were moved back into their slices over six batches (2026-08-08); `app/` now holds `AppGateViewModel` only, which is app-level by design. **The placement rule stands** — it was never amended, only unobserved.
 
 Enforcement no longer rests on this prose. The rule "every `*ViewModel` except `AppGateViewModel` resides outside `..app..`" is machine-checked as `viewModelsLiveInTheirFeatureSliceNotInApp` in [`ArchitectureLayerRulesTest.kt`](../../app/src/test/java/com/eskerra/go/architecture/ArchitectureLayerRulesTest.kt), enforced (not frozen) inside `:app:testDebugUnitTest` — so it runs in the standard quality gate and in CI. A ViewModel added to the composition root fails the build; re-forming the hub now takes a deliberate edit to the rule.
 
@@ -66,9 +66,8 @@ Use these to decide where new code goes:
 | Capability | Placement | Rationale |
 | --- | --- | --- |
 | Notes browsing (git) | Existing `core` + `data/notes` + `data/git` | Shared vault model. |
-| R2 transport (S3 HTTP, ETag poller) | `core` interface + `data/r2` | Both vault settings and podcast playback state use the same transport, credentials, and merge/poll contract. One client, one credential path. |
-| Vault settings (`.eskerra/settings-*.json`) | `core` + `data` | Read by multiple features (setup, sync, podcasts). On-disk contract is vault-wide. |
-| Podcast listening (playback, playlist UI) | `feature/podcasts/` | No other slice reads playback state. The slice *consumes* the shared R2 transport and settings; it does not implement them. |
+| R2 transport (S3 HTTP) | `core` interface + `data/r2` | Vault settings and binary downloads use one credential path. |
+| Vault settings (`.eskerra/settings-*.json`) | `core` + `data` | Read by multiple features (setup and sync). On-disk contract is vault-wide. |
 | Audio recording (future) | Own slice for recording state; recorded files enter the vault through the existing write repositories | Recording state is slice-owned; the produced artifact lands in shared vault territory, so the write path is shared. |
 
 **The dividing line:** transport and on-disk/remote contracts are shared layers; feature behaviour on top of them is slice-owned.
