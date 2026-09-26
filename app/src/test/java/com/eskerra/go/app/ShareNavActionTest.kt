@@ -9,7 +9,7 @@ class ShareNavActionTest {
     fun inboxKeepsTheUserWhereTheyAre() {
         assertEquals(
             ShareNavAction.NoOp,
-            shareNavAction(AppRoute.INBOX, AppRoute.HOME_GRAPH)
+            shareNavAction(AppRoute.INBOX)
         )
     }
 
@@ -17,40 +17,28 @@ class ShareNavActionTest {
     fun noteReaderKeepsTheUserWhereTheyAre() {
         assertEquals(
             ShareNavAction.NoOp,
-            shareNavAction(AppRoute.NOTE_PATTERN, AppRoute.HOME_GRAPH)
+            shareNavAction(AppRoute.NOTE_PATTERN)
         )
         assertEquals(
             ShareNavAction.NoOp,
             shareNavAction(
-                AppRoute.note(com.eskerra.go.core.model.NoteId("Inbox/a.md")),
-                AppRoute.HOME_GRAPH
+                AppRoute.note(com.eskerra.go.core.model.NoteId("Inbox/a.md"))
             )
         )
     }
 
     @Test
     fun searchRoutesArePoppedSoTheShareCannotLandInTheQuery() {
-        assertEquals(ShareNavAction.PopSearch, shareNavAction(AppRoute.SEARCH, AppRoute.HOME_GRAPH))
+        assertEquals(ShareNavAction.PopSearch, shareNavAction(AppRoute.SEARCH))
         assertEquals(
             ShareNavAction.PopSearch,
-            shareNavAction(AppRoute.search("meeting"), AppRoute.HOME_GRAPH)
+            shareNavAction(AppRoute.search("meeting"))
         )
     }
 
     @Test
-    fun podcastModeSwitchesToHome() {
-        assertEquals(
-            ShareNavAction.SwitchToHome,
-            shareNavAction(AppRoute.PODCASTS_GRAPH, AppRoute.PODCASTS_GRAPH)
-        )
-    }
-
-    @Test
-    fun unknownRouteSwitchesToHome() {
-        assertEquals(ShareNavAction.SwitchToHome, shareNavAction(null, null))
-        assertEquals(
-            ShareNavAction.SwitchToHome,
-            shareNavAction("some-other-route", AppRoute.HOME_GRAPH)
-        )
+    fun unknownRouteKeepsTheUserWhereTheyAre() {
+        assertEquals(ShareNavAction.NoOp, shareNavAction(null))
+        assertEquals(ShareNavAction.NoOp, shareNavAction("some-other-route"))
     }
 }

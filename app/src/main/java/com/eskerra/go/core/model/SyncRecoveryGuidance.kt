@@ -36,9 +36,6 @@ object SyncRecoveryGuidance {
             hint = "Non-Inbox/ files are staged in Git. Vault sync normally handles this; " +
                 "if sync is blocked, unstage or commit them with Git on a computer."
         )
-        SyncError.UnexpectedStagedChanges -> SyncRecoveryAction(
-            hint = "Unstage unexpected files with Git on a computer before podcast sync runs."
-        )
         SyncError.UnsafeLocalPath -> SyncRecoveryAction(
             hint = "Fix unsafe working tree paths with Git on a computer before syncing."
         )
@@ -72,7 +69,7 @@ object SyncRecoveryGuidance {
         SyncError.ManualInterventionRequired -> SyncRecoveryAction(
             hint = "Git was interrupted. Tap Sync to recover automatically, " +
                 "or finish or abort the operation on a computer " +
-                "before podcast mark-as-played."
+                "before retrying sync."
         )
         SyncError.SyncAlreadyRunning -> SyncRecoveryAction(
             hint = "Wait for the current sync to finish."

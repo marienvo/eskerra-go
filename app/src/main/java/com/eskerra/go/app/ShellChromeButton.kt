@@ -20,7 +20,7 @@ import com.eskerra.go.ui.theme.EskerraChromeTokens
 internal val ShellChromeButtonSize = 40.dp
 
 /**
- * Shared visual primitive for the floating chrome controls (Notes, Podcasts, Sync, Menu).
+ * Shared visual primitive for the floating chrome controls (Sync, Menu).
  *
  * A flat [Surface] with a fully rounded shape (50%), matte container color and a subtle border.
  * Icon-only content renders as a circle; wider label content renders as a pill. All four controls

@@ -12,7 +12,7 @@ See the **Compatibility matrix (current)** section in the canonical doc. Summary
 |---|---|
 | R2 secrets in Android Keystore (not shared JSON) | Not implemented |
 | `hasR2Connection` + per-device credentials split | Not implemented |
-| `appSettings.vaultLayout` consumed in podcast/inbox paths | Preserve-only stub |
+| `appSettings.vaultLayout` consumed in inbox paths | Preserve-only stub |
 | `.eskerra/settings-local.json` file I/O | DataStore substitute |
 | `cloud.r2SyncEnabled` disable toggle | Planned in canonical spec; not in code |
 

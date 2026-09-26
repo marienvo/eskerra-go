@@ -8,23 +8,8 @@ import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.Request
 import okhttp3.RequestBody
 
-internal const val PLAYLIST_OBJECT_KEY = VaultLayout.PLAYLIST_FILE
-
 /** Vault-relative R2 prefix that mirrors the vault root for device-only binaries. */
 internal const val BINARIES_PREFIX = VaultLayout.BINARIES_PREFIX
-
-/**
- * Builds a SigV4 presigned-query [Request] for the vault's `playlist.json`.
- * Extra [headers] are sent unsigned (only `host` is signed), matching the
- * presigned-query contract.
- */
-internal fun buildSignedPlaylistRequest(
-    config: R2Config,
-    method: String,
-    timestamp: Instant,
-    headers: Map<String, String> = emptyMap(),
-    body: RequestBody? = null
-): Request = buildSignedObjectRequest(config, method, PLAYLIST_OBJECT_KEY, timestamp, headers, body)
 
 /**
  * Builds a SigV4 presigned-query [Request] for an arbitrary object [objectKey].

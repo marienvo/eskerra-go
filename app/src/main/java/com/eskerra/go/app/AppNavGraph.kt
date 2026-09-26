@@ -16,10 +16,7 @@ import androidx.navigation.navigation
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.ActiveTodayHubStore
-import com.eskerra.go.core.repository.PodcastCatalogSnapshotStore
-import com.eskerra.go.core.repository.PodcastPlayerDriver
 import com.eskerra.go.core.repository.TodayHubSnapshotStore
-import com.eskerra.go.core.usecase.ClearPodcastPlaybackSnapshot
 import com.eskerra.go.core.usecase.ClearRemoteSyncSettings
 import com.eskerra.go.core.usecase.DeleteInboxNotes
 import com.eskerra.go.core.usecase.EnsureDeviceInstanceId
@@ -29,16 +26,11 @@ import com.eskerra.go.core.usecase.LoadGitStatusSummary
 import com.eskerra.go.core.usecase.LoadInboxSummariesCached
 import com.eskerra.go.core.usecase.LoadLocalSettings
 import com.eskerra.go.core.usecase.LoadNoteForReading
-import com.eskerra.go.core.usecase.LoadPodcastArtwork
-import com.eskerra.go.core.usecase.LoadPodcastCatalog
 import com.eskerra.go.core.usecase.LoadRemoteSyncSettings
 import com.eskerra.go.core.usecase.LoadTodayHub
 import com.eskerra.go.core.usecase.LoadTodayHubRow
 import com.eskerra.go.core.usecase.LoadVaultSettings
 import com.eskerra.go.core.usecase.MaintainVaultSearchIndex
-import com.eskerra.go.core.usecase.MarkPodcastEpisodesPlayed
-import com.eskerra.go.core.usecase.PersistPodcastPlaybackSnapshot
-import com.eskerra.go.core.usecase.PodcastPlaylistSync
 import com.eskerra.go.core.usecase.PrefetchLinkedNotes
 import com.eskerra.go.core.usecase.RepairVaultSearchIndex
 import com.eskerra.go.core.usecase.SaveLocalSettings
@@ -47,7 +39,6 @@ import com.eskerra.go.core.usecase.SaveRemoteSyncSettings
 import com.eskerra.go.core.usecase.SaveVaultSettings
 import com.eskerra.go.core.usecase.SearchVault
 import com.eskerra.go.core.usecase.SyncBinaries
-import com.eskerra.go.core.usecase.SyncPodcastVaultRefresh
 import com.eskerra.go.core.usecase.TestRemoteConnection
 import com.eskerra.go.core.usecase.TouchVaultSearchPaths
 import com.eskerra.go.feature.editor.NoteEditorScreen
@@ -56,7 +47,6 @@ import com.eskerra.go.feature.inbox.InboxUiState
 import com.eskerra.go.feature.note.NoteReaderUiState
 import com.eskerra.go.feature.note.NoteReaderViewModel
 import com.eskerra.go.feature.note.NoteScreen
-import com.eskerra.go.feature.podcasts.PlaylistR2PollingHost
 import com.eskerra.go.feature.search.SearchViewModel
 import com.eskerra.go.feature.sync.AppSyncViewModel
 import com.eskerra.go.feature.sync.BinariesViewModel
@@ -109,17 +99,6 @@ internal data class AppNavGraphContext(
     val repairVaultSearchIndex: RepairVaultSearchIndex,
     val searchViewModel: SearchViewModel,
     val touchVaultSearchPaths: TouchVaultSearchPaths,
-    val loadPodcastCatalog: LoadPodcastCatalog,
-    val markPodcastEpisodesPlayed: MarkPodcastEpisodesPlayed,
-    val podcastPlaylistSync: PodcastPlaylistSync,
-    val loadPodcastArtwork: LoadPodcastArtwork,
-    val podcastPlayerDriver: PodcastPlayerDriver,
-    val syncPodcastVaultRefresh: SyncPodcastVaultRefresh,
-    val catalogSnapshotStore: PodcastCatalogSnapshotStore,
-    val persistPodcastPlaybackSnapshot: PersistPodcastPlaybackSnapshot,
-    val clearPodcastPlaybackSnapshot: ClearPodcastPlaybackSnapshot,
-    val podcastShellBridge: PodcastShellBridge,
-    val playlistPollingHost: PlaylistR2PollingHost?,
     val markInboxNotesChanged: () -> Unit,
     val onConfigUpdated: (WorkspaceConfig) -> Unit,
     val onInboxUiStateChanged: (InboxUiState) -> Unit,
@@ -148,29 +127,6 @@ internal fun NavGraphBuilder.homeGraph(ctx: AppNavGraphContext) {
                 onTodayHubUiStateChanged = ctx.onTodayHubUiStateChanged,
                 homeReselectSignal = ctx.homeReselectSignal,
                 inboxRefreshSignal = ctx.inboxRefreshSignal
-            )
-        }
-    }
-}
-
-internal fun NavGraphBuilder.podcastsGraph(ctx: AppNavGraphContext) {
-    navigation(startDestination = AppRoute.PODCASTS, route = AppRoute.PODCASTS_GRAPH) {
-        opaqueComposable(AppRoute.PODCASTS) {
-            AppPodcastsRoute(
-                currentConfig = ctx.currentConfig,
-                filesDir = ctx.filesDir,
-                loadPodcastCatalog = ctx.loadPodcastCatalog,
-                markPodcastEpisodesPlayed = ctx.markPodcastEpisodesPlayed,
-                podcastPlaylistSync = ctx.podcastPlaylistSync,
-                loadPodcastArtwork = ctx.loadPodcastArtwork,
-                podcastPlayerDriver = ctx.podcastPlayerDriver,
-                syncPodcastVaultRefresh = ctx.syncPodcastVaultRefresh,
-                catalogSnapshotStore = ctx.catalogSnapshotStore,
-                persistPodcastPlaybackSnapshot = ctx.persistPodcastPlaybackSnapshot,
-                clearPodcastPlaybackSnapshot = ctx.clearPodcastPlaybackSnapshot,
-                loadLocalSettings = ctx.loadLocalSettings,
-                podcastShellBridge = ctx.podcastShellBridge,
-                playlistPollingHost = ctx.playlistPollingHost
             )
         }
     }

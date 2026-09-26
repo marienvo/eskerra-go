@@ -120,16 +120,4 @@ class AppLaunchSettledTest {
             )
         )
     }
-
-    @Test
-    fun settled_whenReadyAndPodcastFirstLaunchWithoutInbox() {
-        assertTrue(
-            isLaunchSettled(
-                AppGateState.Ready(config),
-                inboxUiState = null,
-                todayHubUiState = null,
-                podcastFirstLaunch = true
-            )
-        )
-    }
 }

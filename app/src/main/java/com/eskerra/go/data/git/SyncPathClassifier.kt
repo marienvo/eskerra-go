@@ -7,9 +7,6 @@ import com.eskerra.go.core.model.SyncChangePartition
 object SyncPathClassifier {
 
     private val inboxDirectory = InboxNotePath.INBOX_DIRECTORY
-    private const val GENERAL_PREFIX = "General/"
-    private const val PODCAST_STUB_SUFFIX = "- podcasts.md"
-    private val rssCachePrefix = String(Character.toChars(0x1F4FB))
 
     fun partition(changedPaths: Set<String>): SyncChangePartition {
         val inbox = mutableSetOf<String>()
@@ -40,21 +37,6 @@ object SyncPathClassifier {
             2 -> segments[1] == inboxDirectory
             else -> false
         }
-    }
-
-    /**
-     * True when [rawPath] is an auto-managed podcast markdown file that the podcast
-     * sync channel may stage and commit on its own: a `YYYY Section - podcasts.md`
-     * stub or an RSS cache file (`📻 …`) under `General/`. Regular `General/` notes
-     * are intentionally excluded so external edits there are never auto-committed.
-     */
-    fun isPodcastPath(rawPath: String): Boolean {
-        val path = rawPath.replace('\\', '/').trimStart('/')
-        if (isUnsafe(path)) return false
-        if (!path.startsWith(GENERAL_PREFIX)) return false
-        val name = path.substringAfterLast('/')
-        return name.endsWith(PODCAST_STUB_SUFFIX, ignoreCase = true) ||
-            name.startsWith(rssCachePrefix)
     }
 
     private fun isUnsafe(path: String): Boolean {

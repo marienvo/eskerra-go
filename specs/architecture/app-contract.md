@@ -10,8 +10,8 @@ Product behavior and boundaries for the native Android app. Non-obvious rules th
 - Markdown reader with clickable wiki links (title or filename stem, case-insensitive; path-like targets stay case-sensitive).
 - Full-text vault search (SQLite FTS5).
 - HTTPS remote sync: commits all local vault changes; integrates remote via fast-forward or auto-merge with conflict sidecars. Runs on the sync button and automatically on note writes, boot, and foreground return — always foreground work, never a background scheduler.
-- Podcast episodes tab: catalog, playback, R2 playlist handoff, RSS refresh, mark-as-played.
-- Floating shell navigation with tab state preservation.
+- R2 binary downloads with a downloaded-binaries tile in sync settings.
+- Floating shell chrome with a menu and sync indicator.
 
 ## Share target (other apps → inbox draft)
 
@@ -35,26 +35,13 @@ Rules that follow from that:
 - **`EXTRA_SUBJECT` wins and costs no network call.** The page `<title>` is fetched only when no usable subject arrived; it is bounded (4 s, 256 KB, textual responses only) and any failure is silent — the draft is already usable, and the user simply types the title.
 - **A late-arriving fetched title is applied only while the draft is untouched** — still byte-for-byte what the app wrote for that share, with no save in flight. One keystroke and it is dropped silently.
 - **A share never destroys typed text**: it takes a blank draft, otherwise it appends below. A share arriving mid-save is replayed after the save settles.
-- **A share always lands where the pill is visible**: it wins over resumable podcast playback on a cold start, pops out of search (the pill drives the query there), and leaves the user in place on the inbox or a note reader.
+- **A share always lands where the pill is visible**: it pops out of search (the pill drives the query there), and leaves the user in place on the inbox or a note reader.
 - If the workspace is not set up yet, the share waits and is delivered once setup completes; it is not persisted across process death.
 - `MainActivity` is `singleTask`, so a share reuses the single existing instance instead of building a second composition root. Consequence: **Back after a share returns to the launcher**, not to the sharing app.
 
 ## Compose pill focus
 
 A completed inbox-note save releases the field's focus and lets the keyboard go — for every note, not only shared ones. A failed save keeps focus so the error can be fixed in place.
-
-## Shell bottom navigation
-
-Top-level tab switches use `popUpTo(inbox) { saveState = true }`, `launchSingleTop`, and `restoreState` so sibling stacks (Podcasts, Menu, Search) retain state across round trips. Re-tapping the active tab is a no-op.
-
-Home (inbox) re-selection is decided by [resolveTabNavigation](app/src/main/java/com/eskerra/go/app/AppNavigation.kt) (unit-tested in [AppNavigationTest.kt](app/src/test/java/com/eskerra/go/app/AppNavigationTest.kt)):
-
-| Current route | Home tap | Behavior |
-|---------------|----------|----------|
-| `inbox` | Home | No-op |
-| `note/*` or `editor/*` | Home | Pop to inbox **and reset** (Today Hub → current week, scroll top) |
-| Podcasts / Search / Menu | Home | Pop to inbox **and restore** last home view |
-| `podcasts` | Podcasts | No-op |
 
 ## Inbox note scan rules
 
@@ -70,13 +57,11 @@ Inbox cold start may show the last cached inbox list briefly while the workspace
 
 ## Git write and sync channels
 
-All JGit mutations share one process-wide mutex so vault sync and podcast auto-sync never overlap. Details: [sync-hardening-and-recovery.md](sync-hardening-and-recovery.md).
+All JGit mutations share one process-wide mutex. Details: [sync-hardening-and-recovery.md](sync-hardening-and-recovery.md).
 
 | Channel | Trigger | Staged paths | Integration | Push |
 | --- | --- | --- | --- | --- |
 | Vault sync | User taps sync, **any note write** (inbox create, editor save, inbox delete), **boot**, or **foreground return** | All safe local changes | FF when behind; auto-merge on divergence | Yes, with retry |
-| Podcast RSS refresh | Pull-to-refresh | RSS writes `General/`; then vault sync engine | Same as vault sync | Same as vault sync |
-| Podcast mark-as-played | Checkbox | Changed podcast paths under `General/` only | **Fast-forward only** | Best-effort; pending on divergence |
 
 **Sync moments.** Note writes, app boot, and every foreground return always start a vault sync — the
 same code path as the button, with coalescing so rapid triggers collapse to one follow-up. Automatic
@@ -89,7 +74,7 @@ process is boot's, so it does not sync twice.
 
 All of this is foreground work tied to user actions, never a background scheduler.
 
-Vault sync (button, note writes, and RSS refresh) auto-merges diverged histories with conflict sidecars. Podcast mark-as-played never auto-merges, rebase, or reset.
+Vault sync auto-merges diverged histories with conflict sidecars.
 
 ## Shell sync indicator
 

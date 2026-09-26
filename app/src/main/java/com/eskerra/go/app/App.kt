@@ -3,7 +3,6 @@ package com.eskerra.go.app
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -17,8 +16,6 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.ActiveTodayHubStore
-import com.eskerra.go.core.repository.PodcastCatalogSnapshotStore
-import com.eskerra.go.core.repository.PodcastPlayerDriver
 import com.eskerra.go.core.repository.SyncStateRepository
 import com.eskerra.go.core.repository.TodayHubSnapshotStore
 import com.eskerra.go.core.repository.VaultSyncScheduler
@@ -34,15 +31,12 @@ import com.eskerra.go.core.usecase.LoadGitStatusSummary
 import com.eskerra.go.core.usecase.LoadInboxSummariesCached
 import com.eskerra.go.core.usecase.LoadLocalSettings
 import com.eskerra.go.core.usecase.LoadNoteForReading
-import com.eskerra.go.core.usecase.LoadPodcastArtwork
-import com.eskerra.go.core.usecase.LoadPodcastCatalog
 import com.eskerra.go.core.usecase.LoadRemoteSyncSettings
 import com.eskerra.go.core.usecase.LoadSyncStatus
 import com.eskerra.go.core.usecase.LoadTodayHub
 import com.eskerra.go.core.usecase.LoadTodayHubRow
 import com.eskerra.go.core.usecase.LoadVaultSettings
 import com.eskerra.go.core.usecase.MaintainVaultSearchIndex
-import com.eskerra.go.core.usecase.MarkPodcastEpisodesPlayed
 import com.eskerra.go.core.usecase.PrefetchLinkedNotes
 import com.eskerra.go.core.usecase.ReconcileWorkspaceSyncBranch
 import com.eskerra.go.core.usecase.RefreshRemoteSyncStatus
@@ -54,7 +48,6 @@ import com.eskerra.go.core.usecase.SaveRemoteSyncSettings
 import com.eskerra.go.core.usecase.SaveVaultSettings
 import com.eskerra.go.core.usecase.SearchVault
 import com.eskerra.go.core.usecase.SyncBinaries
-import com.eskerra.go.core.usecase.SyncPodcastVaultRefresh
 import com.eskerra.go.core.usecase.TestRemoteConnection
 import com.eskerra.go.core.usecase.TouchVaultSearchPaths
 import com.eskerra.go.core.usecase.UpdateSyncToken
@@ -106,42 +99,21 @@ fun App(
     maintainVaultSearchIndex: MaintainVaultSearchIndex,
     repairVaultSearchIndex: RepairVaultSearchIndex,
     touchVaultSearchPaths: TouchVaultSearchPaths,
-    loadPodcastCatalog: LoadPodcastCatalog,
-    markPodcastEpisodesPlayed: MarkPodcastEpisodesPlayed,
-    podcastPlaylistWiring: PodcastPlaylistWiring,
-    loadPodcastArtwork: LoadPodcastArtwork,
-    podcastPlayerDriver: PodcastPlayerDriver,
-    syncPodcastVaultRefresh: SyncPodcastVaultRefresh,
-    catalogSnapshotStore: PodcastCatalogSnapshotStore,
-    podcastShellStateWiring: PodcastShellStateWiring,
     shareIntake: ShareIntake,
     readConfig: suspend () -> WorkspaceConfig? = { null },
     onConfigUpdated: (WorkspaceConfig) -> Unit,
     onInboxUiStateChanged: (InboxUiState) -> Unit = {},
-    onTodayHubUiStateChanged: (TodayHubUiState) -> Unit = {},
-    onPodcastFirstLaunchChanged: (Boolean) -> Unit = {}
+    onTodayHubUiStateChanged: (TodayHubUiState) -> Unit = {}
 ) {
     var currentConfig by remember(config) { mutableStateOf(config) }
     val workspaceRoot = remember(currentConfig, filesDir) {
         WorkspacePaths.resolve(filesDir, currentConfig.relativePath).getOrNull()
     }
-    val playlistPollingHost = rememberPlaylistR2PollingHost(
-        workspaceRoot = workspaceRoot,
-        loadVaultSettings = loadVaultSettings,
-        playlistSyncRepository = podcastPlaylistWiring.repository,
-        playlistR2ConditionalFetch = podcastPlaylistWiring.conditionalFetch,
-        podcastPlayerDriver = podcastPlayerDriver
-    )
     val navController = rememberNavController()
     val scope = rememberCoroutineScope()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
     val currentRoute = currentDestination?.route
-    val destinationTopLevelRoute = topLevelGraphRouteForDestination(currentDestination)
-    var currentTopLevelRoute by remember { mutableStateOf(AppRoute.HOME_GRAPH) }
-    LaunchedEffect(destinationTopLevelRoute) {
-        if (destinationTopLevelRoute != null) currentTopLevelRoute = destinationTopLevelRoute
-    }
     // Bumped on each Home tap while already on the inbox; the inbox route reacts (it owns the Today
     // Hub state and decides whether to snap to the current week). A route change can't carry this
     // because re-tapping Home does not navigate.
@@ -194,8 +166,6 @@ fun App(
     AppForegroundSyncEffect(appSyncViewModel)
 
     val syncIndicator = rememberShellSyncIndicator(appSyncViewModel, remoteConfigured)
-    val selectedTopLevelRoute = destinationTopLevelRoute ?: currentTopLevelRoute
-    val inPodcastMode = selectedTopLevelRoute == AppRoute.PODCASTS_GRAPH
     val shellInputState = rememberShellInput(
         currentConfig = currentConfig,
         filesDir = filesDir,
@@ -205,7 +175,6 @@ fun App(
         appSyncViewModel = appSyncViewModel,
         scope = scope,
         currentRoute = currentRoute,
-        selectedTopLevelRoute = selectedTopLevelRoute,
         markInboxNotesChanged = markInboxNotesChanged,
         searchVault = searchVault,
         maintainVaultSearchIndex = maintainVaultSearchIndex,
@@ -213,48 +182,12 @@ fun App(
         navController = navController,
         shareIntake = shareIntake
     )
-    val podcastShellBridge = remember { PodcastShellBridge() }
-    val miniPlayerMount = rememberAppShellMiniPlayerMount(
-        currentConfig = currentConfig,
-        filesDir = filesDir,
-        loadPodcastArtwork = loadPodcastArtwork,
-        markPodcastEpisodesPlayed = markPodcastEpisodesPlayed,
-        podcastPlayerDriver = podcastPlayerDriver,
-        bridge = podcastShellBridge,
-        inPodcastMode = inPodcastMode
-    )
-    AppPodcastBootstrap(
-        currentConfig = currentConfig,
-        filesDir = filesDir,
-        workspaceRoot = workspaceRoot,
-        currentRoute = currentRoute,
-        navController = navController,
-        podcastPlayerDriver = podcastPlayerDriver,
-        podcastShellStateWiring = podcastShellStateWiring,
-        podcastPlaylistSync = podcastPlaylistWiring.sync,
-        loadPodcastArtwork = loadPodcastArtwork,
-        playlistPollingHost = playlistPollingHost,
-        bridge = podcastShellBridge,
-        hasPendingShare = shareIntake.pendingShare != null,
-        onPodcastFirstLaunchChanged = onPodcastFirstLaunchChanged
-    )
-    val onInbox = currentRoute == AppRoute.INBOX ||
-        (currentRoute == null && selectedTopLevelRoute == AppRoute.HOME_GRAPH)
+    val onInbox = currentRoute == AppRoute.INBOX || currentRoute == null
     AppShell(
-        selectedTopLevelRoute = selectedTopLevelRoute,
         syncIndicator = syncIndicator,
         pullToRefreshActive = onInbox && syncIndicator?.spinning == true,
-        miniPlayerVisible = miniPlayerMount.visible,
-        miniPlayer = miniPlayerMount.content,
         shellInput = shellInputState.presentation,
-        onMenuClick = { menuOpen = true },
-        onNavigate = { route ->
-            navController.navigateTab(
-                currentRoute = currentRoute,
-                currentTopLevelRoute = destinationTopLevelRoute ?: currentTopLevelRoute,
-                targetRoute = route
-            ) { homeReselectSignal++ }
-        }
+        onMenuClick = { menuOpen = true }
     ) { contentModifier ->
         val navGraphContext = AppNavGraphContext(
             currentConfig = currentConfig,
@@ -294,17 +227,6 @@ fun App(
             repairVaultSearchIndex = repairVaultSearchIndex,
             searchViewModel = shellInputState.searchViewModel,
             touchVaultSearchPaths = touchVaultSearchPaths,
-            loadPodcastCatalog = loadPodcastCatalog,
-            markPodcastEpisodesPlayed = markPodcastEpisodesPlayed,
-            podcastPlaylistSync = podcastPlaylistWiring.sync,
-            loadPodcastArtwork = loadPodcastArtwork,
-            podcastPlayerDriver = podcastPlayerDriver,
-            syncPodcastVaultRefresh = syncPodcastVaultRefresh,
-            catalogSnapshotStore = catalogSnapshotStore,
-            persistPodcastPlaybackSnapshot = podcastShellStateWiring.persistPodcastPlaybackSnapshot,
-            clearPodcastPlaybackSnapshot = podcastShellStateWiring.clearPodcastPlaybackSnapshot,
-            podcastShellBridge = podcastShellBridge,
-            playlistPollingHost = playlistPollingHost,
             markInboxNotesChanged = markInboxNotesChanged,
             onConfigUpdated = { updated ->
                 currentConfig = updated
@@ -323,7 +245,6 @@ fun App(
             popExitTransition = { ExitTransition.None }
         ) {
             homeGraph(navGraphContext)
-            podcastsGraph(navGraphContext)
             sharedDestinations(navGraphContext)
         }
     }

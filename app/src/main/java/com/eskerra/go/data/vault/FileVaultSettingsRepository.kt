@@ -80,7 +80,7 @@ class FileVaultSettingsRepository(
 
             val eskerraDir = File(workspaceRoot, VaultLayout.ESKERRA_DIR)
             val sharedFile = File(eskerraDir, VaultLayout.SHARED_SETTINGS_FILE)
-            val writeToFile = sharedFile.isFile || R2Settings.isVaultR2PlaylistConfigured(settings)
+            val writeToFile = sharedFile.isFile || R2Settings.isVaultR2Configured(settings)
 
             if (writeToFile) {
                 saveToFile(eskerraDir, sharedFile, settings)

@@ -9,7 +9,7 @@ import com.eskerra.go.data.perf.DataStoreColdStartStatsStore
  * Builds the weekly performance reporting chain.
  *
  * Lifted out of [MainActivity] to keep that file inside its size budget, the same reason
- * [buildPodcastCompositionRoot] exists.
+ * [buildBinariesCompositionRoot] exists.
  */
 fun buildWeeklyPerformanceReporting(context: Context): ReportWeeklyPerformance =
     ReportWeeklyPerformance(

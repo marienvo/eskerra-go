@@ -10,37 +10,37 @@ import org.junit.Test
 
 class R2SettingsTest {
 
-    // ── isVaultR2PlaylistConfigured ──────────────────────────────────────────
+    // ── isVaultR2Configured ──────────────────────────────────────────────────
 
     @Test
     fun `configured when all four fields non-empty`() {
-        assertTrue(R2Settings.isVaultR2PlaylistConfigured(settingsWithR2()))
+        assertTrue(R2Settings.isVaultR2Configured(settingsWithR2()))
     }
 
     @Test
     fun `not configured when r2 absent`() {
-        assertFalse(R2Settings.isVaultR2PlaylistConfigured(EskerraSettings()))
+        assertFalse(R2Settings.isVaultR2Configured(EskerraSettings()))
     }
 
     @Test
     fun `not configured when any field empty`() {
         assertFalse(
-            R2Settings.isVaultR2PlaylistConfigured(
+            R2Settings.isVaultR2Configured(
                 settingsWithR2().copy(r2 = r2().copy(bucket = ""))
             )
         )
         assertFalse(
-            R2Settings.isVaultR2PlaylistConfigured(
+            R2Settings.isVaultR2Configured(
                 settingsWithR2().copy(r2 = r2().copy(endpoint = ""))
             )
         )
         assertFalse(
-            R2Settings.isVaultR2PlaylistConfigured(
+            R2Settings.isVaultR2Configured(
                 settingsWithR2().copy(r2 = r2().copy(accessKeyId = ""))
             )
         )
         assertFalse(
-            R2Settings.isVaultR2PlaylistConfigured(
+            R2Settings.isVaultR2Configured(
                 settingsWithR2().copy(r2 = r2().copy(secretAccessKey = ""))
             )
         )
@@ -49,7 +49,7 @@ class R2SettingsTest {
     @Test
     fun `not configured when fields only whitespace`() {
         assertFalse(
-            R2Settings.isVaultR2PlaylistConfigured(
+            R2Settings.isVaultR2Configured(
                 settingsWithR2().copy(r2 = r2().copy(bucket = "  "))
             )
         )

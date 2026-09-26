@@ -22,7 +22,7 @@ private const val EU_NOTE =
  * Builds the non-OK error message, mirroring the spec §"S3 request contract":
  *
  * ```
- * R2 <VERB> playlist.json failed: HTTP <status>[ (<Code>)][. <hint>]
+ * R2 <VERB> object failed: HTTP <status>[ (<Code>)][. <hint>]
  * ```
  *
  * `<Code>` is scanned from the S3 XML `<Code>...</Code>`; the `<hint>` is appended
@@ -32,7 +32,7 @@ object R2ErrorFormatter {
 
     private val codePattern = Regex("<Code>(.*?)</Code>", RegexOption.DOT_MATCHES_ALL)
 
-    fun format(verb: R2Verb, status: Int, body: String, subject: String = "playlist.json"): String {
+    fun format(verb: R2Verb, status: Int, body: String, subject: String = "object"): String {
         val code = extractCode(body)
         val base = buildString {
             append("R2 ").append(verb.label).append(' ').append(subject)

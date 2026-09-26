@@ -10,7 +10,7 @@ object R2Settings {
     /**
      * All four R2 fields non-empty after trim — jurisdiction is irrelevant for this gate.
      */
-    fun isVaultR2PlaylistConfigured(settings: EskerraSettings): Boolean {
+    fun isVaultR2Configured(settings: EskerraSettings): Boolean {
         val r2 = settings.r2 ?: return false
         return r2.endpoint.trim().isNotEmpty() &&
             r2.bucket.trim().isNotEmpty() &&

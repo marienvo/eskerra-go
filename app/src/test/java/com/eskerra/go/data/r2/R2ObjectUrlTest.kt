@@ -16,8 +16,8 @@ class R2ObjectUrlTest {
             secretAccessKey = "s"
         )
         assertEquals(
-            "https://abc.r2.cloudflarestorage.com/my-bucket/playlist.json",
-            R2ObjectUrl.buildR2ObjectUrl(config, "playlist.json")
+            "https://abc.r2.cloudflarestorage.com/my-bucket/binaries/example.bin",
+            R2ObjectUrl.buildR2ObjectUrl(config, "binaries/example.bin")
         )
     }
 
@@ -31,8 +31,8 @@ class R2ObjectUrlTest {
             jurisdiction = R2Jurisdiction.Eu
         )
         assertEquals(
-            "https://abc.eu.r2.cloudflarestorage.com/my-bucket/playlist.json",
-            R2ObjectUrl.buildR2ObjectUrl(config, "playlist.json")
+            "https://abc.eu.r2.cloudflarestorage.com/my-bucket/binaries/example.bin",
+            R2ObjectUrl.buildR2ObjectUrl(config, "binaries/example.bin")
         )
     }
 
@@ -45,8 +45,8 @@ class R2ObjectUrlTest {
             secretAccessKey = "s"
         )
         assertEquals(
-            "https://abc.r2.cloudflarestorage.com/my-bucket/playlist.json",
-            R2ObjectUrl.buildR2ObjectUrl(config, "playlist.json")
+            "https://abc.r2.cloudflarestorage.com/my-bucket/binaries/example.bin",
+            R2ObjectUrl.buildR2ObjectUrl(config, "binaries/example.bin")
         )
     }
 

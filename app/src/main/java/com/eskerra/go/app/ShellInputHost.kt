@@ -30,7 +30,6 @@ internal fun rememberShellInput(
     appSyncViewModel: AppSyncViewModel,
     scope: CoroutineScope,
     currentRoute: String?,
-    selectedTopLevelRoute: String?,
     markInboxNotesChanged: () -> Unit,
     searchVault: SearchVault,
     maintainVaultSearchIndex: MaintainVaultSearchIndex,
@@ -47,18 +46,12 @@ internal fun rememberShellInput(
         appSyncViewModel = appSyncViewModel,
         scope = scope,
         currentRoute = currentRoute,
-        selectedTopLevelRoute = selectedTopLevelRoute,
         markInboxNotesChanged = markInboxNotesChanged,
         shareIntake = shareIntake,
         onSharePrefillApplied = {
-            when (shareNavAction(currentRoute, selectedTopLevelRoute)) {
+            when (shareNavAction(currentRoute)) {
                 ShareNavAction.NoOp -> Unit
                 ShareNavAction.PopSearch -> navController.popBackStack()
-                ShareNavAction.SwitchToHome -> navController.navigate(AppRoute.HOME_GRAPH) {
-                    launchSingleTop = true
-                    restoreState = true
-                    popUpTo(navController.graph.startDestinationId) { saveState = true }
-                }
             }
         }
     )
