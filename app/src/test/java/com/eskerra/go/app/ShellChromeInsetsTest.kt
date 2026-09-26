@@ -39,28 +39,4 @@ class ShellChromeInsetsTest {
         assertEquals(ShellNewNoteInputHeight, insets.bottom)
     }
 
-    @Test
-    fun calculateShellChromeInsets_withMiniPlayer_addsMiniPlayerHeight() {
-        val insets = calculateShellChromeInsets(
-            statusBarTop = 0.dp,
-            navigationBarBottom = 0.dp,
-            miniPlayerVisible = true
-        )
-
-        assertEquals(ShellTopChromeHeight, insets.top)
-        assertEquals(ShellMiniPlayerHeight, insets.bottom)
-    }
-
-    @Test
-    fun calculateShellChromeInsets_withBothBottomModes_prefersMiniPlayer() {
-        val insets = calculateShellChromeInsets(
-            statusBarTop = 0.dp,
-            navigationBarBottom = 0.dp,
-            miniPlayerVisible = true,
-            newNoteInputVisible = true
-        )
-
-        assertEquals(ShellTopChromeHeight, insets.top)
-        assertEquals(ShellMiniPlayerHeight, insets.bottom)
-    }
 }

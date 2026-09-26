@@ -9,7 +9,6 @@ import com.eskerra.go.core.model.NoteId
  */
 object AppRoute {
     const val HOME_GRAPH = "home-graph"
-    const val PODCASTS_GRAPH = "podcasts-graph"
 
     const val INBOX = "inbox"
     const val SEARCH = "search"
@@ -20,7 +19,6 @@ object AppRoute {
      * navigating to the bare [SEARCH] string still matches this pattern (menu/inbox entry points).
      */
     const val SEARCH_PATTERN = "search?$SEARCH_QUERY_ARG={$SEARCH_QUERY_ARG}"
-    const val PODCASTS = "podcasts"
     const val SYNC = "sync"
     const val SYNC_SETTINGS = "sync-settings"
 

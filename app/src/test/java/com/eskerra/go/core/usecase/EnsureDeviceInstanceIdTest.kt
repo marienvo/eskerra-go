@@ -67,12 +67,4 @@ class EnsureDeviceInstanceIdTest {
         assertTrue(id.length > 10)
     }
 
-    @Test
-    fun `preserves playlist watermarks when generating id`() = runTest {
-        val store = FakeLocalSettingsStore(
-            EskerraLocalSettings(playlistKnownUpdatedAtMs = 12345L)
-        )
-        EnsureDeviceInstanceId(store)()
-        assertEquals(12345L, store.load().playlistKnownUpdatedAtMs)
-    }
 }

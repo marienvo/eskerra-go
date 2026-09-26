@@ -19,8 +19,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.eskerra.go.core.repository.ActiveTodayHubStore
 import com.eskerra.go.core.repository.BootCacheStore
-import com.eskerra.go.core.repository.PodcastCatalogSnapshotStore
-import com.eskerra.go.core.repository.PodcastPlayerDriver
 import com.eskerra.go.core.repository.SyncStateRepository
 import com.eskerra.go.core.repository.TodayHubSnapshotStore
 import com.eskerra.go.core.repository.VaultSyncScheduler
@@ -36,15 +34,12 @@ import com.eskerra.go.core.usecase.LoadGitStatusSummary
 import com.eskerra.go.core.usecase.LoadInboxSummariesCached
 import com.eskerra.go.core.usecase.LoadLocalSettings
 import com.eskerra.go.core.usecase.LoadNoteForReading
-import com.eskerra.go.core.usecase.LoadPodcastArtwork
-import com.eskerra.go.core.usecase.LoadPodcastCatalog
 import com.eskerra.go.core.usecase.LoadRemoteSyncSettings
 import com.eskerra.go.core.usecase.LoadSyncStatus
 import com.eskerra.go.core.usecase.LoadTodayHub
 import com.eskerra.go.core.usecase.LoadTodayHubRow
 import com.eskerra.go.core.usecase.LoadVaultSettings
 import com.eskerra.go.core.usecase.MaintainVaultSearchIndex
-import com.eskerra.go.core.usecase.MarkPodcastEpisodesPlayed
 import com.eskerra.go.core.usecase.PrefetchLinkedNotes
 import com.eskerra.go.core.usecase.ReconcileWorkspaceSyncBranch
 import com.eskerra.go.core.usecase.RefreshRemoteSyncStatus
@@ -56,7 +51,6 @@ import com.eskerra.go.core.usecase.SaveRemoteSyncSettings
 import com.eskerra.go.core.usecase.SaveVaultSettings
 import com.eskerra.go.core.usecase.SearchVault
 import com.eskerra.go.core.usecase.SyncBinaries
-import com.eskerra.go.core.usecase.SyncPodcastVaultRefresh
 import com.eskerra.go.core.usecase.TestRemoteConnection
 import com.eskerra.go.core.usecase.TouchVaultSearchPaths
 import com.eskerra.go.core.usecase.UpdateSyncToken
@@ -118,14 +112,6 @@ fun AppRoot(
     maintainVaultSearchIndex: MaintainVaultSearchIndex,
     repairVaultSearchIndex: RepairVaultSearchIndex,
     touchVaultSearchPaths: TouchVaultSearchPaths,
-    loadPodcastCatalog: LoadPodcastCatalog,
-    markPodcastEpisodesPlayed: MarkPodcastEpisodesPlayed,
-    podcastPlaylistWiring: PodcastPlaylistWiring,
-    loadPodcastArtwork: LoadPodcastArtwork,
-    podcastPlayerDriver: PodcastPlayerDriver,
-    syncPodcastVaultRefresh: SyncPodcastVaultRefresh,
-    catalogSnapshotStore: PodcastCatalogSnapshotStore,
-    podcastShellStateWiring: PodcastShellStateWiring,
     shareIntake: ShareIntake,
     onLaunchSettled: () -> Unit = {}
 ) {
@@ -145,19 +131,16 @@ fun AppRoot(
                 val gateState by gateViewModel.gateState.collectAsState()
                 var inboxUiState by remember { mutableStateOf<InboxUiState?>(null) }
                 var todayHubUiState by remember { mutableStateOf<TodayHubUiState?>(null) }
-                var podcastFirstLaunch by remember { mutableStateOf(false) }
                 val launchSettled = isLaunchSettled(
                     gateState,
                     inboxUiState,
-                    todayHubUiState,
-                    podcastFirstLaunch
+                    todayHubUiState
                 )
 
                 AppLaunchSettledEffect(
                     gateState = gateState,
                     inboxUiState = inboxUiState,
                     todayHubUiState = todayHubUiState,
-                    podcastFirstLaunch = podcastFirstLaunch,
                     onLaunchSettled = onLaunchSettled
                 )
 
@@ -240,22 +223,13 @@ fun AppRoot(
                         maintainVaultSearchIndex = maintainVaultSearchIndex,
                         repairVaultSearchIndex = repairVaultSearchIndex,
                         touchVaultSearchPaths = touchVaultSearchPaths,
-                        loadPodcastCatalog = loadPodcastCatalog,
-                        markPodcastEpisodesPlayed = markPodcastEpisodesPlayed,
-                        podcastPlaylistWiring = podcastPlaylistWiring,
-                        loadPodcastArtwork = loadPodcastArtwork,
-                        podcastPlayerDriver = podcastPlayerDriver,
-                        syncPodcastVaultRefresh = syncPodcastVaultRefresh,
-                        catalogSnapshotStore = catalogSnapshotStore,
-                        podcastShellStateWiring = podcastShellStateWiring,
                         // Only handed over once the workspace is ready; until then the share
                         // simply waits in the Activity and arrives when App mounts.
                         shareIntake = shareIntake,
                         readConfig = workspaceStore::read,
                         onConfigUpdated = gateViewModel::updateReadyConfig,
                         onInboxUiStateChanged = { inboxUiState = it },
-                        onTodayHubUiStateChanged = { todayHubUiState = it },
-                        onPodcastFirstLaunchChanged = { podcastFirstLaunch = it }
+                        onTodayHubUiStateChanged = { todayHubUiState = it }
                     )
                 }
             }

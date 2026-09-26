@@ -195,16 +195,6 @@ class VaultSettingsViewModelTest {
     }
 
     @Test
-    fun `save preserves playlist watermarks across save`() = runTest {
-        localStore.stored = EskerraLocalSettings(playlistKnownUpdatedAtMs = 9999L)
-        vm = buildVm()
-        testDispatcher.scheduler.advanceUntilIdle()
-        vm.save()
-        testDispatcher.scheduler.advanceUntilIdle()
-        assertEquals(9999L, localStore.stored.playlistKnownUpdatedAtMs)
-    }
-
-    @Test
     fun `previousShared extras are preserved on save`() = runTest {
         val themeKey = "themePreference"
         val withExtras = kotlinx.serialization.json.buildJsonObject {

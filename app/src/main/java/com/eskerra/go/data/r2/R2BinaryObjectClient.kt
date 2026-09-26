@@ -27,7 +27,7 @@ class R2BinaryObjectClient(
             httpClient.newCall(request).execute().use { response ->
                 val body = response.body?.string().orEmpty()
                 if (!response.isSuccessful) {
-                    throw R2PlaylistException(
+                    throw R2ObjectException(
                         R2ErrorFormatter.format(R2Verb.READ, response.code, body, "list binaries/")
                     )
                 }
@@ -46,12 +46,12 @@ class R2BinaryObjectClient(
         httpClient.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
                 val text = response.body?.string().orEmpty()
-                throw R2PlaylistException(
+                throw R2ObjectException(
                     R2ErrorFormatter.format(R2Verb.READ, response.code, text, key)
                 )
             }
             val source = response.body?.byteStream()
-                ?: throw R2PlaylistException("R2 GET $key failed: empty response body")
+                ?: throw R2ObjectException("R2 GET $key failed: empty response body")
             val parent = dest.parentFile
             if (parent != null && !parent.isDirectory && !parent.mkdirs()) {
                 throw IOException("Failed to create directory ${parent.path}")

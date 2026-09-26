@@ -12,7 +12,6 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.eskerra.go.core.model.AppShellMode
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.ActiveTodayHubStore
 import com.eskerra.go.core.usecase.CreateInboxNote
@@ -45,7 +44,6 @@ internal fun rememberShellNewNoteInputState(
     appSyncViewModel: AppSyncViewModel,
     scope: CoroutineScope,
     currentRoute: String?,
-    selectedTopLevelRoute: String?,
     markInboxNotesChanged: () -> Unit,
     shareIntake: ShareIntake,
     onSharePrefillApplied: () -> Unit
@@ -64,10 +62,6 @@ internal fun rememberShellNewNoteInputState(
     val createInboxContent = createInboxState as? CreateInboxUiState.Content
     var fieldSignal by remember { mutableStateOf<ShellFieldSignal?>(null) }
     var fieldSignalToken by remember { mutableLongStateOf(0L) }
-    val selectedShellMode = when (selectedTopLevelRoute) {
-        AppRoute.PODCASTS_GRAPH -> AppShellMode.PODCASTS
-        else -> AppShellMode.HOME
-    }
 
     LaunchedEffect(createInboxNoteViewModel, currentConfig, filesDir, appSyncViewModel) {
         createInboxNoteViewModel.savedNoteEvents.collect { noteId ->
@@ -112,7 +106,7 @@ internal fun rememberShellNewNoteInputState(
     }
 
     return ShellNewNoteInputState(
-        visible = shouldShowNewNoteInput(currentRoute, selectedShellMode),
+        visible = shouldShowNewNoteInput(currentRoute),
         draft = createInboxContent?.draft.orEmpty(),
         canSave = createInboxContent?.canSave == true,
         isSaving = createInboxContent?.isSaving == true,

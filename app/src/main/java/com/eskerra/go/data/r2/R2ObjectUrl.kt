@@ -5,7 +5,7 @@ import com.eskerra.go.core.vault.R2Settings
 
 /**
  * Builds R2 S3 object URLs, mirroring `buildR2ObjectUrl` from
- * `packages/eskerra-core/src/r2PlaylistObject.ts`:
+ * R2's S3 object URL convention:
  *
  * ```
  * base = stripTrailingSlashes(r2S3AccountBaseUrl(config))

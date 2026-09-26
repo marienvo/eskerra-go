@@ -18,7 +18,6 @@ import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import com.eskerra.go.app.AppRoot
 import com.eskerra.go.app.ShareIntake
-import com.eskerra.go.core.repository.PodcastPlayerDriver
 import com.eskerra.go.core.usecase.ClearRemoteSyncSettings
 import com.eskerra.go.core.usecase.CreateInboxNote
 import com.eskerra.go.core.usecase.DeleteInboxNotes
@@ -30,14 +29,11 @@ import com.eskerra.go.core.usecase.LoadInboxSummaries
 import com.eskerra.go.core.usecase.LoadInboxSummariesCached
 import com.eskerra.go.core.usecase.LoadLocalSettings
 import com.eskerra.go.core.usecase.LoadNoteForReading
-import com.eskerra.go.core.usecase.LoadPodcastArtwork
-import com.eskerra.go.core.usecase.LoadPodcastCatalog
 import com.eskerra.go.core.usecase.LoadRemoteSyncSettings
 import com.eskerra.go.core.usecase.LoadTodayHub
 import com.eskerra.go.core.usecase.LoadTodayHubRow
 import com.eskerra.go.core.usecase.LoadVaultSettings
 import com.eskerra.go.core.usecase.MaintainVaultSearchIndex
-import com.eskerra.go.core.usecase.MarkPodcastEpisodesPlayed
 import com.eskerra.go.core.usecase.PrefetchLinkedNotes
 import com.eskerra.go.core.usecase.RepairVaultSearchIndex
 import com.eskerra.go.core.usecase.SaveLocalSettings
@@ -45,9 +41,6 @@ import com.eskerra.go.core.usecase.SaveNote
 import com.eskerra.go.core.usecase.SaveRemoteSyncSettings
 import com.eskerra.go.core.usecase.SaveVaultSettings
 import com.eskerra.go.core.usecase.SearchVault
-import com.eskerra.go.core.usecase.SyncPodcastChange
-import com.eskerra.go.core.usecase.SyncPodcastChangesViaVaultSync
-import com.eskerra.go.core.usecase.SyncPodcastVaultRefresh
 import com.eskerra.go.core.usecase.TestRemoteConnection
 import com.eskerra.go.core.usecase.TouchVaultSearchPaths
 import com.eskerra.go.core.usecase.UpdateSyncToken
@@ -56,13 +49,6 @@ import com.eskerra.go.data.notes.FileInboxSnapshotStore
 import com.eskerra.go.data.notes.FileNoteWriteRepository
 import com.eskerra.go.data.notes.ParsedMarkdownCache
 import com.eskerra.go.data.perf.ColdStartTrace
-import com.eskerra.go.data.player.Media3PodcastPlayerDriver
-import com.eskerra.go.data.podcast.FilePodcastCatalogRepository
-import com.eskerra.go.data.podcast.FilePodcastCatalogSnapshotStore
-import com.eskerra.go.data.podcast.FilePodcastFileRepository
-import com.eskerra.go.data.podcast.artwork.FilePodcastArtworkRepository
-import com.eskerra.go.data.podcast.rss.FilePodcastRssVaultSync
-import com.eskerra.go.data.podcast.rss.OkHttpRssFeedFetcher
 import com.eskerra.go.data.search.SqliteVaultSearchRepository
 import com.eskerra.go.data.share.OkHttpPageTitleFetcher
 import com.eskerra.go.data.sync.SyncRuntimeProvider
@@ -73,14 +59,11 @@ import com.eskerra.go.data.vault.FileVaultSettingsRepository
 import com.eskerra.go.data.workspace.DefaultRemoteSyncSettingsRepository
 import com.eskerra.go.data.workspace.DefaultWorkspaceSetupCompletion
 import com.eskerra.go.data.workspace.DefaultWorkspaceSetupRepository
-import com.eskerra.go.data.workspace.GateFingerprintComputer
 import java.io.File
 import okhttp3.OkHttpClient
 
 /** Single entry point. Hosts the Compose UI and nothing else. */
 class MainActivity : ComponentActivity() {
-    private var podcastPlayerDriver: PodcastPlayerDriver? = null
-
     private val shareConsumer = ShareIntentConsumer { message ->
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
     }
@@ -163,9 +146,7 @@ class MainActivity : ComponentActivity() {
         val buildSyncPreflight = syncRuntime.buildSyncPreflight
         val buildSafeSyncDiagnostic = syncRuntime.buildSafeSyncDiagnostic
         val recordLastSyncAttempt = syncRuntime.recordLastSyncAttempt
-        val gitSyncMutex = syncRuntime.gitSyncMutex
         val reconcileWorkspaceSyncBranch = syncRuntime.reconcileWorkspaceSyncBranch
-        val manualSyncNow = syncRuntime.manualSyncNow
 
         val localSettingsStore = DataStoreLocalSettingsStore(applicationContext)
         val vaultSettingsRepository = FileVaultSettingsRepository(
@@ -195,22 +176,6 @@ class MainActivity : ComponentActivity() {
         val repairVaultSearchIndex = RepairVaultSearchIndex(vaultSearchRepository)
         val touchVaultSearchPaths = TouchVaultSearchPaths(vaultSearchRepository)
 
-        val loadPodcastCatalog = LoadPodcastCatalog(FilePodcastCatalogRepository())
-        val catalogSnapshotStore = FilePodcastCatalogSnapshotStore()
-        val syncMarkPlayedChange = SyncPodcastChange(
-            remoteSyncRepository = remoteSyncRepository,
-            credentialStore = credentialStore,
-            gitSyncMutex = gitSyncMutex,
-            commitMessage = "Mark podcast episodes played"
-        )
-        val markPodcastEpisodesPlayed = MarkPodcastEpisodesPlayed(
-            podcastFileRepository = FilePodcastFileRepository(),
-            syncPodcastChange = syncMarkPlayedChange::invoke
-        )
-        // Podcast refresh commits + merges + pushes through the unconditional sync engine.
-        val syncRefreshChange = SyncPodcastChangesViaVaultSync(
-            runVaultSync = { cfg, files -> manualSyncNow(cfg, files) }
-        )
         // Only on a cold start: on rotation the same intent is redelivered and must not re-apply.
         if (savedInstanceState == null) {
             shareConsumer.consume(intent)
@@ -218,32 +183,10 @@ class MainActivity : ComponentActivity() {
 
         val okHttpClient = OkHttpClient()
         installImageLoader(okHttpClient)
-        val rssFeedFetcher = OkHttpRssFeedFetcher(okHttpClient)
-        val syncPodcastVaultRefresh = SyncPodcastVaultRefresh(
-            vaultSync = FilePodcastRssVaultSync(fetcher = rssFeedFetcher),
-            syncPodcastChange = syncRefreshChange::invoke
-        )
-        val loadPodcastArtwork = LoadPodcastArtwork(
-            repository = FilePodcastArtworkRepository(filesDir, okHttpClient),
-            fetchRssXml = { url ->
-                rssFeedFetcher.fetch(url, FilePodcastArtworkRepository.DOWNLOAD_TIMEOUT_MS)
-            },
-            workspaceKeyFor = { config, dir ->
-                GateFingerprintComputer.compute(config, dir).value
-            }
-        )
-        val podcastPlayerDriver = Media3PodcastPlayerDriver(applicationContext)
-            .also { this.podcastPlayerDriver = it }
-
-        val podcastComposition = buildPodcastCompositionRoot(
+        val binariesComposition = buildBinariesCompositionRoot(
             okHttpClient = okHttpClient,
             filesDir = filesDir,
-            vaultSettingsRepository = vaultSettingsRepository,
-            localSettingsStore = localSettingsStore,
-            loadVaultSettings = loadVaultSettings,
-            ensureDeviceInstanceId = ensureDeviceInstanceId,
-            loadPodcastCatalog = loadPodcastCatalog,
-            podcastPlayerDriver = podcastPlayerDriver
+            loadVaultSettings = loadVaultSettings
         )
 
         ColdStartTrace.markDiBuilt()
@@ -284,20 +227,12 @@ class MainActivity : ComponentActivity() {
                 loadLocalSettings = loadLocalSettings,
                 saveLocalSettings = saveLocalSettings,
                 ensureDeviceInstanceId = ensureDeviceInstanceId,
-                syncBinaries = podcastComposition.syncBinaries,
-                loadDownloadedBinaries = podcastComposition.loadDownloadedBinaries,
+                syncBinaries = binariesComposition.syncBinaries,
+                loadDownloadedBinaries = binariesComposition.loadDownloadedBinaries,
                 searchVault = searchVault,
                 maintainVaultSearchIndex = maintainVaultSearchIndex,
                 repairVaultSearchIndex = repairVaultSearchIndex,
                 touchVaultSearchPaths = touchVaultSearchPaths,
-                loadPodcastCatalog = loadPodcastCatalog,
-                markPodcastEpisodesPlayed = markPodcastEpisodesPlayed,
-                podcastPlaylistWiring = podcastComposition.podcastPlaylistWiring,
-                loadPodcastArtwork = loadPodcastArtwork,
-                podcastPlayerDriver = podcastPlayerDriver,
-                syncPodcastVaultRefresh = syncPodcastVaultRefresh,
-                catalogSnapshotStore = catalogSnapshotStore,
-                podcastShellStateWiring = podcastComposition.podcastShellStateWiring,
                 shareIntake = ShareIntake(
                     pendingShare = shareConsumer.pending.value,
                     fetchSharedPageTitle = FetchSharedPageTitle(
@@ -319,12 +254,6 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         shareConsumer.consume(intent)
-    }
-
-    override fun onDestroy() {
-        podcastPlayerDriver?.release()
-        podcastPlayerDriver = null
-        super.onDestroy()
     }
 
     private fun installImageLoader(okHttpClient: OkHttpClient) {

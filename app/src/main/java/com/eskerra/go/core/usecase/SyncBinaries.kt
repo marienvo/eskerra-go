@@ -28,7 +28,7 @@ class SyncBinaries(
         val settings = loadVaultSettings(workspaceRoot).getOrElse {
             return BinarySyncSummary.Failed(it.message ?: "Failed to read vault settings.")
         }
-        if (!R2Settings.isVaultR2PlaylistConfigured(settings)) {
+        if (!R2Settings.isVaultR2Configured(settings)) {
             return BinarySyncSummary.NotConfigured
         }
         val config = settings.r2 ?: return BinarySyncSummary.NotConfigured

@@ -67,26 +67,4 @@ class SyncPathClassifierTest {
         assertEquals(setOf(".git/HEAD"), partition.unsafePaths)
     }
 
-    @Test
-    fun isPodcastPath_acceptsStubFile() {
-        assertTrue(SyncPathClassifier.isPodcastPath("General/2026 News - podcasts.md"))
-    }
-
-    @Test
-    fun isPodcastPath_acceptsRssCacheFile() {
-        val name = "General/" + String(Character.toChars(0x1F4FB)) + " Daily News.md"
-        assertTrue(SyncPathClassifier.isPodcastPath(name))
-    }
-
-    @Test
-    fun isPodcastPath_rejectsRegularGeneralNote() {
-        assertFalse(SyncPathClassifier.isPodcastPath("General/Some note.md"))
-    }
-
-    @Test
-    fun isPodcastPath_rejectsNonGeneralAndUnsafePaths() {
-        assertFalse(SyncPathClassifier.isPodcastPath("Inbox/2026 News - podcasts.md"))
-        assertFalse(SyncPathClassifier.isPodcastPath("General/../escape - podcasts.md"))
-        assertFalse(SyncPathClassifier.isPodcastPath(".git/config"))
-    }
 }

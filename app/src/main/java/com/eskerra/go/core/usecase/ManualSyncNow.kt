@@ -29,7 +29,7 @@ import kotlinx.coroutines.withContext
  * Vault sync commits all safe local working-tree changes, integrates remote changes
  * (fast-forward when behind; auto-merge with conflict sidecars when diverged), and
  * pushes. Recovers from interrupted Git operations before proceeding. Shares one
- * [GitSyncMutex] with podcast auto-sync. See [specs/architecture/sync-hardening-and-recovery.md].
+ * [GitSyncMutex]. See [specs/architecture/sync-hardening-and-recovery.md].
  */
 class ManualSyncNow(
     private val remoteSyncRepository: RemoteSyncRepository,

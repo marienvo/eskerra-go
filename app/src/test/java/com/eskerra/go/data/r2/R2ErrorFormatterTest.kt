@@ -8,7 +8,7 @@ class R2ErrorFormatterTest {
     @Test
     fun `formats status without an xml code`() {
         assertEquals(
-            "R2 GET playlist.json failed: HTTP 500",
+            "R2 GET object failed: HTTP 500",
             R2ErrorFormatter.format(R2Verb.READ, 500, "internal error")
         )
     }
@@ -17,7 +17,7 @@ class R2ErrorFormatterTest {
     fun `formats status with an xml code but no hint`() {
         val body = "<Error><Code>NoSuchBucket</Code></Error>"
         assertEquals(
-            "R2 PUT playlist.json failed: HTTP 404 (NoSuchBucket)",
+            "R2 PUT object failed: HTTP 404 (NoSuchBucket)",
             R2ErrorFormatter.format(R2Verb.WRITE, 404, body)
         )
     }
@@ -26,7 +26,7 @@ class R2ErrorFormatterTest {
     fun `appends read hint with eu note on access denied`() {
         val body = "<Error><Code>AccessDenied</Code></Error>"
         assertEquals(
-            "R2 GET playlist.json failed: HTTP 403 (AccessDenied). " +
+            "R2 GET object failed: HTTP 403 (AccessDenied). " +
                 "Grant Object Read on the R2 S3 API token for this bucket " +
                 "(Cloudflare: R2 → Manage R2 API Tokens). " +
                 "EU data location buckets need jurisdiction \"EU\" in settings " +
@@ -39,7 +39,7 @@ class R2ErrorFormatterTest {
     fun `appends write hint on access denied`() {
         val body = "<Error><Code>AccessDenied</Code></Error>"
         assertEquals(
-            "R2 PUT playlist.json failed: HTTP 403 (AccessDenied). " +
+            "R2 PUT object failed: HTTP 403 (AccessDenied). " +
                 "Grant Object Write on the R2 S3 API token for this bucket. " +
                 "EU data location buckets need jurisdiction \"EU\" in settings " +
                 "(or the .eu.r2.cloudflarestorage.com endpoint).",
@@ -51,7 +51,7 @@ class R2ErrorFormatterTest {
     fun `appends delete hint on access denied`() {
         val body = "<Error><Code>AccessDenied</Code></Error>"
         assertEquals(
-            "R2 DELETE playlist.json failed: HTTP 403 (AccessDenied). " +
+            "R2 DELETE object failed: HTTP 403 (AccessDenied). " +
                 "Grant Object Delete on the R2 S3 API token for this bucket. " +
                 "EU data location buckets need jurisdiction \"EU\" in settings " +
                 "(or the .eu.r2.cloudflarestorage.com endpoint).",
