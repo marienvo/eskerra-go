@@ -3,8 +3,8 @@ package com.eskerra.go.data.notes
 import com.eskerra.go.core.markdown.PreparedMarkdown
 import com.eskerra.go.core.markdown.prepareVaultMarkdown
 import com.eskerra.go.core.repository.ParsedMarkdownCachePort
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
