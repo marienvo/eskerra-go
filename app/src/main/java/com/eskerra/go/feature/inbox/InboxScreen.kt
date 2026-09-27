@@ -36,17 +36,14 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.eskerra.go.app.HideShellTopScrim
 import com.eskerra.go.app.LocalShellChromeInsets
 import com.eskerra.go.app.ShellChromeButtonSize
 import com.eskerra.go.app.ShellChromeCenterFromStatusBar
+import com.eskerra.go.app.ShellTopScrimReveal
 import com.eskerra.go.core.datetime.RelativeCalendarLabel
 import com.eskerra.go.core.inbox.InboxTileColor
 import com.eskerra.go.core.model.NoteId
@@ -106,8 +103,16 @@ fun InboxScreen(
         }
     }
 
-    val atTop by remember { derivedStateOf { !listState.canScrollBackward } }
-    HideShellTopScrim(hidden = atTop)
+    // The hub header (item 0) is taller than the top scrim, so its scroll offset while item 0 is
+    // still the first visible item tracks the scrim's reveal distance 1:1; past that, it's fully
+    // revealed. This makes the scrim slide into place at exactly scroll speed, not on a timer.
+    ShellTopScrimReveal {
+        if (listState.firstVisibleItemIndex > 0) {
+            Float.MAX_VALUE
+        } else {
+            listState.firstVisibleItemScrollOffset.toFloat()
+        }
+    }
 
     PullToRefreshBox(
         isRefreshing = isSyncing,
