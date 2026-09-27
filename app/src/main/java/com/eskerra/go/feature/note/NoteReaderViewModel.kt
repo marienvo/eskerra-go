@@ -53,7 +53,9 @@ class NoteReaderViewModel(
                         path = document.content.path.value,
                         canEdit = document.note.isInbox,
                         document = document,
-                        bodyMarkdown = VaultMarkdownPreprocess.stripTitleHeading(document.content.markdown)
+                        bodyMarkdown = VaultMarkdownPreprocess.stripTitleHeading(
+                            document.content.markdown
+                        )
                     )
                     schedulePrefetch(document)
                 },

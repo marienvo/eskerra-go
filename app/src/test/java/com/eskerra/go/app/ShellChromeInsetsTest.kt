@@ -41,7 +41,10 @@ class ShellChromeInsetsTest {
 
     @Test
     fun shellChromeCenterFromStatusBar_isButtonTopPlusHalfButtonHeight() {
-        assertEquals(ShellChromeButtonTop + ShellChromeButtonSize / 2, ShellChromeCenterFromStatusBar)
+        assertEquals(
+            ShellChromeButtonTop + ShellChromeButtonSize / 2,
+            ShellChromeCenterFromStatusBar
+        )
         assertEquals(29.dp, ShellChromeCenterFromStatusBar)
     }
 }

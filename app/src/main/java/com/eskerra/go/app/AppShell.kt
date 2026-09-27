@@ -78,7 +78,12 @@ fun AppShell(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .statusBarsPadding()
-                    .padding(start = 16.dp, end = 16.dp, top = ShellChromeButtonTop, bottom = 16.dp),
+                    .padding(
+                        start = 16.dp,
+                        end = 16.dp,
+                        top = ShellChromeButtonTop,
+                        bottom = 16.dp
+                    ),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
