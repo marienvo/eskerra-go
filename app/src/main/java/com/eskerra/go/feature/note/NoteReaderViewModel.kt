@@ -3,6 +3,7 @@ package com.eskerra.go.feature.note
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.eskerra.go.core.markdown.PrefetchLinkTargets
 import com.eskerra.go.core.markdown.VaultMarkdownPreprocess
 import com.eskerra.go.core.model.NoteContentError
 import com.eskerra.go.core.model.NoteContentException
@@ -11,7 +12,7 @@ import com.eskerra.go.core.model.NoteReaderDocument
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.ParsedMarkdownCachePort
 import com.eskerra.go.core.usecase.LoadNoteForReading
-import com.eskerra.go.core.usecase.PrefetchLinkedNotes
+import com.eskerra.go.core.usecase.NotePrefetchScheduler
 import com.eskerra.go.data.notes.ParsedMarkdownCache
 import java.io.File
 import kotlinx.coroutines.Job
@@ -26,14 +27,14 @@ class NoteReaderViewModel(
     private val noteId: NoteId,
     private val loadNoteForReading: LoadNoteForReading,
     private val parsedMarkdownCache: ParsedMarkdownCachePort = ParsedMarkdownCache(),
-    private val prefetchLinkedNotes: PrefetchLinkedNotes? = null
+    private val notePrefetchScheduler: NotePrefetchScheduler? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<NoteReaderUiState>(NoteReaderUiState.Loading)
     val uiState: StateFlow<NoteReaderUiState> = _uiState.asStateFlow()
 
     private var loadJob: Job? = null
-    private var prefetchJob: Job? = null
+    private var currentDocument: NoteReaderDocument? = null
 
     init {
         load()
@@ -46,7 +47,7 @@ class NoteReaderViewModel(
 
     private fun load() {
         loadJob?.cancel()
-        prefetchJob?.cancel()
+        currentDocument = null
         loadJob = viewModelScope.launch {
             loadNoteForReading(config, filesDir, noteId, viewModelScope).fold(
                 onSuccess = { document ->
@@ -66,7 +67,8 @@ class NoteReaderViewModel(
                         bodyMarkdown = bodyMarkdown,
                         preparedBody = preparedBody
                     )
-                    schedulePrefetch(document)
+                    currentDocument = document
+                    schedulePrefetch(document, visibleStartFraction = 0f, visibleEndFraction = 0f)
                 },
                 onFailure = { error ->
                     _uiState.value = mapFailure(error)
@@ -76,16 +78,41 @@ class NoteReaderViewModel(
     }
 
     /**
-     * Warms linked-note content in the background once the open note is shown. Runs in
-     * [viewModelScope] so it is cancelled when the reader is disposed; a fresh [load] cancels any
-     * prior prefetch first.
+     * Reports which fraction of this note's body is currently scrolled into view (`0f` = top,
+     * `1f` = bottom), so the shared [NotePrefetchScheduler] batch can be reprioritized toward the
+     * links actually on screen as the user scrolls. The caller (`NoteScreen`) debounces this; it is
+     * a no-op before the note has finished loading.
      */
-    private fun schedulePrefetch(document: NoteReaderDocument) {
-        val prefetch = prefetchLinkedNotes ?: return
-        prefetchJob?.cancel()
-        prefetchJob = viewModelScope.launch {
-            prefetch(config, filesDir, document)
-        }
+    fun onViewportChanged(visibleStartFraction: Float, visibleEndFraction: Float) {
+        val document = currentDocument ?: return
+        schedulePrefetch(document, visibleStartFraction, visibleEndFraction)
+    }
+
+    /**
+     * (re)submits this note's linked notes to the shared, app-scoped [NotePrefetchScheduler] —
+     * ordered by distance to the visible window, closest first — replacing whatever batch was
+     * previously submitted (by this note or any other). The scheduler owns its own lifecycle, so
+     * this is a fire-and-forget call, not tied to [viewModelScope].
+     */
+    private fun schedulePrefetch(
+        document: NoteReaderDocument,
+        visibleStartFraction: Float,
+        visibleEndFraction: Float
+    ) {
+        val scheduler = notePrefetchScheduler ?: return
+        val targets = PrefetchLinkTargets.resolveWithOffsets(
+            markdown = document.content.markdown,
+            sourceNoteId = document.note.id,
+            registry = document.registry
+        )
+        if (targets.isEmpty()) return
+        val ordered = PrefetchLinkTargets.orderByViewport(
+            targets = targets,
+            markdownLength = document.content.markdown.length,
+            visibleStartFraction = visibleStartFraction,
+            visibleEndFraction = visibleEndFraction
+        )
+        scheduler.submit(config, filesDir, ordered)
     }
 
     private fun mapFailure(error: Throwable): NoteReaderUiState {
@@ -113,7 +140,7 @@ class NoteReaderViewModel(
             noteId: NoteId,
             loadNoteForReading: LoadNoteForReading,
             parsedMarkdownCache: ParsedMarkdownCachePort = ParsedMarkdownCache(),
-            prefetchLinkedNotes: PrefetchLinkedNotes? = null
+            notePrefetchScheduler: NotePrefetchScheduler? = null
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T = NoteReaderViewModel(
@@ -122,7 +149,7 @@ class NoteReaderViewModel(
                 noteId,
                 loadNoteForReading,
                 parsedMarkdownCache,
-                prefetchLinkedNotes
+                notePrefetchScheduler
             ) as T
         }
     }

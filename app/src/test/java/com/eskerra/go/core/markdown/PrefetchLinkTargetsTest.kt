@@ -124,4 +124,63 @@ class PrefetchLinkTargetsTest {
 
         assertEquals(listOf(second.id, first.id), result)
     }
+
+    @Test
+    fun resolveWithOffsets_reportsFirstSeenLinkStartOffset() {
+        val source = note("Notes/Source.md", "Source")
+        val target = note("Notes/Target.md", "Target")
+        val registry = registryOf(source, target)
+        val markdown = "Padding. [[Target]] and again [[Target]]."
+
+        val result = PrefetchLinkTargets.resolveWithOffsets(markdown, source.id, registry)
+
+        assertEquals(1, result.size)
+        assertEquals(target.id, result[0].noteId)
+        assertEquals(markdown.indexOf("[[Target]]"), result[0].sourceOffset)
+    }
+
+    @Test
+    fun orderByViewport_prioritizesTargetInsideVisibleWindow() {
+        val near = PrefetchLinkTargets.Target(NoteId("Near.md"), sourceOffset = 500)
+        val far = PrefetchLinkTargets.Target(NoteId("Far.md"), sourceOffset = 10)
+
+        val result = PrefetchLinkTargets.orderByViewport(
+            targets = listOf(far, near),
+            markdownLength = 1000,
+            visibleStartFraction = 0.45f,
+            visibleEndFraction = 0.55f
+        )
+
+        assertEquals(listOf(NoteId("Near.md"), NoteId("Far.md")), result)
+    }
+
+    @Test
+    fun orderByViewport_ordersByDistanceOutsideWindow() {
+        val closest = PrefetchLinkTargets.Target(NoteId("Closest.md"), sourceOffset = 600)
+        val furthest = PrefetchLinkTargets.Target(NoteId("Furthest.md"), sourceOffset = 900)
+
+        val result = PrefetchLinkTargets.orderByViewport(
+            targets = listOf(furthest, closest),
+            markdownLength = 1000,
+            visibleStartFraction = 0f,
+            visibleEndFraction = 0.1f
+        )
+
+        assertEquals(listOf(NoteId("Closest.md"), NoteId("Furthest.md")), result)
+    }
+
+    @Test
+    fun orderByViewport_fallsBackToIncomingOrder_whenLengthNotPositive() {
+        val a = PrefetchLinkTargets.Target(NoteId("A.md"), sourceOffset = 5)
+        val b = PrefetchLinkTargets.Target(NoteId("B.md"), sourceOffset = 1)
+
+        val result = PrefetchLinkTargets.orderByViewport(
+            targets = listOf(a, b),
+            markdownLength = 0,
+            visibleStartFraction = 0f,
+            visibleEndFraction = 1f
+        )
+
+        assertEquals(listOf(NoteId("A.md"), NoteId("B.md")), result)
+    }
 }

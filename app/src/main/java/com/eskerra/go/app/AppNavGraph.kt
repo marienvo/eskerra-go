@@ -31,7 +31,7 @@ import com.eskerra.go.core.usecase.LoadTodayHub
 import com.eskerra.go.core.usecase.LoadTodayHubRow
 import com.eskerra.go.core.usecase.LoadVaultSettings
 import com.eskerra.go.core.usecase.MaintainVaultSearchIndex
-import com.eskerra.go.core.usecase.PrefetchLinkedNotes
+import com.eskerra.go.core.usecase.NotePrefetchScheduler
 import com.eskerra.go.core.usecase.RepairVaultSearchIndex
 import com.eskerra.go.core.usecase.SaveLocalSettings
 import com.eskerra.go.core.usecase.SaveNote
@@ -41,6 +41,7 @@ import com.eskerra.go.core.usecase.SearchVault
 import com.eskerra.go.core.usecase.SyncBinaries
 import com.eskerra.go.core.usecase.TestRemoteConnection
 import com.eskerra.go.core.usecase.TouchVaultSearchPaths
+import com.eskerra.go.core.usecase.WarmNote
 import com.eskerra.go.feature.editor.NoteEditorScreen
 import com.eskerra.go.feature.editor.NoteEditorViewModel
 import com.eskerra.go.feature.inbox.InboxUiState
@@ -75,7 +76,8 @@ internal data class AppNavGraphContext(
     val inboxRefreshSignal: Int,
     val loadInboxSummaries: LoadInboxSummariesCached,
     val loadNoteForReading: LoadNoteForReading,
-    val prefetchLinkedNotes: PrefetchLinkedNotes,
+    val notePrefetchScheduler: NotePrefetchScheduler,
+    val warmNote: WarmNote,
     val deleteInboxNotes: DeleteInboxNotes,
     val loadEditableNote: LoadEditableNote,
     val saveNote: SaveNote,
@@ -118,6 +120,7 @@ internal fun NavGraphBuilder.homeGraph(ctx: AppNavGraphContext) {
                 loadTodayHubRow = ctx.loadTodayHubRow,
                 activeTodayHubStore = ctx.activeTodayHubStore,
                 todayHubSnapshotStore = ctx.todayHubSnapshotStore,
+                warmNote = ctx.warmNote,
                 workspaceRoot = ctx.workspaceRoot,
                 currentRoute = ctx.currentRoute,
                 entry = entry,
@@ -145,6 +148,9 @@ internal fun NavGraphBuilder.sharedDestinations(ctx: AppNavGraphContext) {
     ) { entry ->
         // Seed the shared view model when the route carries a pre-filled query (deep links, back stack).
         AppSearchRoute(
+            currentConfig = ctx.currentConfig,
+            filesDir = ctx.filesDir,
+            warmNote = ctx.warmNote,
             searchViewModel = ctx.searchViewModel,
             navController = ctx.navController,
             entry = entry
@@ -238,7 +244,7 @@ internal fun NavGraphBuilder.sharedDestinations(ctx: AppNavGraphContext) {
                 noteId = noteId,
                 loadNoteForReading = ctx.loadNoteForReading,
                 parsedMarkdownCache = parsedMarkdownCache,
-                prefetchLinkedNotes = ctx.prefetchLinkedNotes
+                notePrefetchScheduler = ctx.notePrefetchScheduler
             )
         )
         val readerState by noteReaderViewModel.uiState.collectAsState()
@@ -257,7 +263,13 @@ internal fun NavGraphBuilder.sharedDestinations(ctx: AppNavGraphContext) {
             onRetry = noteReaderViewModel::retry,
             onEdit = { ctx.navController.navigate(AppRoute.editor(noteId)) },
             onOpenInternalNote = { targetId: NoteId ->
-                ctx.navController.navigate(AppRoute.note(targetId))
+                ctx.scope.openNoteWithWarmBudget(
+                    ctx.warmNote,
+                    ctx.currentConfig,
+                    ctx.filesDir,
+                    ctx.navController,
+                    targetId
+                )
             },
             onOpenExternalUrl = { url: String ->
                 openExternalUrl(noteReaderContext, url)
@@ -268,7 +280,8 @@ internal fun NavGraphBuilder.sharedDestinations(ctx: AppNavGraphContext) {
             onNoteNotFound = { message: String ->
                 showNoteNotFoundToast(noteReaderContext, message)
             },
-            workspaceRoot = ctx.workspaceRoot
+            workspaceRoot = ctx.workspaceRoot,
+            onViewportChanged = noteReaderViewModel::onViewportChanged
         )
 
         val registry = (readerState as? NoteReaderUiState.Content)?.document?.registry
@@ -278,7 +291,13 @@ internal fun NavGraphBuilder.sharedDestinations(ctx: AppNavGraphContext) {
                 registry = registry,
                 onPickNote = { picked ->
                     ambiguousCandidates = null
-                    ctx.navController.navigate(AppRoute.note(picked))
+                    ctx.scope.openNoteWithWarmBudget(
+                        ctx.warmNote,
+                        ctx.currentConfig,
+                        ctx.filesDir,
+                        ctx.navController,
+                        picked
+                    )
                 },
                 onDismiss = { ambiguousCandidates = null }
             )

@@ -66,3 +66,43 @@ constructor — same pre-existing `File`-parameter violations, just under new ma
 and a `ColdStartTrace`-style capture to confirm launch-settled timing is unchanged. Whoever picks
 up a device for this should log `adb logcat` timestamps for note-open → first frame across a
 walk (home → hub link → 3–4 links deep → back to home) and fill in the numbers here.
+
+---
+
+## 2026-09-27 — PR 2: viewport-aware prefetch scheduler + "wait briefly, then switch" on tap
+
+**Problem observed (user report, continued).** A link tap always has delay comparable to "back".
+The user asked that links currently in view be preloaded so a tap has the best chance of an
+instant switch — prioritized by what's actually on screen, not just document order.
+
+**What PR 1 didn't fix.** `PrefetchLinkedNotes` ran inside each note's own `viewModelScope`, in
+document order, with no priority signal and no relationship to what was on screen. Because reader
+ViewModels stay alive on the back stack, forward navigation never cancelled a prior note's prefetch
+job, so several notes' prefetch batches could end up running (and competing for CPU) at once. A tap
+itself never waited for anything — it always painted `Loading` first on a miss, even a near-miss.
+
+**Changes.**
+- `PrefetchLinkTargets` gained `resolveWithOffsets` (candidates + the character offset of their
+  first link occurrence) and a pure `orderByViewport(targets, markdownLength, visibleStartFraction,
+  visibleEndFraction)` that ranks a target inside the visible window first, then by distance to it.
+- New `WarmNote` use case: the single "load content, warm parsed body" step, extracted so the
+  background scheduler and a direct tap warm exactly the same way (and so a tap landing on an
+  already-warming target does no redundant work — the caches themselves de-duplicate).
+- New `NotePrefetchScheduler`: one process-wide instance (wired once in `MainActivity`, not
+  per-note), concurrency 2. Every `submit` cancels whatever batch was previously running and starts
+  fresh — "the newest note always wins" — so switching notes, or scrolling to a different part of
+  one, immediately reprioritizes background work instead of piling it up. Replaces
+  `PrefetchLinkedNotes` (removed).
+- `NoteReaderViewModel` submits its open note's links ordered by `orderByViewport` and resubmits as
+  `NoteScreen` reports the top-of-viewport scroll fraction (debounced ~150ms via `snapshotFlow`).
+- New `NoteOpenGate.openNoteWithWarmBudget`: every note-opening tap in the app (a link inside a
+  note, an ambiguous-link pick, an inbox tile, a Today Hub cell link, a search result) now waits up
+  to 150ms for `WarmNote` on the target before navigating. An already-warm target (from prefetch or
+  a prior visit) returns near-instantly, so the budget is only ever spent on a genuine miss, and a
+  true miss still navigates once it elapses — the reader's `Loading` state covers the remainder.
+  Inbox notes are small enough that this budget is essentially never felt.
+
+**Not yet done.** Home-screen (Today Hub) prefetch after launch has settled — planned as PR 3, not
+built yet. On-device confirmation that link taps feel instant and that the 150ms budget never
+causes a *perceptible* stall on a genuine cold miss (it shouldn't — `Loading` already painted
+instantly before this change too, just with no chance of an atomic swap).

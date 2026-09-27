@@ -37,7 +37,7 @@ import com.eskerra.go.core.usecase.LoadTodayHub
 import com.eskerra.go.core.usecase.LoadTodayHubRow
 import com.eskerra.go.core.usecase.LoadVaultSettings
 import com.eskerra.go.core.usecase.MaintainVaultSearchIndex
-import com.eskerra.go.core.usecase.PrefetchLinkedNotes
+import com.eskerra.go.core.usecase.NotePrefetchScheduler
 import com.eskerra.go.core.usecase.ReconcileWorkspaceSyncBranch
 import com.eskerra.go.core.usecase.RefreshRemoteSyncStatus
 import com.eskerra.go.core.usecase.RepairVaultSearchIndex
@@ -51,6 +51,7 @@ import com.eskerra.go.core.usecase.SyncBinaries
 import com.eskerra.go.core.usecase.TestRemoteConnection
 import com.eskerra.go.core.usecase.TouchVaultSearchPaths
 import com.eskerra.go.core.usecase.UpdateSyncToken
+import com.eskerra.go.core.usecase.WarmNote
 import com.eskerra.go.data.workspace.WorkspacePaths
 import com.eskerra.go.feature.inbox.InboxUiState
 import com.eskerra.go.feature.sync.AppSyncViewModel
@@ -65,7 +66,8 @@ fun App(
     launchSettled: Boolean,
     loadInboxSummaries: LoadInboxSummariesCached,
     loadNoteForReading: LoadNoteForReading,
-    prefetchLinkedNotes: PrefetchLinkedNotes,
+    notePrefetchScheduler: NotePrefetchScheduler,
+    warmNote: WarmNote,
     createInboxNote: CreateInboxNote,
     deleteInboxNotes: DeleteInboxNotes,
     loadEditableNote: LoadEditableNote,
@@ -208,7 +210,8 @@ fun App(
             inboxRefreshSignal = inboxRefreshSignal,
             loadInboxSummaries = loadInboxSummaries,
             loadNoteForReading = loadNoteForReading,
-            prefetchLinkedNotes = prefetchLinkedNotes,
+            notePrefetchScheduler = notePrefetchScheduler,
+            warmNote = warmNote,
             deleteInboxNotes = deleteInboxNotes,
             loadEditableNote = loadEditableNote,
             saveNote = saveNote,

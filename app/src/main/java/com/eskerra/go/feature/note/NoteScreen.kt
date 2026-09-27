@@ -11,6 +11,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -21,6 +23,8 @@ import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NoteRegistry
 import com.eskerra.go.ui.markdown.VaultMarkdownView
 import java.io.File
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
 
 /**
  * Stateless read-only note reader. Renders precomputed [NoteReaderUiState] through the shared §8
@@ -39,6 +43,10 @@ fun NoteScreen(
     onAmbiguousWikiLink: (List<NoteId>, String) -> Unit,
     onNoteNotFound: (String) -> Unit = {},
     workspaceRoot: File? = null,
+    onViewportChanged: (
+        visibleStartFraction: Float,
+        visibleEndFraction: Float
+    ) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
     Box(modifier = modifier.fillMaxSize()) {
@@ -57,7 +65,8 @@ fun NoteScreen(
                 onOpenExternalUrl = onOpenExternalUrl,
                 onAmbiguousWikiLink = onAmbiguousWikiLink,
                 onNoteNotFound = onNoteNotFound,
-                workspaceRoot = workspaceRoot
+                workspaceRoot = workspaceRoot,
+                onViewportChanged = onViewportChanged
             )
             NoteReaderUiState.NotFound -> NoteReaderMessage(
                 title = "Note not found",
@@ -99,13 +108,26 @@ private fun NoteReaderContent(
     onOpenExternalUrl: (String) -> Unit,
     onAmbiguousWikiLink: (List<NoteId>, String) -> Unit,
     onNoteNotFound: (String) -> Unit,
-    workspaceRoot: File?
+    workspaceRoot: File?,
+    onViewportChanged: (visibleStartFraction: Float, visibleEndFraction: Float) -> Unit
 ) {
     val chrome = LocalShellChromeInsets.current
+    val scrollState = rememberScrollState()
+    // Reports the top-of-viewport fraction (a point, not a window — cheap and close enough to
+    // reorder background prefetch toward what's on screen) so link prefetch follows scrolling.
+    // Debounced: this is a priority hint, not something that needs to react every frame.
+    LaunchedEffect(scrollState) {
+        snapshotFlow {
+            if (scrollState.maxValue > 0) scrollState.value.toFloat() / scrollState.maxValue else 0f
+        }
+            .distinctUntilChanged()
+            .debounce(150)
+            .collect { fraction -> onViewportChanged(fraction, fraction) }
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scrollState)
             .padding(top = chrome.top, bottom = chrome.bottom, start = 16.dp, end = 16.dp)
     ) {
         Text(

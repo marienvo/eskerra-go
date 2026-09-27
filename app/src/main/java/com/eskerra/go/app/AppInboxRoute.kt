@@ -26,6 +26,7 @@ import com.eskerra.go.core.usecase.LoadInboxSummariesCached
 import com.eskerra.go.core.usecase.LoadTodayHub
 import com.eskerra.go.core.usecase.LoadTodayHubRow
 import com.eskerra.go.core.usecase.TouchVaultSearchPaths
+import com.eskerra.go.core.usecase.WarmNote
 import com.eskerra.go.feature.inbox.InboxScreen
 import com.eskerra.go.feature.inbox.InboxUiState
 import com.eskerra.go.feature.inbox.InboxViewModel
@@ -46,6 +47,7 @@ internal fun AppInboxRoute(
     loadTodayHubRow: LoadTodayHubRow,
     activeTodayHubStore: ActiveTodayHubStore,
     todayHubSnapshotStore: TodayHubSnapshotStore,
+    warmNote: WarmNote,
     workspaceRoot: File?,
     currentRoute: String?,
     entry: NavBackStackEntry,
@@ -160,7 +162,7 @@ internal fun AppInboxRoute(
         onPullToRefreshSync = appSyncViewModel::syncFromPull,
         onRetry = inboxViewModel::refresh,
         onNoteClick = { noteId: NoteId ->
-            navController.navigate(AppRoute.note(noteId))
+            scope.openNoteWithWarmBudget(warmNote, currentConfig, filesDir, navController, noteId)
         },
         onAvatarClick = inboxViewModel::toggleSelection,
         onClearSelection = inboxViewModel::clearSelection,
@@ -174,7 +176,13 @@ internal fun AppInboxRoute(
                 onNextWeek = todayHubViewModel::nextWeek,
                 onRetry = todayHubViewModel::retry,
                 onOpenInternalNote = { targetId ->
-                    navController.navigate(AppRoute.note(targetId))
+                    scope.openNoteWithWarmBudget(
+                        warmNote,
+                        currentConfig,
+                        filesDir,
+                        navController,
+                        targetId
+                    )
                 },
                 onOpenExternalUrl = { url -> openExternalUrl(context, url) },
                 onAmbiguousWikiLink = { candidates, _ -> ambiguousCandidates = candidates },
@@ -192,7 +200,13 @@ internal fun AppInboxRoute(
             registry = registry,
             onPickNote = { picked ->
                 ambiguousCandidates = null
-                navController.navigate(AppRoute.note(picked))
+                scope.openNoteWithWarmBudget(
+                    warmNote,
+                    currentConfig,
+                    filesDir,
+                    navController,
+                    picked
+                )
             },
             onDismiss = { ambiguousCandidates = null }
         )

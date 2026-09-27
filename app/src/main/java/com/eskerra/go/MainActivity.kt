@@ -34,7 +34,7 @@ import com.eskerra.go.core.usecase.LoadTodayHub
 import com.eskerra.go.core.usecase.LoadTodayHubRow
 import com.eskerra.go.core.usecase.LoadVaultSettings
 import com.eskerra.go.core.usecase.MaintainVaultSearchIndex
-import com.eskerra.go.core.usecase.PrefetchLinkedNotes
+import com.eskerra.go.core.usecase.NotePrefetchScheduler
 import com.eskerra.go.core.usecase.RepairVaultSearchIndex
 import com.eskerra.go.core.usecase.SaveLocalSettings
 import com.eskerra.go.core.usecase.SaveNote
@@ -44,6 +44,7 @@ import com.eskerra.go.core.usecase.SearchVault
 import com.eskerra.go.core.usecase.TestRemoteConnection
 import com.eskerra.go.core.usecase.TouchVaultSearchPaths
 import com.eskerra.go.core.usecase.UpdateSyncToken
+import com.eskerra.go.core.usecase.WarmNote
 import com.eskerra.go.data.git.JGitWorkspaceRepository
 import com.eskerra.go.data.notes.FileInboxSnapshotStore
 import com.eskerra.go.data.notes.FileNoteWriteRepository
@@ -107,10 +108,11 @@ class MainActivity : ComponentActivity() {
             registryCache = noteRegistryCache,
             contentRepository = noteContentCache
         )
-        val prefetchLinkedNotes = PrefetchLinkedNotes(
+        val warmNote = WarmNote(
             contentCache = noteContentCache,
             parsedMarkdownCache = parsedMarkdownCache
         )
+        val notePrefetchScheduler = NotePrefetchScheduler(warmNote = warmNote)
         val createInboxNote = CreateInboxNote(
             writeRepository = noteWriteRepository,
             registryCache = noteRegistryCache,
@@ -199,7 +201,8 @@ class MainActivity : ComponentActivity() {
                 parsedMarkdownCache = parsedMarkdownCache,
                 loadInboxSummaries = loadInboxSummaries,
                 loadNoteForReading = loadNoteForReading,
-                prefetchLinkedNotes = prefetchLinkedNotes,
+                notePrefetchScheduler = notePrefetchScheduler,
+                warmNote = warmNote,
                 createInboxNote = createInboxNote,
                 deleteInboxNotes = deleteInboxNotes,
                 loadEditableNote = loadEditableNote,
