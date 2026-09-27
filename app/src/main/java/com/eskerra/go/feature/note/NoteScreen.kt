@@ -109,7 +109,7 @@ private fun NoteReaderContent(
             text = title,
             style = MaterialTheme.typography.headlineMedium,
             color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(bottom = 4.dp)
+            modifier = Modifier.padding(top = 10.dp, bottom = 4.dp)
         )
         Text(
             text = path,
