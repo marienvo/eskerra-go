@@ -3,6 +3,7 @@ package com.eskerra.go.feature.note
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.eskerra.go.core.markdown.VaultMarkdownPreprocess
 import com.eskerra.go.core.model.NoteContentError
 import com.eskerra.go.core.model.NoteContentException
 import com.eskerra.go.core.model.NoteId
@@ -51,7 +52,10 @@ class NoteReaderViewModel(
                         noteId = document.note.id,
                         path = document.content.path.value,
                         canEdit = document.note.isInbox,
-                        document = document
+                        document = document,
+                        bodyMarkdown = VaultMarkdownPreprocess.stripTitleHeading(
+                            document.content.markdown
+                        )
                     )
                     schedulePrefetch(document)
                 },

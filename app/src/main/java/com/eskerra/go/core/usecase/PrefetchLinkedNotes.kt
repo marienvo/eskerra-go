@@ -1,6 +1,7 @@
 package com.eskerra.go.core.usecase
 
 import com.eskerra.go.core.markdown.PrefetchLinkTargets
+import com.eskerra.go.core.markdown.VaultMarkdownPreprocess
 import com.eskerra.go.core.model.NoteReaderDocument
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.NoteContentCachePort
@@ -17,8 +18,9 @@ import kotlinx.coroutines.withContext
 
 /**
  * Warms the content cache with the notes linked from the open note, so a wiki-link tap reads
- * from memory instead of disk. Also pre-parses each target body into the parsed-markdown cache
- * used by [com.eskerra.go.ui.markdown.VaultMarkdownView], so a warm link open paints atomically.
+ * from memory instead of disk. Also pre-parses each target body — with its leading title heading
+ * stripped, matching what the reader actually renders — into the parsed-markdown cache used by
+ * [com.eskerra.go.ui.markdown.VaultMarkdownView], so a warm link open paints atomically.
  *
  * The registry is already cached, so resolution is in-memory; only the link targets' content is
  * read, then parsed.
@@ -62,7 +64,9 @@ class PrefetchLinkedNotes(
                             val content = contentCache.load(config, filesDir, noteId).getOrNull()
                                 ?: return@withPermit
                             withContext(parseDispatcher) {
-                                parsedMarkdownCache.warm(content.markdown)
+                                parsedMarkdownCache.warm(
+                                    VaultMarkdownPreprocess.stripTitleHeading(content.markdown)
+                                )
                             }
                         }
                     }

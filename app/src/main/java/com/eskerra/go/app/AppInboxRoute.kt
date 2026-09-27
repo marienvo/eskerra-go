@@ -99,7 +99,7 @@ internal fun AppInboxRoute(
     val isDeleting by inboxViewModel.isDeleting.collectAsState()
     val deleteError by inboxViewModel.deleteError.collectAsState()
     val todayHubState by todayHubViewModel.uiState.collectAsState()
-    val syncSpinnerVisible by appSyncViewModel.syncSpinnerVisible.collectAsState()
+    val pullRefreshing by appSyncViewModel.pullRefreshing.collectAsState()
 
     LaunchedEffect(inboxState) {
         onInboxUiStateChanged(inboxState)
@@ -156,8 +156,8 @@ internal fun AppInboxRoute(
         selectedNoteIds = selectedNoteIds,
         isDeleting = isDeleting,
         deleteError = deleteError,
-        isSyncing = syncSpinnerVisible,
-        onPullToRefreshSync = appSyncViewModel::syncNow,
+        isSyncing = pullRefreshing,
+        onPullToRefreshSync = appSyncViewModel::syncFromPull,
         onRetry = inboxViewModel::refresh,
         onNoteClick = { noteId: NoteId ->
             navController.navigate(AppRoute.note(noteId))

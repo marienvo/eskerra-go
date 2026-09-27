@@ -250,7 +250,6 @@ internal fun NavGraphBuilder.sharedDestinations(ctx: AppNavGraphContext) {
         NoteScreen(
             state = readerState,
             onRetry = noteReaderViewModel::retry,
-            onBack = { ctx.navController.popBackStack() },
             onEdit = { ctx.navController.navigate(AppRoute.editor(noteId)) },
             onOpenInternalNote = { targetId: NoteId ->
                 ctx.navController.navigate(AppRoute.note(targetId))

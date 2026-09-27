@@ -11,7 +11,9 @@ sealed interface NoteReaderUiState {
         val noteId: NoteId,
         val path: String,
         val canEdit: Boolean,
-        val document: NoteReaderDocument
+        val document: NoteReaderDocument,
+        /** [document]'s markdown with the leading `# ` title heading removed (already shown as [title]). */
+        val bodyMarkdown: String
     ) : NoteReaderUiState
 
     data object NotFound : NoteReaderUiState

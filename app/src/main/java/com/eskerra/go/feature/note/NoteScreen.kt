@@ -7,11 +7,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -28,12 +24,14 @@ import java.io.File
 /**
  * Stateless read-only note reader. Renders precomputed [NoteReaderUiState] through the shared §8
  * markdown renderer and reports navigation through callbacks only.
+ *
+ * Back navigation is a floating shell button (see `AppShell`'s `onBack`), not part of this
+ * screen's content, so the whole note scrolls underneath it and the hamburger.
  */
 @Composable
 fun NoteScreen(
     state: NoteReaderUiState,
     onRetry: () -> Unit,
-    onBack: () -> Unit,
     onEdit: () -> Unit,
     onOpenInternalNote: (NoteId) -> Unit,
     onOpenExternalUrl: (String) -> Unit,
@@ -42,30 +40,14 @@ fun NoteScreen(
     workspaceRoot: File? = null,
     modifier: Modifier = Modifier
 ) {
-    val chrome = LocalShellChromeInsets.current
-    Column(modifier = modifier.fillMaxSize()) {
-        IconButton(
-            onClick = onBack,
-            modifier = Modifier.padding(
-                top = chrome.top,
-                start = 16.dp,
-                end = 16.dp
-            )
-        ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Back",
-                tint = MaterialTheme.colorScheme.onSurface
-            )
-        }
-
+    Box(modifier = modifier.fillMaxSize()) {
         when (state) {
             NoteReaderUiState.Loading -> NoteReaderLoading()
             is NoteReaderUiState.Content -> NoteReaderContent(
                 title = state.title,
                 path = state.path,
                 canEdit = state.canEdit,
-                markdown = state.document.content.markdown,
+                markdown = state.bodyMarkdown,
                 registry = state.document.registry,
                 sourceNoteId = state.document.note.id,
                 onEdit = onEdit,
@@ -121,13 +103,13 @@ private fun NoteReaderContent(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(bottom = chrome.bottom, start = 16.dp, end = 16.dp)
+            .padding(top = chrome.top, bottom = chrome.bottom, start = 16.dp, end = 16.dp)
     ) {
         Text(
             text = title,
             style = MaterialTheme.typography.headlineMedium,
             color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(bottom = 4.dp)
+            modifier = Modifier.padding(top = 10.dp, bottom = 4.dp)
         )
         Text(
             text = path,
@@ -164,7 +146,7 @@ private fun NoteReaderMessage(title: String, body: String, onRetry: (() -> Unit)
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(bottom = chrome.bottom, start = 16.dp, end = 16.dp),
+            .padding(top = chrome.top, bottom = chrome.bottom, start = 16.dp, end = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
