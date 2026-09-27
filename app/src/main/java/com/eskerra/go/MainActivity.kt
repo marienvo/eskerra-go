@@ -34,7 +34,7 @@ import com.eskerra.go.core.usecase.LoadTodayHub
 import com.eskerra.go.core.usecase.LoadTodayHubRow
 import com.eskerra.go.core.usecase.LoadVaultSettings
 import com.eskerra.go.core.usecase.MaintainVaultSearchIndex
-import com.eskerra.go.core.usecase.PrefetchLinkedNotes
+import com.eskerra.go.core.usecase.NotePrefetchScheduler
 import com.eskerra.go.core.usecase.RepairVaultSearchIndex
 import com.eskerra.go.core.usecase.SaveLocalSettings
 import com.eskerra.go.core.usecase.SaveNote
@@ -44,11 +44,13 @@ import com.eskerra.go.core.usecase.SearchVault
 import com.eskerra.go.core.usecase.TestRemoteConnection
 import com.eskerra.go.core.usecase.TouchVaultSearchPaths
 import com.eskerra.go.core.usecase.UpdateSyncToken
+import com.eskerra.go.core.usecase.WarmNote
 import com.eskerra.go.data.git.JGitWorkspaceRepository
 import com.eskerra.go.data.notes.FileInboxSnapshotStore
 import com.eskerra.go.data.notes.FileNoteWriteRepository
 import com.eskerra.go.data.notes.ParsedMarkdownCache
 import com.eskerra.go.data.perf.ColdStartTrace
+import com.eskerra.go.data.perf.NoteNavTrace
 import com.eskerra.go.data.search.SqliteVaultSearchRepository
 import com.eskerra.go.data.share.OkHttpPageTitleFetcher
 import com.eskerra.go.data.sync.SyncRuntimeProvider
@@ -107,10 +109,18 @@ class MainActivity : ComponentActivity() {
             registryCache = noteRegistryCache,
             contentRepository = noteContentCache
         )
-        val prefetchLinkedNotes = PrefetchLinkedNotes(
+        val warmNote = WarmNote(
             contentCache = noteContentCache,
-            parsedMarkdownCache = parsedMarkdownCache
+            parsedMarkdownCache = parsedMarkdownCache,
+            onWarmed = { warmedNoteId, contentMs, parseMs, loaded ->
+                NoteNavTrace.log(
+                    "warm.done",
+                    "noteId=${warmedNoteId.value} loaded=$loaded " +
+                        "contentMs=$contentMs parseMs=$parseMs"
+                )
+            }
         )
+        val notePrefetchScheduler = NotePrefetchScheduler(warmNote = warmNote)
         val createInboxNote = CreateInboxNote(
             writeRepository = noteWriteRepository,
             registryCache = noteRegistryCache,
@@ -199,7 +209,8 @@ class MainActivity : ComponentActivity() {
                 parsedMarkdownCache = parsedMarkdownCache,
                 loadInboxSummaries = loadInboxSummaries,
                 loadNoteForReading = loadNoteForReading,
-                prefetchLinkedNotes = prefetchLinkedNotes,
+                notePrefetchScheduler = notePrefetchScheduler,
+                warmNote = warmNote,
                 createInboxNote = createInboxNote,
                 deleteInboxNotes = deleteInboxNotes,
                 loadEditableNote = loadEditableNote,

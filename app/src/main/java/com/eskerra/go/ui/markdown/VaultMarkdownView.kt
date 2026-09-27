@@ -1,7 +1,6 @@
 package com.eskerra.go.ui.markdown
 
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -10,11 +9,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.eskerra.go.core.markdown.PreparedMarkdown
-import com.eskerra.go.core.markdown.PreparedSegment
 import com.eskerra.go.core.markdown.VaultReadonlyLink
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NoteRegistry
-import com.mikepenz.markdown.compose.Markdown
 import com.mikepenz.markdown.m3.markdownColor
 import java.io.File
 import java.time.LocalDateTime
@@ -36,6 +33,10 @@ import java.time.LocalDateTime
  *   cells, whose read-only representation mirrors the source's line-based editor.
  * @param onNoteNotFound called when a tapped link cannot be resolved; message reflects [indexStatus]
  *   ("Note not found", "Still indexing vault", "Vault index unavailable").
+ * @param preparedOverride when the caller already prepared [markdown] before publishing its state
+ *   (e.g. [com.eskerra.go.feature.note.NoteReaderViewModel]), pass it here to render directly:
+ *   this skips the cache lookup and its [LaunchedEffect], so there is no risk of a stray recompose
+ *   showing stale content from a previous [markdown] value.
  */
 @Composable
 fun VaultMarkdownView(
@@ -49,15 +50,21 @@ fun VaultMarkdownView(
     workspaceRoot: File? = null,
     sourceNoteId: NoteId? = null,
     preserveLineBreaks: Boolean = false,
-    onNoteNotFound: (String) -> Unit = {}
+    onNoteNotFound: (String) -> Unit = {},
+    preparedOverride: PreparedMarkdown? = null
 ) {
     val now = remember { LocalDateTime.now() }
     val cache = LocalParsedMarkdownCache.current
-    // Seed from the warm cache so warm content paints on the first frame; otherwise the previous
-    // body stays visible (retain state) until the new body finishes parsing off the main thread.
-    var prepared by remember { mutableStateOf<PreparedMarkdown?>(cache.peek(markdown)) }
-    LaunchedEffect(markdown, cache) {
-        prepared = cache.get(markdown)
+    // Seed from the override or the warm cache so warm content paints on the first frame;
+    // otherwise the previous body stays visible (retain state) until the new body finishes parsing
+    // off the main thread.
+    var prepared by remember(markdown, preparedOverride) {
+        mutableStateOf(preparedOverride ?: cache.peek(markdown))
+    }
+    LaunchedEffect(markdown, cache, preparedOverride) {
+        if (preparedOverride == null) {
+            prepared = cache.get(markdown)
+        }
     }
 
     val colors = markdownColor()
@@ -90,27 +97,13 @@ fun VaultMarkdownView(
 
     Column(modifier) {
         prepared?.segments?.forEach { segment ->
-            when (segment) {
-                is PreparedSegment.Markdown -> Markdown(
-                    segment.state,
-                    colors = colors,
-                    typography = typography,
-                    annotator = annotator,
-                    components = components,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                is PreparedSegment.Callout -> CalloutCard(
-                    resolved = segment.resolved,
-                    title = segment.title,
-                    body = segment.body,
-                    colors = colors,
-                    typography = typography,
-                    workspaceRoot = workspaceRoot,
-                    sourceNoteId = sourceNoteId,
-                    annotator = annotator
-                )
-            }
+            VaultMarkdownSegmentContent(
+                segment = segment,
+                colors = colors,
+                typography = typography,
+                annotator = annotator,
+                components = components
+            )
         }
     }
 }

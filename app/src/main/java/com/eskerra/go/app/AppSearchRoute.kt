@@ -5,18 +5,27 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
 import com.eskerra.go.core.model.NoteId
+import com.eskerra.go.core.model.WorkspaceConfig
+import com.eskerra.go.core.usecase.WarmNote
 import com.eskerra.go.feature.search.SearchScreen
 import com.eskerra.go.feature.search.SearchViewModel
+import java.io.File
 
 @Composable
 internal fun AppSearchRoute(
+    currentConfig: WorkspaceConfig,
+    filesDir: File,
+    warmNote: WarmNote,
+    noteOpenGate: NoteOpenGate,
     searchViewModel: SearchViewModel,
     navController: NavHostController,
     entry: NavBackStackEntry
 ) {
+    val scope = rememberCoroutineScope()
     val routeQuery = remember(entry) {
         entry.arguments
             ?.getString(AppRoute.SEARCH_QUERY_ARG)
@@ -35,7 +44,16 @@ internal fun AppSearchRoute(
     SearchScreen(
         state = state,
         query = query,
-        onOpenNote = { noteId: NoteId -> navController.navigate(AppRoute.note(noteId)) },
+        onOpenNote = { noteId: NoteId ->
+            noteOpenGate.openNoteWithWarmBudget(
+                scope,
+                warmNote,
+                currentConfig,
+                filesDir,
+                navController,
+                noteId
+            )
+        },
         onRetryIndex = searchViewModel::retryIndex
     )
 }

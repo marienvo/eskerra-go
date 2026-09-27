@@ -77,6 +77,6 @@ class NoteContentCache(
     }
 
     companion object {
-        const val DEFAULT_SIZE = 16
+        const val DEFAULT_SIZE = 64
     }
 }

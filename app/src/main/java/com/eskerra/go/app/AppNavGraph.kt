@@ -5,6 +5,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -31,7 +32,7 @@ import com.eskerra.go.core.usecase.LoadTodayHub
 import com.eskerra.go.core.usecase.LoadTodayHubRow
 import com.eskerra.go.core.usecase.LoadVaultSettings
 import com.eskerra.go.core.usecase.MaintainVaultSearchIndex
-import com.eskerra.go.core.usecase.PrefetchLinkedNotes
+import com.eskerra.go.core.usecase.NotePrefetchScheduler
 import com.eskerra.go.core.usecase.RepairVaultSearchIndex
 import com.eskerra.go.core.usecase.SaveLocalSettings
 import com.eskerra.go.core.usecase.SaveNote
@@ -41,6 +42,7 @@ import com.eskerra.go.core.usecase.SearchVault
 import com.eskerra.go.core.usecase.SyncBinaries
 import com.eskerra.go.core.usecase.TestRemoteConnection
 import com.eskerra.go.core.usecase.TouchVaultSearchPaths
+import com.eskerra.go.core.usecase.WarmNote
 import com.eskerra.go.feature.editor.NoteEditorScreen
 import com.eskerra.go.feature.editor.NoteEditorViewModel
 import com.eskerra.go.feature.inbox.InboxUiState
@@ -57,6 +59,7 @@ import com.eskerra.go.feature.sync.SyncUiState
 import com.eskerra.go.feature.sync.VaultSettingsViewModel
 import com.eskerra.go.feature.todayhub.TodayHubUiState
 import com.eskerra.go.ui.markdown.AmbiguousWikiLinkSheet
+import com.eskerra.go.ui.markdown.LocalParsedMarkdownCache
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 
@@ -68,13 +71,15 @@ internal data class AppNavGraphContext(
     val currentRoute: String?,
     val navController: NavHostController,
     val scope: CoroutineScope,
+    val noteOpenGate: NoteOpenGate,
     val appSyncViewModel: AppSyncViewModel,
     val syncState: SyncUiState,
     val homeReselectSignal: Int,
     val inboxRefreshSignal: Int,
     val loadInboxSummaries: LoadInboxSummariesCached,
     val loadNoteForReading: LoadNoteForReading,
-    val prefetchLinkedNotes: PrefetchLinkedNotes,
+    val notePrefetchScheduler: NotePrefetchScheduler,
+    val warmNote: WarmNote,
     val deleteInboxNotes: DeleteInboxNotes,
     val loadEditableNote: LoadEditableNote,
     val saveNote: SaveNote,
@@ -117,6 +122,8 @@ internal fun NavGraphBuilder.homeGraph(ctx: AppNavGraphContext) {
                 loadTodayHubRow = ctx.loadTodayHubRow,
                 activeTodayHubStore = ctx.activeTodayHubStore,
                 todayHubSnapshotStore = ctx.todayHubSnapshotStore,
+                warmNote = ctx.warmNote,
+                noteOpenGate = ctx.noteOpenGate,
                 workspaceRoot = ctx.workspaceRoot,
                 currentRoute = ctx.currentRoute,
                 entry = entry,
@@ -144,6 +151,10 @@ internal fun NavGraphBuilder.sharedDestinations(ctx: AppNavGraphContext) {
     ) { entry ->
         // Seed the shared view model when the route carries a pre-filled query (deep links, back stack).
         AppSearchRoute(
+            currentConfig = ctx.currentConfig,
+            filesDir = ctx.filesDir,
+            warmNote = ctx.warmNote,
+            noteOpenGate = ctx.noteOpenGate,
             searchViewModel = ctx.searchViewModel,
             navController = ctx.navController,
             entry = entry
@@ -225,15 +236,20 @@ internal fun NavGraphBuilder.sharedDestinations(ctx: AppNavGraphContext) {
             navArgument(AppRoute.NOTE_ARG) { type = NavType.StringType }
         )
     ) { entry ->
+        val noteRouteScope = rememberCoroutineScope()
         val raw = entry.arguments?.getString(AppRoute.NOTE_ARG).orEmpty()
         val noteId = AppRoute.decodeNoteId(raw)
+        // Same instance the shared markdown renderers read from (provided at the AppRoot level), so
+        // a warm parse (from a prior visit or from prefetch) is visible here too.
+        val parsedMarkdownCache = LocalParsedMarkdownCache.current
         val noteReaderViewModel: NoteReaderViewModel = viewModel(
             factory = NoteReaderViewModel.factory(
                 config = ctx.currentConfig,
                 filesDir = ctx.filesDir,
                 noteId = noteId,
                 loadNoteForReading = ctx.loadNoteForReading,
-                prefetchLinkedNotes = ctx.prefetchLinkedNotes
+                parsedMarkdownCache = parsedMarkdownCache,
+                notePrefetchScheduler = ctx.notePrefetchScheduler
             )
         )
         val readerState by noteReaderViewModel.uiState.collectAsState()
@@ -252,7 +268,14 @@ internal fun NavGraphBuilder.sharedDestinations(ctx: AppNavGraphContext) {
             onRetry = noteReaderViewModel::retry,
             onEdit = { ctx.navController.navigate(AppRoute.editor(noteId)) },
             onOpenInternalNote = { targetId: NoteId ->
-                ctx.navController.navigate(AppRoute.note(targetId))
+                ctx.noteOpenGate.openNoteWithWarmBudget(
+                    noteRouteScope,
+                    ctx.warmNote,
+                    ctx.currentConfig,
+                    ctx.filesDir,
+                    ctx.navController,
+                    targetId
+                )
             },
             onOpenExternalUrl = { url: String ->
                 openExternalUrl(noteReaderContext, url)
@@ -263,7 +286,8 @@ internal fun NavGraphBuilder.sharedDestinations(ctx: AppNavGraphContext) {
             onNoteNotFound = { message: String ->
                 showNoteNotFoundToast(noteReaderContext, message)
             },
-            workspaceRoot = ctx.workspaceRoot
+            workspaceRoot = ctx.workspaceRoot,
+            onViewportChanged = noteReaderViewModel::onViewportChanged
         )
 
         val registry = (readerState as? NoteReaderUiState.Content)?.document?.registry
@@ -273,7 +297,14 @@ internal fun NavGraphBuilder.sharedDestinations(ctx: AppNavGraphContext) {
                 registry = registry,
                 onPickNote = { picked ->
                     ambiguousCandidates = null
-                    ctx.navController.navigate(AppRoute.note(picked))
+                    ctx.noteOpenGate.openNoteWithWarmBudget(
+                        noteRouteScope,
+                        ctx.warmNote,
+                        ctx.currentConfig,
+                        ctx.filesDir,
+                        ctx.navController,
+                        picked
+                    )
                 },
                 onDismiss = { ambiguousCandidates = null }
             )

@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.dp
 import com.eskerra.go.core.markdown.CalloutHeader
 import com.eskerra.go.core.model.NoteId
 import com.mikepenz.markdown.compose.Markdown
+import com.mikepenz.markdown.compose.components.MarkdownComponents
 import com.mikepenz.markdown.model.MarkdownAnnotator
 import com.mikepenz.markdown.model.MarkdownColors
 import com.mikepenz.markdown.model.MarkdownTypography
@@ -41,6 +42,29 @@ fun CalloutCard(
     sourceNoteId: NoteId? = null,
     annotator: MarkdownAnnotator? = null,
     preserveLineBreaks: Boolean = false
+) = CalloutCardContent(
+    resolved = resolved,
+    title = title,
+    body = body,
+    colors = colors,
+    typography = typography,
+    modifier = modifier,
+    annotator = annotator ?: markdownAnnotator(
+        config = markdownAnnotatorConfig(eolAsNewLine = preserveLineBreaks)
+    ),
+    components = vaultMarkdownComponents(workspaceRoot, sourceNoteId)
+)
+
+@Composable
+internal fun CalloutCardContent(
+    resolved: CalloutHeader.ResolvedCallout,
+    title: String,
+    body: State?,
+    colors: MarkdownColors,
+    typography: MarkdownTypography,
+    annotator: MarkdownAnnotator,
+    components: MarkdownComponents,
+    modifier: Modifier = Modifier
 ) {
     val accent = VaultMarkdownTokens.calloutAccent(resolved.color)
     Box(
@@ -63,10 +87,8 @@ fun CalloutCard(
                     body,
                     colors = colors,
                     typography = typography,
-                    annotator = annotator ?: markdownAnnotator(
-                        config = markdownAnnotatorConfig(eolAsNewLine = preserveLineBreaks)
-                    ),
-                    components = vaultMarkdownComponents(workspaceRoot, sourceNoteId),
+                    annotator = annotator,
+                    components = components,
                     modifier = Modifier.fillMaxWidth()
                 )
             }

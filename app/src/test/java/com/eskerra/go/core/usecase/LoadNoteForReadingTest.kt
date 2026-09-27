@@ -11,6 +11,7 @@ import com.eskerra.go.data.notes.FakeNoteRegistryRepository
 import com.eskerra.go.data.notes.NoteContentCache
 import com.eskerra.go.data.notes.NoteRegistryCache
 import com.eskerra.go.data.workspace.WorkspacePaths
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -47,6 +48,36 @@ class LoadNoteForReadingTest {
         useCase(config, filesDir, noteId).getOrThrow() // warm hit: uses current(), no refresh
 
         assertEquals(refreshesAfterColdMiss, fakeRepo.refreshCount)
+    }
+
+    @Test
+    fun backgroundRefresh_isThrottled_untilThrottleWindowElapses() = runTest {
+        val filesDir = temp.newFolder("files")
+        val noteId = NoteId("Inbox/First.md")
+        val fakeRepo = FakeNoteRegistryRepository.withInboxNotes(summary(noteId, "First"))
+        val content = FakeNoteContentRepository.withContent(noteId, "# First")
+        var nowMs = 0L
+        val useCase = LoadNoteForReading(
+            registryCache = NoteRegistryCache(fakeRepo),
+            contentRepository = content,
+            refreshThrottleMs = 30_000L,
+            now = { nowMs }
+        )
+
+        useCase(config, filesDir, noteId, backgroundScope = this).getOrThrow() // cold miss
+        advanceUntilIdle()
+        val refreshesAfterColdMiss = fakeRepo.refreshCount
+
+        useCase(config, filesDir, noteId, backgroundScope = this) // warm, within window
+            .getOrThrow()
+        advanceUntilIdle()
+        assertEquals(refreshesAfterColdMiss, fakeRepo.refreshCount)
+
+        nowMs += 30_000L
+        useCase(config, filesDir, noteId, backgroundScope = this) // warm, window elapsed
+            .getOrThrow()
+        advanceUntilIdle()
+        assertEquals(refreshesAfterColdMiss + 1, fakeRepo.refreshCount)
     }
 
     @Test

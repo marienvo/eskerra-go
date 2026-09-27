@@ -10,17 +10,29 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ProcessLifecycleOwner
 import com.eskerra.go.core.model.WorkspaceConfig
+import com.eskerra.go.core.usecase.NotePrefetchScheduler
 import com.eskerra.go.core.usecase.ReconcileWorkspaceSyncBranch
 import com.eskerra.go.core.usecase.ReportWeeklyPerformance
 import com.eskerra.go.data.perf.ColdStartTrace
+import com.eskerra.go.data.perf.NoteNavTrace
 import com.eskerra.go.feature.sync.AppSyncViewModel
+import com.eskerra.go.feature.todayhub.TodayHubPrefetchTargets
+import com.eskerra.go.feature.todayhub.TodayHubUiState
+import com.eskerra.go.ui.markdown.LocalParsedMarkdownCache
 import java.io.File
+import kotlinx.coroutines.delay
+
+/** Home prefetch waits this long past the settle frame before submitting, so it never contends
+ * with whatever the settling frame itself is still finishing (compositing, boot sync kickoff). */
+internal const val HOME_PREFETCH_DELAY_MS = 500L
 
 @Composable
 internal fun AppBootEffects(
     config: WorkspaceConfig,
     filesDir: File,
     launchSettled: Boolean,
+    todayHubUiState: TodayHubUiState?,
+    notePrefetchScheduler: NotePrefetchScheduler,
     reconcileWorkspaceSyncBranch: ReconcileWorkspaceSyncBranch,
     appSyncViewModel: AppSyncViewModel,
     reportWeeklyPerformance: ReportWeeklyPerformance,
@@ -73,6 +85,27 @@ internal fun AppBootEffects(
             onConfigUpdated(reconciled)
         }
     }
+
+    // Home-screen prefetch: strictly after launch has settled, at the lowest priority (any note's
+    // own submit immediately supersedes it — see NotePrefetchScheduler). Re-keyed to the Today Hub
+    // content itself, so a week/hub change resubmits with the newly-visible links.
+    val todayHubContent = todayHubUiState as? TodayHubUiState.Content
+    val parsedMarkdownCache = LocalParsedMarkdownCache.current
+    LaunchedEffect(launchSettled, todayHubContent) {
+        if (!shouldSubmitHomePrefetch(launchSettled, todayHubContent) || todayHubContent == null) {
+            return@LaunchedEffect
+        }
+        withFrameNanos { }
+        delay(HOME_PREFETCH_DELAY_MS)
+        val targets = TodayHubPrefetchTargets.resolve(todayHubContent, parsedMarkdownCache)
+        NoteNavTrace.log(
+            "prefetch.submit",
+            "source=home count=${targets.size} targets=${targets.map { it.value }}"
+        )
+        if (targets.isNotEmpty()) {
+            notePrefetchScheduler.submit(config, filesDir, targets)
+        }
+    }
 }
 
 @Composable
@@ -109,3 +142,12 @@ internal fun shouldTriggerBootSync(launchSettled: Boolean, alreadyRequested: Boo
 
 /** Branch reconciliation is checkout-mutating work and therefore starts only after settle. */
 internal fun shouldReconcileAfterLaunchSettled(launchSettled: Boolean): Boolean = launchSettled
+
+/**
+ * Home-screen (Today Hub) prefetch only starts once launch has settled and there is Today Hub
+ * content to read links from; it must never be part of the sacred startup path.
+ */
+internal fun shouldSubmitHomePrefetch(
+    launchSettled: Boolean,
+    todayHubContent: TodayHubUiState.Content?
+): Boolean = launchSettled && todayHubContent != null

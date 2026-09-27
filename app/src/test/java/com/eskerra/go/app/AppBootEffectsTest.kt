@@ -1,6 +1,9 @@
 package com.eskerra.go.app
 
 import androidx.lifecycle.Lifecycle
+import com.eskerra.go.core.model.NoteId
+import com.eskerra.go.core.model.NoteRegistry
+import com.eskerra.go.feature.todayhub.TodayHubUiState
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -77,5 +80,36 @@ class AppBootEffectsTest {
     @Test
     fun searchIndexMaintenance_runsAfterLaunchSettles() {
         assertTrue(shouldMaintainSearchIndex(launchSettled = true))
+    }
+
+    private fun content() = TodayHubUiState.Content(
+        hubs = emptyList(),
+        activeHubId = NoteId("Today.md"),
+        folderLabel = "",
+        introMarkdown = "",
+        registry = NoteRegistry.fromNotes(emptyList()),
+        columnHeaders = emptyList(),
+        selectedWeekStem = "2026-W01",
+        weekRangeLabel = "",
+        canGoPrev = false,
+        canGoNext = false,
+        progressSegments = emptyList(),
+        row = null,
+        rowLoading = false
+    )
+
+    @Test
+    fun homePrefetch_doesNotSubmitBeforeLaunchSettles() {
+        assertFalse(shouldSubmitHomePrefetch(launchSettled = false, todayHubContent = content()))
+    }
+
+    @Test
+    fun homePrefetch_doesNotSubmitWithoutTodayHubContent() {
+        assertFalse(shouldSubmitHomePrefetch(launchSettled = true, todayHubContent = null))
+    }
+
+    @Test
+    fun homePrefetch_submitsOnceSettledWithContent() {
+        assertTrue(shouldSubmitHomePrefetch(launchSettled = true, todayHubContent = content()))
     }
 }

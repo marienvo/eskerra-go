@@ -1,56 +1,39 @@
 package com.eskerra.go.core.markdown
 
 import com.eskerra.go.core.model.NoteId
-import com.eskerra.go.core.model.NoteRegistry
-import com.eskerra.go.core.model.ResolvedWikiLink
-import com.eskerra.go.core.wikilink.WikiLinkParser
-import com.eskerra.go.core.wikilink.WikiLinkResolver
 
 /**
- * Pure collection of prefetch candidates from a note's markdown: unambiguous `[[wikilinks]]` and
- * relative `.md` inline links that resolve to exactly one note in [registry].
- *
- * Ambiguous and missing links are skipped — there is no single file to warm. The source note is
- * never included, and the result is de-duplicated while preserving first-seen order so the closest
- * links are prefetched first.
+ * Shared prefetch-target types and ordering. Discovering *which* notes a body links to lives in
+ * [PreparedMarkdownLinks] (AST-based, matching the reader's own tap resolution exactly); this
+ * object holds only what both prefetch call sites need afterward: the candidate shape and
+ * viewport-based prioritization.
  */
 object PrefetchLinkTargets {
 
-    fun resolve(markdown: String, sourceNoteId: NoteId, registry: NoteRegistry): List<NoteId> {
-        val ids = LinkedHashSet<NoteId>()
-
-        WikiLinkParser.parse(markdown).forEach { link ->
-            val resolution = WikiLinkResolver.resolve(link, registry)
-            if (resolution is ResolvedWikiLink) {
-                ids.add(resolution.note.id)
-            }
-        }
-
-        extractInlineHrefs(markdown).forEach { href ->
-            VaultLink.resolveVaultRelativeMarkdownHref(sourceNoteId, href, registry)
-                ?.let { ids.add(it) }
-        }
-
-        ids.remove(sourceNoteId)
-        return ids.toList()
-    }
+    /** A prefetch candidate together with where its link token starts in the source. */
+    data class Target(val noteId: NoteId, val sourceOffset: Int)
 
     /**
-     * Extracts the href part of inline `[label](href)` markdown links. Drops an optional
-     * ` "title"` suffix; does not understand fences or escapes (good enough for prefetch hints).
+     * Orders [targets] by distance to the visible source window
+     * `[visibleStartOffset, visibleEndOffset]`: a target whose link falls inside the visible window sorts
+     * first, then targets are ranked by distance to the nearest edge of that window. Ties keep
+     * [targets]' incoming (first-seen) order.
      */
-    private fun extractInlineHrefs(markdown: String): List<String> {
-        val hrefs = mutableListOf<String>()
-        var searchFrom = 0
-        while (searchFrom < markdown.length) {
-            val open = markdown.indexOf("](", searchFrom)
-            if (open == -1) break
-            val close = markdown.indexOf(')', open + 2)
-            if (close == -1) break
-            val href = markdown.substring(open + 2, close).trim().substringBefore(' ').trim()
-            if (href.isNotEmpty()) hrefs.add(href)
-            searchFrom = close + 1
+    fun orderByViewport(
+        targets: List<Target>,
+        visibleStartOffset: Int,
+        visibleEndOffset: Int
+    ): List<NoteId> {
+        if (targets.isEmpty()) return emptyList()
+
+        val visibleStart = minOf(visibleStartOffset, visibleEndOffset)
+        val visibleEnd = maxOf(visibleStartOffset, visibleEndOffset)
+        fun distanceToVisibleWindow(offset: Int): Int = when {
+            offset < visibleStart -> visibleStart - offset
+            offset > visibleEnd -> offset - visibleEnd
+            else -> 0
         }
-        return hrefs
+
+        return targets.sortedBy { distanceToVisibleWindow(it.sourceOffset) }.map { it.noteId }
     }
 }

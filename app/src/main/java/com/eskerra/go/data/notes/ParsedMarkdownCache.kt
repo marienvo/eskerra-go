@@ -3,6 +3,12 @@ package com.eskerra.go.data.notes
 import com.eskerra.go.core.markdown.PreparedMarkdown
 import com.eskerra.go.core.markdown.prepareVaultMarkdown
 import com.eskerra.go.core.repository.ParsedMarkdownCachePort
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Bounded LRU cache of [PreparedMarkdown] keyed by the raw note body, so repeat renders (and
@@ -12,6 +18,15 @@ import com.eskerra.go.core.repository.ParsedMarkdownCachePort
  * Parsing is content-derived (registry/theme/now are applied at render time, not baked in), so the
  * body text is a complete cache key. Thread-safe: synchronous [peek]/[get] guard the LRU under the
  * instance monitor while the (suspending) [prepare] call runs outside the lock.
+ *
+ * Concurrent [get] calls for the same body (e.g. a background prefetch and a tap landing on the
+ * same note) are de-duplicated: only the first caller parses, and every other caller joins that
+ * in-flight parse instead of starting its own — otherwise the two would race the CPU for the same
+ * work while sharing one LRU slot.
+ *
+ * [maxSize] defaults large enough to survive a densely-linked note's [warm] calls without evicting
+ * the notes actually on the back stack (see [DEFAULT_SIZE]); entries are small parsed-AST handles,
+ * not raw file bytes, so a generous bound is cheap.
  */
 class ParsedMarkdownCache(
     private val maxSize: Int = DEFAULT_SIZE,
@@ -23,16 +38,55 @@ class ParsedMarkdownCache(
             size > maxSize
     }
 
+    private val inFlightMutex = Mutex()
+    private val inFlight = mutableMapOf<String, CompletableDeferred<PreparedMarkdown>>()
+
     /** Synchronous warm-cache lookup for atomic first-frame rendering; `null` on a miss. */
     @Synchronized
     override fun peek(markdown: String): PreparedMarkdown? = lru[markdown]
 
-    /** Returns the prepared body, parsing it (off the main thread) on a cache miss. */
-    suspend fun get(markdown: String): PreparedMarkdown {
-        peek(markdown)?.let { return it }
-        val prepared = prepare(markdown)
-        store(markdown, prepared)
-        return prepared
+    /**
+     * Returns the prepared body, parsing it (off the main thread) on a cache miss. A miss that is
+     * already being parsed by another caller joins that parse instead of starting a second one.
+     */
+    override suspend fun get(markdown: String): PreparedMarkdown {
+        while (true) {
+            peek(markdown)?.let { return it }
+
+            var owns = false
+            val deferred = inFlightMutex.withLock {
+                peek(markdown)?.let { return it }
+                inFlight.getOrPut(markdown) {
+                    owns = true
+                    CompletableDeferred()
+                }
+            }
+
+            if (!owns) {
+                try {
+                    return deferred.await()
+                } catch (error: CancellationException) {
+                    // A cancelled prefetch must not cancel a reader that joined its parse. If this
+                    // caller itself was cancelled, ensureActive rethrows; otherwise retry and own
+                    // the replacement parse after the old in-flight entry is removed.
+                    currentCoroutineContext().ensureActive()
+                }
+            }
+
+            try {
+                val prepared = prepare(markdown)
+                store(markdown, prepared)
+                deferred.complete(prepared)
+                return prepared
+            } catch (error: Throwable) {
+                deferred.completeExceptionally(error)
+                throw error
+            } finally {
+                inFlightMutex.withLock {
+                    if (inFlight[markdown] === deferred) inFlight.remove(markdown)
+                }
+            }
+        }
     }
 
     /** Pre-parses [markdown] into the cache without rendering it (link/note prefetch). */
@@ -46,6 +100,6 @@ class ParsedMarkdownCache(
     }
 
     companion object {
-        const val DEFAULT_SIZE = 16
+        const val DEFAULT_SIZE = 64
     }
 }
