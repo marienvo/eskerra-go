@@ -65,6 +65,18 @@ class AppRouteTest {
     }
 
     @Test
+    fun isNoteReaderRoute_matchesBothThePatternAndConcreteRoutes() {
+        val noteId = NoteId("Inbox/First.md")
+
+        // NavDestination.route reports the raw pattern, not the filled-in path.
+        assertTrue(AppRoute.isNoteReaderRoute(AppRoute.NOTE_PATTERN))
+        assertTrue(AppRoute.isNoteReaderRoute(AppRoute.note(noteId)))
+        assertFalse(AppRoute.isNoteReaderRoute(AppRoute.EDITOR_PATTERN))
+        assertFalse(AppRoute.isNoteReaderRoute(AppRoute.INBOX))
+        assertFalse(AppRoute.isNoteReaderRoute(null))
+    }
+
+    @Test
     fun invalidRouteIdsDoNotCrash() {
         val decoded = AppRoute.decodeNoteId("")
         assertEquals(NoteId(""), decoded)

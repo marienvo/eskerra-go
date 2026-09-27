@@ -189,7 +189,7 @@ fun App(
         pullToRefreshActive = onInbox && pullRefreshing,
         shellInput = shellInputState.presentation,
         onMenuClick = { menuOpen = true },
-        onBack = if (AppRoute.isConcreteNoteRoute(currentRoute)) {
+        onBack = if (AppRoute.isNoteReaderRoute(currentRoute)) {
             { navController.popBackStack() }
         } else {
             null

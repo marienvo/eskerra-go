@@ -63,4 +63,12 @@ object AppRoute {
         val prefix = NOTE_PATTERN.substringBefore("{")
         return route.startsWith(prefix)
     }
+
+    /**
+     * Whether [route] is the note reader, in either form seen from `NavBackStackEntry`:
+     * `NavDestination.route` reports the raw pattern [NOTE_PATTERN] (arguments are read
+     * separately), while a route built by [note] and compared elsewhere is concrete.
+     */
+    internal fun isNoteReaderRoute(route: String?): Boolean =
+        route == NOTE_PATTERN || isConcreteNoteRoute(route)
 }
