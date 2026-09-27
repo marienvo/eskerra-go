@@ -183,9 +183,10 @@ fun App(
         shareIntake = shareIntake
     )
     val onInbox = currentRoute == AppRoute.INBOX || currentRoute == null
+    val pullRefreshing by appSyncViewModel.pullRefreshing.collectAsState()
     AppShell(
         syncIndicator = syncIndicator,
-        pullToRefreshActive = onInbox && syncIndicator?.spinning == true,
+        pullToRefreshActive = onInbox && pullRefreshing,
         shellInput = shellInputState.presentation,
         onMenuClick = { menuOpen = true },
         onBack = if (AppRoute.isConcreteNoteRoute(currentRoute)) {

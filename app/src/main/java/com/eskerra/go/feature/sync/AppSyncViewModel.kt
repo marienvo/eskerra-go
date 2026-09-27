@@ -45,6 +45,15 @@ class AppSyncViewModel(
     private val _syncSpinnerVisible = MutableStateFlow(false)
     val syncSpinnerVisible: StateFlow<Boolean> = _syncSpinnerVisible.asStateFlow()
 
+    /**
+     * True only while a manual pull-to-refresh is the reason a sync is in flight, so the home
+     * screen's pull indicator never appears for boot/foreground/write-triggered auto syncs (those
+     * show only the hamburger badge spinner). Cleared on the same falling edge as
+     * [syncSpinnerVisible], so it never outlives the sync it was requested for.
+     */
+    private val _pullRefreshing = MutableStateFlow(false)
+    val pullRefreshing: StateFlow<Boolean> = _pullRefreshing.asStateFlow()
+
     private var loadJob: Job? = null
     private var lastRemoteRefreshAtMs: Long = -1L
     private var lastStatusSummary: SyncStatusSummary? = null
@@ -55,7 +64,12 @@ class AppSyncViewModel(
         viewModelScope.launch {
             syncSpinnerRequested
                 .holdTrueAtLeast(SYNC_SPINNER_HOLD_MS)
-                .collect { _syncSpinnerVisible.value = it }
+                .collect { visible ->
+                    _syncSpinnerVisible.value = visible
+                    if (!visible) {
+                        _pullRefreshing.value = false
+                    }
+                }
         }
     }
 
@@ -218,6 +232,26 @@ class AppSyncViewModel(
         ensureObservingDurableState()
         viewModelScope.launch {
             if (config.remoteUri.isNullOrBlank()) {
+                refreshLocalStatusQuietly()
+                return@launch
+            }
+            syncStateRepository.markGenerationRequested()
+            vaultSyncScheduler.scheduleSync()
+        }
+    }
+
+    /**
+     * Manual pull-to-refresh entry point. Identical to [syncNow], but also drives
+     * [pullRefreshing] so the home screen's own refresh indicator shows for this sync — and only
+     * this kind of sync, never an automatic one. If an automatic sync is already in flight, the
+     * coalesced sync this joins is the one the pull indicator waits on.
+     */
+    fun syncFromPull() {
+        ensureObservingDurableState()
+        _pullRefreshing.value = true
+        viewModelScope.launch {
+            if (config.remoteUri.isNullOrBlank()) {
+                _pullRefreshing.value = false
                 refreshLocalStatusQuietly()
                 return@launch
             }
