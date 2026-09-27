@@ -187,7 +187,12 @@ fun App(
         syncIndicator = syncIndicator,
         pullToRefreshActive = onInbox && syncIndicator?.spinning == true,
         shellInput = shellInputState.presentation,
-        onMenuClick = { menuOpen = true }
+        onMenuClick = { menuOpen = true },
+        onBack = if (AppRoute.isConcreteNoteRoute(currentRoute)) {
+            { navController.popBackStack() }
+        } else {
+            null
+        }
     ) { contentModifier ->
         val navGraphContext = AppNavGraphContext(
             currentConfig = currentConfig,
