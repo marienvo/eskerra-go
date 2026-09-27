@@ -47,7 +47,7 @@ fun NoteScreen(
                 title = state.title,
                 path = state.path,
                 canEdit = state.canEdit,
-                markdown = state.document.content.markdown,
+                markdown = state.bodyMarkdown,
                 registry = state.document.registry,
                 sourceNoteId = state.document.note.id,
                 onEdit = onEdit,

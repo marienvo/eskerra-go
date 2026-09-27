@@ -128,4 +128,48 @@ class VaultMarkdownPreprocessTest {
         assertTrue(got.contains("[x](eskerra-wiki:x)"))
         assertTrue(got.contains("[[y]]"))
     }
+
+    // --- stripTitleHeading ---
+
+    @Test
+    fun stripTitleHeading_removesLeadingH1AndFollowingBlankLines() {
+        val md = "# Title\n\n\nBody text"
+        assertEquals("Body text", VaultMarkdownPreprocess.stripTitleHeading(md))
+    }
+
+    @Test
+    fun stripTitleHeading_removesH1AfterFrontmatter() {
+        val md = "---\nk: v\n---\n\n# Title\nBody text"
+        assertEquals("---\nk: v\n---\n\nBody text", VaultMarkdownPreprocess.stripTitleHeading(md))
+    }
+
+    @Test
+    fun stripTitleHeading_noH1_returnsUnchanged() {
+        val md = "Just a body\nwith no heading"
+        assertEquals(md, VaultMarkdownPreprocess.stripTitleHeading(md))
+    }
+
+    @Test
+    fun stripTitleHeading_doesNotStripH2() {
+        val md = "## Not a title\nBody"
+        assertEquals(md, VaultMarkdownPreprocess.stripTitleHeading(md))
+    }
+
+    @Test
+    fun stripTitleHeading_onlyRemovesFirstH1() {
+        val md = "# First\nBody\n# Second"
+        assertEquals("Body\n# Second", VaultMarkdownPreprocess.stripTitleHeading(md))
+    }
+
+    @Test
+    fun stripTitleHeading_bareHashWithNoTextIsNotATitle() {
+        val md = "#\nBody"
+        assertEquals(md, VaultMarkdownPreprocess.stripTitleHeading(md))
+    }
+
+    @Test
+    fun stripTitleHeading_normalizesCrlf() {
+        val md = "# Title\r\n\r\nBody"
+        assertEquals("Body", VaultMarkdownPreprocess.stripTitleHeading(md))
+    }
 }

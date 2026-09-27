@@ -100,6 +100,31 @@ object VaultMarkdownPreprocess {
     fun preprocessVaultReadonlyMarkdownBody(markdown: String): String =
         transformOutsideTripleBacktickFences(markdown, ::wikiLinksToSyntheticMarkdownLinks)
 
+    /**
+     * Removes the leading `# ` heading line that the note reader already renders as its title
+     * (mirrors `MarkdownNoteScanner`'s title extraction: the first line whose trimmed form starts
+     * with `# `), plus any blank lines directly following it. Returns [markdown] unchanged when no
+     * such line exists, since the title then came from the filename rather than the body.
+     */
+    fun stripTitleHeading(markdown: String): String {
+        val normalized = markdown.replace("\r\n", "\n")
+        val lines = normalized.split("\n")
+        val titleIndex = lines.indexOfFirst(::isTitleHeadingLine)
+        if (titleIndex < 0) return markdown
+
+        var bodyStart = titleIndex + 1
+        while (bodyStart < lines.size && lines[bodyStart].isBlank()) {
+            bodyStart += 1
+        }
+        return (lines.subList(0, titleIndex) + lines.subList(bodyStart, lines.size))
+            .joinToString("\n")
+    }
+
+    private fun isTitleHeadingLine(line: String): Boolean {
+        val trimmed = line.trim()
+        return trimmed.startsWith(H1_LINE_PREFIX) && trimmed.length > H1_LINE_PREFIX.length
+    }
+
     private fun wikiLinkMarkdownLabel(inner: String): String {
         val raw = inner.trim()
         val pipeAt = raw.indexOf('|')
@@ -130,4 +155,5 @@ object VaultMarkdownPreprocess {
     }
 
     private const val UNRESERVED = "-_.!~*'()"
+    private const val H1_LINE_PREFIX = "# "
 }
