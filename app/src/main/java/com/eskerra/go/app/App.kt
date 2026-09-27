@@ -105,6 +105,7 @@ fun App(
     readConfig: suspend () -> WorkspaceConfig? = { null },
     onConfigUpdated: (WorkspaceConfig) -> Unit,
     onInboxUiStateChanged: (InboxUiState) -> Unit = {},
+    todayHubUiState: TodayHubUiState? = null,
     onTodayHubUiStateChanged: (TodayHubUiState) -> Unit = {}
 ) {
     var currentConfig by remember(config) { mutableStateOf(config) }
@@ -153,6 +154,8 @@ fun App(
         config = currentConfig,
         filesDir = filesDir,
         launchSettled = launchSettled,
+        todayHubUiState = todayHubUiState,
+        notePrefetchScheduler = notePrefetchScheduler,
         reconcileWorkspaceSyncBranch = reconcileWorkspaceSyncBranch,
         appSyncViewModel = appSyncViewModel,
         reportWeeklyPerformance = reportWeeklyPerformance,

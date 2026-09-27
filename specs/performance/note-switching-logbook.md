@@ -102,7 +102,34 @@ itself never waited for anything — it always painted `Loading` first on a miss
   true miss still navigates once it elapses — the reader's `Loading` state covers the remainder.
   Inbox notes are small enough that this budget is essentially never felt.
 
-**Not yet done.** Home-screen (Today Hub) prefetch after launch has settled — planned as PR 3, not
-built yet. On-device confirmation that link taps feel instant and that the 150ms budget never
-causes a *perceptible* stall on a genuine cold miss (it shouldn't — `Loading` already painted
+**Not yet done.** On-device confirmation that link taps feel instant and that the 150ms budget
+never causes a *perceptible* stall on a genuine cold miss (it shouldn't — `Loading` already painted
 instantly before this change too, just with no chance of an atomic swap).
+
+---
+
+## 2026-09-27 — PR 3: home-screen (Today Hub) prefetch after launch settled
+
+**Problem observed (user report, continued).** The first link tap from the home screen was always
+cold — no prefetch ran there at all before this change.
+
+**Change.** `AppBootEffects` now submits the Today Hub's currently visible links (intro markdown +
+the loaded week row's columns, via the new pure `TodayHubPrefetchTargets.resolve`) to the shared
+`NotePrefetchScheduler`, gated by the new `shouldSubmitHomePrefetch` predicate: only once
+`launchSettled` is true and there is Today Hub content to read links from. The submit itself waits
+one frame past settle plus a fixed `HOME_PREFETCH_DELAY_MS` (500ms), so it never contends with the
+settling frame or the boot-sync kickoff that also gates on `launchSettled`. It resubmits whenever
+the Today Hub content changes (week navigation, hub switch).
+
+Because `NotePrefetchScheduler.submit` always cancels and replaces whatever batch was running,
+this home batch is automatically the lowest priority in practice: the moment a note is opened (from
+home or anywhere else), that note's own submit supersedes it — no separate priority mechanism was
+needed.
+
+**Verification done.** Full unit suite green, ktlint clean, module budgets unaffected, no ArchUnit
+signature drift this time. `shouldSubmitHomePrefetch` is unit-tested the same way the file's other
+launch-settled gates already are (pure predicate, no Compose test harness needed).
+
+**Not yet done (needs a device).** Confirming cold-start / launch-settled timing is unaffected by
+this addition (it should be, by construction — it's strictly a post-settle side effect — but only a
+device run with `ColdStartTrace` / `scripts/measure-cold-start.sh` confirms it).

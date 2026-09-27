@@ -73,6 +73,8 @@ Wiki-link opens use [NoteContentCache](app/src/main/java/com/eskerra/go/data/not
 
 [NoteReaderViewModel](app/src/main/java/com/eskerra/go/feature/note/NoteReaderViewModel.kt) prepares the body (`ParsedMarkdownCache.get`) *before* publishing `Content`, so title and body always reach the screen in the same frame: a warm hit does not suspend, so there is never a title-before-body flash, and a note already on the back stack re-shows instantly with its scroll position intact (the body was never empty at first layout, so the restored scroll offset is never clamped to 0). `VaultMarkdownView`'s `preparedOverride` parameter accepts this precomputed body and skips its own cache lookup.
 
+**Home-screen prefetch** ([AppBootEffects](app/src/main/java/com/eskerra/go/app/AppBootEffects.kt)): strictly after `launchSettled` (one frame past settle, plus a fixed delay — `HOME_PREFETCH_DELAY_MS`), the Today Hub's visible links (intro + loaded week row, via [TodayHubPrefetchTargets](app/src/main/java/com/eskerra/go/feature/todayhub/TodayHubPrefetchTargets.kt)) are submitted to the same `NotePrefetchScheduler`. This never sits on the startup path — `shouldSubmitHomePrefetch` gates it on `launchSettled` — and is automatically superseded the moment any note is opened, since `submit` always replaces the previous batch.
+
 ## Inbox snapshot cache
 
 [FileInboxSnapshotStore](app/src/main/java/com/eskerra/go/data/notes/FileInboxSnapshotStore.kt) persists the last inbox summary list under `filesDir/cache/inbox_snapshot.json`, keyed by workspace fingerprint. This remains the cold-start path for the inbox list until a later consolidation to `registry.inboxSummaries` only.

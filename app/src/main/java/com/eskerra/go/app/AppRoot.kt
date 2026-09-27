@@ -232,6 +232,7 @@ fun AppRoot(
                         readConfig = workspaceStore::read,
                         onConfigUpdated = gateViewModel::updateReadyConfig,
                         onInboxUiStateChanged = { inboxUiState = it },
+                        todayHubUiState = todayHubUiState,
                         onTodayHubUiStateChanged = { todayHubUiState = it }
                     )
                 }
