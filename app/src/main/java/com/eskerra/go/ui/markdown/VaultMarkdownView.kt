@@ -36,6 +36,10 @@ import java.time.LocalDateTime
  *   cells, whose read-only representation mirrors the source's line-based editor.
  * @param onNoteNotFound called when a tapped link cannot be resolved; message reflects [indexStatus]
  *   ("Note not found", "Still indexing vault", "Vault index unavailable").
+ * @param preparedOverride when the caller already prepared [markdown] before publishing its state
+ *   (e.g. [com.eskerra.go.feature.note.NoteReaderViewModel]), pass it here to render directly:
+ *   this skips the cache lookup and its [LaunchedEffect], so there is no risk of a stray recompose
+ *   showing stale content from a previous [markdown] value.
  */
 @Composable
 fun VaultMarkdownView(
@@ -49,15 +53,21 @@ fun VaultMarkdownView(
     workspaceRoot: File? = null,
     sourceNoteId: NoteId? = null,
     preserveLineBreaks: Boolean = false,
-    onNoteNotFound: (String) -> Unit = {}
+    onNoteNotFound: (String) -> Unit = {},
+    preparedOverride: PreparedMarkdown? = null
 ) {
     val now = remember { LocalDateTime.now() }
     val cache = LocalParsedMarkdownCache.current
-    // Seed from the warm cache so warm content paints on the first frame; otherwise the previous
-    // body stays visible (retain state) until the new body finishes parsing off the main thread.
-    var prepared by remember { mutableStateOf<PreparedMarkdown?>(cache.peek(markdown)) }
-    LaunchedEffect(markdown, cache) {
-        prepared = cache.get(markdown)
+    // Seed from the override or the warm cache so warm content paints on the first frame;
+    // otherwise the previous body stays visible (retain state) until the new body finishes parsing
+    // off the main thread.
+    var prepared by remember(markdown, preparedOverride) {
+        mutableStateOf(preparedOverride ?: cache.peek(markdown))
+    }
+    LaunchedEffect(markdown, cache, preparedOverride) {
+        if (preparedOverride == null) {
+            prepared = cache.get(markdown)
+        }
     }
 
     val colors = markdownColor()

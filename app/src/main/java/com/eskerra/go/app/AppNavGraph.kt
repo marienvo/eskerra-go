@@ -57,6 +57,7 @@ import com.eskerra.go.feature.sync.SyncUiState
 import com.eskerra.go.feature.sync.VaultSettingsViewModel
 import com.eskerra.go.feature.todayhub.TodayHubUiState
 import com.eskerra.go.ui.markdown.AmbiguousWikiLinkSheet
+import com.eskerra.go.ui.markdown.LocalParsedMarkdownCache
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 
@@ -227,12 +228,16 @@ internal fun NavGraphBuilder.sharedDestinations(ctx: AppNavGraphContext) {
     ) { entry ->
         val raw = entry.arguments?.getString(AppRoute.NOTE_ARG).orEmpty()
         val noteId = AppRoute.decodeNoteId(raw)
+        // Same instance the shared markdown renderers read from (provided at the AppRoot level), so
+        // a warm parse (from a prior visit or from prefetch) is visible here too.
+        val parsedMarkdownCache = LocalParsedMarkdownCache.current
         val noteReaderViewModel: NoteReaderViewModel = viewModel(
             factory = NoteReaderViewModel.factory(
                 config = ctx.currentConfig,
                 filesDir = ctx.filesDir,
                 noteId = noteId,
                 loadNoteForReading = ctx.loadNoteForReading,
+                parsedMarkdownCache = parsedMarkdownCache,
                 prefetchLinkedNotes = ctx.prefetchLinkedNotes
             )
         )

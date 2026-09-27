@@ -1,6 +1,9 @@
 package com.eskerra.go.data.notes
 
 import com.eskerra.go.core.markdown.PreparedMarkdown
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -67,6 +70,30 @@ class ParsedMarkdownCacheTest {
         cache.get("A") // miss — A was evicted
 
         assertEquals(countAfterPopulate + 1, counter.callCount)
+    }
+
+    @Test
+    fun get_concurrentMissesForSameBody_parseOnlyOnce() = runTest {
+        val counter = CountingPrepare()
+        val started = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val cache = ParsedMarkdownCache(
+            prepare = { markdown ->
+                started.complete(Unit)
+                release.await()
+                counter.prepare(markdown)
+            }
+        )
+
+        val first = async { cache.get("# A") }
+        started.await() // first caller is now inside prepare, holding the in-flight slot
+        val second = async { cache.get("# A") } // must join, not start a second parse
+
+        release.complete(Unit)
+        val results = awaitAll(first, second)
+
+        assertEquals(1, counter.callCount)
+        assertSame(results[0], results[1])
     }
 
     @Test

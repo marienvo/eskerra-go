@@ -9,8 +9,10 @@ import com.eskerra.go.core.model.NoteContentException
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NoteReaderDocument
 import com.eskerra.go.core.model.WorkspaceConfig
+import com.eskerra.go.core.repository.ParsedMarkdownCachePort
 import com.eskerra.go.core.usecase.LoadNoteForReading
 import com.eskerra.go.core.usecase.PrefetchLinkedNotes
+import com.eskerra.go.data.notes.ParsedMarkdownCache
 import java.io.File
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,6 +25,7 @@ class NoteReaderViewModel(
     private val filesDir: File,
     private val noteId: NoteId,
     private val loadNoteForReading: LoadNoteForReading,
+    private val parsedMarkdownCache: ParsedMarkdownCachePort = ParsedMarkdownCache(),
     private val prefetchLinkedNotes: PrefetchLinkedNotes? = null
 ) : ViewModel() {
 
@@ -47,15 +50,21 @@ class NoteReaderViewModel(
         loadJob = viewModelScope.launch {
             loadNoteForReading(config, filesDir, noteId, viewModelScope).fold(
                 onSuccess = { document ->
+                    val bodyMarkdown = VaultMarkdownPreprocess.stripTitleHeading(
+                        document.content.markdown
+                    )
+                    // Prepare the body before publishing Content: on a warm cache hit this does not
+                    // suspend, so title and body always reach the screen together (never title-first,
+                    // never an empty flash on the frame the reader appears).
+                    val preparedBody = parsedMarkdownCache.get(bodyMarkdown)
                     _uiState.value = NoteReaderUiState.Content(
                         title = document.note.title,
                         noteId = document.note.id,
                         path = document.content.path.value,
                         canEdit = document.note.isInbox,
                         document = document,
-                        bodyMarkdown = VaultMarkdownPreprocess.stripTitleHeading(
-                            document.content.markdown
-                        )
+                        bodyMarkdown = bodyMarkdown,
+                        preparedBody = preparedBody
                     )
                     schedulePrefetch(document)
                 },
@@ -103,6 +112,7 @@ class NoteReaderViewModel(
             filesDir: File,
             noteId: NoteId,
             loadNoteForReading: LoadNoteForReading,
+            parsedMarkdownCache: ParsedMarkdownCachePort = ParsedMarkdownCache(),
             prefetchLinkedNotes: PrefetchLinkedNotes? = null
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
@@ -111,6 +121,7 @@ class NoteReaderViewModel(
                 filesDir,
                 noteId,
                 loadNoteForReading,
+                parsedMarkdownCache,
                 prefetchLinkedNotes
             ) as T
         }

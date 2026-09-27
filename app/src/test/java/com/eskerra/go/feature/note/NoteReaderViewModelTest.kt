@@ -1,5 +1,6 @@
 package com.eskerra.go.feature.note
 
+import com.eskerra.go.core.markdown.PreparedMarkdown
 import com.eskerra.go.core.model.NoteContentError
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NoteIndexError
@@ -9,6 +10,7 @@ import com.eskerra.go.core.usecase.LoadNoteForReading
 import com.eskerra.go.data.notes.FakeNoteContentRepository
 import com.eskerra.go.data.notes.FakeNoteRegistryRepository
 import com.eskerra.go.data.notes.NoteRegistryCache
+import com.eskerra.go.data.notes.ParsedMarkdownCache
 import com.eskerra.go.data.workspace.WorkspacePaths
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -38,6 +40,13 @@ class NoteReaderViewModelTest {
         setupCompletedAtEpochMs = 1_700_000_000_000L
     )
 
+    // A real markdown parse dispatches to Dispatchers.Default internally; these tests assert
+    // synchronous state right after construction, so `prepare` here stays trivial and on the
+    // calling thread — the async-preparation behavior itself is covered by ParsedMarkdownCacheTest.
+    private fun instantParsedMarkdownCache() = ParsedMarkdownCache(
+        prepare = { PreparedMarkdown(emptyList()) }
+    )
+
     @Before
     fun setUpMainDispatcher() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
@@ -61,7 +70,8 @@ class NoteReaderViewModelTest {
             config = config,
             filesDir = temp.newFolder("files"),
             noteId = noteId,
-            loadNoteForReading = LoadNoteForReading(NoteRegistryCache(registry), content)
+            loadNoteForReading = LoadNoteForReading(NoteRegistryCache(registry), content),
+            parsedMarkdownCache = instantParsedMarkdownCache()
         )
 
         assertEquals(NoteReaderUiState.Loading, viewModel.uiState.value)
@@ -80,7 +90,8 @@ class NoteReaderViewModelTest {
             config = config,
             filesDir = temp.newFolder("files"),
             noteId = noteId,
-            loadNoteForReading = LoadNoteForReading(NoteRegistryCache(registry), content)
+            loadNoteForReading = LoadNoteForReading(NoteRegistryCache(registry), content),
+            parsedMarkdownCache = instantParsedMarkdownCache()
         )
 
         val state = viewModel.uiState.value as NoteReaderUiState.Content
@@ -89,6 +100,9 @@ class NoteReaderViewModelTest {
         assertEquals("Inbox/First.md", state.path)
         assertEquals("Hello [[Second]].", state.document.content.markdown)
         assertTrue(state.document.registry.notes.any { it.id == secondId })
+        // Title and body are published together: preparedBody is already available on this first
+        // state, never arriving on a later recomposition.
+        assertEquals(PreparedMarkdown(emptyList()), state.preparedBody)
     }
 
     @Test
@@ -100,7 +114,8 @@ class NoteReaderViewModelTest {
             config = config,
             filesDir = temp.newFolder("files"),
             noteId = noteId,
-            loadNoteForReading = LoadNoteForReading(NoteRegistryCache(registry), content)
+            loadNoteForReading = LoadNoteForReading(NoteRegistryCache(registry), content),
+            parsedMarkdownCache = instantParsedMarkdownCache()
         )
 
         assertEquals(NoteReaderUiState.NotFound, viewModel.uiState.value)
@@ -115,7 +130,8 @@ class NoteReaderViewModelTest {
             config = config,
             filesDir = temp.newFolder("files"),
             noteId = noteId,
-            loadNoteForReading = LoadNoteForReading(NoteRegistryCache(registry), content)
+            loadNoteForReading = LoadNoteForReading(NoteRegistryCache(registry), content),
+            parsedMarkdownCache = instantParsedMarkdownCache()
         )
 
         assertEquals(
@@ -133,7 +149,8 @@ class NoteReaderViewModelTest {
             loadNoteForReading = LoadNoteForReading(
                 NoteRegistryCache(FakeNoteRegistryRepository()),
                 FakeNoteContentRepository()
-            )
+            ),
+            parsedMarkdownCache = instantParsedMarkdownCache()
         )
 
         assertEquals(NoteReaderUiState.InvalidNoteId, viewModel.uiState.value)
@@ -152,7 +169,8 @@ class NoteReaderViewModelTest {
             loadNoteForReading = LoadNoteForReading(
                 NoteRegistryCache(registry),
                 FakeNoteContentRepository()
-            )
+            ),
+            parsedMarkdownCache = instantParsedMarkdownCache()
         )
 
         assertEquals(
@@ -173,7 +191,8 @@ class NoteReaderViewModelTest {
             config = config,
             filesDir = temp.newFolder("files"),
             noteId = noteId,
-            loadNoteForReading = LoadNoteForReading(NoteRegistryCache(registry), content)
+            loadNoteForReading = LoadNoteForReading(NoteRegistryCache(registry), content),
+            parsedMarkdownCache = instantParsedMarkdownCache()
         )
         dispatcher.scheduler.runCurrent()
         assertEquals(
@@ -205,7 +224,8 @@ class NoteReaderViewModelTest {
             config = config,
             filesDir = temp.newFolder("files"),
             noteId = noteId,
-            loadNoteForReading = LoadNoteForReading(NoteRegistryCache(registry), content)
+            loadNoteForReading = LoadNoteForReading(NoteRegistryCache(registry), content),
+            parsedMarkdownCache = instantParsedMarkdownCache()
         )
 
         val original = viewModel.uiState.value as NoteReaderUiState.Content

@@ -58,14 +58,16 @@ Snapshot notes persist `sizeBytes` in [SnapshotNoteJsonCodec](app/src/main/java/
 Read paths use [current](app/src/main/java/com/eskerra/go/data/notes/NoteRegistryCache.kt) when possible and refresh incrementally in the background:
 
 - [LoadInboxSummaries](app/src/main/java/com/eskerra/go/core/usecase/LoadInboxSummaries.kt) — always refreshes (inbox SWR).
-- [LoadNoteForReading](app/src/main/java/com/eskerra/go/core/usecase/LoadNoteForReading.kt) — serves cached registry on the critical path; cold miss awaits refresh; warm hit dispatches background refresh.
+- [LoadNoteForReading](app/src/main/java/com/eskerra/go/core/usecase/LoadNoteForReading.kt) — serves cached registry on the critical path; cold miss awaits refresh; warm hit dispatches a background refresh throttled to at most once per `refreshThrottleMs` (default 30s), so repeated note opens do not each re-trigger a full vault walk.
 - [LoadTodayHub](app/src/main/java/com/eskerra/go/core/usecase/LoadTodayHub.kt) — uses `current()` for snapshot restore, then background revalidation.
 
 Write paths (`SaveNote`, `CreateInboxNote`, `DeleteInboxNotes`, successful manual sync) evict affected content where applicable and call incremental [refresh](app/src/main/java/com/eskerra/go/data/notes/NoteRegistryCache.kt) without [invalidate](app/src/main/java/com/eskerra/go/data/notes/NoteRegistryCache.kt), so the in-memory registry remains the memo base for the post-write scan.
 
 [refresh](app/src/main/java/com/eskerra/go/data/notes/NoteRegistryCache.kt) persists a snapshot via [FileNoteRegistrySnapshotStore](app/src/main/java/com/eskerra/go/data/notes/FileNoteRegistrySnapshotStore.kt) on success; snapshot write failures are best-effort (`runCatching`) and do not fail the refresh.
 
-Wiki-link opens use [NoteContentCache](app/src/main/java/com/eskerra/go/data/notes/NoteContentCache.kt) (bounded LRU, workspace-fingerprint scoped, generation-guarded against post-evict TOCTOU) with background [PrefetchLinkedNotes](app/src/main/java/com/eskerra/go/core/usecase/PrefetchLinkedNotes.kt). Prefetch warms both content and the shared [ParsedMarkdownCache](app/src/main/java/com/eskerra/go/data/notes/ParsedMarkdownCache.kt) (parse on `Dispatchers.Default`, max concurrency 4) so a warm link tap can atomic-swap in [VaultMarkdownView](app/src/main/java/com/eskerra/go/ui/markdown/VaultMarkdownView.kt).
+Wiki-link opens use [NoteContentCache](app/src/main/java/com/eskerra/go/data/notes/NoteContentCache.kt) (bounded LRU, 64 entries, workspace-fingerprint scoped, generation-guarded against post-evict TOCTOU) with background [PrefetchLinkedNotes](app/src/main/java/com/eskerra/go/core/usecase/PrefetchLinkedNotes.kt). Prefetch warms both content and the shared [ParsedMarkdownCache](app/src/main/java/com/eskerra/go/data/notes/ParsedMarkdownCache.kt) (bounded LRU, 64 entries; parse on `Dispatchers.Default`, max concurrency 4; concurrent `get`/`warm` calls for the same body de-duplicate onto one in-flight parse) so a warm link tap can atomic-swap in [VaultMarkdownView](app/src/main/java/com/eskerra/go/ui/markdown/VaultMarkdownView.kt).
+
+[NoteReaderViewModel](app/src/main/java/com/eskerra/go/feature/note/NoteReaderViewModel.kt) prepares the body (`ParsedMarkdownCache.get`) *before* publishing `Content`, so title and body always reach the screen in the same frame: a warm hit does not suspend, so there is never a title-before-body flash, and a note already on the back stack re-shows instantly with its scroll position intact (the body was never empty at first layout, so the restored scroll offset is never clamped to 0). `VaultMarkdownView`'s `preparedOverride` parameter accepts this precomputed body and skips its own cache lookup.
 
 ## Inbox snapshot cache
 

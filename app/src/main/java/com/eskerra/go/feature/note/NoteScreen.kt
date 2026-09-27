@@ -15,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.eskerra.go.app.LocalShellChromeInsets
+import com.eskerra.go.core.markdown.PreparedMarkdown
 import com.eskerra.go.core.markdown.VaultReadonlyLink
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NoteRegistry
@@ -48,6 +49,7 @@ fun NoteScreen(
                 path = state.path,
                 canEdit = state.canEdit,
                 markdown = state.bodyMarkdown,
+                preparedBody = state.preparedBody,
                 registry = state.document.registry,
                 sourceNoteId = state.document.note.id,
                 onEdit = onEdit,
@@ -89,6 +91,7 @@ private fun NoteReaderContent(
     path: String,
     canEdit: Boolean,
     markdown: String,
+    preparedBody: PreparedMarkdown,
     registry: NoteRegistry,
     sourceNoteId: NoteId,
     onEdit: () -> Unit,
@@ -135,6 +138,7 @@ private fun NoteReaderContent(
             workspaceRoot = workspaceRoot,
             sourceNoteId = sourceNoteId,
             onNoteNotFound = onNoteNotFound,
+            preparedOverride = preparedBody,
             modifier = Modifier.fillMaxWidth()
         )
     }

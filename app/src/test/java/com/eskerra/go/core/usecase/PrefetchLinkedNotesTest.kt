@@ -198,6 +198,11 @@ class PrefetchLinkedNotesTest {
 
         override fun peek(markdown: String): PreparedMarkdown? = null
 
+        override suspend fun get(markdown: String): PreparedMarkdown {
+            warmed += markdown
+            return PreparedMarkdown(emptyList())
+        }
+
         override suspend fun warm(markdown: String) {
             warmed += markdown
         }
