@@ -48,6 +48,7 @@ internal fun AppInboxRoute(
     activeTodayHubStore: ActiveTodayHubStore,
     todayHubSnapshotStore: TodayHubSnapshotStore,
     warmNote: WarmNote,
+    noteOpenGate: NoteOpenGate,
     workspaceRoot: File?,
     currentRoute: String?,
     entry: NavBackStackEntry,
@@ -162,7 +163,14 @@ internal fun AppInboxRoute(
         onPullToRefreshSync = appSyncViewModel::syncFromPull,
         onRetry = inboxViewModel::refresh,
         onNoteClick = { noteId: NoteId ->
-            scope.openNoteWithWarmBudget(warmNote, currentConfig, filesDir, navController, noteId)
+            noteOpenGate.openNoteWithWarmBudget(
+                scope,
+                warmNote,
+                currentConfig,
+                filesDir,
+                navController,
+                noteId
+            )
         },
         onAvatarClick = inboxViewModel::toggleSelection,
         onClearSelection = inboxViewModel::clearSelection,
@@ -176,7 +184,8 @@ internal fun AppInboxRoute(
                 onNextWeek = todayHubViewModel::nextWeek,
                 onRetry = todayHubViewModel::retry,
                 onOpenInternalNote = { targetId ->
-                    scope.openNoteWithWarmBudget(
+                    noteOpenGate.openNoteWithWarmBudget(
+                        scope,
                         warmNote,
                         currentConfig,
                         filesDir,
@@ -200,7 +209,8 @@ internal fun AppInboxRoute(
             registry = registry,
             onPickNote = { picked ->
                 ambiguousCandidates = null
-                scope.openNoteWithWarmBudget(
+                noteOpenGate.openNoteWithWarmBudget(
+                    scope,
                     warmNote,
                     currentConfig,
                     filesDir,

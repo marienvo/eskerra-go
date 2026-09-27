@@ -5,6 +5,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -70,6 +71,7 @@ internal data class AppNavGraphContext(
     val currentRoute: String?,
     val navController: NavHostController,
     val scope: CoroutineScope,
+    val noteOpenGate: NoteOpenGate,
     val appSyncViewModel: AppSyncViewModel,
     val syncState: SyncUiState,
     val homeReselectSignal: Int,
@@ -121,6 +123,7 @@ internal fun NavGraphBuilder.homeGraph(ctx: AppNavGraphContext) {
                 activeTodayHubStore = ctx.activeTodayHubStore,
                 todayHubSnapshotStore = ctx.todayHubSnapshotStore,
                 warmNote = ctx.warmNote,
+                noteOpenGate = ctx.noteOpenGate,
                 workspaceRoot = ctx.workspaceRoot,
                 currentRoute = ctx.currentRoute,
                 entry = entry,
@@ -151,6 +154,7 @@ internal fun NavGraphBuilder.sharedDestinations(ctx: AppNavGraphContext) {
             currentConfig = ctx.currentConfig,
             filesDir = ctx.filesDir,
             warmNote = ctx.warmNote,
+            noteOpenGate = ctx.noteOpenGate,
             searchViewModel = ctx.searchViewModel,
             navController = ctx.navController,
             entry = entry
@@ -232,6 +236,7 @@ internal fun NavGraphBuilder.sharedDestinations(ctx: AppNavGraphContext) {
             navArgument(AppRoute.NOTE_ARG) { type = NavType.StringType }
         )
     ) { entry ->
+        val noteRouteScope = rememberCoroutineScope()
         val raw = entry.arguments?.getString(AppRoute.NOTE_ARG).orEmpty()
         val noteId = AppRoute.decodeNoteId(raw)
         // Same instance the shared markdown renderers read from (provided at the AppRoot level), so
@@ -263,7 +268,8 @@ internal fun NavGraphBuilder.sharedDestinations(ctx: AppNavGraphContext) {
             onRetry = noteReaderViewModel::retry,
             onEdit = { ctx.navController.navigate(AppRoute.editor(noteId)) },
             onOpenInternalNote = { targetId: NoteId ->
-                ctx.scope.openNoteWithWarmBudget(
+                ctx.noteOpenGate.openNoteWithWarmBudget(
+                    noteRouteScope,
                     ctx.warmNote,
                     ctx.currentConfig,
                     ctx.filesDir,
@@ -291,7 +297,8 @@ internal fun NavGraphBuilder.sharedDestinations(ctx: AppNavGraphContext) {
                 registry = registry,
                 onPickNote = { picked ->
                     ambiguousCandidates = null
-                    ctx.scope.openNoteWithWarmBudget(
+                    ctx.noteOpenGate.openNoteWithWarmBudget(
+                        noteRouteScope,
                         ctx.warmNote,
                         ctx.currentConfig,
                         ctx.filesDir,

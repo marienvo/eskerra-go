@@ -20,6 +20,7 @@ internal fun AppSearchRoute(
     currentConfig: WorkspaceConfig,
     filesDir: File,
     warmNote: WarmNote,
+    noteOpenGate: NoteOpenGate,
     searchViewModel: SearchViewModel,
     navController: NavHostController,
     entry: NavBackStackEntry
@@ -44,7 +45,14 @@ internal fun AppSearchRoute(
         state = state,
         query = query,
         onOpenNote = { noteId: NoteId ->
-            scope.openNoteWithWarmBudget(warmNote, currentConfig, filesDir, navController, noteId)
+            noteOpenGate.openNoteWithWarmBudget(
+                scope,
+                warmNote,
+                currentConfig,
+                filesDir,
+                navController,
+                noteId
+            )
         },
         onRetryIndex = searchViewModel::retryIndex
     )

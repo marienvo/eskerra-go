@@ -7,6 +7,7 @@ import com.eskerra.go.core.usecase.WarmNote
 import com.eskerra.go.data.perf.NoteNavTrace
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -24,18 +25,40 @@ internal const val NOTE_OPEN_WARM_BUDGET_MS = 150L
  * lands on a link inside a note, an ambiguous-link pick, an inbox tile, a Today Hub cell link, or a
  * search result.
  */
-internal fun CoroutineScope.openNoteWithWarmBudget(
+/** Coordinates pending note opens so a newer tap always wins over an older warming request. */
+internal class NoteOpenGate {
+    private var pendingOpen: Job? = null
+    private var latestRequestId = 0L
+
+    fun open(
+        scope: CoroutineScope,
+        warm: suspend () -> Unit,
+        onReadyToNavigate: (warmedInBudget: Boolean) -> Unit
+    ) {
+        val requestId = ++latestRequestId
+        pendingOpen?.cancel()
+        pendingOpen = scope.launch {
+            val warmedInBudget = withTimeoutOrNull(NOTE_OPEN_WARM_BUDGET_MS) { warm() } != null
+            if (requestId == latestRequestId) {
+                onReadyToNavigate(warmedInBudget)
+            }
+        }
+    }
+}
+
+internal fun NoteOpenGate.openNoteWithWarmBudget(
+    scope: CoroutineScope,
     warmNote: WarmNote,
     config: WorkspaceConfig,
     filesDir: File,
     navController: NavHostController,
     noteId: NoteId
 ) {
-    launch {
-        NoteNavTrace.log("tap.start", "noteId=${noteId.value}")
-        val warmedInBudget = withTimeoutOrNull(NOTE_OPEN_WARM_BUDGET_MS) {
-            warmNote(config, filesDir, noteId)
-        } != null
+    NoteNavTrace.log("tap.start", "noteId=${noteId.value}")
+    open(
+        scope = scope,
+        warm = { warmNote(config, filesDir, noteId) }
+    ) { warmedInBudget ->
         NoteNavTrace.log(
             "tap.warmed",
             "noteId=${noteId.value} withinBudget=$warmedInBudget"
