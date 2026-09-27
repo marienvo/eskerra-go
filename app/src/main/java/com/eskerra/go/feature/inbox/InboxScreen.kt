@@ -5,12 +5,16 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -32,12 +36,17 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.eskerra.go.app.HideShellTopScrim
 import com.eskerra.go.app.LocalShellChromeInsets
-import com.eskerra.go.app.shellScrollContentPadding
+import com.eskerra.go.app.ShellChromeButtonSize
+import com.eskerra.go.app.ShellChromeCenterFromStatusBar
 import com.eskerra.go.core.datetime.RelativeCalendarLabel
 import com.eskerra.go.core.inbox.InboxTileColor
 import com.eskerra.go.core.model.NoteId
@@ -50,6 +59,13 @@ import com.eskerra.go.ui.theme.EskerraHeadingH1
 
 /** Fixed height for the shared top row so switching in/out of selection never shifts the list. */
 private val InboxTopBarHeight = 56.dp
+
+/**
+ * Keeps this row's trailing content clear of the floating hamburger, which now shares its
+ * vertical center line. Applies to both the hub header (long hub name) and the selection bar
+ * (delete button), which alternate in the same slot.
+ */
+private val InboxTopRowEndPadding = 16.dp + ShellChromeButtonSize
 
 /**
  * Stateless home screen: inbox list (or empty/error) with Today Hub below.
@@ -79,6 +95,9 @@ fun InboxScreen(
     val listState = rememberLazyListState()
     val pullRefreshState = rememberPullToRefreshState()
     val chrome = LocalShellChromeInsets.current
+    val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    // Aligns the hub header's vertical center with the floating hamburger's center line.
+    val headerTopPadding = statusBarTop + ShellChromeCenterFromStatusBar - InboxTopBarHeight / 2
 
     // Home re-selection from a drill-down bumps the signal; jump the list back to the top.
     LaunchedEffect(scrollToTopSignal) {
@@ -86,6 +105,9 @@ fun InboxScreen(
             listState.animateScrollToItem(0)
         }
     }
+
+    val atTop by remember { derivedStateOf { !listState.canScrollBackward } }
+    HideShellTopScrim(hidden = atTop)
 
     PullToRefreshBox(
         isRefreshing = isSyncing,
@@ -105,11 +127,17 @@ fun InboxScreen(
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
-            contentPadding = shellScrollContentPadding()
+            contentPadding = PaddingValues(
+                start = 16.dp,
+                top = headerTopPadding,
+                end = 16.dp,
+                bottom = chrome.bottom
+            )
         ) {
             // Top row shares one slot: selection actions while notes are selected, otherwise the hub
             // chrome (title, hub switcher). Both branches share InboxTopBarHeight so toggling selection
-            // never shifts the list below.
+            // never shifts the list below. Its center line matches the floating hamburger's; the
+            // extra end padding keeps a long hub name from running under that button.
             item {
                 if (hasSelection) {
                     InboxSelectionBar(
@@ -124,7 +152,7 @@ fun InboxScreen(
                         onSelectHub = onSelectHub,
                         modifier = Modifier
                             .height(InboxTopBarHeight)
-                            .padding(horizontal = 16.dp)
+                            .padding(start = 16.dp, end = InboxTopRowEndPadding)
                     )
                 }
             }
@@ -224,7 +252,7 @@ private fun InboxSelectionBar(
         modifier = Modifier
             .fillMaxWidth()
             .height(InboxTopBarHeight)
-            .padding(horizontal = 8.dp),
+            .padding(start = 8.dp, end = InboxTopRowEndPadding),
         verticalAlignment = Alignment.CenterVertically
     ) {
         IconButton(onClick = onClearSelection, enabled = !isDeleting) {
