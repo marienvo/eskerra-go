@@ -21,6 +21,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.eskerra.go.data.perf.ColdStartTrace
 import com.eskerra.go.feature.sync.SyncSpinner
@@ -29,7 +31,9 @@ import com.eskerra.go.feature.sync.SyncSpinner
  * Floating navigation shell. It overlays controls on top of the current screen:
  * - top and bottom edge scrims so content fades under the floating chrome
  * - a bottom new-note input while reading the vault
- * - a top-right hamburger Menu button carrying the sync count/attention badge
+ * - a top-right hamburger Menu button carrying the sync count/attention badge; while a sync is
+ *   spinning (and pull-to-refresh isn't already showing its own indicator), the Menu glyph itself
+ *   is swapped for the rotating sync glyph, same color, same button — no separate badge dot
  * - an optional top-left floating Back button (note reader) sharing the hamburger's center line
  *
  * The shell owns no app state. It reports the menu overlay through [onMenuClick], and renders the
@@ -87,20 +91,31 @@ fun AppShell(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                val showSpinner = syncIndicator?.spinning == true && !pullToRefreshActive
                 BadgedBox(
                     badge = {
                         val badgeText = syncIndicator?.badgeText
-                        if (syncIndicator?.spinning == true) {
-                            if (!pullToRefreshActive) {
-                                Badge { SyncSpinner(modifier = Modifier.size(8.dp)) }
-                            }
-                        } else if (badgeText != null) {
+                        if (syncIndicator?.spinning != true && badgeText != null) {
                             Badge { Text(badgeText) }
                         }
                     }
                 ) {
                     ShellChromeButton(onClick = onMenuClick) {
-                        Icon(Icons.Filled.Menu, contentDescription = "Menu")
+                        Box(
+                            modifier = Modifier.size(24.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (showSpinner) {
+                                SyncSpinner(
+                                    modifier = Modifier
+                                        .size(20.dp)
+                                        .semantics { contentDescription = "Menu, syncing" },
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Icon(Icons.Filled.Menu, contentDescription = "Menu")
+                            }
+                        }
                     }
                 }
             }
