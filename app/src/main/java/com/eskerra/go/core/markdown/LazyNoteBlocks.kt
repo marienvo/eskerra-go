@@ -38,22 +38,41 @@ object LazyNoteBlocks {
 
     const val LIST_ITEM_CHUNK_SIZE = 10
 
-    fun split(prepared: PreparedMarkdown): List<PreparedSegment> {
-        val segments = mutableListOf<PreparedSegment>()
+    /** A lazy render item and its source range in [PreparedMarkdownLinks]' coordinate space. */
+    data class Block(
+        val segment: PreparedSegment,
+        val sourceStartOffset: Int,
+        val sourceEndOffset: Int
+    )
+
+    fun split(prepared: PreparedMarkdown): List<PreparedSegment> =
+        splitWithSourceRanges(prepared).map { it.segment }
+
+    fun splitWithSourceRanges(prepared: PreparedMarkdown): List<Block> {
+        val blocks = mutableListOf<Block>()
+        var cursor = 0
         for (segment in prepared.segments) {
             when (segment) {
-                is PreparedSegment.Markdown -> splitMarkdownRun(segment.state, segments)
-                is PreparedSegment.Callout -> segments += segment
+                is PreparedSegment.Markdown -> {
+                    splitMarkdownRun(segment.state, cursor, blocks)
+                    cursor += contentLength(segment.state)
+                }
+
+                is PreparedSegment.Callout -> {
+                    val length = segment.body?.let(::contentLength) ?: 0
+                    blocks += Block(segment, cursor, cursor + length)
+                    cursor += length
+                }
             }
         }
-        return segments
+        return blocks
     }
 
-    private fun splitMarkdownRun(state: State, into: MutableList<PreparedSegment>) {
+    private fun splitMarkdownRun(state: State, cursor: Int, into: MutableList<Block>) {
         val success = state as? State.Success
         val topLevel = success?.node?.children?.filter { isRenderableTopLevel(it.type) }
         if (success == null || topLevel.isNullOrEmpty()) {
-            into += PreparedSegment.Markdown(state)
+            into += Block(PreparedSegment.Markdown(state), cursor, cursor + contentLength(state))
             return
         }
         for (child in topLevel) {
@@ -63,13 +82,23 @@ object LazyNoteBlocks {
             ) {
                 items.chunked(LIST_ITEM_CHUNK_SIZE).forEach { chunk ->
                     val innerList = GroupedNode(MarkdownElementTypes.UNORDERED_LIST, chunk)
-                    into += PreparedSegment.Markdown(regroup(success, listOf(innerList)))
+                    into += Block(
+                        segment = PreparedSegment.Markdown(regroup(success, listOf(innerList))),
+                        sourceStartOffset = cursor + chunk.first().startOffset,
+                        sourceEndOffset = cursor + chunk.last().endOffset
+                    )
                 }
             } else {
-                into += PreparedSegment.Markdown(regroup(success, listOf(child)))
+                into += Block(
+                    segment = PreparedSegment.Markdown(regroup(success, listOf(child))),
+                    sourceStartOffset = cursor + child.startOffset,
+                    sourceEndOffset = cursor + child.endOffset
+                )
             }
         }
     }
+
+    private fun contentLength(state: State): Int = (state as? State.Success)?.content?.length ?: 0
 
     private fun isRenderableTopLevel(type: IElementType): Boolean =
         type != MarkdownTokenTypes.EOL &&

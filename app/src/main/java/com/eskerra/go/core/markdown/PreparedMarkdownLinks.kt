@@ -25,8 +25,8 @@ import org.intellij.markdown.ast.ASTNode
  */
 object PreparedMarkdownLinks {
 
-    /** [targets] in first-seen order, plus the synthesized total length [orderByViewport] scales against. */
-    data class Result(val targets: List<PrefetchLinkTargets.Target>, val totalLength: Int)
+    /** [targets] in first-seen order, with source offsets used by [PrefetchLinkTargets]. */
+    data class Result(val targets: List<PrefetchLinkTargets.Target>)
 
     fun resolve(prepared: PreparedMarkdown, sourceNoteId: NoteId, registry: NoteRegistry): Result {
         val offsetByNoteId = LinkedHashMap<NoteId, Int>()
@@ -49,7 +49,7 @@ object PreparedMarkdownLinks {
         val targets = offsetByNoteId.map { (noteId, offset) ->
             PrefetchLinkTargets.Target(noteId, offset)
         }
-        return Result(targets, cursor)
+        return Result(targets)
     }
 
     /** Walks one parsed run's AST, resolving every internal link into [into]; returns the next cursor. */

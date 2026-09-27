@@ -79,6 +79,21 @@ class LazyNoteBlocksTest {
     }
 
     @Test
+    fun sourceRanges_followTheOriginalMarkdownAcrossUnevenBlocks() = runTest {
+        val longFirst = "a".repeat(100)
+        val markdown = "$longFirst\n\nshort"
+        val prepared = prepareVaultMarkdown(markdown)
+
+        val blocks = LazyNoteBlocks.splitWithSourceRanges(prepared)
+
+        assertEquals(2, blocks.size)
+        assertEquals(0, blocks[0].sourceStartOffset)
+        assertEquals(longFirst.length, blocks[0].sourceEndOffset)
+        assertEquals(markdown.indexOf("short"), blocks[1].sourceStartOffset)
+        assertEquals(markdown.length, blocks[1].sourceEndOffset)
+    }
+
+    @Test
     fun largeOrderedList_isNotChunked() = runTest {
         val markdown = (1..25).joinToString("\n") { "$it. item $it" }
         val prepared = prepareVaultMarkdown(markdown)

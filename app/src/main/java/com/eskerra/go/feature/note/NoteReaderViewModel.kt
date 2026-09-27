@@ -92,8 +92,8 @@ class NoteReaderViewModel(
                     schedulePrefetch(
                         document,
                         preparedBody,
-                        visibleStartFraction = 0f,
-                        visibleEndFraction = 0f
+                        visibleStartOffset = 0,
+                        visibleEndOffset = 0
                     )
                 },
                 onFailure = { error ->
@@ -103,16 +103,11 @@ class NoteReaderViewModel(
         }
     }
 
-    /**
-     * Reports which fraction of this note's body is currently scrolled into view (`0f` = top,
-     * `1f` = bottom), so the shared [NotePrefetchScheduler] batch can be reprioritized toward the
-     * links actually on screen as the user scrolls. The caller (`NoteScreen`) debounces this; it is
-     * a no-op before the note has finished loading.
-     */
-    fun onViewportChanged(visibleStartFraction: Float, visibleEndFraction: Float) {
+    /** Reports the original markdown range that is visible, so prefetch follows visible links. */
+    fun onViewportChanged(visibleStartOffset: Int, visibleEndOffset: Int) {
         val document = currentDocument ?: return
         val preparedBody = currentPreparedBody ?: return
-        schedulePrefetch(document, preparedBody, visibleStartFraction, visibleEndFraction)
+        schedulePrefetch(document, preparedBody, visibleStartOffset, visibleEndOffset)
     }
 
     /**
@@ -128,8 +123,8 @@ class NoteReaderViewModel(
     private fun schedulePrefetch(
         document: NoteReaderDocument,
         preparedBody: PreparedMarkdown,
-        visibleStartFraction: Float,
-        visibleEndFraction: Float
+        visibleStartOffset: Int,
+        visibleEndOffset: Int
     ) {
         val scheduler = notePrefetchScheduler ?: return
         val resolved = PreparedMarkdownLinks.resolve(
@@ -140,9 +135,8 @@ class NoteReaderViewModel(
         if (resolved.targets.isEmpty()) return
         val ordered = PrefetchLinkTargets.orderByViewport(
             targets = resolved.targets,
-            markdownLength = resolved.totalLength,
-            visibleStartFraction = visibleStartFraction,
-            visibleEndFraction = visibleEndFraction
+            visibleStartOffset = visibleStartOffset,
+            visibleEndOffset = visibleEndOffset
         )
         NoteNavTrace.log(
             "prefetch.submit",

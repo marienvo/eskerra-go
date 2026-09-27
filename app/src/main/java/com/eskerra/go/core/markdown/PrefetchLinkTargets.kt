@@ -14,26 +14,24 @@ object PrefetchLinkTargets {
     data class Target(val noteId: NoteId, val sourceOffset: Int)
 
     /**
-     * Orders [targets] by distance to the visible window `[visibleStartFraction, visibleEndFraction]`
-     * of a [markdownLength]-character body: a target whose link falls inside the visible window sorts
+     * Orders [targets] by distance to the visible source window
+     * `[visibleStartOffset, visibleEndOffset]`: a target whose link falls inside the visible window sorts
      * first, then targets are ranked by distance to the nearest edge of that window. Ties keep
-     * [targets]' incoming (first-seen) order. Falls back to that incoming order when [markdownLength]
-     * is not positive.
+     * [targets]' incoming (first-seen) order.
      */
     fun orderByViewport(
         targets: List<Target>,
-        markdownLength: Int,
-        visibleStartFraction: Float,
-        visibleEndFraction: Float
+        visibleStartOffset: Int,
+        visibleEndOffset: Int
     ): List<NoteId> {
-        if (markdownLength <= 0 || targets.isEmpty()) return targets.map { it.noteId }
+        if (targets.isEmpty()) return emptyList()
 
-        val visibleStart = (visibleStartFraction.coerceIn(0f, 1f) * markdownLength)
-        val visibleEnd = (visibleEndFraction.coerceIn(0f, 1f) * markdownLength)
-        fun distanceToVisibleWindow(offset: Int): Float = when {
+        val visibleStart = minOf(visibleStartOffset, visibleEndOffset)
+        val visibleEnd = maxOf(visibleStartOffset, visibleEndOffset)
+        fun distanceToVisibleWindow(offset: Int): Int = when {
             offset < visibleStart -> visibleStart - offset
             offset > visibleEnd -> offset - visibleEnd
-            else -> 0f
+            else -> 0
         }
 
         return targets.sortedBy { distanceToVisibleWindow(it.sourceOffset) }.map { it.noteId }

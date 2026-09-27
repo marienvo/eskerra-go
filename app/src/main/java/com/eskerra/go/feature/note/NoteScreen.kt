@@ -56,8 +56,8 @@ fun NoteScreen(
     onNoteNotFound: (String) -> Unit = {},
     workspaceRoot: File? = null,
     onViewportChanged: (
-        visibleStartFraction: Float,
-        visibleEndFraction: Float
+        visibleStartOffset: Int,
+        visibleEndOffset: Int
     ) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
@@ -128,11 +128,11 @@ private fun NoteReaderContent(
     onAmbiguousWikiLink: (List<NoteId>, String) -> Unit,
     onNoteNotFound: (String) -> Unit,
     workspaceRoot: File?,
-    onViewportChanged: (visibleStartFraction: Float, visibleEndFraction: Float) -> Unit
+    onViewportChanged: (visibleStartOffset: Int, visibleEndOffset: Int) -> Unit
 ) {
     val chrome = LocalShellChromeInsets.current
     val listState = rememberLazyListState()
-    val segments = remember(preparedBody) { LazyNoteBlocks.split(preparedBody) }
+    val blocks = remember(preparedBody) { LazyNoteBlocks.splitWithSourceRanges(preparedBody) }
 
     // Debug-only: marks the first frame this note's content is actually on screen, so a logcat
     // read can measure composition + layout cost (reader.published -> reader.firstFrame) — the
@@ -142,21 +142,20 @@ private fun NoteReaderContent(
         withFrameNanos { }
         NoteNavTrace.log("reader.firstFrame", "noteId=${sourceNoteId.value}")
     }
-    // Reports which slice of segments is visible (0f = top, 1f = bottom) so background prefetch
-    // follows scrolling. Debounced: this is a priority hint, not something needing per-frame react.
-    LaunchedEffect(listState, segments) {
-        val segmentCount = segments.size
-        if (segmentCount == 0) return@LaunchedEffect
+    // Reports the visible blocks' original markdown range so prefetch follows actual visible links.
+    LaunchedEffect(listState, blocks) {
+        if (blocks.isEmpty()) return@LaunchedEffect
         snapshotFlow { listState.layoutInfo.visibleItemsInfo }
             .distinctUntilChanged()
             .debounce(150)
             .collect { visible ->
-                val visibleSegmentIndexes = visible
+                val visibleBlocks = visible
                     .map { it.index - NOTE_READER_HEADER_ITEM_COUNT }
-                    .filter { it in 0 until segmentCount }
-                if (visibleSegmentIndexes.isEmpty()) return@collect
-                val start = visibleSegmentIndexes.min().toFloat() / segmentCount
-                val end = (visibleSegmentIndexes.max() + 1).toFloat() / segmentCount
+                    .filter { it in blocks.indices }
+                    .map(blocks::get)
+                if (visibleBlocks.isEmpty()) return@collect
+                val start = visibleBlocks.minOf { it.sourceStartOffset }
+                val end = visibleBlocks.maxOf { it.sourceEndOffset }
                 onViewportChanged(start, end)
             }
     }
@@ -222,11 +221,11 @@ private fun NoteReaderContent(
             }
         }
         itemsIndexed(
-            items = segments,
-            key = { index, segment -> noteSegmentKey(index, segment) }
-        ) { _, segment ->
+            items = blocks,
+            key = { index, block -> noteSegmentKey(index, block.segment) }
+        ) { _, block ->
             VaultMarkdownSegmentContent(
-                segment = segment,
+                segment = block.segment,
                 colors = colors,
                 typography = typography,
                 annotator = annotator,

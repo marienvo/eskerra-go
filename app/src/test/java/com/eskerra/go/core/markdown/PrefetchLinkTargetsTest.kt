@@ -13,9 +13,8 @@ class PrefetchLinkTargetsTest {
 
         val result = PrefetchLinkTargets.orderByViewport(
             targets = listOf(far, near),
-            markdownLength = 1000,
-            visibleStartFraction = 0.45f,
-            visibleEndFraction = 0.55f
+            visibleStartOffset = 450,
+            visibleEndOffset = 550
         )
 
         assertEquals(listOf(NoteId("Near.md"), NoteId("Far.md")), result)
@@ -28,26 +27,24 @@ class PrefetchLinkTargetsTest {
 
         val result = PrefetchLinkTargets.orderByViewport(
             targets = listOf(furthest, closest),
-            markdownLength = 1000,
-            visibleStartFraction = 0f,
-            visibleEndFraction = 0.1f
+            visibleStartOffset = 0,
+            visibleEndOffset = 100
         )
 
         assertEquals(listOf(NoteId("Closest.md"), NoteId("Furthest.md")), result)
     }
 
     @Test
-    fun orderByViewport_fallsBackToIncomingOrder_whenLengthNotPositive() {
+    fun orderByViewport_ordersUsingOffsetsWithoutDocumentLength() {
         val a = PrefetchLinkTargets.Target(NoteId("A.md"), sourceOffset = 5)
         val b = PrefetchLinkTargets.Target(NoteId("B.md"), sourceOffset = 1)
 
         val result = PrefetchLinkTargets.orderByViewport(
             targets = listOf(a, b),
-            markdownLength = 0,
-            visibleStartFraction = 0f,
-            visibleEndFraction = 1f
+            visibleStartOffset = 1,
+            visibleEndOffset = 1
         )
 
-        assertEquals(listOf(NoteId("A.md"), NoteId("B.md")), result)
+        assertEquals(listOf(NoteId("B.md"), NoteId("A.md")), result)
     }
 }
