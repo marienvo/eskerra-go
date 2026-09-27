@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -16,6 +17,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -28,6 +30,7 @@ import com.eskerra.go.feature.sync.SyncSpinner
  * - top and bottom edge scrims so content fades under the floating chrome
  * - a bottom new-note input while reading the vault
  * - a top-right hamburger Menu button carrying the sync count/attention badge
+ * - an optional top-left floating Back button (note reader) sharing the hamburger's center line
  *
  * The shell owns no app state. It reports the menu overlay through [onMenuClick], and renders the
  * active screen edge-to-edge via [content]. Scrollable screens
@@ -40,13 +43,18 @@ fun AppShell(
     pullToRefreshActive: Boolean = false,
     shellInput: ShellInputPresentation? = null,
     onMenuClick: () -> Unit,
+    onBack: (() -> Unit)? = null,
     content: @Composable (contentModifier: Modifier) -> Unit
 ) {
     val chromeInsets = rememberShellChromeInsets(
         newNoteInputVisible = shellInput?.visible == true
     )
+    val topScrimController = remember { ShellTopScrimController() }
 
-    CompositionLocalProvider(LocalShellChromeInsets provides chromeInsets) {
+    CompositionLocalProvider(
+        LocalShellChromeInsets provides chromeInsets,
+        LocalShellTopScrim provides topScrimController
+    ) {
         Box(modifier = Modifier.fillMaxSize()) {
             content(
                 Modifier
@@ -54,11 +62,23 @@ fun AppShell(
                     .shellEdgeScrimOverlay()
             )
 
+            if (onBack != null) {
+                ShellChromeButton(
+                    onClick = onBack,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .statusBarsPadding()
+                        .padding(start = 16.dp, top = ShellChromeButtonTop)
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                }
+            }
+
             Row(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .statusBarsPadding()
-                    .padding(start = 16.dp, end = 16.dp, top = 9.dp, bottom = 16.dp),
+                    .padding(start = 16.dp, end = 16.dp, top = ShellChromeButtonTop, bottom = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {

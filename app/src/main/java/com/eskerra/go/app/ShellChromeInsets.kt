@@ -14,6 +14,12 @@ import androidx.compose.ui.unit.dp
 internal val ShellTopChromeHeight = 56.dp
 internal val ShellNewNoteInputHeight = 88.dp
 
+/** Top padding applied to every floating chrome button (hamburger, back) below the status bar. */
+internal val ShellChromeButtonTop = 9.dp
+
+/** Vertical center line of the floating chrome buttons, measured from the status bar's bottom edge. */
+internal val ShellChromeCenterFromStatusBar = ShellChromeButtonTop + ShellChromeButtonSize / 2
+
 private val ShellHorizontalContentPadding = 16.dp
 
 data class ShellChromeInsets(val top: Dp, val bottom: Dp) {
