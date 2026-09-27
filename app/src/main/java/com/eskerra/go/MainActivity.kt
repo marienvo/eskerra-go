@@ -50,6 +50,7 @@ import com.eskerra.go.data.notes.FileInboxSnapshotStore
 import com.eskerra.go.data.notes.FileNoteWriteRepository
 import com.eskerra.go.data.notes.ParsedMarkdownCache
 import com.eskerra.go.data.perf.ColdStartTrace
+import com.eskerra.go.data.perf.NoteNavTrace
 import com.eskerra.go.data.search.SqliteVaultSearchRepository
 import com.eskerra.go.data.share.OkHttpPageTitleFetcher
 import com.eskerra.go.data.sync.SyncRuntimeProvider
@@ -110,7 +111,14 @@ class MainActivity : ComponentActivity() {
         )
         val warmNote = WarmNote(
             contentCache = noteContentCache,
-            parsedMarkdownCache = parsedMarkdownCache
+            parsedMarkdownCache = parsedMarkdownCache,
+            onWarmed = { warmedNoteId, contentMs, parseMs, loaded ->
+                NoteNavTrace.log(
+                    "warm.done",
+                    "noteId=${warmedNoteId.value} loaded=$loaded " +
+                        "contentMs=$contentMs parseMs=$parseMs"
+                )
+            }
         )
         val notePrefetchScheduler = NotePrefetchScheduler(warmNote = warmNote)
         val createInboxNote = CreateInboxNote(

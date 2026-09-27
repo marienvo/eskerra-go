@@ -13,6 +13,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -21,6 +22,7 @@ import com.eskerra.go.core.markdown.PreparedMarkdown
 import com.eskerra.go.core.markdown.VaultReadonlyLink
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NoteRegistry
+import com.eskerra.go.data.perf.NoteNavTrace
 import com.eskerra.go.ui.markdown.VaultMarkdownView
 import java.io.File
 import kotlinx.coroutines.flow.debounce
@@ -113,6 +115,14 @@ private fun NoteReaderContent(
 ) {
     val chrome = LocalShellChromeInsets.current
     val scrollState = rememberScrollState()
+    // Debug-only: marks the first frame this note's content is actually on screen, so a logcat
+    // read can measure composition + layout cost (reader.published -> reader.firstFrame) — the
+    // part no cache can shrink. Keyed on sourceNoteId so it fires once per distinct note shown,
+    // not on every unrelated recomposition.
+    LaunchedEffect(sourceNoteId) {
+        withFrameNanos { }
+        NoteNavTrace.log("reader.firstFrame", "noteId=${sourceNoteId.value}")
+    }
     // Reports the top-of-viewport fraction (a point, not a window — cheap and close enough to
     // reorder background prefetch toward what's on screen) so link prefetch follows scrolling.
     // Debounced: this is a priority hint, not something that needs to react every frame.

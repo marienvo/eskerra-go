@@ -14,6 +14,7 @@ import com.eskerra.go.core.repository.ParsedMarkdownCachePort
 import com.eskerra.go.core.usecase.LoadNoteForReading
 import com.eskerra.go.core.usecase.NotePrefetchScheduler
 import com.eskerra.go.data.notes.ParsedMarkdownCache
+import com.eskerra.go.data.perf.NoteNavTrace
 import java.io.File
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -48,16 +49,27 @@ class NoteReaderViewModel(
     private fun load() {
         loadJob?.cancel()
         currentDocument = null
+        NoteNavTrace.log("reader.load.start", "noteId=${noteId.value}")
         loadJob = viewModelScope.launch {
+            val loadStartMs = System.currentTimeMillis()
             loadNoteForReading(config, filesDir, noteId, viewModelScope).fold(
                 onSuccess = { document ->
+                    NoteNavTrace.log(
+                        "reader.content",
+                        "noteId=${noteId.value} tookMs=${System.currentTimeMillis() - loadStartMs}"
+                    )
                     val bodyMarkdown = VaultMarkdownPreprocess.stripTitleHeading(
                         document.content.markdown
                     )
                     // Prepare the body before publishing Content: on a warm cache hit this does not
                     // suspend, so title and body always reach the screen together (never title-first,
                     // never an empty flash on the frame the reader appears).
+                    val prepareStartMs = System.currentTimeMillis()
                     val preparedBody = parsedMarkdownCache.get(bodyMarkdown)
+                    NoteNavTrace.log(
+                        "reader.prepared",
+                        "noteId=${noteId.value} tookMs=${System.currentTimeMillis() - prepareStartMs}"
+                    )
                     _uiState.value = NoteReaderUiState.Content(
                         title = document.note.title,
                         noteId = document.note.id,
@@ -66,6 +78,10 @@ class NoteReaderViewModel(
                         document = document,
                         bodyMarkdown = bodyMarkdown,
                         preparedBody = preparedBody
+                    )
+                    NoteNavTrace.log(
+                        "reader.published",
+                        "noteId=${noteId.value} totalMs=${System.currentTimeMillis() - loadStartMs}"
                     )
                     currentDocument = document
                     schedulePrefetch(document, visibleStartFraction = 0f, visibleEndFraction = 0f)
@@ -111,6 +127,11 @@ class NoteReaderViewModel(
             markdownLength = document.content.markdown.length,
             visibleStartFraction = visibleStartFraction,
             visibleEndFraction = visibleEndFraction
+        )
+        NoteNavTrace.log(
+            "prefetch.submit",
+            "source=note:${document.note.id.value} count=${ordered.size} " +
+                "targets=${ordered.map { it.value }}"
         )
         scheduler.submit(config, filesDir, ordered)
     }

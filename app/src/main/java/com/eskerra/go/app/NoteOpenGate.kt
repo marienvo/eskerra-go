@@ -4,6 +4,7 @@ import androidx.navigation.NavHostController
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.usecase.WarmNote
+import com.eskerra.go.data.perf.NoteNavTrace
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -31,7 +32,15 @@ internal fun CoroutineScope.openNoteWithWarmBudget(
     noteId: NoteId
 ) {
     launch {
-        withTimeoutOrNull(NOTE_OPEN_WARM_BUDGET_MS) { warmNote(config, filesDir, noteId) }
+        NoteNavTrace.log("tap.start", "noteId=${noteId.value}")
+        val warmedInBudget = withTimeoutOrNull(NOTE_OPEN_WARM_BUDGET_MS) {
+            warmNote(config, filesDir, noteId)
+        } != null
+        NoteNavTrace.log(
+            "tap.warmed",
+            "noteId=${noteId.value} withinBudget=$warmedInBudget"
+        )
         navController.navigate(AppRoute.note(noteId))
+        NoteNavTrace.log("tap.navigate", "noteId=${noteId.value}")
     }
 }

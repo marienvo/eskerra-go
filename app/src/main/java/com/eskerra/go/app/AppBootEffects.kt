@@ -14,6 +14,7 @@ import com.eskerra.go.core.usecase.NotePrefetchScheduler
 import com.eskerra.go.core.usecase.ReconcileWorkspaceSyncBranch
 import com.eskerra.go.core.usecase.ReportWeeklyPerformance
 import com.eskerra.go.data.perf.ColdStartTrace
+import com.eskerra.go.data.perf.NoteNavTrace
 import com.eskerra.go.feature.sync.AppSyncViewModel
 import com.eskerra.go.feature.todayhub.TodayHubPrefetchTargets
 import com.eskerra.go.feature.todayhub.TodayHubUiState
@@ -95,6 +96,10 @@ internal fun AppBootEffects(
         withFrameNanos { }
         delay(HOME_PREFETCH_DELAY_MS)
         val targets = TodayHubPrefetchTargets.resolve(todayHubContent)
+        NoteNavTrace.log(
+            "prefetch.submit",
+            "source=home count=${targets.size} targets=${targets.map { it.value }}"
+        )
         if (targets.isNotEmpty()) {
             notePrefetchScheduler.submit(config, filesDir, targets)
         }

@@ -17,13 +17,34 @@ import java.io.File
  *
  * Best effort: a missing or unreadable note is silently skipped (`load` returns a `Result`), never
  * surfaced here — the caller's own load path is what reports real failures to the user.
+ *
+ * @param onWarmed optional telemetry hook (core stays free of a concrete logger dependency per the
+ *   layering ADR; the composition root wires this to `NoteNavTrace`). Reports how long the content
+ *   load and the parse-warm step each took, and whether the note actually loaded. A near-zero
+ *   [contentMs]/[parseMs] indicates a cache hit; a real load/parse takes measurably longer.
  */
 class WarmNote(
     private val contentCache: NoteContentCachePort,
-    private val parsedMarkdownCache: ParsedMarkdownCachePort
+    private val parsedMarkdownCache: ParsedMarkdownCachePort,
+    private val onWarmed: (
+        noteId: NoteId,
+        contentMs: Long,
+        parseMs: Long,
+        loaded: Boolean
+    ) -> Unit =
+        { _, _, _, _ -> }
 ) {
     suspend operator fun invoke(config: WorkspaceConfig, filesDir: File, noteId: NoteId) {
-        val content = contentCache.load(config, filesDir, noteId).getOrNull() ?: return
+        val contentStartMs = System.currentTimeMillis()
+        val content = contentCache.load(config, filesDir, noteId).getOrNull()
+        val contentMs = System.currentTimeMillis() - contentStartMs
+        if (content == null) {
+            onWarmed(noteId, contentMs, 0L, false)
+            return
+        }
+        val parseStartMs = System.currentTimeMillis()
         parsedMarkdownCache.warm(VaultMarkdownPreprocess.stripTitleHeading(content.markdown))
+        val parseMs = System.currentTimeMillis() - parseStartMs
+        onWarmed(noteId, contentMs, parseMs, true)
     }
 }
