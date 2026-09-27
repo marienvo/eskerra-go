@@ -1,7 +1,6 @@
 package com.eskerra.go.ui.markdown
 
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -10,11 +9,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.eskerra.go.core.markdown.PreparedMarkdown
-import com.eskerra.go.core.markdown.PreparedSegment
 import com.eskerra.go.core.markdown.VaultReadonlyLink
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NoteRegistry
-import com.mikepenz.markdown.compose.Markdown
 import com.mikepenz.markdown.m3.markdownColor
 import java.io.File
 import java.time.LocalDateTime
@@ -100,27 +97,13 @@ fun VaultMarkdownView(
 
     Column(modifier) {
         prepared?.segments?.forEach { segment ->
-            when (segment) {
-                is PreparedSegment.Markdown -> Markdown(
-                    segment.state,
-                    colors = colors,
-                    typography = typography,
-                    annotator = annotator,
-                    components = components,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                is PreparedSegment.Callout -> CalloutCard(
-                    resolved = segment.resolved,
-                    title = segment.title,
-                    body = segment.body,
-                    colors = colors,
-                    typography = typography,
-                    workspaceRoot = workspaceRoot,
-                    sourceNoteId = sourceNoteId,
-                    annotator = annotator
-                )
-            }
+            VaultMarkdownSegmentContent(
+                segment = segment,
+                colors = colors,
+                typography = typography,
+                annotator = annotator,
+                components = components
+            )
         }
     }
 }

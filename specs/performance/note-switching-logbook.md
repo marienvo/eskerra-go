@@ -183,3 +183,35 @@ remaining gap the user is seeing — the AST-parity fix here corrects *which* li
 specific home links now show up in `prefetch.submit`/`warm.done` before the tap (they may already
 have before this fix, if the regex scan happened to handle their exact href shape — the trace will
 show either way).
+
+---
+
+## 2026-09-27 — PR 6: lazy rendering for long note bodies
+
+**Problem observed (device trace).** The prefetch/cache work was doing its job for a home-link tap
+on a 50+ item list note: every relevant cache and prefetch step was warm, and
+`reader.published` (title and parsed body together) arrived at +4ms. Yet
+`reader.firstFrame` did not arrive until +3054ms. The whole remaining wait was Compose composing
+and laying out a body that `NoteScreen` put in one non-lazy `Column`.
+
+**Change.** `NoteReaderContent` is now a single `LazyColumn`, retaining the existing UX where
+title, path, Edit button, and body scroll together. `LazyNoteBlocks.split` splits a prepared
+markdown run into one segment per top-level block, and chunks only an unordered list larger than
+10 items. Each segment still goes through the same high-level `Markdown(state, colors,
+typography, annotator, components, modifier)` renderer as before; it does not hand-roll the
+library's per-node rendering or its CompositionLocals. Ordered lists remain whole because their
+numbering can depend on their position. Segment keys combine index and source offset, while the
+viewport prefetch signal now uses the visible lazy body items rather than scroll pixels.
+
+**Verification done.** `LazyNoteBlocksTest` covers top-level splitting, unordered-list chunking,
+order/text preservation, ordered-list pass-through, callouts, blank lines/link definitions, and
+reference-style links. The full JVM quality gate is green:
+`./scripts/gradle.sh :app:ktlintCheck :app:lintDebug :app:testDebugUnitTest`; module budgets and
+`git diff --check` are also clean. The debug APK was installed on the connected device.
+
+**Not yet done (must happen before merge).** The installed device was locked, so no visual or
+interaction verification could be performed. Unlock it, then test the original long-list note for
+complete/correct bullets, spacing, images/tables/code blocks, smooth scrolling, and preserved
+scroll position after back navigation. Re-run home → wait 10s → tap the list note with
+`adb logcat -s NoteNav:I` and confirm that `reader.firstFrame - reader.published` is no longer a
+multi-second gap. The `LIST_ITEM_CHUNK_SIZE = 10` is intentionally un-tuned until that measurement.
