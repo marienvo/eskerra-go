@@ -5,10 +5,14 @@ import com.eskerra.go.core.model.NoteRegistry
 import com.eskerra.go.core.model.NoteSummary
 import com.eskerra.go.core.todayhub.TodayHubRef
 import com.eskerra.go.core.todayhub.TodayHubRow
+import com.eskerra.go.data.notes.ParsedMarkdownCache
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class TodayHubPrefetchTargetsTest {
+
+    private val parsedMarkdownCache = ParsedMarkdownCache()
 
     private fun note(path: String, title: String) =
         NoteSummary(id = NoteId(path), title = title, snippet = "", isInbox = false)
@@ -31,20 +35,21 @@ class TodayHubPrefetchTargetsTest {
         )
 
     @Test
-    fun resolvesIntroLinks() {
+    fun resolvesIntroLinks() = runTest {
         val hub = note("Today.md", "Today")
         val target = note("Notes/Target.md", "Target")
         val registry = NoteRegistry.fromNotes(listOf(hub, target))
 
         val result = TodayHubPrefetchTargets.resolve(
-            content(introMarkdown = "See [[Target]].", registry = registry)
+            content(introMarkdown = "See [[Target]].", registry = registry),
+            parsedMarkdownCache
         )
 
         assertEquals(listOf(target.id), result)
     }
 
     @Test
-    fun resolvesRowColumnLinks_usingRowNoteIdAsSource() {
+    fun resolvesRowColumnLinks_usingRowNoteIdAsSource() = runTest {
         val hub = note("Today.md", "Today")
         val rowNote = note("Weeks/2026-W01.md", "Week")
         val target = note("Notes/Target.md", "Target")
@@ -56,19 +61,40 @@ class TodayHubPrefetchTargetsTest {
         )
 
         val result = TodayHubPrefetchTargets.resolve(
-            content(introMarkdown = "", registry = registry, row = row)
+            content(introMarkdown = "", registry = registry, row = row),
+            parsedMarkdownCache
         )
 
         assertEquals(listOf(target.id), result)
     }
 
     @Test
-    fun noRow_resolvesIntroOnly() {
+    fun noRow_resolvesIntroOnly() = runTest {
         val hub = note("Today.md", "Today")
         val registry = NoteRegistry.fromNotes(listOf(hub))
 
         val result = TodayHubPrefetchTargets.resolve(
-            content(introMarkdown = "No links.", registry = registry, row = null)
+            content(introMarkdown = "No links.", registry = registry, row = null),
+            parsedMarkdownCache
+        )
+
+        assertEquals(emptyList<NoteId>(), result)
+    }
+
+    @Test
+    fun blankIntroAndBlankColumn_areSkipped() = runTest {
+        val hub = note("Today.md", "Today")
+        val rowNote = note("Weeks/2026-W01.md", "Week")
+        val registry = NoteRegistry.fromNotes(listOf(hub, rowNote))
+        val row = TodayHubRow(
+            rowNoteId = rowNote.id,
+            weekStartStem = "2026-W01",
+            columns = listOf("", "   ")
+        )
+
+        val result = TodayHubPrefetchTargets.resolve(
+            content(introMarkdown = "", registry = registry, row = row),
+            parsedMarkdownCache
         )
 
         assertEquals(emptyList<NoteId>(), result)

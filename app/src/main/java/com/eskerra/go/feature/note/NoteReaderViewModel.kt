@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.eskerra.go.core.markdown.PrefetchLinkTargets
+import com.eskerra.go.core.markdown.PreparedMarkdown
+import com.eskerra.go.core.markdown.PreparedMarkdownLinks
 import com.eskerra.go.core.markdown.VaultMarkdownPreprocess
 import com.eskerra.go.core.model.NoteContentError
 import com.eskerra.go.core.model.NoteContentException
@@ -36,6 +38,7 @@ class NoteReaderViewModel(
 
     private var loadJob: Job? = null
     private var currentDocument: NoteReaderDocument? = null
+    private var currentPreparedBody: PreparedMarkdown? = null
 
     init {
         load()
@@ -49,6 +52,7 @@ class NoteReaderViewModel(
     private fun load() {
         loadJob?.cancel()
         currentDocument = null
+        currentPreparedBody = null
         NoteNavTrace.log("reader.load.start", "noteId=${noteId.value}")
         loadJob = viewModelScope.launch {
             val loadStartMs = System.currentTimeMillis()
@@ -84,7 +88,13 @@ class NoteReaderViewModel(
                         "noteId=${noteId.value} totalMs=${System.currentTimeMillis() - loadStartMs}"
                     )
                     currentDocument = document
-                    schedulePrefetch(document, visibleStartFraction = 0f, visibleEndFraction = 0f)
+                    currentPreparedBody = preparedBody
+                    schedulePrefetch(
+                        document,
+                        preparedBody,
+                        visibleStartFraction = 0f,
+                        visibleEndFraction = 0f
+                    )
                 },
                 onFailure = { error ->
                     _uiState.value = mapFailure(error)
@@ -101,7 +111,8 @@ class NoteReaderViewModel(
      */
     fun onViewportChanged(visibleStartFraction: Float, visibleEndFraction: Float) {
         val document = currentDocument ?: return
-        schedulePrefetch(document, visibleStartFraction, visibleEndFraction)
+        val preparedBody = currentPreparedBody ?: return
+        schedulePrefetch(document, preparedBody, visibleStartFraction, visibleEndFraction)
     }
 
     /**
@@ -109,22 +120,27 @@ class NoteReaderViewModel(
      * ordered by distance to the visible window, closest first — replacing whatever batch was
      * previously submitted (by this note or any other). The scheduler owns its own lifecycle, so
      * this is a fire-and-forget call, not tied to [viewModelScope].
+     *
+     * Targets come from [PreparedMarkdownLinks], which walks the same parsed AST the reader
+     * renders — not a separate regex scan — so a link that is tappable is always prefetched, and
+     * vice versa.
      */
     private fun schedulePrefetch(
         document: NoteReaderDocument,
+        preparedBody: PreparedMarkdown,
         visibleStartFraction: Float,
         visibleEndFraction: Float
     ) {
         val scheduler = notePrefetchScheduler ?: return
-        val targets = PrefetchLinkTargets.resolveWithOffsets(
-            markdown = document.content.markdown,
+        val resolved = PreparedMarkdownLinks.resolve(
+            prepared = preparedBody,
             sourceNoteId = document.note.id,
             registry = document.registry
         )
-        if (targets.isEmpty()) return
+        if (resolved.targets.isEmpty()) return
         val ordered = PrefetchLinkTargets.orderByViewport(
-            targets = targets,
-            markdownLength = document.content.markdown.length,
+            targets = resolved.targets,
+            markdownLength = resolved.totalLength,
             visibleStartFraction = visibleStartFraction,
             visibleEndFraction = visibleEndFraction
         )

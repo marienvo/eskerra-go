@@ -133,3 +133,53 @@ launch-settled gates already are (pure predicate, no Compose test harness needed
 **Not yet done (needs a device).** Confirming cold-start / launch-settled timing is unaffected by
 this addition (it should be, by construction — it's strictly a post-settle side effect — but only a
 device run with `ColdStartTrace` / `scripts/measure-cold-start.sh` confirms it).
+
+---
+
+## 2026-09-27 — Follow-up: home links still wait, even after 10s in view
+
+**User report.** On Home, 3 links to long (50+ item) list notes sit in the viewport for ~10s —
+long enough that background prefetch should have finished — yet a tap still waits, now
+*specifically before the page appears* (a direct effect of PR 1's atomic-publish fix: previously
+the title rendered first while the body was still loading, masking this same underlying cost).
+Tested on a **debug** build (2–5x slower Compose rendering than an optimized build).
+
+**Root-cause analysis (see the plan for the full write-up); three suspects identified:**
+1. Nothing was actually measured before now — PR 1's step 0 (a `NoteOpenTrace`) was planned but
+   never built. Fixed in the commit right before this one (`NoteNavTrace`).
+2. `NoteScreen` renders a note's entire body in one non-lazy `Column(verticalScroll)`. Prefetch
+   only ever warmed *data* (file content + parsed AST) — it cannot shrink first-frame composition
+   and layout cost, which for a 50+ item list is substantial and lands entirely before the page now
+   appears (this commit does not yet fix this; see the plan's Step 2).
+3. **Prefetch resolved links differently than a tap did.** Prefetch used a regex-based scan
+   (`WikiLinkParser` + a hand-rolled `[label](href)` matcher); a tap resolves through the *parsed*
+   AST via `VaultReadonlyLink.targetFor`. An href the AST parser accepts but the regex scan didn't
+   handle (angle-bracket-wrapped destinations, a trailing `"title"`, or the AST's own idea of where
+   a link's boundaries are) meant prefetch could silently skip a link that was, in fact, tappable —
+   exactly the symptom reported.
+
+**Change (this commit fixes cause 3; cause 2 is next).**
+- New `PreparedMarkdownLinks.resolve(prepared, sourceNoteId, registry)`: walks a `PreparedMarkdown`'s
+  parsed AST (all segments, including callout bodies) and resolves every `INLINE_LINK` destination
+  with `VaultReadonlyLink.targetFor` — the exact function a tap uses. One source of truth for "is
+  this link tappable," used by both prefetch and the tap path.
+- `PrefetchLinkTargets` shrinks to just `Target` and `orderByViewport` (the regex-based
+  `resolve`/`resolveWithOffsets`/`extractInlineHrefs` are removed — superseded, not kept alongside).
+- `NoteReaderViewModel` now resolves prefetch targets from `preparedBody` (already computed for the
+  atomic publish) instead of re-scanning the raw markdown.
+- `TodayHubPrefetchTargets` now parses the intro/column markdown through the same
+  `ParsedMarkdownCache` `VaultMarkdownView` already populated (a cache hit, not a re-parse) and
+  resolves through `PreparedMarkdownLinks` too, with the same blank-intro/blank-column guards the
+  renderer itself uses.
+
+**Verification done.** Full unit suite green (including a new `PreparedMarkdownLinksTest` covering
+angle-bracket destinations, a title suffix, callout bodies, ambiguous/external/unresolvable links,
+dedup, and first-seen order — cases the old regex scan handled inconsistently or not at all).
+ktlint clean, module budgets unaffected, no ArchUnit drift.
+
+**Not yet done.** Step 2 (lazy note rendering) is the change expected to actually close the
+remaining gap the user is seeing — the AST-parity fix here corrects *which* links prefetch, not
+*how expensive* the first frame is. On-device confirmation via `adb logcat -s NoteNav` that these 3
+specific home links now show up in `prefetch.submit`/`warm.done` before the tap (they may already
+have before this fix, if the regex scan happened to handle their exact href shape — the trace will
+show either way).

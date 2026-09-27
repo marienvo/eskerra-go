@@ -18,6 +18,7 @@ import com.eskerra.go.data.perf.NoteNavTrace
 import com.eskerra.go.feature.sync.AppSyncViewModel
 import com.eskerra.go.feature.todayhub.TodayHubPrefetchTargets
 import com.eskerra.go.feature.todayhub.TodayHubUiState
+import com.eskerra.go.ui.markdown.LocalParsedMarkdownCache
 import java.io.File
 import kotlinx.coroutines.delay
 
@@ -89,13 +90,14 @@ internal fun AppBootEffects(
     // own submit immediately supersedes it — see NotePrefetchScheduler). Re-keyed to the Today Hub
     // content itself, so a week/hub change resubmits with the newly-visible links.
     val todayHubContent = todayHubUiState as? TodayHubUiState.Content
+    val parsedMarkdownCache = LocalParsedMarkdownCache.current
     LaunchedEffect(launchSettled, todayHubContent) {
         if (!shouldSubmitHomePrefetch(launchSettled, todayHubContent) || todayHubContent == null) {
             return@LaunchedEffect
         }
         withFrameNanos { }
         delay(HOME_PREFETCH_DELAY_MS)
-        val targets = TodayHubPrefetchTargets.resolve(todayHubContent)
+        val targets = TodayHubPrefetchTargets.resolve(todayHubContent, parsedMarkdownCache)
         NoteNavTrace.log(
             "prefetch.submit",
             "source=home count=${targets.size} targets=${targets.map { it.value }}"
