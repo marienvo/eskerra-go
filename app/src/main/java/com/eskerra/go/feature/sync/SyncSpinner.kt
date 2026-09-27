@@ -33,8 +33,8 @@ private const val ARROWHEAD_HALF_ANGLE_DEGREES = 24f
  * derived from the draw scope's own [androidx.compose.ui.graphics.drawscope.DrawScope.center] and one
  * `radius`, and the rotation pivots on that same center — so the figure cannot wobble off its own
  * axis the way rotating a pre-baked vector icon can (a vector's drawn centroid rarely coincides with
- * its viewport center). Meant to sit inside the same [androidx.compose.material3.Badge] slot the
- * pending-change count uses, so it inherits that badge's footprint and content color.
+ * its viewport center). Used in place of the hamburger's Menu glyph while a sync is spinning, so it
+ * inherits that button's content color rather than carrying one of its own.
  */
 @Composable
 fun SyncSpinner(
