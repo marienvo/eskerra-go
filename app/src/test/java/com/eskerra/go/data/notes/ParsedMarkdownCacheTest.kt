@@ -2,8 +2,12 @@ package com.eskerra.go.data.notes
 
 import com.eskerra.go.core.markdown.PreparedMarkdown
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -94,6 +98,32 @@ class ParsedMarkdownCacheTest {
 
         assertEquals(1, counter.callCount)
         assertSame(results[0], results[1])
+    }
+
+    @Test
+    fun get_retriesWhenTheInFlightProducerIsCancelled() = runTest {
+        val started = CompletableDeferred<Unit>()
+        var calls = 0
+        val cache = ParsedMarkdownCache(
+            prepare = {
+                calls += 1
+                if (calls == 1) {
+                    started.complete(Unit)
+                    awaitCancellation()
+                }
+                PreparedMarkdown(emptyList())
+            }
+        )
+
+        val prefetch = launch { cache.get("# A") }
+        started.await()
+        val reader = async { cache.get("# A") }
+        runCurrent()
+
+        prefetch.cancelAndJoin()
+
+        assertSame(reader.await(), cache.peek("# A"))
+        assertEquals(2, calls)
     }
 
     @Test

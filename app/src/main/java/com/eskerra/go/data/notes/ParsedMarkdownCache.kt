@@ -4,6 +4,9 @@ import com.eskerra.go.core.markdown.PreparedMarkdown
 import com.eskerra.go.core.markdown.prepareVaultMarkdown
 import com.eskerra.go.core.repository.ParsedMarkdownCachePort
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -47,32 +50,41 @@ class ParsedMarkdownCache(
      * already being parsed by another caller joins that parse instead of starting a second one.
      */
     override suspend fun get(markdown: String): PreparedMarkdown {
-        peek(markdown)?.let { return it }
-
-        var owns = false
-        val deferred = inFlightMutex.withLock {
+        while (true) {
             peek(markdown)?.let { return it }
-            inFlight.getOrPut(markdown) {
-                owns = true
-                CompletableDeferred()
+
+            var owns = false
+            val deferred = inFlightMutex.withLock {
+                peek(markdown)?.let { return it }
+                inFlight.getOrPut(markdown) {
+                    owns = true
+                    CompletableDeferred()
+                }
             }
-        }
 
-        if (!owns) {
-            return deferred.await()
-        }
+            if (!owns) {
+                try {
+                    return deferred.await()
+                } catch (error: CancellationException) {
+                    // A cancelled prefetch must not cancel a reader that joined its parse. If this
+                    // caller itself was cancelled, ensureActive rethrows; otherwise retry and own
+                    // the replacement parse after the old in-flight entry is removed.
+                    currentCoroutineContext().ensureActive()
+                }
+            }
 
-        return try {
-            val prepared = prepare(markdown)
-            store(markdown, prepared)
-            deferred.complete(prepared)
-            prepared
-        } catch (error: Throwable) {
-            deferred.completeExceptionally(error)
-            throw error
-        } finally {
-            inFlightMutex.withLock {
-                if (inFlight[markdown] === deferred) inFlight.remove(markdown)
+            try {
+                val prepared = prepare(markdown)
+                store(markdown, prepared)
+                deferred.complete(prepared)
+                return prepared
+            } catch (error: Throwable) {
+                deferred.completeExceptionally(error)
+                throw error
+            } finally {
+                inFlightMutex.withLock {
+                    if (inFlight[markdown] === deferred) inFlight.remove(markdown)
+                }
             }
         }
     }
