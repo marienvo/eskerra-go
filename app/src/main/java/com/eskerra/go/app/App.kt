@@ -211,10 +211,7 @@ fun App(
         if (onInbox) {
             if (selected == activeHubId) homeReselectSignal++
         } else {
-            navController.navigate(AppRoute.INBOX) {
-                popUpTo(AppRoute.HOME_GRAPH)
-                launchSingleTop = true
-            }
+            navController.popBackStack(AppRoute.INBOX, inclusive = false)
         }
     }
     AppShell(
