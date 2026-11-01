@@ -18,6 +18,7 @@ import com.eskerra.go.core.usecase.LoadInboxSummariesCached
 import com.eskerra.go.feature.inbox.InboxUiState
 import java.io.File
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -46,6 +47,7 @@ class InboxViewModel(
 
     private var refreshJob: Job? = null
     private var deleteJob: Job? = null
+    private var snoozeWakeJob: Job? = null
 
     /** All inbox notes across hubs from the last load; the UI shows only [activeHubFolder]'s slice. */
     private var rawSummaries: List<NoteSummary> = emptyList()
@@ -61,6 +63,7 @@ class InboxViewModel(
             val cached = loadInboxSummaries.readCached(config, filesDir)
             if (cached != null) {
                 rawSummaries = cached
+                scheduleSnoozeWake()
                 _uiState.value = visibleSummaries().toInboxUiState(isRefreshing = true)
             }
             refresh(showFullScreenLoading = cached == null)
@@ -80,6 +83,7 @@ class InboxViewModel(
     /** Applies inbox summaries published by the shared registry without starting a new scan. */
     private fun applyExternalInboxSummaries(notes: List<NoteSummary>) {
         rawSummaries = notes
+        scheduleSnoozeWake()
         val visible = visibleSummaries()
         val isRefreshing = (_uiState.value as? InboxUiState.Content)?.isRefreshing ?: false
         val currentNotes = (_uiState.value as? InboxUiState.Content)?.notes
@@ -102,8 +106,21 @@ class InboxViewModel(
         _uiState.value = visibleSummaries().toInboxUiState(isRefreshing = isRefreshing)
     }
 
-    private fun visibleSummaries(): List<NoteSummary> =
-        rawSummaries.filter { InboxNotePath.inboxHubFolderOf(it.id.value) == activeHubFolder }
+    private fun visibleSummaries(): List<NoteSummary> = rawSummaries.filter {
+        InboxNotePath.inboxHubFolderOf(it.id.value) == activeHubFolder &&
+            it.snoozedUntilEpochMillis <= System.currentTimeMillis()
+    }
+
+    private fun scheduleSnoozeWake() {
+        snoozeWakeJob?.cancel()
+        val now = System.currentTimeMillis()
+        val next = rawSummaries.map { it.snoozedUntilEpochMillis }
+            .filter { it > now }.minOrNull() ?: return
+        snoozeWakeJob = viewModelScope.launch {
+            delay((next - now).coerceAtMost(60_000L))
+            applyExternalInboxSummaries(rawSummaries)
+        }
+    }
 
     fun refresh() {
         refresh(showFullScreenLoading = _uiState.value !is InboxUiState.Content)
@@ -166,6 +183,7 @@ class InboxViewModel(
             loadInboxSummaries(config, filesDir).fold(
                 onSuccess = { notes ->
                     rawSummaries = notes
+                    scheduleSnoozeWake()
                     val visible = visibleSummaries()
                     val currentNotes = (_uiState.value as? InboxUiState.Content)?.notes
                     if (visible == currentNotes) {
