@@ -50,6 +50,7 @@ import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NoteSummary
 import com.eskerra.go.feature.todayhub.TodayHubHeader
 import com.eskerra.go.feature.todayhub.TodayHubUiState
+import com.eskerra.go.ui.DatedFolderLinks
 import com.eskerra.go.ui.markdown.VaultMarkdownTokens
 import com.eskerra.go.ui.theme.EskerraChromeTokens
 import com.eskerra.go.ui.theme.EskerraHeadingH1
@@ -159,6 +160,15 @@ fun InboxScreen(
                             .height(InboxTopBarHeight)
                             .padding(start = 16.dp, end = InboxTopRowEndPadding)
                     )
+                }
+            }
+
+            val datedLinks = (todayHubState as? TodayHubUiState.Content)?.datedLinks.orEmpty()
+            if (!hasSelection && datedLinks.isNotEmpty()) {
+                item {
+                    Box(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                        DatedFolderLinks(datedLinks, current = null, onOpen = onNoteClick)
+                    }
                 }
             }
 

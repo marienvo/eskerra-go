@@ -104,4 +104,22 @@ class LoadTodayHubTest {
         val error = broken(config, File("."), null).exceptionOrNull() as NoteContentException
         assertEquals(NoteContentError.WorkspaceMissing, error.error)
     }
+
+    @Test
+    fun datedLinksForAnotherFlowUseProvidedRegistryWithoutRefresh() = runTest {
+        val registry = FakeNoteRegistryRepository.withInboxNotes()
+        val target = NoteId("Other/Journal/2026-10-31.md")
+        val content = FakeNoteContentRepository.withContent(target, "# Pending")
+        val useCase = LoadTodayHub(
+            NoteRegistryCache(registry),
+            content,
+            NoteflowRepository { _, _ -> Result.success(emptyList()) },
+            today = { LocalDate(2026, 11, 1) }
+        )
+        val index = com.eskerra.go.core.model.NoteRegistry.fromNotes(listOf(note(target.value)))
+        val links = useCase.datedLinks(config, File("."), index, NoteId("Other/.flow")).getOrThrow()
+        assertEquals(target, links.single().noteId)
+        assertTrue(links.single().isIncomplete)
+        assertEquals(0, registry.refreshCount)
+    }
 }

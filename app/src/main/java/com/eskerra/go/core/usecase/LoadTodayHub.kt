@@ -54,16 +54,8 @@ class LoadTodayHub(
                 TodayHubDiscovery.directoryOf(it.id.value) == preferredDirectory
             }
             ?: flows.first()
-        val links = mutableListOf<TodayHubDatedLink>()
-        for (target in NoteflowDatedNotes.select(registry, active.id, today())) {
-            val content = contentRepository.load(config, filesDir, target.noteId).getOrElse {
-                return Result.failure(it)
-            }
-            links += TodayHubDatedLink(
-                target.folder,
-                target.noteId,
-                NoteflowDatedNotes.isIncomplete(content.markdown)
-            )
+        val links = datedLinks(config, filesDir, registry, active.id).getOrElse {
+            return Result.failure(it)
         }
         return Result.success(
             TodayHubData(
@@ -86,5 +78,25 @@ class LoadTodayHub(
                 datedLinks = links
             )
         )
+    }
+
+    suspend fun datedLinks(
+        config: WorkspaceConfig,
+        filesDir: File,
+        registry: NoteRegistry,
+        marker: NoteId
+    ): Result<List<TodayHubDatedLink>> {
+        val links = mutableListOf<TodayHubDatedLink>()
+        for (target in NoteflowDatedNotes.select(registry, marker, today())) {
+            val content = contentRepository.load(config, filesDir, target.noteId).getOrElse {
+                return Result.failure(it)
+            }
+            links += TodayHubDatedLink(
+                target.folder,
+                target.noteId,
+                NoteflowDatedNotes.isIncomplete(content.markdown)
+            )
+        }
+        return Result.success(links)
     }
 }
