@@ -6,11 +6,13 @@ import androidx.work.WorkerParameters
 import com.eskerra.go.core.model.DurableSyncStatus
 import com.eskerra.go.core.repository.SyncStateRepository
 import com.eskerra.go.core.repository.VaultSyncScheduler
+import com.eskerra.go.data.notifications.PostSyncNotificationRefresh
 
 /** Requests a fresh vault sync through the existing serialized worker queue. */
 class PeriodicVaultSyncWorker(context: Context, params: WorkerParameters) :
     CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
+        if (!PostSyncNotificationRefresh.enabled(applicationContext)) return Result.success()
         val runtime = (applicationContext as? SyncRuntimeProvider)?.syncRuntime
             ?: return Result.failure()
         val config = runtime.workspaceStore.read() ?: return Result.success()

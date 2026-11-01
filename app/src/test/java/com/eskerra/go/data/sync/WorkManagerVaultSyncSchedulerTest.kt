@@ -1,7 +1,9 @@
 package com.eskerra.go.data.sync
 
 import androidx.work.ExistingWorkPolicy
+import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequest
+import androidx.work.PeriodicWorkRequest
 import com.eskerra.go.core.model.DurableSyncStatus
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -45,6 +47,7 @@ class WorkManagerVaultSyncSchedulerTest {
             context = object : android.content.ContextWrapper(null) {},
             syncStateRepository = repo,
             enqueueWork = { _, _, _ -> enqueued = true },
+            periodicEnabled = { true },
             enqueuePeriodicWork = {},
             getActiveWorkInfos = { emptyList() }
         )
@@ -65,5 +68,34 @@ class WorkManagerVaultSyncSchedulerTest {
         )
         scheduler.scheduleBackgroundSync()
         assertTrue(captured!!.workSpec.input.getBoolean(VaultSyncWorker.KEY_BACKGROUND, false))
+    }
+
+    @Test
+    fun reconcileCancelsPeriodicWorkWhenNotificationsAreDisabled() = runTest {
+        var cancelled = false
+        val scheduler = WorkManagerVaultSyncScheduler(
+            context = object : android.content.ContextWrapper(null) {},
+            syncStateRepository = FakeSyncStateRepository(),
+            periodicEnabled = { false },
+            cancelPeriodicWork = { cancelled = true },
+            getActiveWorkInfos = { emptyList() }
+        )
+        scheduler.reconcile()
+        assertTrue(cancelled)
+    }
+
+    @Test
+    fun reconcileSchedulesNetworkConstrainedFifteenMinuteWorkWhenEnabled() = runTest {
+        var captured: PeriodicWorkRequest? = null
+        val scheduler = WorkManagerVaultSyncScheduler(
+            context = object : android.content.ContextWrapper(null) {},
+            syncStateRepository = FakeSyncStateRepository(),
+            periodicEnabled = { true },
+            enqueuePeriodicWork = { captured = it },
+            getActiveWorkInfos = { emptyList() }
+        )
+        scheduler.reconcile()
+        assertEquals(15 * 60 * 1000L, captured!!.workSpec.intervalDuration)
+        assertEquals(NetworkType.CONNECTED, captured!!.workSpec.constraints.requiredNetworkType)
     }
 }

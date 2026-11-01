@@ -17,7 +17,7 @@ Rules:
 - Markdown parsing and wiki-link resolution live outside UI.
 - Inbox editability is a domain rule: inbox notes editable, all other notes read-only.
 - Manual vault sync (`ManualSyncNow`) commits all safe local changes with auto-merge on divergence; RSS refresh delegates to the same engine; mark-as-played uses a scoped podcast-only channel (shared git mutex; see sync-hardening spec).
-- Periodic WorkManager sync uses the shared vault-sync engine and Git mutex; Android may delay its 15-minute interval.
+- When notifications are enabled, periodic WorkManager sync uses the shared vault-sync engine and Git mutex; Android may delay its 15-minute interval.
 - No multi-workspace support.
 - Prefer small files. Module size is enforced mechanically at **400** lines (touch it, tidy it) — see AGENTS.md § Module size budget and `specs/team-scalability/README.md`.
 - Every feature slice must include at least one unit test for domain/data behavior.

@@ -16,6 +16,7 @@ import androidx.work.workDataOf
 import com.eskerra.go.core.model.DurableSyncStatus
 import com.eskerra.go.core.repository.SyncStateRepository
 import com.eskerra.go.core.repository.VaultSyncScheduler
+import com.eskerra.go.data.notifications.PostSyncNotificationRefresh
 import java.util.concurrent.TimeUnit
 
 class WorkManagerVaultSyncScheduler(
@@ -30,6 +31,10 @@ class WorkManagerVaultSyncScheduler(
     },
     private val cancelWork: (name: String) -> Unit = { name ->
         WorkManager.getInstance(context).cancelUniqueWork(name)
+    },
+    private val periodicEnabled: () -> Boolean = { PostSyncNotificationRefresh.enabled(context) },
+    private val cancelPeriodicWork: () -> Unit = {
+        WorkManager.getInstance(context).cancelUniqueWork("periodic_vault_sync")
     },
     private val enqueuePeriodicWork: (PeriodicWorkRequest) -> Unit = { request ->
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
@@ -103,6 +108,10 @@ class WorkManagerVaultSyncScheduler(
     }
 
     private fun schedulePeriodicSync() {
+        if (!periodicEnabled()) {
+            cancelPeriodicWork()
+            return
+        }
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
             .build()

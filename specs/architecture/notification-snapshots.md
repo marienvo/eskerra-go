@@ -2,7 +2,8 @@
 
 Notification delivery is implemented separately. This layer stores candidate occurrences and a
 queue for the delivery layer. It is disabled by default and performs its first complete scan after a
-successful sync when enabled. The first successful scan is a silent baseline. Later scans queue new
+successful sync when enabled. The future settings use case must request an immediate vault sync and
+reconcile the periodic scheduler after enabling; it must reconcile after disabling to cancel the job. The first successful scan is a silent baseline. Later scans queue new
 inbox items, elapsed snoozes and newly available incomplete dated-folder notes; an already overdue
 reminder discovered for the first time is not queued. Known future reminders become due after their
 deadline. Dated notes initially marked complete stay known, so removing the completion mark alone
