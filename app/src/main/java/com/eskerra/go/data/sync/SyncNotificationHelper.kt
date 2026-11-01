@@ -48,7 +48,7 @@ object SyncNotificationHelper {
         )
 
         val notification: Notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.mipmap.ic_launcher_brand_foreground)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(stepText)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
