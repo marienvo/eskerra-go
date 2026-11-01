@@ -1,5 +1,6 @@
 package com.eskerra.go.feature.inbox
 
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -8,7 +9,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
@@ -49,5 +52,26 @@ internal fun InboxSnoozeDatePicker(
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
     ) {
         DatePicker(state = state, title = { Text("Snooze until 9:00 AM") })
+    }
+}
+
+@Composable
+internal fun InboxSnoozeButton(enabled: Boolean, onDateSelected: (LocalDate) -> Unit) {
+    var open by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    androidx.compose.material3.IconButton(onClick = { open = true }, enabled = enabled) {
+        androidx.compose.material3.Icon(
+            imageVector = androidx.compose.material.icons.Icons.Filled.Schedule,
+            contentDescription = "Snooze selected notes"
+        )
+    }
+    if (open) {
+        InboxSnoozeDatePicker(
+            today = LocalDate.now(),
+            onDismiss = { open = false },
+            onDateSelected = { date ->
+                open = false
+                onDateSelected(date)
+            }
+        )
     }
 }

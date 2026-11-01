@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.eskerra.go.core.inbox.InboxNotePath
+import com.eskerra.go.core.inbox.InboxSnooze
 import com.eskerra.go.core.model.DeleteInboxNoteError
 import com.eskerra.go.core.model.DeleteInboxNoteException
 import com.eskerra.go.core.model.NoteId
@@ -15,8 +16,11 @@ import com.eskerra.go.core.repository.ActiveTodayHubStore
 import com.eskerra.go.core.todayhub.TodayHubDiscovery
 import com.eskerra.go.core.usecase.DeleteInboxNotes
 import com.eskerra.go.core.usecase.LoadInboxSummariesCached
+import com.eskerra.go.core.usecase.SnoozeInboxNotes
 import com.eskerra.go.feature.inbox.InboxUiState
 import java.io.File
+import java.time.LocalDate
+import java.time.ZoneId
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -44,6 +48,12 @@ class InboxViewModel(
 
     private val _deleteError = MutableStateFlow<String?>(null)
     val deleteError: StateFlow<String?> = _deleteError.asStateFlow()
+
+    private var snoozeInboxNotes: SnoozeInboxNotes? = null
+
+    fun configureSnooze(usecase: SnoozeInboxNotes) {
+        snoozeInboxNotes = usecase
+    }
 
     private var refreshJob: Job? = null
     private var deleteJob: Job? = null
@@ -137,6 +147,34 @@ class InboxViewModel(
     fun clearSelection() {
         _deleteError.value = null
         _selectedNoteIds.value = emptySet()
+    }
+
+    fun snoozeSelected(date: LocalDate) {
+        val usecase = snoozeInboxNotes ?: return
+        if (_isDeleting.value || _selectedNoteIds.value.isEmpty()) return
+        val ids = _selectedNoteIds.value.toList()
+        val notes = (_uiState.value as? InboxUiState.Content)?.notes.orEmpty()
+        viewModelScope.launch {
+            _isDeleting.value = true
+            _deleteError.value = null
+            try {
+                val result = usecase(
+                    config,
+                    filesDir,
+                    ids,
+                    notes,
+                    InboxSnooze.until(date, ZoneId.systemDefault())
+                )
+                _selectedNoteIds.value = result.failed.toSet()
+                if (result.succeeded.isNotEmpty()) onInboxMutated(result.succeeded.map { it.value })
+                if (result.failed.isNotEmpty() || result.refreshFailed) {
+                    _deleteError.value = "Could not snooze all selected notes."
+                }
+                refresh(showFullScreenLoading = false)
+            } finally {
+                _isDeleting.value = false
+            }
+        }
     }
 
     fun deleteSelected() {

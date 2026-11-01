@@ -29,6 +29,7 @@ import com.eskerra.go.core.usecase.DeleteInboxNotes
 import com.eskerra.go.core.usecase.LoadInboxSummariesCached
 import com.eskerra.go.core.usecase.LoadTodayHub
 import com.eskerra.go.core.usecase.LoadTodayHubRow
+import com.eskerra.go.core.usecase.SnoozeInboxNotes
 import com.eskerra.go.core.usecase.TouchVaultSearchPaths
 import com.eskerra.go.core.usecase.WarmNote
 import com.eskerra.go.feature.inbox.InboxScreen
@@ -47,6 +48,7 @@ internal fun AppInboxRoute(
     filesDir: File,
     loadInboxSummaries: LoadInboxSummariesCached,
     deleteInboxNotes: DeleteInboxNotes,
+    snoozeInboxNotes: SnoozeInboxNotes,
     loadTodayHub: LoadTodayHub,
     loadTodayHubRow: LoadTodayHubRow,
     activeTodayHubStore: ActiveTodayHubStore,
@@ -90,6 +92,7 @@ internal fun AppInboxRoute(
             }
         )
     )
+    inboxViewModel.configureSnooze(snoozeInboxNotes)
     val todayHubViewModel: TodayHubViewModel = viewModel(
         key = todayHubViewModelKey(currentConfig.remoteUri),
         factory = TodayHubViewModel.factory(
@@ -205,6 +208,7 @@ internal fun AppInboxRoute(
         onAvatarClick = inboxViewModel::toggleSelection,
         onClearSelection = inboxViewModel::clearSelection,
         onDeleteSelected = inboxViewModel::deleteSelected,
+        onSnoozeSelected = inboxViewModel::snoozeSelected,
         onSelectHub = todayHubViewModel::selectHub,
         scrollToTopSignal = scrollResetSignal,
         todayHubBody = {

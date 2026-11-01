@@ -40,6 +40,7 @@ import com.eskerra.go.core.usecase.SaveNote
 import com.eskerra.go.core.usecase.SaveRemoteSyncSettings
 import com.eskerra.go.core.usecase.SaveVaultSettings
 import com.eskerra.go.core.usecase.SearchVault
+import com.eskerra.go.core.usecase.SnoozeInboxNotes
 import com.eskerra.go.core.usecase.SyncBinaries
 import com.eskerra.go.core.usecase.TestRemoteConnection
 import com.eskerra.go.core.usecase.TouchVaultSearchPaths
@@ -85,6 +86,7 @@ internal data class AppNavGraphContext(
     val notePrefetchScheduler: NotePrefetchScheduler,
     val warmNote: WarmNote,
     val deleteInboxNotes: DeleteInboxNotes,
+    val snoozeInboxNotes: SnoozeInboxNotes,
     val loadEditableNote: LoadEditableNote,
     val saveNote: SaveNote,
     val loadGitStatusSummary: LoadGitStatusSummary,
@@ -122,6 +124,7 @@ internal fun NavGraphBuilder.homeGraph(ctx: AppNavGraphContext) {
                 filesDir = ctx.filesDir,
                 loadInboxSummaries = ctx.loadInboxSummaries,
                 deleteInboxNotes = ctx.deleteInboxNotes,
+                snoozeInboxNotes = ctx.snoozeInboxNotes,
                 loadTodayHub = ctx.loadTodayHub,
                 loadTodayHubRow = ctx.loadTodayHubRow,
                 activeTodayHubStore = ctx.activeTodayHubStore,

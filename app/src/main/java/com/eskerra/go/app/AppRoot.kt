@@ -50,6 +50,7 @@ import com.eskerra.go.core.usecase.SaveNote
 import com.eskerra.go.core.usecase.SaveRemoteSyncSettings
 import com.eskerra.go.core.usecase.SaveVaultSettings
 import com.eskerra.go.core.usecase.SearchVault
+import com.eskerra.go.core.usecase.SnoozeInboxNotes
 import com.eskerra.go.core.usecase.SyncBinaries
 import com.eskerra.go.core.usecase.TestRemoteConnection
 import com.eskerra.go.core.usecase.TouchVaultSearchPaths
@@ -83,6 +84,7 @@ fun AppRoot(
     warmNote: WarmNote,
     createInboxNote: CreateInboxNote,
     deleteInboxNotes: DeleteInboxNotes,
+    snoozeInboxNotes: SnoozeInboxNotes,
     loadEditableNote: LoadEditableNote,
     saveNote: SaveNote,
     loadGitStatusSummary: LoadGitStatusSummary,
@@ -195,6 +197,7 @@ fun AppRoot(
                         warmNote = warmNote,
                         createInboxNote = createInboxNote,
                         deleteInboxNotes = deleteInboxNotes,
+                        snoozeInboxNotes = snoozeInboxNotes,
                         loadEditableNote = loadEditableNote,
                         saveNote = saveNote,
                         loadGitStatusSummary = loadGitStatusSummary,

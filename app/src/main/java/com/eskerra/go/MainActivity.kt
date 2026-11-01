@@ -41,12 +41,14 @@ import com.eskerra.go.core.usecase.SaveNote
 import com.eskerra.go.core.usecase.SaveRemoteSyncSettings
 import com.eskerra.go.core.usecase.SaveVaultSettings
 import com.eskerra.go.core.usecase.SearchVault
+import com.eskerra.go.core.usecase.SnoozeInboxNotes
 import com.eskerra.go.core.usecase.TestRemoteConnection
 import com.eskerra.go.core.usecase.TouchVaultSearchPaths
 import com.eskerra.go.core.usecase.UpdateSyncToken
 import com.eskerra.go.core.usecase.WarmNote
 import com.eskerra.go.data.git.JGitWorkspaceRepository
 import com.eskerra.go.data.notes.FileInboxSnapshotStore
+import com.eskerra.go.data.notes.FileInboxSnoozeRepository
 import com.eskerra.go.data.notes.FileNoteWriteRepository
 import com.eskerra.go.data.notes.ParsedMarkdownCache
 import com.eskerra.go.data.perf.ColdStartTrace
@@ -125,6 +127,11 @@ class MainActivity : ComponentActivity() {
             writeRepository = noteWriteRepository,
             registryCache = noteRegistryCache,
             loadGitStatusSummary = loadGitStatusSummary
+        )
+        val snoozeInboxNotes = SnoozeInboxNotes(
+            FileInboxSnoozeRepository(syncRuntime.gitSyncMutex),
+            noteRegistryCache,
+            noteContentCache
         )
         val deleteInboxNotes = DeleteInboxNotes(
             writeRepository = noteWriteRepository,
@@ -214,6 +221,7 @@ class MainActivity : ComponentActivity() {
                 warmNote = warmNote,
                 createInboxNote = createInboxNote,
                 deleteInboxNotes = deleteInboxNotes,
+                snoozeInboxNotes = snoozeInboxNotes,
                 loadEditableNote = loadEditableNote,
                 saveNote = saveNote,
                 loadGitStatusSummary = loadGitStatusSummary,
