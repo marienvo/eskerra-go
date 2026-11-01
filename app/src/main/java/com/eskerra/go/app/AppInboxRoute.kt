@@ -64,6 +64,7 @@ internal fun AppInboxRoute(
     onInboxUiStateChanged: (InboxUiState) -> Unit,
     onTodayHubUiStateChanged: (TodayHubUiState) -> Unit,
     homeReselectSignal: Int,
+    onSelectHub: (NoteId) -> Unit,
     pendingHubSelection: NoteId?,
     onHubSelectionHandled: () -> Unit,
     inboxRefreshSignal: Int,
@@ -237,6 +238,7 @@ internal fun AppInboxRoute(
         onClearSelection = inboxViewModel::clearSelection,
         onDeleteSelected = inboxViewModel::deleteSelected,
         onSnoozeSelected = inboxViewModel::snoozeSelected,
+        onSelectHub = onSelectHub,
         scrollToTopSignal = scrollResetSignal,
         todayHubBody = {
             TodayHubBody(

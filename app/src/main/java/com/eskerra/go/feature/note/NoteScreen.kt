@@ -3,9 +3,13 @@ package com.eskerra.go.feature.note
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -22,7 +26,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.eskerra.go.app.LocalShellChromeInsets
-import com.eskerra.go.app.ShellDatedLinksTopOffset
+import com.eskerra.go.app.ShellChromeCenterFromStatusBar
+import com.eskerra.go.app.ShellTopChromeHeight
 import com.eskerra.go.core.markdown.LazyNoteBlocks
 import com.eskerra.go.core.markdown.PreparedMarkdown
 import com.eskerra.go.core.markdown.PreparedSegment
@@ -31,6 +36,8 @@ import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NoteRegistry
 import com.eskerra.go.core.todayhub.DatedNoteHeader
 import com.eskerra.go.data.perf.NoteNavTrace
+import com.eskerra.go.feature.todayhub.TodayHubHeader
+import com.eskerra.go.feature.todayhub.TodayHubUiState
 import com.eskerra.go.ui.DateNavigationBar
 import com.eskerra.go.ui.DatedFolderLinks
 import com.eskerra.go.ui.markdown.VaultMarkdownAnnotator
@@ -136,7 +143,10 @@ private fun NoteReaderContent(
     onViewportChanged: (visibleStartOffset: Int, visibleEndOffset: Int) -> Unit
 ) {
     val datedHeader = LocalDatedHeader.current
+    val workspaceHeader = LocalNoteWorkspaceHeader.current
     val chrome = LocalShellChromeInsets.current
+    val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val headerTopPadding = statusBarTop + ShellChromeCenterFromStatusBar - ShellTopChromeHeight / 2
     val listState = rememberLazyListState()
     val blocks = remember(preparedBody) { LazyNoteBlocks.splitWithSourceRanges(preparedBody) }
 
@@ -194,15 +204,26 @@ private fun NoteReaderContent(
         state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(
-            top = chrome.top + if (datedHeader != null) ShellDatedLinksTopOffset else 0.dp,
+            top = headerTopPadding,
             bottom = chrome.bottom,
             start = 32.dp,
             end = 32.dp
         )
     ) {
+        item(key = "workspace-header") {
+            TodayHubHeader(
+                state = workspaceHeader.state,
+                onSelectHub = workspaceHeader.onSelectHub,
+                modifier = Modifier
+                    .height(ShellTopChromeHeight)
+                    .padding(start = 72.dp, end = 72.dp)
+            )
+        }
         item(key = "title") {
             if (datedHeader != null) {
-                DatedFolderLinks(datedHeader.links, datedHeader.current, onOpenInternalNote)
+                Box(Modifier.padding(top = 8.dp)) {
+                    DatedFolderLinks(datedHeader.links, datedHeader.current, onOpenInternalNote)
+                }
                 DateNavigationBar(
                     label = datedHeader.dateLabel,
                     canGoPrev = datedHeader.previous != null,
@@ -254,9 +275,15 @@ private fun NoteReaderContent(
     }
 }
 
-private const val NOTE_READER_HEADER_ITEM_COUNT = 2
+private const val NOTE_READER_HEADER_ITEM_COUNT = 3
 
 val LocalDatedHeader = staticCompositionLocalOf<DatedNoteHeader?> { null }
+
+data class NoteWorkspaceHeader(val state: TodayHubUiState, val onSelectHub: (NoteId) -> Unit)
+
+val LocalNoteWorkspaceHeader = staticCompositionLocalOf {
+    NoteWorkspaceHeader(state = TodayHubUiState.Loading, onSelectHub = { })
+}
 
 private fun noteSegmentKey(index: Int, segment: PreparedSegment): String {
     val offset = (segment as? PreparedSegment.Markdown)

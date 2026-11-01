@@ -3,6 +3,7 @@ package com.eskerra.go.app
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -57,6 +58,8 @@ import com.eskerra.go.core.usecase.UpdateSyncToken
 import com.eskerra.go.core.usecase.WarmNote
 import com.eskerra.go.data.workspace.WorkspacePaths
 import com.eskerra.go.feature.inbox.InboxUiState
+import com.eskerra.go.feature.note.LocalNoteWorkspaceHeader
+import com.eskerra.go.feature.note.NoteWorkspaceHeader
 import com.eskerra.go.feature.sync.AppSyncViewModel
 import com.eskerra.go.feature.todayhub.TodayHubUiState
 import java.io.File
@@ -198,23 +201,22 @@ fun App(
     )
     val onInbox = currentRoute == AppRoute.INBOX || currentRoute == null
     val pullRefreshing by appSyncViewModel.pullRefreshing.collectAsState()
+    val onSelectHub: (NoteId) -> Unit = { selected ->
+        val activeHubId = (todayHubUiState as? TodayHubUiState.Content)?.activeHubId
+        if (selected != activeHubId) {
+            pendingHubSelection = selected
+        }
+        if (onInbox) {
+            if (selected == activeHubId) homeReselectSignal++
+        } else {
+            navController.navigate(AppRoute.INBOX) {
+                popUpTo(AppRoute.HOME_GRAPH)
+                launchSingleTop = true
+            }
+        }
+    }
     AppShell(
         syncIndicator = syncIndicator,
-        todayHubState = todayHubUiState ?: TodayHubUiState.Loading,
-        onSelectHub = { selected ->
-            val activeHubId = (todayHubUiState as? TodayHubUiState.Content)?.activeHubId
-            if (selected != activeHubId) {
-                pendingHubSelection = selected
-            }
-            if (onInbox) {
-                if (selected == activeHubId) homeReselectSignal++
-            } else {
-                navController.navigate(AppRoute.INBOX) {
-                    popUpTo(AppRoute.HOME_GRAPH)
-                    launchSingleTop = true
-                }
-            }
-        },
         pullToRefreshActive = onInbox && pullRefreshing,
         shellInput = shellInputState.presentation,
         onMenuClick = { menuOpen = true },
@@ -235,6 +237,7 @@ fun App(
             appSyncViewModel = appSyncViewModel,
             syncState = syncState,
             homeReselectSignal = homeReselectSignal,
+            onSelectHub = onSelectHub,
             pendingHubSelection = pendingHubSelection,
             onHubSelectionHandled = { pendingHubSelection = null },
             inboxRefreshSignal = inboxRefreshSignal,
@@ -280,17 +283,24 @@ fun App(
             onInboxUiStateChanged = onInboxUiStateChanged,
             onTodayHubUiStateChanged = onTodayHubUiStateChanged
         )
-        NavHost(
-            navController = navController,
-            startDestination = AppRoute.HOME_GRAPH,
-            modifier = contentModifier,
-            enterTransition = { EnterTransition.None },
-            exitTransition = { ExitTransition.None },
-            popEnterTransition = { EnterTransition.None },
-            popExitTransition = { ExitTransition.None }
+        CompositionLocalProvider(
+            LocalNoteWorkspaceHeader provides NoteWorkspaceHeader(
+                state = todayHubUiState ?: TodayHubUiState.Loading,
+                onSelectHub = onSelectHub
+            )
         ) {
-            homeGraph(navGraphContext)
-            sharedDestinations(navGraphContext)
+            NavHost(
+                navController = navController,
+                startDestination = AppRoute.HOME_GRAPH,
+                modifier = contentModifier,
+                enterTransition = { EnterTransition.None },
+                exitTransition = { ExitTransition.None },
+                popEnterTransition = { EnterTransition.None },
+                popExitTransition = { ExitTransition.None }
+            ) {
+                homeGraph(navGraphContext)
+                sharedDestinations(navGraphContext)
+            }
         }
     }
 
