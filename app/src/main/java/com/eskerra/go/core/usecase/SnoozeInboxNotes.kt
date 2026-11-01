@@ -9,6 +9,7 @@ import com.eskerra.go.core.repository.NoteContentCachePort
 import com.eskerra.go.core.repository.NoteRegistryCachePort
 import java.io.File
 import java.time.Instant
+import kotlinx.coroutines.CancellationException
 
 /** Reports each completed write, even when another note fails. */
 class SnoozeInboxNotes(
@@ -45,8 +46,17 @@ class SnoozeInboxNotes(
                 failed += id
             }
         }
-        val refreshFailed = succeeded.isNotEmpty() &&
-            registry.refreshAffected(config, filesDir, succeeded.toSet()).isFailure
+        val refreshFailed = if (succeeded.isEmpty()) {
+            false
+        } else {
+            try {
+                registry.refreshAffected(config, filesDir, succeeded.toSet()).isFailure
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                true
+            }
+        }
         return Outcome(succeeded, failed, refreshFailed)
     }
 }
