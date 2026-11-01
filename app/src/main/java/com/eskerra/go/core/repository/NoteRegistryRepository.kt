@@ -16,4 +16,11 @@ interface NoteRegistryRepository {
         filesDir: File,
         previousRegistry: NoteRegistry? = null
     ): Result<NoteRegistry>
+
+    /** A scan started after this call, for changes already written to disk. */
+    suspend fun refreshFresh(
+        config: WorkspaceConfig,
+        filesDir: File,
+        previousRegistry: NoteRegistry?
+    ): Result<NoteRegistry> = refresh(config, filesDir, previousRegistry)
 }

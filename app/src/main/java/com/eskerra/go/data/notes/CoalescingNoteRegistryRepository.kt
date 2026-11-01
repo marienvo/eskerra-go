@@ -9,6 +9,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.yield
 
 /**
  * Deduplicates concurrent [refresh] calls for the same workspace so parallel callers
@@ -24,11 +25,31 @@ class CoalescingNoteRegistryRepository(private val delegate: NoteRegistryReposit
         config: WorkspaceConfig,
         filesDir: File,
         previousRegistry: NoteRegistry?
+    ): Result<NoteRegistry> =
+        refreshInternal(config, filesDir, previousRegistry, forceOwnScan = false)
+
+    override suspend fun refreshFresh(
+        config: WorkspaceConfig,
+        filesDir: File,
+        previousRegistry: NoteRegistry?
+    ): Result<NoteRegistry> =
+        refreshInternal(config, filesDir, previousRegistry, forceOwnScan = true)
+
+    private suspend fun refreshInternal(
+        config: WorkspaceConfig,
+        filesDir: File,
+        previousRegistry: NoteRegistry?,
+        forceOwnScan: Boolean
     ): Result<NoteRegistry> {
         val key = cacheKey(config, filesDir)
         while (true) {
             val joinTarget = synchronized(inFlight) { inFlight[key] }
             if (joinTarget != null) {
+                if (forceOwnScan) {
+                    joinTarget.deferred.await()
+                    yield()
+                    continue
+                }
                 markPendingRescanIfLateJoin(key, joinTarget)
                 val result = joinTarget.deferred.await()
                 if (synchronized(inFlight) { pendingRescan.remove(key) == true }) {

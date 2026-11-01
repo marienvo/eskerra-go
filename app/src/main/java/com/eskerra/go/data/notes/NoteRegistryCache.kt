@@ -88,7 +88,12 @@ class NoteRegistryCache(
         } else {
             original?.let { NoteRegistry(it.notes.filterNot { note -> note.id in noteIds }) }
         }
-        repository.refresh(config, filesDir, memoBase).onSuccess { fresh ->
+        val result = if (noteIds.isEmpty()) {
+            repository.refresh(config, filesDir, memoBase)
+        } else {
+            repository.refreshFresh(config, filesDir, memoBase)
+        }
+        result.onSuccess { fresh ->
             _registry.value = fresh
             if (original == null || fresh != original) {
                 snapshotScope.launch {
