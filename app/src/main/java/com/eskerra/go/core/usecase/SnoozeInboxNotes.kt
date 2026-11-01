@@ -32,20 +32,21 @@ class SnoozeInboxNotes(
         val succeeded = mutableListOf<NoteId>()
         val failed = mutableListOf<NoteId>()
         for (id in ids.distinct()) {
-            if (available.none { it.id == id && it.isInbox } ||
-                !InboxNotePath.isInboxRelativePath(id.value)
+            val note = available.singleOrNull { it.id == id && it.isInbox }
+            if (note == null || !InboxNotePath.isInboxRelativePath(id.value)
             ) {
                 failed += id
                 continue
             }
-            if (repository.snooze(config, filesDir, id, until).isSuccess) {
+            if (repository.snooze(config, filesDir, note, until).isSuccess) {
                 succeeded += id
                 contentCache.evict(id)
             } else {
                 failed += id
             }
         }
-        val refreshFailed = succeeded.isNotEmpty() && registry.refresh(config, filesDir).isFailure
+        val refreshFailed = succeeded.isNotEmpty() &&
+            registry.refreshAffected(config, filesDir, succeeded.toSet()).isFailure
         return Outcome(succeeded, failed, refreshFailed)
     }
 }

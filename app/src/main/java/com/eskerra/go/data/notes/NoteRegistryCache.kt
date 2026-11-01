@@ -1,5 +1,6 @@
 package com.eskerra.go.data.notes
 
+import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NoteRegistry
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.NoteRegistryCachePort
@@ -73,25 +74,34 @@ class NoteRegistryCache(
      * now-fresh registry, so it remains an incremental (cheap) pass.
      */
     override suspend fun refresh(config: WorkspaceConfig, filesDir: File): Result<NoteRegistry> =
-        mutex.withLock {
-            val startedAtMs = ColdStartTrace.sinceStartMs()
-            val memoBase = _registry.value
-            repository.refresh(config, filesDir, memoBase).onSuccess { fresh ->
-                _registry.value = fresh
-                if (memoBase == null || fresh != memoBase) {
-                    snapshotScope.launch {
-                        runCatching { snapshotStore?.save(config, filesDir, fresh) }
-                    }
-                }
-            }.also {
-                // hadMemoBase=false means the incremental scan degenerated into a full re-read of
-                // every note, which is the most expensive shape a cold start can take.
-                ColdStartTrace.markRegistryRefresh(
-                    tookMs = ColdStartTrace.sinceStartMs() - startedAtMs,
-                    hadMemoBase = memoBase != null
-                )
-            }
+        refreshAffected(config, filesDir, emptySet())
+
+    override suspend fun refreshAffected(
+        config: WorkspaceConfig,
+        filesDir: File,
+        noteIds: Set<NoteId>
+    ): Result<NoteRegistry> = mutex.withLock {
+        val startedAtMs = ColdStartTrace.sinceStartMs()
+        val original = _registry.value
+        val memoBase = if (noteIds.isEmpty()) {
+            original
+        } else {
+            original?.let { NoteRegistry(it.notes.filterNot { note -> note.id in noteIds }) }
         }
+        repository.refresh(config, filesDir, memoBase).onSuccess { fresh ->
+            _registry.value = fresh
+            if (original == null || fresh != original) {
+                snapshotScope.launch {
+                    runCatching { snapshotStore?.save(config, filesDir, fresh) }
+                }
+            }
+        }.also {
+            ColdStartTrace.markRegistryRefresh(
+                tookMs = ColdStartTrace.sinceStartMs() - startedAtMs,
+                hadMemoBase = memoBase != null
+            )
+        }
+    }
 
     /**
      * Marks the cache out of date after a known local mutation: drops the in-memory registry (so

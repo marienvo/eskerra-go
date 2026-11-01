@@ -17,7 +17,8 @@ carry the deadline; old snapshots remain readable and are revalidated after laun
 
 Go uses SnakeYAML's safe parser to validate existing YAML without round-tripping unrelated user
 content. Parsing runs on the existing background inbox registry refresh, after launch settlement;
-it does not add a vault-wide scan. Only leading frontmatter is read for inbox notes, and unchanged
-registry entries reuse their cached deadline. This adds parser and file-read cost during refresh;
+it does not add a vault-wide scan. Inbox notes are hashed during background indexing to guard against stale selections; their
+leading frontmatter is parsed without reading unrelated Markdown into memory. Unchanged registry
+entries reuse their cached hash and deadline. This adds parser and file-read cost during refresh;
 measure `ColdStartTrace` first-frame and registry scan duration, plus visited/re-read counts on a
 representative vault, before release. Device measurements remain necessary when a device is available.

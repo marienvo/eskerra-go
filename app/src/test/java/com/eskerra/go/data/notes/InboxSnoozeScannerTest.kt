@@ -1,5 +1,6 @@
 package com.eskerra.go.data.notes
 
+import com.eskerra.go.core.model.GateFingerprint
 import java.io.File
 import java.time.Instant
 import org.junit.Assert.assertEquals
@@ -22,7 +23,14 @@ class InboxSnoozeScannerTest {
         val first = scanner.scan(root).getOrThrow()
         val expected = Instant.parse("2026-11-02T08:00:00Z").toEpochMilli()
         assertEquals(expected, first.inboxSummaries.single().snoozedUntilEpochMillis)
-        val second = scanner.scan(root, first).getOrThrow()
+        val fingerprint = GateFingerprint("test")
+        val snapshot = NoteRegistrySnapshotCodec.encode(fingerprint, 0L, first)
+        val restored = NoteRegistrySnapshotCodec.decode(snapshot, fingerprint)
+        assertEquals(
+            first.inboxSummaries.single().inboxContentSha256,
+            restored.inboxSummaries.single().inboxContentSha256
+        )
+        val second = scanner.scan(root, restored).getOrThrow()
         assertEquals(expected, second.inboxSummaries.single().snoozedUntilEpochMillis)
     }
 }

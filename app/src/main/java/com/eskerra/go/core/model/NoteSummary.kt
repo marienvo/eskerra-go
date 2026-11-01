@@ -11,7 +11,8 @@ data class NoteSummary(
     val isInbox: Boolean,
     val lastModifiedEpochMillis: Long = 0L,
     val sizeBytes: Long = 0L,
-    val snoozedUntilEpochMillis: Long = 0L
+    val snoozedUntilEpochMillis: Long = 0L,
+    val inboxContentSha256: String? = null
 ) {
     val fileName: String get() = id.value.substringAfterLast('/')
 }

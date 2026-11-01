@@ -99,6 +99,18 @@ class MarkdownNoteScanner : NoteWorkspaceScanner {
                             InboxSnoozeMetadataReader.read(file)
                         }
 
+                        val contentHash = if (!isInbox) {
+                            null
+                        } else if (previous != null &&
+                            previous.lastModifiedEpochMillis == mtime &&
+                            previous.sizeBytes == size &&
+                            previous.inboxContentSha256 != null
+                        ) {
+                            previous.inboxContentSha256
+                        } else {
+                            InboxContentHash.of(file)
+                        }
+
                         summaries += NoteSummary(
                             id = NoteId(notePath.value),
                             title = title,
@@ -106,7 +118,8 @@ class MarkdownNoteScanner : NoteWorkspaceScanner {
                             isInbox = isInbox,
                             lastModifiedEpochMillis = mtime,
                             sizeBytes = size,
-                            snoozedUntilEpochMillis = snoozedUntil
+                            snoozedUntilEpochMillis = snoozedUntil,
+                            inboxContentSha256 = contentHash
                         )
                         return FileVisitResult.CONTINUE
                     }

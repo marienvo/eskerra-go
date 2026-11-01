@@ -22,11 +22,11 @@ class SnoozeInboxNotesTest {
             override suspend fun snooze(
                 config: WorkspaceConfig,
                 filesDir: File,
-                noteId: NoteId,
+                note: NoteSummary,
                 until: Instant
             ): Result<Unit> {
-                calls += noteId
-                return if (noteId.value.endsWith("bad.md")) {
+                calls += note.id
+                return if (note.id.value.endsWith("bad.md")) {
                     Result.failure(IllegalStateException())
                 } else {
                     Result.success(Unit)

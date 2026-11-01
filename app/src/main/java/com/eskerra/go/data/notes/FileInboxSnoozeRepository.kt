@@ -2,8 +2,8 @@ package com.eskerra.go.data.notes
 
 import com.eskerra.go.core.inbox.InboxNotePath
 import com.eskerra.go.core.inbox.InboxSnoozePatch
-import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NotePath
+import com.eskerra.go.core.model.NoteSummary
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.InboxSnoozeRepository
 import com.eskerra.go.data.git.GitSyncMutex
@@ -22,12 +22,12 @@ class FileInboxSnoozeRepository(private val syncMutex: GitSyncMutex) : InboxSnoo
     override suspend fun snooze(
         config: WorkspaceConfig,
         filesDir: File,
-        noteId: NoteId,
+        note: NoteSummary,
         until: Instant
     ): Result<Unit> = withContext(Dispatchers.IO) {
         syncMutex.mutex.withLock {
             runCatching {
-                val path = NotePath.fromRelativePath(noteId.value).getOrThrow().value
+                val path = NotePath.fromRelativePath(note.id.value).getOrThrow().value
                 require(InboxNotePath.isInboxRelativePath(path)) { "Not an inbox note" }
                 val root = WorkspacePaths.resolve(filesDir, config.relativePath).getOrThrow()
                 require(root.isDirectory) { "Workspace missing" }
@@ -36,13 +36,24 @@ class FileInboxSnoozeRepository(private val syncMutex: GitSyncMutex) : InboxSnoo
                 require(Files.isRegularFile(target.toPath(), LinkOption.NOFOLLOW_LINKS)) {
                     "Note missing"
                 }
+                require(
+                    target.lastModified() == note.lastModifiedEpochMillis &&
+                        target.length() == note.sizeBytes
+                ) {
+                    "Note changed since selection"
+                }
                 val originalBytes = target.readBytes()
+                require(
+                    note.inboxContentSha256 != null &&
+                        InboxContentHash.of(originalBytes) == note.inboxContentSha256
+                ) { "Note changed since selection" }
                 val original = originalBytes.toString(Charsets.UTF_8)
                 require(original.toByteArray(Charsets.UTF_8).contentEquals(originalBytes)) {
                     "Note is not valid UTF-8"
                 }
                 val updated = InboxSnoozePatch.apply(original, until).getOrThrow()
-                val temporary = Files.createTempFile(target.parentFile.toPath(), ".snooze-", ".tmp")
+                val parent = requireNotNull(target.parentFile) { "Missing inbox directory" }
+                val temporary = Files.createTempFile(parent.toPath(), ".snooze-", ".tmp")
                 try {
                     Files.write(temporary, updated.toByteArray(Charsets.UTF_8))
                     require(target.readBytes().contentEquals(originalBytes)) { "Note changed" }
