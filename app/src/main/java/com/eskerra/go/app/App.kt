@@ -134,6 +134,7 @@ fun App(
     // because re-tapping Home does not navigate.
     var homeReselectSignal by remember { mutableIntStateOf(0) }
     var pendingHubSelection by remember { mutableStateOf<NoteId?>(null) }
+    var hubPickerVisible by remember { mutableStateOf(false) }
     var inboxRefreshSignal by remember { mutableIntStateOf(0) }
     // The hamburger menu is an overlay, not a NavHost destination: opening it must not navigate, so
     // the underlying route (wherever you were) stays put and closing it cannot jump back to Home.
@@ -225,6 +226,11 @@ fun App(
             { navController.popBackStack() }
         } else {
             null
+        },
+        onWorkspaceSwitch = if (onInbox && todayHubUiState.canSwitchHub()) {
+            { hubPickerVisible = true }
+        } else {
+            null
         }
     ) { contentModifier ->
         val navGraphContext = AppNavGraphContext(
@@ -314,6 +320,13 @@ fun App(
             navController.navigate(AppRoute.NOTIFICATION_LIST)
         }
     }
+
+    AppHubPicker(
+        visible = hubPickerVisible,
+        state = todayHubUiState,
+        onSelectHub = onSelectHub,
+        onDismiss = { hubPickerVisible = false }
+    )
 
     if (menuOpen) {
         AppMenuSheet(
