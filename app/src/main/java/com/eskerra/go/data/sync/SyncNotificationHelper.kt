@@ -48,7 +48,7 @@ object SyncNotificationHelper {
         )
 
         val notification: Notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_notification)
+            .setSmallIcon(R.drawable.ic_sync_notification)
             .setContentTitle(stepText)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
