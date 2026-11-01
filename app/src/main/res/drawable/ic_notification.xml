@@ -1,29 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
-    android:height="18dp"
-    android:viewportWidth="178"
-    android:viewportHeight="136">
-    <group
-        android:translateX="-32"
-        android:translateY="-52">
-        <path
-            android:pathData="M 42 113 H 162 C 172 113 174.510 111.376 168.716 101.733 A 51 51 0 0 0 83.757 98 M 83.757 158 A 51 51 0 0 0 166.352 157.849"
-            android:strokeColor="#FFFFFFFF"
-            android:strokeWidth="10"
-            android:strokeLineCap="round"
-            android:strokeLineJoin="round" />
-        <path
-            android:pathData="M 42 128 H 162 C 182 128 193.161 113.294 181.573 94.007 A 66 66 0 0 0 66.212 98 M 66.212 158 A 66 66 0 0 0 178.515 166.629"
-            android:strokeColor="#FFFFFFFF"
-            android:strokeWidth="10"
-            android:strokeLineCap="round"
-            android:strokeLineJoin="round" />
-        <path
-            android:pathData="M 42 143 H 162 C 192 143 211.813 115.211 194.431 86.282 A 81 81 0 0 0 49.760 98 M 49.760 158 A 81 81 0 0 0 190.677 175.408"
-            android:strokeColor="#FFFFFFFF"
-            android:strokeWidth="10"
-            android:strokeLineCap="round"
-            android:strokeLineJoin="round" />
-    </group>
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12,2C6.48,2 2,6.48 2,12s4.48,10 10,10 10,-4.48 10,-10S17.52,2 12,2z" />
 </vector>
