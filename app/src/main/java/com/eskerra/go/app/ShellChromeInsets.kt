@@ -20,6 +20,9 @@ internal val ShellChromeButtonTop = 9.dp
 /** Vertical center line of the floating chrome buttons, measured from the status bar's bottom edge. */
 internal val ShellChromeCenterFromStatusBar = ShellChromeButtonTop + ShellChromeButtonSize / 2
 
+/** Shared vertical offset for dated-folder links below the shell on home and dated notes. */
+internal val ShellDatedLinksTopOffset = 17.dp
+
 private val ShellHorizontalContentPadding = 16.dp
 
 data class ShellChromeInsets(val top: Dp, val bottom: Dp) {

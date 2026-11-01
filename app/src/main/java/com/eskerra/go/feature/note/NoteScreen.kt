@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.eskerra.go.app.LocalShellChromeInsets
+import com.eskerra.go.app.ShellDatedLinksTopOffset
 import com.eskerra.go.core.markdown.LazyNoteBlocks
 import com.eskerra.go.core.markdown.PreparedMarkdown
 import com.eskerra.go.core.markdown.PreparedSegment
@@ -193,7 +194,7 @@ private fun NoteReaderContent(
         state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(
-            top = chrome.top + if (datedHeader != null) 17.dp else 0.dp,
+            top = chrome.top + if (datedHeader != null) ShellDatedLinksTopOffset else 0.dp,
             bottom = chrome.bottom,
             start = 32.dp,
             end = 32.dp

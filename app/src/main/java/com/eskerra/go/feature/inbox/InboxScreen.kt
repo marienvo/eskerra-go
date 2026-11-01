@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -44,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import com.eskerra.go.app.LocalShellChromeInsets
 import com.eskerra.go.app.ShellChromeButtonSize
 import com.eskerra.go.app.ShellChromeCenterFromStatusBar
+import com.eskerra.go.app.ShellDatedLinksTopOffset
 import com.eskerra.go.app.ShellTopScrimReveal
 import com.eskerra.go.core.datetime.RelativeCalendarLabel
 import com.eskerra.go.core.inbox.InboxTileColor
@@ -135,7 +135,7 @@ fun InboxScreen(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
                 start = 16.dp,
-                top = headerTopPadding,
+                top = if (hasSelection) headerTopPadding else chrome.top + ShellDatedLinksTopOffset,
                 end = 16.dp,
                 bottom = chrome.bottom
             )
@@ -149,15 +149,13 @@ fun InboxScreen(
                         onDeleteSelected = onDeleteSelected,
                         onSnoozeSelected = onSnoozeSelected
                     )
-                } else {
-                    Spacer(Modifier.height(InboxTopBarHeight))
                 }
             }
 
             val datedLinks = (todayHubState as? TodayHubUiState.Content)?.datedLinks.orEmpty()
             if (!hasSelection && datedLinks.isNotEmpty()) {
                 item {
-                    Box(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    Box(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp)) {
                         DatedFolderLinks(datedLinks, current = null, onOpen = onNoteClick)
                     }
                 }
