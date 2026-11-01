@@ -156,7 +156,7 @@ fun InboxScreen(
                         onSelectHub = onSelectHub,
                         modifier = Modifier
                             .height(InboxTopBarHeight)
-                            .padding(start = 16.dp, end = InboxTopRowEndPadding)
+                            .padding(horizontal = 72.dp)
                     )
                 }
             }
