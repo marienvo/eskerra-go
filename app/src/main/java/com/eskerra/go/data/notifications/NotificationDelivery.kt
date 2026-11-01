@@ -35,7 +35,7 @@ class NotificationDelivery(private val context: Context) : NotificationEventDeli
         val title = if (events.size == 1) title(events.single()) else "${events.size} notifications"
         val text = if (events.size == 1) label(events.single().noteId) else "Choose a note to open"
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.mipmap.ic_launcher_brand_foreground)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
             .setContentText(text)
             .setContentIntent(contentIntent)
