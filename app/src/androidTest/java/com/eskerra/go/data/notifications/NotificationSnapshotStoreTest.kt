@@ -90,6 +90,25 @@ class NotificationSnapshotStoreTest {
     }
 
     @Test
+    fun acknowledgementDoesNotDeleteChangedDeadline() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val workspace = "test-${UUID.randomUUID()}"
+        val event = ReminderCandidates.scan(
+            "a.md",
+            "@2026-11-01_1000",
+            ZoneId.of("UTC")
+        ).single()
+        NotificationSnapshotStore(context).use { store ->
+            store.replaceSnapshot(workspace, listOf(event), event.dueAtEpochMillis - 1)
+            store.replaceSnapshot(workspace, listOf(event), event.dueAtEpochMillis)
+            store.acknowledge(workspace, event.key, event.dueAtEpochMillis - 1)
+            assertEquals(listOf(event), store.pending(workspace))
+            store.acknowledge(workspace, event.key, event.dueAtEpochMillis)
+            assertEquals(emptyList<NotificationEvent>(), store.pending(workspace))
+        }
+    }
+
+    @Test
     fun ambiguousDuplicateKeepsOnePendingNotificationForTheSameNote() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val workspace = "test-${UUID.randomUUID()}"

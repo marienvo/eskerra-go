@@ -40,6 +40,8 @@ fun SyncSettingsScreen(
     onSaveVault: () -> Unit,
     binariesState: BinariesUiState,
     onSyncBinaries: () -> Unit,
+    notificationsEnabled: Boolean,
+    onNotificationsEnabledChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -50,6 +52,11 @@ fun SyncSettingsScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text(text = "Sync settings", style = MaterialTheme.typography.headlineMedium)
+        NotificationSettingsSection(
+            enabled = notificationsEnabled,
+            onEnabledChange = onNotificationsEnabledChange
+        )
+        Spacer(modifier = Modifier.height(4.dp))
 
         BinariesTile(state = binariesState, onSyncNow = onSyncBinaries)
 

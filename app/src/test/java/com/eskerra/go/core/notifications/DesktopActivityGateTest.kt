@@ -57,6 +57,7 @@ class DesktopActivityGateTest {
             now
         )
         assertTrue(decision.skippedEventKeys.isEmpty())
+        assertEquals(setOf("due"), decision.deliverableEventKeys)
         assertNull(decision.nextAlarmAtEpochMillis)
     }
 
