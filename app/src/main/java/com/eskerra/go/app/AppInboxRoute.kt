@@ -131,6 +131,23 @@ internal fun AppInboxRoute(
         onDispose { lifecycle.removeObserver(observer) }
     }
 
+    DisposableEffect(inboxViewModel, currentRoute) {
+        val lifecycle = ProcessLifecycleOwner.get().lifecycle
+        fun updateSnoozeActivity() {
+            inboxViewModel.setSnoozeActive(
+                currentRoute == AppRoute.INBOX &&
+                    lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
+            )
+        }
+        val observer = LifecycleEventObserver { _, _ -> updateSnoozeActivity() }
+        lifecycle.addObserver(observer)
+        updateSnoozeActivity()
+        onDispose {
+            lifecycle.removeObserver(observer)
+            inboxViewModel.setSnoozeActive(false)
+        }
+    }
+
     val inboxState by inboxViewModel.uiState.collectAsState()
     val selectedNoteIds by inboxViewModel.selectedNoteIds.collectAsState()
     val isDeleting by inboxViewModel.isDeleting.collectAsState()
