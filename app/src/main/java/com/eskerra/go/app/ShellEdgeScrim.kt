@@ -56,6 +56,16 @@ internal fun bottomEdgeScrimColors(background: Color): List<Color> = listOf(
 internal fun topScrimTranslationPx(revealedPx: Float, fullPx: Float): Float =
     revealedPx.coerceIn(0f, fullPx) - fullPx
 
+internal fun workspaceHeaderScrimRevealPx(
+    firstVisibleItemIndex: Int,
+    firstVisibleItemScrollOffsetPx: Int,
+    headerHeightPx: Float
+): Float = if (firstVisibleItemIndex > 0) {
+    Float.MAX_VALUE
+} else {
+    (firstVisibleItemScrollOffsetPx - headerHeightPx).coerceAtLeast(0f)
+}
+
 /**
  * Tracks how far the floating top scrim should be revealed, driven by scroll position rather
  * than time. A screen registers a reveal provider via [ShellTopScrimReveal] that reports the

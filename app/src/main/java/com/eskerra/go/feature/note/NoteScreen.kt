@@ -24,10 +24,13 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.eskerra.go.app.LocalShellChromeInsets
 import com.eskerra.go.app.ShellChromeCenterFromStatusBar
 import com.eskerra.go.app.ShellTopChromeHeight
+import com.eskerra.go.app.ShellTopScrimReveal
+import com.eskerra.go.app.workspaceHeaderScrimRevealPx
 import com.eskerra.go.core.markdown.LazyNoteBlocks
 import com.eskerra.go.core.markdown.PreparedMarkdown
 import com.eskerra.go.core.markdown.PreparedSegment
@@ -147,6 +150,7 @@ private fun NoteReaderContent(
     val chrome = LocalShellChromeInsets.current
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val headerTopPadding = statusBarTop + ShellChromeCenterFromStatusBar - ShellTopChromeHeight / 2
+    val headerHeightPx = with(LocalDensity.current) { ShellTopChromeHeight.toPx() }
     val listState = rememberLazyListState()
     val blocks = remember(preparedBody) { LazyNoteBlocks.splitWithSourceRanges(preparedBody) }
 
@@ -157,6 +161,13 @@ private fun NoteReaderContent(
     LaunchedEffect(sourceNoteId) {
         withFrameNanos { }
         NoteNavTrace.log("reader.firstFrame", "noteId=${sourceNoteId.value}")
+    }
+    ShellTopScrimReveal {
+        workspaceHeaderScrimRevealPx(
+            firstVisibleItemIndex = listState.firstVisibleItemIndex,
+            firstVisibleItemScrollOffsetPx = listState.firstVisibleItemScrollOffset,
+            headerHeightPx = headerHeightPx
+        )
     }
     // Reports the visible blocks' original markdown range so prefetch follows actual visible links.
     LaunchedEffect(listState, blocks) {
