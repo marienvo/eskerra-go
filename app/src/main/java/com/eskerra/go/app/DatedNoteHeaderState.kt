@@ -1,8 +1,12 @@
 package com.eskerra.go.app
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NoteReaderDocument
@@ -23,6 +27,20 @@ private data class LoadedLinks(
 
 @Composable
 internal fun datedNoteHeader(
+    ctx: AppNavGraphContext,
+    noteId: NoteId,
+    document: NoteReaderDocument?,
+    hub: TodayHubUiState.Content?
+): DatedNoteHeader? {
+    val resolved = resolveDatedNoteHeader(ctx, noteId, document, hub)
+    var previous by remember { mutableStateOf<DatedNoteHeader?>(null) }
+    val retained = datedHeaderForNavigation(resolved, previous, noteId)
+    SideEffect { previous = retained }
+    return retained
+}
+
+@Composable
+private fun resolveDatedNoteHeader(
     ctx: AppNavGraphContext,
     noteId: NoteId,
     document: NoteReaderDocument?,
@@ -76,4 +94,14 @@ internal fun datedNoteHeader(
             Clock.System.todayIn(TimeZone.currentSystemDefault())
         )
     )
+}
+
+internal fun datedHeaderForNavigation(
+    resolved: DatedNoteHeader?,
+    previous: DatedNoteHeader?,
+    target: NoteId
+): DatedNoteHeader? = resolved ?: previous?.takeIf {
+    target == it.previous ||
+        target == it.next ||
+        it.links.any { link -> link.noteId == target }
 }
