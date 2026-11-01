@@ -40,6 +40,9 @@ class InboxSnoozeTest {
             InboxSnooze.parse("2026-11-02T09:00:00+01:00")
         )
         assertNull(InboxSnooze.parse("2026-11-02"))
+        assertNull(InboxSnooze.parse("2026-11-02T09:00Z"))
+        assertNull(InboxSnooze.parse("2026-11-02T09:00:00+19:00"))
+        assertNull(InboxSnooze.parse("2026-11-02T09:00:00.1234567890Z"))
         assertNull(InboxSnooze.parse(null))
     }
 
