@@ -9,12 +9,20 @@ object InboxSnoozeFrontmatter {
 
     fun read(markdown: String): Instant? {
         val lines = markdown.removePrefix("\uFEFF").lineSequence().iterator()
-        if (!lines.hasNext() || lines.next().trimEnd('\r') != "---") return null
+        var opening: String? = null
+        while (lines.hasNext()) {
+            val line = lines.next().trimEnd('\r')
+            if (line.isNotBlank()) {
+                opening = line
+                break
+            }
+        }
+        if (opening?.trim() != "---") return null
         var value: String? = null
         var found = false
         while (lines.hasNext()) {
             val line = lines.next().trimEnd('\r')
-            if (line == "---") return if (found) InboxSnooze.parse(value) else null
+            if (line.trim() == "---") return if (found) InboxSnooze.parse(value) else null
             val match = key.matchEntire(line) ?: continue
             if (found) return null
             found = true
