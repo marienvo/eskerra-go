@@ -33,8 +33,11 @@ internal fun datedNoteHeader(
     hub: TodayHubUiState.Content?
 ): DatedNoteHeader? {
     val resolved = resolveDatedNoteHeader(ctx, noteId, document, hub)
+    val targetIsDated = hub?.hubs?.any {
+        NoteflowDatedNotes.neighbours(hub.registry, it.noteId, noteId) != null
+    } == true
     var previous by remember { mutableStateOf<DatedNoteHeader?>(null) }
-    val retained = datedHeaderForNavigation(resolved, previous, noteId)
+    val retained = datedHeaderForNavigation(resolved, previous, noteId, targetIsDated)
     SideEffect { previous = retained }
     return retained
 }
@@ -99,9 +102,11 @@ private fun resolveDatedNoteHeader(
 internal fun datedHeaderForNavigation(
     resolved: DatedNoteHeader?,
     previous: DatedNoteHeader?,
-    target: NoteId
+    target: NoteId,
+    targetIsDated: Boolean = false
 ): DatedNoteHeader? = resolved ?: previous?.takeIf {
-    target == it.previous ||
+    targetIsDated ||
+        target == it.previous ||
         target == it.next ||
         it.links.any { link -> link.noteId == target }
 }

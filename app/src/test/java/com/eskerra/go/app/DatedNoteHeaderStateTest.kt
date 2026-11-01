@@ -28,6 +28,13 @@ class DatedNoteHeaderStateTest {
     }
 
     @Test
+    fun datedHeaderForNavigation_knownDatedTargetFromAnotherHub_retainsPreviousWhileLoading() {
+        val target = NoteId("Other/2026-11-03.md")
+
+        assertSame(header, datedHeaderForNavigation(null, header, target, targetIsDated = true))
+    }
+
+    @Test
     fun datedHeaderForNavigation_nonDatedTarget_doesNotRetainPrevious() {
         assertNull(datedHeaderForNavigation(null, header, NoteId("Inbox/note.md")))
     }
