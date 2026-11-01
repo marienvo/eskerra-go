@@ -3,6 +3,8 @@ package com.eskerra.go.feature.todayhub
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -23,6 +25,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -116,6 +120,7 @@ fun TodayHubBody(
 }
 
 @Composable
+@OptIn(ExperimentalLayoutApi::class)
 private fun TodayHubBodyContent(
     state: TodayHubUiState.Content,
     onPreviousWeek: () -> Unit,
@@ -128,14 +133,24 @@ private fun TodayHubBodyContent(
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
-        WeekNavBar(
-            label = state.weekRangeLabel,
-            canGoPrev = state.canGoPrev,
-            canGoNext = state.canGoNext,
-            onPrevious = onPreviousWeek,
-            onNext = onNextWeek
-        )
-
+        if (state.datedLinks.isNotEmpty()) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                state.datedLinks.forEach { link ->
+                    Text(
+                        text = link.folder + if (link.isIncomplete) " •" else "",
+                        modifier = Modifier
+                            .semantics {
+                                contentDescription = if (link.isIncomplete) {
+                                    "${link.folder}, unfinished"
+                                } else {
+                                    link.folder
+                                }
+                            }
+                            .clickable { onOpenInternalNote(link.noteId) }
+                    )
+                }
+            }
+        }
         if (state.introMarkdown.isNotBlank()) {
             VaultMarkdownView(
                 markdown = state.introMarkdown,
@@ -150,6 +165,13 @@ private fun TodayHubBodyContent(
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
             )
         }
+        WeekNavBar(
+            label = state.weekRangeLabel,
+            canGoPrev = state.canGoPrev,
+            canGoNext = state.canGoNext,
+            onPrevious = onPreviousWeek,
+            onNext = onNextWeek
+        )
 
         if (state.rowLoading) {
             Row(

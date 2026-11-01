@@ -1,5 +1,6 @@
 package com.eskerra.go.core.todayhub
 
+import com.eskerra.go.core.markdown.VaultMarkdownPreprocess
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NoteRegistry
 import com.eskerra.go.core.vault.VaultVisibility
@@ -32,8 +33,11 @@ object NoteflowDatedNotes {
     }
 
     fun isIncomplete(markdown: String): Boolean {
-        val title = markdown.lineSequence().map { it.trim() }
-            .firstOrNull { it.startsWith("# ") }
+        val body = VaultMarkdownPreprocess.splitYamlFrontmatter(markdown).body
+        val preview = body.lineSequence().take(60).joinToString("\n").take(4000)
+        val title = preview.lineSequence().map { it.trim() }.firstOrNull {
+            it.startsWith("#") && !it.startsWith("##") && it.drop(1).isNotBlank()
+        }
         return title == null || !title.contains("✅")
     }
 }

@@ -2,6 +2,7 @@ package com.eskerra.go.feature.todayhub
 
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NoteRegistry
+import com.eskerra.go.core.todayhub.TodayHubDatedLink
 import com.eskerra.go.core.todayhub.TodayHubRef
 import com.eskerra.go.core.todayhub.TodayHubRow
 import com.eskerra.go.core.todayhub.TodayHubWeeks
@@ -33,7 +34,8 @@ sealed interface TodayHubUiState {
         /** The loaded week row, or `null` until the first row fetch completes. */
         val row: TodayHubRow?,
         /** True when a slow (>200 ms) row fetch is in flight (spec §11.4). */
-        val rowLoading: Boolean
+        val rowLoading: Boolean,
+        val datedLinks: List<TodayHubDatedLink> = emptyList()
     ) : TodayHubUiState {
         val showHubPicker: Boolean get() = hubs.size > 1
     }

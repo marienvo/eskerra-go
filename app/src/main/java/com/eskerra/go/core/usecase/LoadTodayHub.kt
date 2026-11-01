@@ -1,7 +1,5 @@
 package com.eskerra.go.core.usecase
 
-import com.eskerra.go.core.markdown.TodayHubIntroStrip
-import com.eskerra.go.core.markdown.VaultMarkdownPreprocess
 import com.eskerra.go.core.model.NoteContentError
 import com.eskerra.go.core.model.NoteContentException
 import com.eskerra.go.core.model.NoteId
@@ -11,22 +9,25 @@ import com.eskerra.go.core.model.NoteRegistry
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.NoteContentRepository
 import com.eskerra.go.core.repository.NoteRegistryCachePort
+import com.eskerra.go.core.repository.NoteflowRepository
+import com.eskerra.go.core.todayhub.NoteflowDatedNotes
 import com.eskerra.go.core.todayhub.TodayHubData
+import com.eskerra.go.core.todayhub.TodayHubDatedLink
 import com.eskerra.go.core.todayhub.TodayHubDiscovery
-import com.eskerra.go.core.todayhub.TodayHubFrontmatter
 import com.eskerra.go.core.todayhub.TodayHubRef
 import java.io.File
+import kotlinx.datetime.Clock
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.todayIn
 
-/**
- * Discovers Today hubs in the vault and loads the active hub's intro + settings (spec §11.1–§11.2).
- * Returns `null` when no `Today.md` exists so the caller can show the empty state. Week rows are
- * fetched separately via [LoadTodayHubRow] (spec §11.4).
- */
+/** Loads a Studio .flow and resolves its current dated-folder links. */
 class LoadTodayHub(
     private val registryCache: NoteRegistryCachePort,
-    private val contentRepository: NoteContentRepository
+    private val contentRepository: NoteContentRepository,
+    private val noteflowRepository: NoteflowRepository,
+    private val today: () -> LocalDate = { Clock.System.todayIn(TimeZone.currentSystemDefault()) }
 ) {
-
     suspend fun currentRegistry(config: WorkspaceConfig, filesDir: File): NoteRegistry? =
         registryCache.current(config, filesDir)
 
@@ -35,63 +36,55 @@ class LoadTodayHub(
         filesDir: File,
         preferredHubId: NoteId?
     ): Result<TodayHubData?> {
-        val registryResult = registryCache.refresh(config, filesDir)
-        if (registryResult.isFailure) {
-            return Result.failure(registryFailure(registryResult.exceptionOrNull()))
-        }
-        val registry = registryResult.getOrThrow()
-
-        val hubIds = TodayHubDiscovery.sortedHubNoteIds(registry)
-        if (hubIds.isEmpty()) {
-            return Result.success(null)
-        }
-
-        val activeHubId = preferredHubId?.takeIf { it in hubIds } ?: hubIds.first()
-
-        val contentResult = contentRepository.load(config, filesDir, activeHubId)
-        if (contentResult.isFailure) {
-            return Result.failure(contentResult.exceptionOrNull()!!)
-        }
-        val markdown = contentResult.getOrThrow().markdown
-
-        val settings = TodayHubFrontmatter.parse(markdown)
-        val titleById = registry.notes.associate { it.id to it.title }
-        val hubTitle = titleById[activeHubId]?.takeIf { it.isNotBlank() }
-        // The hub note's H1 already shows as the "Switch hub" title, so drop it from the intro body
-        // to keep a single H1 on the today-hub page (spec §11). Other notes render their H1 as usual.
-        val introMarkdown = TodayHubIntroStrip.stripLeadingAtxH1ForTitle(
-            VaultMarkdownPreprocess.splitYamlFrontmatter(markdown).body,
-            hubTitle
-        )
-        val availableWeekStems = TodayHubDiscovery.availableWeekStems(activeHubId.value, registry)
-        // Label each hub by its note's H1 (the registry title), falling back to the folder name when
-        // the hub has no heading, so the "Switch hub" title/picker read the hub's own title.
-        val hubs = hubIds.map { id ->
-            val h1 = titleById[id]?.takeIf { it.isNotBlank() }
-            TodayHubRef(id, h1 ?: TodayHubDiscovery.folderLabel(id.value))
-        }
-
-        return Result.success(
-            TodayHubData(
-                hubs = hubs,
-                activeHubId = activeHubId,
-                settings = settings,
-                introMarkdown = introMarkdown,
-                availableWeekStems = availableWeekStems,
-                registry = registry
-            )
-        )
-    }
-
-    private fun registryFailure(cause: Throwable?): NoteContentException {
-        if (cause is NoteIndexException) {
-            val error = when (cause.error) {
+        val registry = registryCache.refresh(config, filesDir).getOrElse {
+            val error = when ((it as? NoteIndexException)?.error) {
                 is NoteIndexError.InvalidWorkspacePath -> NoteContentError.InvalidWorkspacePath
                 is NoteIndexError.WorkspaceMissing -> NoteContentError.WorkspaceMissing
-                is NoteIndexError.ScanFailed -> NoteContentError.ReadFailed(cause.error.detail)
+                else -> NoteContentError.ReadFailed(it.message)
             }
-            return NoteContentException(error)
+            return Result.failure(NoteContentException(error))
         }
-        return NoteContentException(NoteContentError.ReadFailed(cause?.message))
+        val flows = noteflowRepository.discover(config, filesDir).getOrElse {
+            return Result.failure(NoteContentException(NoteContentError.ReadFailed(it.message)))
+        }
+        if (flows.isEmpty()) return Result.success(null)
+        val preferredDirectory = preferredHubId?.let { TodayHubDiscovery.directoryOf(it.value) }
+        val active = flows.firstOrNull { it.id == preferredHubId }
+            ?: flows.firstOrNull {
+                TodayHubDiscovery.directoryOf(it.id.value) == preferredDirectory
+            }
+            ?: flows.first()
+        val links = mutableListOf<TodayHubDatedLink>()
+        for (target in NoteflowDatedNotes.select(registry, active.id, today())) {
+            val content = contentRepository.load(config, filesDir, target.noteId).getOrElse {
+                return Result.failure(it)
+            }
+            links += TodayHubDatedLink(
+                target.folder,
+                target.noteId,
+                NoteflowDatedNotes.isIncomplete(content.markdown)
+            )
+        }
+        return Result.success(
+            TodayHubData(
+                hubs = flows.map { flow ->
+                    TodayHubRef(
+                        flow.id,
+                        flow.title.ifBlank {
+                            TodayHubDiscovery.folderLabel(flow.id.value)
+                        }
+                    )
+                },
+                activeHubId = active.id,
+                settings = active.settings,
+                introMarkdown = active.links.joinToString(" "),
+                availableWeekStems = TodayHubDiscovery.availableWeekStems(
+                    active.id.value,
+                    registry
+                ),
+                registry = registry,
+                datedLinks = links
+            )
+        )
     }
 }

@@ -37,5 +37,7 @@ class NoteflowDatedNotesTest {
         assertTrue(NoteflowDatedNotes.isIncomplete("# Title\n\n✅"))
         assertTrue(NoteflowDatedNotes.isIncomplete("no title"))
         assertFalse(NoteflowDatedNotes.isIncomplete("# Done ✅️\n"))
+        assertTrue(NoteflowDatedNotes.isIncomplete("---\n# ✅\n---\n# Pending"))
+        assertTrue(NoteflowDatedNotes.isIncomplete("## ✅\n# Pending"))
     }
 }

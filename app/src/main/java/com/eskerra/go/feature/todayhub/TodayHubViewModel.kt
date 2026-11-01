@@ -52,6 +52,7 @@ class TodayHubViewModel(
     private var loaded: Loaded? = null
     private var loadJob: Job? = null
     private var rowJob: Job? = null
+    private var loadedDay: LocalDate? = null
 
     /** Resolved hub context plus the navigation window derived from it. */
     private data class Loaded(
@@ -61,7 +62,22 @@ class TodayHubViewModel(
     )
 
     init {
-        load(preferredHubId = null, restoreFromStore = true, restoreSnapshotFirst = true)
+        loadJob = viewModelScope.launch {
+            restoreSnapshot()
+            if (_uiState.value is TodayHubUiState.Loading) {
+                _uiState.value = TodayHubUiState.Empty
+            }
+        }
+    }
+
+    fun startDeferredRefresh() = load(
+        preferredHubId = null,
+        restoreFromStore = true,
+        restoreSnapshotFirst = _uiState.value is TodayHubUiState.Loading
+    )
+
+    fun refreshOnDayChange() {
+        if (loadedDay != null && loadedDay != today()) retry()
     }
 
     fun retry() =
@@ -114,7 +130,9 @@ class TodayHubViewModel(
             if (restoreSnapshotFirst) {
                 restoreSnapshot()
             }
-            if (_uiState.value !is TodayHubUiState.Content) {
+            if (_uiState.value !is TodayHubUiState.Content &&
+                _uiState.value !is TodayHubUiState.Empty
+            ) {
                 _uiState.value = TodayHubUiState.Loading
             }
             val preferred = preferredHubId
@@ -135,6 +153,7 @@ class TodayHubViewModel(
     }
 
     private fun onHubLoaded(data: TodayHubData) {
+        loadedDay = today()
         activeTodayHubStore.persist(data.activeHubId)
         val currentStem = TodayHubNavigation.currentWeekStem(today(), data.settings.start)
         val navigable = TodayHubNavigation.navigableWeekStems(data.availableWeekStems, currentStem)
@@ -218,7 +237,8 @@ class TodayHubViewModel(
                 gapPx = 0
             ),
             row = row,
-            rowLoading = rowLoading
+            rowLoading = rowLoading,
+            datedLinks = data.datedLinks
         )
     }
 
@@ -238,7 +258,8 @@ class TodayHubViewModel(
             settings = snapshot.settings,
             introMarkdown = snapshot.introMarkdown,
             availableWeekStems = snapshot.availableWeekStems,
-            registry = registry
+            registry = registry,
+            datedLinks = snapshot.datedLinks
         )
         val currentStem = TodayHubNavigation.currentWeekStem(today(), snapshot.settings.start)
         val navigable = TodayHubNavigation.navigableWeekStems(
@@ -274,7 +295,8 @@ class TodayHubViewModel(
                     introMarkdown = content.introMarkdown,
                     availableWeekStems = current.data.availableWeekStems,
                     selectedWeekStem = content.selectedWeekStem,
-                    row = content.row
+                    row = content.row,
+                    datedLinks = content.datedLinks
                 )
             )
         }

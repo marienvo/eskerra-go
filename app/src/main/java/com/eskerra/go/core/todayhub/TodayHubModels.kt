@@ -16,13 +16,16 @@ data class TodayHubData(
     val settings: TodayHubFrontmatter.Settings,
     val introMarkdown: String,
     val availableWeekStems: List<String>,
-    val registry: NoteRegistry
+    val registry: NoteRegistry,
+    val datedLinks: List<TodayHubDatedLink> = emptyList()
 ) {
     val columnCount: Int get() = TodayHubFrontmatter.columnCount(settings)
     val folderLabel: String get() = hubs.firstOrNull {
         it.noteId == activeHubId
     }?.folderLabel.orEmpty()
 }
+
+data class TodayHubDatedLink(val folder: String, val noteId: NoteId, val isIncomplete: Boolean)
 
 /**
  * One week's row, split into [columns] markdown sections (spec §11.3). [rowNoteId] is the synthetic

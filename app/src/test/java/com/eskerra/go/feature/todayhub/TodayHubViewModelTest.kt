@@ -94,13 +94,15 @@ class TodayHubViewModelTest {
         filesDir = filesDir,
         loadTodayHub = LoadTodayHub(
             NoteRegistryCache(registry, FakeNoteRegistrySnapshotStore(cachedRegistry)),
-            content
+            content,
+            fakeNoteflowRepository(registry),
+            fixedToday
         ),
         loadTodayHubRow = LoadTodayHubRow(content),
         activeTodayHubStore = store,
         todayHubSnapshotStore = snapshotStore,
         today = fixedToday
-    )
+    ).also { it.startDeferredRefresh() }
 
     @Test
     fun emptyWhenNoHubs() = runTest {
