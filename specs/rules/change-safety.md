@@ -24,7 +24,7 @@ Reviewer legend — **self**: author merges on green CI (solo era); **maintainer
 | **G2** | **Local feature change** — one feature slice, no sync/vault-write surface | Low | [`specs/adr/001-hybrid-layering-and-feature-slices.md`](../adr/001-hybrid-layering-and-feature-slices.md) (placement); the slice's existing files across `feature`/`data`/`core` | Colocated unit test for the changed domain/data behavior (AGENTS.md rule); single-file run named in the report | self | **Yes** |
 | **G3** | **Sync / vault-write change** — anything touching `data/git`, `ManualSyncNow`, the shared git mutex, a Markdown/vault write path, or FTS reconcile | **Critical** | [`specs/architecture/sync-hardening-and-recovery.md`](../architecture/sync-hardening-and-recovery.md); the layering ADR; enumerate every write/mutation path the change adds or removes | Tests **in the same change** (hard rule); the affected sync/recovery suites; a new write path ⇒ a new test proving the write is scoped and safe | maintainer (+ 2nd-model) | **Yes** — agent applies the diff; risk raises the bar (same-PR tests + invariant argument in the report), not whether the agent may build |
 | **G4** | **Test-only change** — new tests, splits, fakes, harness | Low | The module's existing test style (behavioral, not snapshot) | The tests themselves green; **zero production diff** (CI-verifiable: no non-test file changed) | self | **Yes** — best first task for a new agent |
-| **G5** | **Guardrail / meta change** — module budgets, `module-budget-baseline.json`, ArchUnit rules + violation store, `.github/workflows/`, git hooks, this rules file | High (meta) | The guardrail's own tests (`check-module-budget-baseline.test.sh`, the ArchUnit suite); the ratchet philosophy (baselines only go down) | The guardrail's own colocated tests green | maintainer, always | **Mechanism yes, policy no** — an agent may build the checker; only a human decides what it permits |
+| **G5** | **Guardrail / meta change** — module budgets, `module-budget-baseline.json`, ArchUnit rules + violation store, `.github/workflows/`, git hooks, this rules file | High (meta) | The guardrail's own tests (`check-module-budget-baseline.test.sh`, the ArchUnit suite); the ratchet philosophy (baselines only go down) | The guardrail's own colocated tests green | maintainer, always | **Yes** — an agent may implement explicitly authorized policy and mechanism changes; maintainer review remains |
 
 A change that cannot answer "which G is this?" in one type is mis-scoped.
 
@@ -91,7 +91,6 @@ DONE tests.
   ArchUnit violation store, or any new suppression invalidates the change regardless of
   how good the rest is.
 - **Never weaken a test to make a suite pass.** Agents do not delete or soften an assertion
-  to get to green; a legitimately obsolete assertion is a report item ("assertion X now
-  wrong because Y — confirm before I change it"), not a silent edit.
+  to get to green; an assertion made obsolete by the authorized behavior change may be updated with a documented reason and evidence.
 - **Preserve the fragile specifics.** Do not change the git mutex discipline or the fail-closed
   recovery behavior without a spec update in the same change and G3 review.
