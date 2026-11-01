@@ -79,6 +79,10 @@ up: `review-markdown-integrity-data-loss-prevention` (any Markdown/vault write p
 
 ## Execution persistence
 
+- An execution request authorizes routine technical decisions, necessary test changes, and revisions to stale plans within the agreed outcome. Continue implementation, tests, and documentation without renewed approval. Ask only for a material product decision, indispensable missing information, or new authority. Planning-only requests and the active interaction mode govern scope.
+- When a plan premise changes, replan in session and continue. Extend task-generated allowlists when necessary and explain why; respect user-imposed limits. Split mixed change types into reviewable changes without waiting for a human to apply them.
+- Missing reviews, devices, services, or failing checks block only dependent steps. Record pending work and evidence; do not claim required verification or review succeeded when it did not.
+
 When a user asks an agent to implement a plan or complete work, the task is not complete until
 every authorized, executable step is done. A blocker applies only to the operation that actually
 needs the missing input, access, hardware, or approval; it must not silently end independent work.

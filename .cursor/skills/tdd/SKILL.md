@@ -55,16 +55,10 @@ RIGHT (vertical):
 
 Before writing any code:
 
-- [ ] Confirm with user what interface changes are needed
-- [ ] Confirm with user which behaviors to test (prioritize)
-- [ ] Identify opportunities for [deep modules](deep-modules.md) (small interface, deep implementation)
-- [ ] Design interfaces for [testability](interface-design.md)
-- [ ] List the behaviors to test (not implementation steps)
-- [ ] Get user approval on the plan
-
-Ask: "What should the public interface look like? Which behaviors are most important to test?"
-
-**You can't test everything.** Confirm with the user exactly which behaviors matter most. Focus testing effort on critical paths and complex logic, not every possible edge case.
+- Use the agreed behavior and interfaces; make routine technical decisions independently.
+- Identify opportunities for [deep modules](deep-modules.md) and design interfaces for [testability](interface-design.md).
+- List and prioritize critical behaviors and complex logic. Ask only when a material product decision remains unresolved.
+- An existing execution request authorizes this workflow; do not request approval again.
 
 ### 2. Tracer Bullet
 
