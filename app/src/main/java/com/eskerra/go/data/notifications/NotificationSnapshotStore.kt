@@ -57,8 +57,7 @@ class NotificationSnapshotStore(context: Context) :
                     "(SELECT event_key FROM snapshot WHERE workspace = ? AND due_at != 9223372036854775807)",
                 arrayOf(workspace, workspace)
             )
-            db.delete("pending", "workspace = ? AND due_at > ?", arrayOf(workspace, now.toString()))
-            for (event in due) {
+            for (event in due + NotificationEvents.upcoming(events, now)) {
                 insertIgnoringExisting(db, "pending", workspace, event)
             }
             val meta = ContentValues().apply {
