@@ -4,6 +4,7 @@ import com.eskerra.go.core.model.GateFingerprint
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.TodayHubSnapshotStore
+import com.eskerra.go.core.todayhub.TodayHubDatedLink
 import com.eskerra.go.core.todayhub.TodayHubFrontmatter
 import com.eskerra.go.core.todayhub.TodayHubRef
 import com.eskerra.go.core.todayhub.TodayHubRow
@@ -95,6 +96,14 @@ internal object TodayHubSnapshotCodec {
         append(escape(snapshot.selectedWeekStem))
         append("\",\"row\":")
         append(snapshot.row?.let(::encodeRow) ?: "null")
+        append(",\"datedLinks\":[")
+        append(
+            snapshot.datedLinks.joinToString(",") {
+                "{\"folder\":\"${escape(it.folder)}\",\"noteId\":\"${escape(it.noteId.value)}\"," +
+                    "\"status\":\"${it.isIncomplete}\"}"
+            }
+        )
+        append(']')
         append('}')
     }
 
@@ -116,7 +125,14 @@ internal object TodayHubSnapshotCodec {
             introMarkdown = readQuotedValue(raw, "introMarkdown"),
             availableWeekStems = readStringArray(raw, "availableWeekStems"),
             selectedWeekStem = readQuotedValue(raw, "selectedWeekStem"),
-            row = readNullableObject(raw, "row")?.let(::parseRow)
+            row = readNullableObject(raw, "row")?.let(::parseRow),
+            datedLinks = readObjectArray(raw, "datedLinks").map {
+                TodayHubDatedLink(
+                    readQuotedValue(it, "folder"),
+                    NoteId(readQuotedValue(it, "noteId")),
+                    readQuotedValue(it, "status").toBooleanStrict()
+                )
+            }
         )
     }
 

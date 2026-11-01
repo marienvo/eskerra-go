@@ -28,6 +28,7 @@ object TodayHubDiscovery {
         val dir = directoryOf(todayNotePath)
         val segment = dir.substringAfterLast('/').ifEmpty { dir }
         if (segment.isNotEmpty()) return segment
+        if (fileName(todayNotePath) == ".flow") return "Noteflow"
         return fileName(todayNotePath).removeSuffix(".md")
     }
 

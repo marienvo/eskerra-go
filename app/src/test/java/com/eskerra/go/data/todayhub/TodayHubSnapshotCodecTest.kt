@@ -2,6 +2,7 @@ package com.eskerra.go.data.todayhub
 
 import com.eskerra.go.core.model.GateFingerprint
 import com.eskerra.go.core.model.NoteId
+import com.eskerra.go.core.todayhub.TodayHubDatedLink
 import com.eskerra.go.core.todayhub.TodayHubFrontmatter
 import com.eskerra.go.core.todayhub.TodayHubRef
 import com.eskerra.go.core.todayhub.TodayHubRow
@@ -28,6 +29,9 @@ class TodayHubSnapshotCodecTest {
             rowNoteId = NoteId("Daily/2026-04-06.md"),
             weekStartStem = "2026-04-06",
             columns = listOf("default", "tasks},{not-split", "notes")
+        ),
+        datedLinks = listOf(
+            TodayHubDatedLink("Journal", NoteId("Daily/Journal/2026-04-06.md"), true)
         )
     )
 
@@ -68,5 +72,14 @@ class TodayHubSnapshotCodecTest {
         }.exceptionOrNull()
 
         assertEquals("snapshot fingerprint mismatch", result?.message)
+    }
+
+    @Test
+    fun decode_rejectsLegacySnapshotWithoutDatedLinks() {
+        val fingerprint = GateFingerprint("abc123")
+        val raw = TodayHubSnapshotCodec.encode(fingerprint, 99L, snapshot)
+            .substringBefore(",\"datedLinks\":") + "}"
+        val result = runCatching { TodayHubSnapshotCodec.decode(raw, fingerprint) }
+        assertEquals(true, result.isFailure)
     }
 }

@@ -2,6 +2,7 @@ package com.eskerra.go.app
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -13,6 +14,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
@@ -58,7 +62,8 @@ internal fun AppInboxRoute(
     onInboxUiStateChanged: (InboxUiState) -> Unit,
     onTodayHubUiStateChanged: (TodayHubUiState) -> Unit,
     homeReselectSignal: Int,
-    inboxRefreshSignal: Int
+    inboxRefreshSignal: Int,
+    launchSettled: Boolean
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -96,6 +101,30 @@ internal fun AppInboxRoute(
             todayHubSnapshotStore = todayHubSnapshotStore
         )
     )
+    LaunchedEffect(launchSettled) {
+        if (launchSettled) {
+            androidx.compose.runtime.withFrameNanos { }
+            todayHubViewModel.startDeferredRefresh()
+        }
+    }
+    LaunchedEffect(todayHubViewModel) {
+        while (true) {
+            kotlinx.coroutines.delay(60_000)
+            todayHubViewModel.refreshOnDayChange()
+        }
+    }
+    DisposableEffect(todayHubViewModel, launchSettled) {
+        var accepting = false
+        val observer = LifecycleEventObserver { _, event ->
+            if (accepting && launchSettled && event == Lifecycle.Event.ON_START) {
+                todayHubViewModel.retry()
+            }
+        }
+        val lifecycle = ProcessLifecycleOwner.get().lifecycle
+        lifecycle.addObserver(observer)
+        accepting = true
+        onDispose { lifecycle.removeObserver(observer) }
+    }
 
     val inboxState by inboxViewModel.uiState.collectAsState()
     val selectedNoteIds by inboxViewModel.selectedNoteIds.collectAsState()
@@ -137,6 +166,7 @@ internal fun AppInboxRoute(
     LaunchedEffect(inboxRefreshSignal) {
         if (inboxRefreshSignal > 0) {
             inboxViewModel.refresh()
+            todayHubViewModel.retry()
         }
     }
 

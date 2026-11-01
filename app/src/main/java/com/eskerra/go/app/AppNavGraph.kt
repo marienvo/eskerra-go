@@ -1,5 +1,6 @@
 package com.eskerra.go.app
 
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -46,6 +47,7 @@ import com.eskerra.go.core.usecase.WarmNote
 import com.eskerra.go.feature.editor.NoteEditorScreen
 import com.eskerra.go.feature.editor.NoteEditorViewModel
 import com.eskerra.go.feature.inbox.InboxUiState
+import com.eskerra.go.feature.note.LocalDatedHeader
 import com.eskerra.go.feature.note.NoteReaderUiState
 import com.eskerra.go.feature.note.NoteReaderViewModel
 import com.eskerra.go.feature.note.NoteScreen
@@ -76,6 +78,8 @@ internal data class AppNavGraphContext(
     val syncState: SyncUiState,
     val homeReselectSignal: Int,
     val inboxRefreshSignal: Int,
+    val launchSettled: Boolean,
+    val todayHubUiState: TodayHubUiState?,
     val loadInboxSummaries: LoadInboxSummariesCached,
     val loadNoteForReading: LoadNoteForReading,
     val notePrefetchScheduler: NotePrefetchScheduler,
@@ -133,7 +137,8 @@ internal fun NavGraphBuilder.homeGraph(ctx: AppNavGraphContext) {
                 onInboxUiStateChanged = ctx.onInboxUiStateChanged,
                 onTodayHubUiStateChanged = ctx.onTodayHubUiStateChanged,
                 homeReselectSignal = ctx.homeReselectSignal,
-                inboxRefreshSignal = ctx.inboxRefreshSignal
+                inboxRefreshSignal = ctx.inboxRefreshSignal,
+                launchSettled = ctx.launchSettled
             )
         }
     }
@@ -262,33 +267,41 @@ internal fun NavGraphBuilder.sharedDestinations(ctx: AppNavGraphContext) {
 
         val noteReaderContext = LocalContext.current
         var ambiguousCandidates by remember { mutableStateOf<List<NoteId>?>(null) }
-
-        NoteScreen(
-            state = readerState,
-            onRetry = noteReaderViewModel::retry,
-            onEdit = { ctx.navController.navigate(AppRoute.editor(noteId)) },
-            onOpenInternalNote = { targetId: NoteId ->
-                ctx.noteOpenGate.openNoteWithWarmBudget(
-                    noteRouteScope,
-                    ctx.warmNote,
-                    ctx.currentConfig,
-                    ctx.filesDir,
-                    ctx.navController,
-                    targetId
-                )
-            },
-            onOpenExternalUrl = { url: String ->
-                openExternalUrl(noteReaderContext, url)
-            },
-            onAmbiguousWikiLink = { candidates: List<NoteId>, _: String ->
-                ambiguousCandidates = candidates
-            },
-            onNoteNotFound = { message: String ->
-                showNoteNotFoundToast(noteReaderContext, message)
-            },
-            workspaceRoot = ctx.workspaceRoot,
-            onViewportChanged = noteReaderViewModel::onViewportChanged
+        val datedHeader = datedNoteHeader(
+            ctx,
+            noteId,
+            (readerState as? NoteReaderUiState.Content)?.document,
+            ctx.todayHubUiState as? TodayHubUiState.Content
         )
+
+        CompositionLocalProvider(LocalDatedHeader provides datedHeader) {
+            NoteScreen(
+                state = readerState,
+                onRetry = noteReaderViewModel::retry,
+                onEdit = { ctx.navController.navigate(AppRoute.editor(noteId)) },
+                onOpenInternalNote = { targetId: NoteId ->
+                    ctx.noteOpenGate.openNoteWithWarmBudget(
+                        noteRouteScope,
+                        ctx.warmNote,
+                        ctx.currentConfig,
+                        ctx.filesDir,
+                        ctx.navController,
+                        targetId
+                    )
+                },
+                onOpenExternalUrl = { url: String ->
+                    openExternalUrl(noteReaderContext, url)
+                },
+                onAmbiguousWikiLink = { candidates: List<NoteId>, _: String ->
+                    ambiguousCandidates = candidates
+                },
+                onNoteNotFound = { message: String ->
+                    showNoteNotFoundToast(noteReaderContext, message)
+                },
+                workspaceRoot = ctx.workspaceRoot,
+                onViewportChanged = noteReaderViewModel::onViewportChanged
+            )
+        }
 
         val registry = (readerState as? NoteReaderUiState.Content)?.document?.registry
         if (ambiguousCandidates != null && registry != null) {

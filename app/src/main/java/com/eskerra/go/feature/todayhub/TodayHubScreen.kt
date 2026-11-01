@@ -7,13 +7,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.UnfoldMore
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -30,6 +27,7 @@ import com.eskerra.go.core.markdown.VaultReadonlyLink
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NoteRegistry
 import com.eskerra.go.core.todayhub.TodayHubWeeks
+import com.eskerra.go.ui.DateNavigationBar
 import com.eskerra.go.ui.markdown.VaultMarkdownView
 import com.eskerra.go.ui.theme.EskerraHeadingH1
 import java.io.File
@@ -128,14 +126,6 @@ private fun TodayHubBodyContent(
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
-        WeekNavBar(
-            label = state.weekRangeLabel,
-            canGoPrev = state.canGoPrev,
-            canGoNext = state.canGoNext,
-            onPrevious = onPreviousWeek,
-            onNext = onNextWeek
-        )
-
         if (state.introMarkdown.isNotBlank()) {
             VaultMarkdownView(
                 markdown = state.introMarkdown,
@@ -150,6 +140,15 @@ private fun TodayHubBodyContent(
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
             )
         }
+        DateNavigationBar(
+            previousDescription = "Previous week",
+            nextDescription = "Next week",
+            label = state.weekRangeLabel,
+            canGoPrev = state.canGoPrev,
+            canGoNext = state.canGoNext,
+            onPrevious = onPreviousWeek,
+            onNext = onNextWeek
+        )
 
         if (state.rowLoading) {
             Row(
@@ -243,40 +242,6 @@ private fun HubHeader(
                     modifier = Modifier.padding(start = 4.dp)
                 )
             }
-        }
-    }
-}
-
-@Composable
-private fun WeekNavBar(
-    label: String,
-    canGoPrev: Boolean,
-    canGoNext: Boolean,
-    onPrevious: () -> Unit,
-    onNext: () -> Unit
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        IconButton(onClick = onPrevious, enabled = canGoPrev) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                contentDescription = "Previous week"
-            )
-        }
-        Text(
-            text = label,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.weight(1f),
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-        )
-        IconButton(onClick = onNext, enabled = canGoNext) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = "Next week"
-            )
         }
     }
 }

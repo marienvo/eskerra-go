@@ -213,6 +213,8 @@ fun App(
             syncState = syncState,
             homeReselectSignal = homeReselectSignal,
             inboxRefreshSignal = inboxRefreshSignal,
+            launchSettled = launchSettled,
+            todayHubUiState = todayHubUiState,
             loadInboxSummaries = loadInboxSummaries,
             loadNoteForReading = loadNoteForReading,
             notePrefetchScheduler = notePrefetchScheduler,

@@ -144,7 +144,8 @@ class MainActivity : ComponentActivity() {
 
         val loadTodayHub = LoadTodayHub(
             registryCache = noteRegistryCache,
-            contentRepository = noteContentCache
+            contentRepository = noteContentCache,
+            noteflowRepository = com.eskerra.go.data.todayhub.FileNoteflowRepository()
         )
         val loadTodayHubRow = LoadTodayHubRow(contentRepository = noteContentCache)
         val activeTodayHubStore = DataStoreActiveTodayHubStore(applicationContext)

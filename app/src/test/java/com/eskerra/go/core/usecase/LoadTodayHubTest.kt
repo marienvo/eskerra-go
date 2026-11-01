@@ -3,106 +3,123 @@ package com.eskerra.go.core.usecase
 import com.eskerra.go.core.model.NoteContentError
 import com.eskerra.go.core.model.NoteContentException
 import com.eskerra.go.core.model.NoteId
+import com.eskerra.go.core.model.NoteIndexError
 import com.eskerra.go.core.model.NoteSummary
 import com.eskerra.go.core.model.WorkspaceConfig
+import com.eskerra.go.core.repository.NoteflowRepository
+import com.eskerra.go.core.todayhub.NoteflowConfig
 import com.eskerra.go.core.todayhub.TodayHubFrontmatter
 import com.eskerra.go.data.notes.FakeNoteContentRepository
 import com.eskerra.go.data.notes.FakeNoteRegistryRepository
 import com.eskerra.go.data.notes.NoteRegistryCache
-import com.eskerra.go.data.workspace.WorkspacePaths
+import java.io.File
 import kotlinx.coroutines.test.runTest
+import kotlinx.datetime.LocalDate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
-import org.junit.Rule
 import org.junit.Test
-import org.junit.rules.TemporaryFolder
 
 class LoadTodayHubTest {
-
-    @get:Rule
-    val temp = TemporaryFolder()
-
-    private val config = WorkspaceConfig(
-        name = "My Notes",
-        relativePath = WorkspacePaths.DEFAULT_RELATIVE_PATH,
-        remoteUri = null,
-        branch = "master",
-        setupCompletedAtEpochMs = 1_700_000_000_000L
+    private val config = WorkspaceConfig("test", "vault", null, "main", 0)
+    private val marker = NoteId("Work/.flow")
+    private val flow = NoteflowConfig(
+        marker,
+        "Work title",
+        listOf("[[Plan]]"),
+        TodayHubFrontmatter.Settings(columns = listOf("Tasks"))
     )
-
-    private val filesDir get() = temp.newFolder("files")
-
-    private fun note(path: String, title: String = path): NoteSummary =
-        NoteSummary(id = NoteId(path), title = title, snippet = "", isInbox = false)
-
-    private val hubMarkdown = """
-        ---
-        perpetualType: weekly
-        columns:
-          - Tasks
-        start: monday
-        ---
-        # Daily hub
-
-        Intro body here.
-    """.trimIndent()
+    private fun note(path: String) = NoteSummary(NoteId(path), "", "", false)
 
     @Test
-    fun returnsNullWhenNoHubs() = runTest {
-        val registry = FakeNoteRegistryRepository.withInboxNotes(note("Inbox/a.md"))
-        val content = FakeNoteContentRepository.failing(NoteContentError.NotFound)
-        val result = LoadTodayHub(NoteRegistryCache(registry), content)(config, filesDir, null)
-        assertTrue(result.isSuccess)
-        assertNull(result.getOrThrow())
-    }
-
-    @Test
-    fun loadsActiveHubSettingsAndIntro() = runTest {
+    fun loadsMarkerAndCurrentDatedNote() = runTest {
         val registry = FakeNoteRegistryRepository.withInboxNotes(
-            note("Work/Today.md", "Work hub"),
-            note("Daily/Today.md", "Daily hub"),
-            note("Daily/2026-04-06.md"),
-            note("Daily/2026-03-30.md")
+            note("Work/2026-11-02.md"),
+            note("Work/Journal/2026-10-30.md")
         )
-        val content = FakeNoteContentRepository.withContent(NoteId("Daily/Today.md"), hubMarkdown)
-
-        val useCase = LoadTodayHub(NoteRegistryCache(registry), content)
-        val data = useCase(config, filesDir, null).getOrThrow()!!
-
-        // First hub by sorted id is Daily/Today.md.
-        assertEquals(NoteId("Daily/Today.md"), data.activeHubId)
-        assertEquals(listOf("Tasks"), data.settings.columns)
-        assertEquals(TodayHubFrontmatter.StartDay.MONDAY, data.settings.start)
-        assertEquals(2, data.columnCount)
-        assertEquals("Daily hub", data.folderLabel)
-        assertEquals(2, data.hubs.size)
-        assertEquals(listOf("2026-03-30", "2026-04-06"), data.availableWeekStems)
-        assertEquals("Intro body here.", data.introMarkdown)
+        val content = FakeNoteContentRepository.withContent(
+            NoteId("Work/Journal/2026-10-30.md"),
+            "# Done ✅"
+        )
+        val useCase = LoadTodayHub(
+            NoteRegistryCache(registry),
+            content,
+            NoteflowRepository { _, _ ->
+                Result.success(listOf(flow))
+            },
+            today = { LocalDate(2026, 11, 1) }
+        )
+        val result = useCase(config, File("."), NoteId("Work/Today.md")).getOrThrow()!!
+        assertEquals(marker, result.activeHubId)
+        assertEquals("Work title", result.folderLabel)
+        assertEquals("[[Plan]]", result.introMarkdown)
+        assertEquals(listOf("2026-11-02"), result.availableWeekStems)
+        assertEquals(false, result.datedLinks.single().isIncomplete)
     }
 
     @Test
-    fun honoursPreferredHubWhenPresent() = runTest {
-        val registry = FakeNoteRegistryRepository.withInboxNotes(
-            note("Work/Today.md", "Work hub"),
-            note("Daily/Today.md", "Daily hub")
-        )
-        val content = FakeNoteContentRepository.withContent(NoteId("Work/Today.md"), hubMarkdown)
-
-        val useCase = LoadTodayHub(NoteRegistryCache(registry), content)
-        val data = useCase(config, filesDir, NoteId("Work/Today.md")).getOrThrow()!!
-
-        assertEquals(NoteId("Work/Today.md"), data.activeHubId)
-        assertEquals("Work hub", data.folderLabel)
+    fun emptyAndInvalidMarkersAreReported() = runTest {
+        val registry = NoteRegistryCache(FakeNoteRegistryRepository.withInboxNotes())
+        val content = FakeNoteContentRepository.withContent(NoteId("unused.md"), "")
+        val empty =
+            LoadTodayHub(
+                registry,
+                content,
+                NoteflowRepository { _, _ ->
+                    Result.success(emptyList())
+                }
+            )
+        assertNull(empty(config, File("."), null).getOrThrow())
+        val invalid =
+            LoadTodayHub(
+                registry,
+                content,
+                NoteflowRepository { _, _ ->
+                    Result.failure(Exception("bad"))
+                }
+            )
+        assertTrue(invalid(config, File("."), null).isFailure)
     }
 
     @Test
-    fun propagatesHubReadFailure() = runTest {
-        val registry = FakeNoteRegistryRepository.withInboxNotes(note("Daily/Today.md"))
-        val content = FakeNoteContentRepository.failing(NoteContentError.ReadFailed("io"))
-        val result = LoadTodayHub(NoteRegistryCache(registry), content)(config, filesDir, null)
-        assertTrue(result.isFailure)
-        val error = (result.exceptionOrNull() as NoteContentException).error
-        assertTrue(error is NoteContentError.ReadFailed)
+    fun prefersSelectedFlowAndPropagatesRegistryFailure() = runTest {
+        val second = flow.copy(id = NoteId("Other/.flow"), title = "Other")
+        val content = FakeNoteContentRepository.withContent(NoteId("unused.md"), "")
+        val flows = NoteflowRepository { _, _ -> Result.success(listOf(flow, second)) }
+        val useCase =
+            LoadTodayHub(
+                NoteRegistryCache(FakeNoteRegistryRepository.withInboxNotes()),
+                content,
+                flows
+            )
+        assertEquals(second.id, useCase(config, File("."), second.id).getOrThrow()?.activeHubId)
+
+        val broken = LoadTodayHub(
+            NoteRegistryCache(
+                FakeNoteRegistryRepository.failing(NoteIndexError.WorkspaceMissing(null))
+            ),
+            content,
+            flows
+        )
+        val error = broken(config, File("."), null).exceptionOrNull() as NoteContentException
+        assertEquals(NoteContentError.WorkspaceMissing, error.error)
+    }
+
+    @Test
+    fun datedLinksForAnotherFlowUseProvidedRegistryWithoutRefresh() = runTest {
+        val registry = FakeNoteRegistryRepository.withInboxNotes()
+        val target = NoteId("Other/Journal/2026-10-31.md")
+        val content = FakeNoteContentRepository.withContent(target, "# Pending")
+        val useCase = LoadTodayHub(
+            NoteRegistryCache(registry),
+            content,
+            NoteflowRepository { _, _ -> Result.success(emptyList()) },
+            today = { LocalDate(2026, 11, 1) }
+        )
+        val index = com.eskerra.go.core.model.NoteRegistry.fromNotes(listOf(note(target.value)))
+        val links = useCase.datedLinks(config, File("."), index, NoteId("Other/.flow")).getOrThrow()
+        assertEquals(target, links.single().noteId)
+        assertTrue(links.single().isIncomplete)
+        assertEquals(0, registry.refreshCount)
     }
 }

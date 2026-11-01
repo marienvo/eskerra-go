@@ -16,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,7 +28,10 @@ import com.eskerra.go.core.markdown.PreparedSegment
 import com.eskerra.go.core.markdown.VaultReadonlyLink
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NoteRegistry
+import com.eskerra.go.core.todayhub.DatedNoteHeader
 import com.eskerra.go.data.perf.NoteNavTrace
+import com.eskerra.go.ui.DateNavigationBar
+import com.eskerra.go.ui.DatedFolderLinks
 import com.eskerra.go.ui.markdown.VaultMarkdownAnnotator
 import com.eskerra.go.ui.markdown.VaultMarkdownSegmentContent
 import com.eskerra.go.ui.markdown.vaultMarkdownComponents
@@ -130,6 +134,7 @@ private fun NoteReaderContent(
     workspaceRoot: File?,
     onViewportChanged: (visibleStartOffset: Int, visibleEndOffset: Int) -> Unit
 ) {
+    val datedHeader = LocalDatedHeader.current
     val chrome = LocalShellChromeInsets.current
     val listState = rememberLazyListState()
     val blocks = remember(preparedBody) { LazyNoteBlocks.splitWithSourceRanges(preparedBody) }
@@ -195,6 +200,18 @@ private fun NoteReaderContent(
         )
     ) {
         item(key = "title") {
+            if (datedHeader != null) {
+                DatedFolderLinks(datedHeader.links, datedHeader.current, onOpenInternalNote)
+                DateNavigationBar(
+                    label = datedHeader.dateLabel,
+                    canGoPrev = datedHeader.previous != null,
+                    canGoNext = datedHeader.next != null,
+                    previousDescription = "Previous note",
+                    nextDescription = "Next note",
+                    onPrevious = { datedHeader.previous?.let(onOpenInternalNote) },
+                    onNext = { datedHeader.next?.let(onOpenInternalNote) }
+                )
+            }
             Text(
                 text = title,
                 style = MaterialTheme.typography.headlineMedium,
@@ -237,6 +254,8 @@ private fun NoteReaderContent(
 }
 
 private const val NOTE_READER_HEADER_ITEM_COUNT = 2
+
+val LocalDatedHeader = staticCompositionLocalOf<DatedNoteHeader?> { null }
 
 private fun noteSegmentKey(index: Int, segment: PreparedSegment): String {
     val offset = (segment as? PreparedSegment.Markdown)

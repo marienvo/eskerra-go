@@ -13,5 +13,6 @@ data class TodayHubSnapshot(
     val introMarkdown: String,
     val availableWeekStems: List<String>,
     val selectedWeekStem: String,
-    val row: TodayHubRow?
+    val row: TodayHubRow?,
+    val datedLinks: List<TodayHubDatedLink> = emptyList()
 )
