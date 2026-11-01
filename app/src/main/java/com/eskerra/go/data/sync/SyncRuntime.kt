@@ -6,7 +6,9 @@ import com.eskerra.go.core.repository.SyncStateRepository
 import com.eskerra.go.core.repository.VaultSyncScheduler
 import com.eskerra.go.core.usecase.BuildSafeSyncDiagnostic
 import com.eskerra.go.core.usecase.BuildSyncPreflight
+import com.eskerra.go.core.usecase.LoadDesktopActivity
 import com.eskerra.go.core.usecase.LoadSyncStatus
+import com.eskerra.go.core.usecase.LoadVaultSettings
 import com.eskerra.go.core.usecase.ManualSyncNow
 import com.eskerra.go.core.usecase.ReconcileWorkspaceSyncBranch
 import com.eskerra.go.core.usecase.RecordLastSyncAttempt
@@ -23,10 +25,16 @@ import com.eskerra.go.data.notes.FileNoteRegistryRepository
 import com.eskerra.go.data.notes.FileNoteRegistrySnapshotStore
 import com.eskerra.go.data.notes.NoteContentCache
 import com.eskerra.go.data.notes.NoteRegistryCache
+import com.eskerra.go.data.notifications.NotificationAlarmCoordinator
+import com.eskerra.go.data.notifications.NotificationAlarmScheduler
 import com.eskerra.go.data.notifications.PostSyncNotificationRefresh
+import com.eskerra.go.data.r2.R2BinaryObjectClient
+import com.eskerra.go.data.r2.R2DesktopActivityRepository
+import com.eskerra.go.data.vault.FileVaultSettingsRepository
 import com.eskerra.go.data.workspace.DataStoreWorkspaceStore
 import com.eskerra.go.data.workspace.WorkspaceStore
 import java.io.File
+import okhttp3.OkHttpClient
 
 interface SyncRuntimeProvider {
     val syncRuntime: SyncRuntime
@@ -51,7 +59,8 @@ class SyncRuntime(
     val recordLastSyncAttempt: RecordLastSyncAttempt,
     val reconcileWorkspaceSyncBranch: ReconcileWorkspaceSyncBranch,
     val manualSyncNow: ManualSyncNow,
-    val vaultSyncScheduler: VaultSyncScheduler
+    val vaultSyncScheduler: VaultSyncScheduler,
+    val notificationAlarmCoordinator: NotificationAlarmCoordinator? = null
 ) {
     companion object {
         fun create(context: Context, filesDir: File = context.filesDir): SyncRuntime {
@@ -115,6 +124,15 @@ class SyncRuntime(
                 context = context,
                 syncStateRepository = syncStateRepository
             )
+            val notificationAlarmCoordinator = NotificationAlarmCoordinator(
+                context = context,
+                filesDir = filesDir,
+                loadDesktopActivity = LoadDesktopActivity(
+                    R2DesktopActivityRepository(R2BinaryObjectClient(OkHttpClient())),
+                    LoadVaultSettings(FileVaultSettingsRepository(context))
+                ),
+                scheduler = NotificationAlarmScheduler(context)
+            )
 
             return SyncRuntime(
                 context = context,
@@ -135,7 +153,8 @@ class SyncRuntime(
                 recordLastSyncAttempt = recordLastSyncAttempt,
                 reconcileWorkspaceSyncBranch = reconcileWorkspaceSyncBranch,
                 manualSyncNow = manualSyncNow,
-                vaultSyncScheduler = vaultSyncScheduler
+                vaultSyncScheduler = vaultSyncScheduler,
+                notificationAlarmCoordinator = notificationAlarmCoordinator
             )
         }
     }
