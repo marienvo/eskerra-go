@@ -2,6 +2,7 @@ package com.eskerra.go
 
 import android.content.Intent
 import android.graphics.Color
+import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -11,12 +12,15 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.core.app.ActivityCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.lifecycle.lifecycleScope
 import coil.Coil
 import coil.ImageLoader
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import com.eskerra.go.app.AppRoot
+import com.eskerra.go.app.NotificationOpenRequest
 import com.eskerra.go.app.ShareIntake
 import com.eskerra.go.core.usecase.ClearRemoteSyncSettings
 import com.eskerra.go.core.usecase.CreateInboxNote
@@ -51,6 +55,8 @@ import com.eskerra.go.data.notes.FileInboxSnapshotStore
 import com.eskerra.go.data.notes.FileInboxSnoozeRepository
 import com.eskerra.go.data.notes.FileNoteWriteRepository
 import com.eskerra.go.data.notes.ParsedMarkdownCache
+import com.eskerra.go.data.notifications.NotificationDelivery
+import com.eskerra.go.data.notifications.PostSyncNotificationRefresh
 import com.eskerra.go.data.perf.ColdStartTrace
 import com.eskerra.go.data.perf.NoteNavTrace
 import com.eskerra.go.data.search.SqliteVaultSearchRepository
@@ -64,6 +70,7 @@ import com.eskerra.go.data.workspace.DefaultRemoteSyncSettingsRepository
 import com.eskerra.go.data.workspace.DefaultWorkspaceSetupCompletion
 import com.eskerra.go.data.workspace.DefaultWorkspaceSetupRepository
 import java.io.File
+import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 
 /** Single entry point. Hosts the Compose UI and nothing else. */
@@ -71,6 +78,8 @@ class MainActivity : ComponentActivity() {
     private val shareConsumer = ShareIntentConsumer { message ->
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
     }
+    private var notificationOpenRequest by mutableStateOf(NotificationOpenRequest(emptyList()))
+    private var notificationsEnabled by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()
@@ -85,6 +94,10 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT)
         )
         val syncRuntime = (applicationContext as SyncRuntimeProvider).syncRuntime
+        notificationsEnabled = PostSyncNotificationRefresh.enabled(this)
+        notificationOpenRequest = NotificationOpenRequest(
+            intent.getStringArrayListExtra(NotificationDelivery.EXTRA_NOTE_IDS).orEmpty()
+        )
         val workspaceStore = syncRuntime.workspaceStore
         val bootCacheStore = syncRuntime.bootCacheStore
         val credentialStore = syncRuntime.credentialStore
@@ -263,6 +276,28 @@ class MainActivity : ComponentActivity() {
                     ),
                     onShareHandled = shareConsumer::handled
                 ),
+                notificationOpenRequest = notificationOpenRequest,
+                notificationsEnabled = notificationsEnabled,
+                onNotificationsEnabledChange = { value ->
+                    lifecycleScope.launch {
+                        PostSyncNotificationRefresh.setEnabled(syncRuntime, value).onSuccess {
+                            notificationsEnabled = value
+                            if (value && Build.VERSION.SDK_INT >= 33) {
+                                ActivityCompat.requestPermissions(
+                                    this@MainActivity,
+                                    arrayOf(android.Manifest.permission.POST_NOTIFICATIONS),
+                                    42
+                                )
+                            }
+                        }.onFailure {
+                            Toast.makeText(
+                                this@MainActivity,
+                                "Could not update notifications",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
+                },
                 onLaunchSettled = {
                     if (keepSplashOnScreen) {
                         ColdStartTrace.markSettled()
@@ -276,6 +311,9 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        notificationOpenRequest = NotificationOpenRequest(
+            intent.getStringArrayListExtra(NotificationDelivery.EXTRA_NOTE_IDS).orEmpty()
+        )
         shareConsumer.consume(intent)
     }
 

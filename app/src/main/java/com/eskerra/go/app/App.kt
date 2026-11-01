@@ -3,6 +3,7 @@ package com.eskerra.go.app
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -104,6 +105,9 @@ fun App(
     repairVaultSearchIndex: RepairVaultSearchIndex,
     touchVaultSearchPaths: TouchVaultSearchPaths,
     shareIntake: ShareIntake,
+    notificationOpenRequest: NotificationOpenRequest,
+    notificationsEnabled: Boolean,
+    onNotificationsEnabledChange: (Boolean) -> Unit,
     readConfig: suspend () -> WorkspaceConfig? = { null },
     onConfigUpdated: (WorkspaceConfig) -> Unit,
     onInboxUiStateChanged: (InboxUiState) -> Unit = {},
@@ -246,6 +250,9 @@ fun App(
             repairVaultSearchIndex = repairVaultSearchIndex,
             searchViewModel = shellInputState.searchViewModel,
             touchVaultSearchPaths = touchVaultSearchPaths,
+            notificationOpenRequest = notificationOpenRequest,
+            notificationsEnabled = notificationsEnabled,
+            onNotificationsEnabledChange = onNotificationsEnabledChange,
             markInboxNotesChanged = markInboxNotesChanged,
             onConfigUpdated = { updated ->
                 currentConfig = updated
@@ -265,6 +272,15 @@ fun App(
         ) {
             homeGraph(navGraphContext)
             sharedDestinations(navGraphContext)
+        }
+    }
+
+    LaunchedEffect(notificationOpenRequest) {
+        val ids = notificationOpenRequest.noteIds
+        if (ids.size == 1) {
+            navController.navigate(AppRoute.note(com.eskerra.go.core.model.NoteId(ids.single())))
+        } else if (ids.isNotEmpty()) {
+            navController.navigate(AppRoute.NOTIFICATION_LIST)
         }
     }
 

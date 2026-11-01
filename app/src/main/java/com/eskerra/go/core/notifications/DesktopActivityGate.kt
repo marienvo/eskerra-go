@@ -7,6 +7,7 @@ sealed interface DesktopActivityStatus {
 
 data class NotificationAlarmDecision(
     val skippedEventKeys: Set<String> = emptySet(),
+    val deliverableEventKeys: Set<String> = emptySet(),
     val nextAlarmAtEpochMillis: Long? = null
 )
 
@@ -36,7 +37,11 @@ object DesktopActivityGate {
                 nextAlarmAtEpochMillis = future.minOfOrNull { it.dueAtEpochMillis }
             )
         }
-        if (due.isNotEmpty()) return NotificationAlarmDecision()
+        if (due.isNotEmpty()) {
+            return NotificationAlarmDecision(
+                deliverableEventKeys = due.mapTo(mutableSetOf()) { it.key }
+            )
+        }
         return NotificationAlarmDecision(
             nextAlarmAtEpochMillis = future.minOfOrNull { it.dueAtEpochMillis }
         )

@@ -117,6 +117,9 @@ fun AppRoot(
     repairVaultSearchIndex: RepairVaultSearchIndex,
     touchVaultSearchPaths: TouchVaultSearchPaths,
     shareIntake: ShareIntake,
+    notificationOpenRequest: NotificationOpenRequest,
+    notificationsEnabled: Boolean,
+    onNotificationsEnabledChange: (Boolean) -> Unit,
     onLaunchSettled: () -> Unit = {}
 ) {
     EskerraGoTheme(darkTheme = true) {
@@ -232,6 +235,9 @@ fun AppRoot(
                         // Only handed over once the workspace is ready; until then the share
                         // simply waits in the Activity and arrives when App mounts.
                         shareIntake = shareIntake,
+                        notificationOpenRequest = notificationOpenRequest,
+                        notificationsEnabled = notificationsEnabled,
+                        onNotificationsEnabledChange = onNotificationsEnabledChange,
                         readConfig = workspaceStore::read,
                         onConfigUpdated = gateViewModel::updateReadyConfig,
                         onInboxUiStateChanged = { inboxUiState = it },

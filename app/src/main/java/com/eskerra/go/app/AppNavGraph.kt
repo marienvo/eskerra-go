@@ -52,6 +52,7 @@ import com.eskerra.go.feature.note.LocalDatedHeader
 import com.eskerra.go.feature.note.NoteReaderUiState
 import com.eskerra.go.feature.note.NoteReaderViewModel
 import com.eskerra.go.feature.note.NoteScreen
+import com.eskerra.go.feature.notifications.NotificationListScreen
 import com.eskerra.go.feature.search.SearchViewModel
 import com.eskerra.go.feature.sync.AppSyncViewModel
 import com.eskerra.go.feature.sync.BinariesViewModel
@@ -110,6 +111,9 @@ internal data class AppNavGraphContext(
     val repairVaultSearchIndex: RepairVaultSearchIndex,
     val searchViewModel: SearchViewModel,
     val touchVaultSearchPaths: TouchVaultSearchPaths,
+    val notificationOpenRequest: NotificationOpenRequest,
+    val notificationsEnabled: Boolean,
+    val onNotificationsEnabledChange: (Boolean) -> Unit,
     val markInboxNotesChanged: () -> Unit,
     val onConfigUpdated: (WorkspaceConfig) -> Unit,
     val onInboxUiStateChanged: (InboxUiState) -> Unit,
@@ -234,7 +238,16 @@ internal fun NavGraphBuilder.sharedDestinations(ctx: AppNavGraphContext) {
             onDeviceNameChange = vaultSettingsViewModel::onDeviceNameChange,
             onSaveVault = vaultSettingsViewModel::save,
             binariesState = binariesState,
-            onSyncBinaries = binariesViewModel::syncNow
+            onSyncBinaries = binariesViewModel::syncNow,
+            notificationsEnabled = ctx.notificationsEnabled,
+            onNotificationsEnabledChange = ctx.onNotificationsEnabledChange
+        )
+    }
+
+    opaqueComposable(AppRoute.NOTIFICATION_LIST) {
+        NotificationListScreen(
+            noteIds = ctx.notificationOpenRequest.noteIds,
+            onOpenNote = { ctx.navController.navigate(AppRoute.note(NoteId(it))) }
         )
     }
 

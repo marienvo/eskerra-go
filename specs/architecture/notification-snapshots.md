@@ -1,7 +1,6 @@
 # Notification snapshots
 
-Visible notification delivery and deep links are implemented separately. This layer stores candidate occurrences and a
-queue for the delivery layer. It is disabled by default and performs its first complete scan after a
+The notification pipeline stores candidate occurrences and a queue for delivery. It is disabled by default; the sync-settings toggle requests Android notification permission when enabling and performs its first complete scan after a
 successful sync when enabled. The settings adapter serializes enable/disable with vault mutations, clears the prior baseline and
 pending queue, requests an immediate sync on enabling, and reconciles the periodic scheduler. The first successful scan is a silent baseline. Later scans queue new
 inbox items, elapsed snoozes and newly available incomplete dated-folder notes; an already overdue
@@ -29,8 +28,11 @@ five-minute retry. The activity request runs outside the Git mutex.
 
 Future events use `AlarmManager` exact, idle-tolerant alarms when permission is granted, with an
 inexact idle-tolerant fallback otherwise. Boot, package replacement, clock and time-zone changes
-reconcile the persisted queue. A due, deliverable occurrence is left for the separate visible
-notification layer; this scheduling layer does not acknowledge it.
+reconcile the persisted queue. Deliverable occurrences are acknowledged only after Android accepts
+their visible notification. A single occurrence opens its note directly through the existing note
+route. Simultaneous occurrences share one expandable notification whose content intent opens an
+in-app note picker; each picker row opens the corresponding note. If notification permission is
+missing, occurrences stay queued for a later reconciliation.
 
 Sync and scanning share the Git mutex to avoid capturing partially integrated or locally written
 notes. The first scan reads every indexed note and `.flow` discovery walks the vault; later scans

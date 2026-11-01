@@ -170,11 +170,11 @@ class NotificationSnapshotStore(context: Context) :
         workspace
     ).values.toList()
 
-    fun acknowledge(workspace: String, eventKey: String) {
+    fun acknowledge(workspace: String, eventKey: String, dueAtEpochMillis: Long) {
         writableDatabase.delete(
             "pending",
-            "workspace = ? AND event_key = ?",
-            arrayOf(workspace, eventKey)
+            "workspace = ? AND event_key = ? AND due_at = ?",
+            arrayOf(workspace, eventKey, dueAtEpochMillis.toString())
         )
     }
 

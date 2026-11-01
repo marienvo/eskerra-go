@@ -21,6 +21,7 @@ object AppRoute {
     const val SEARCH_PATTERN = "search?$SEARCH_QUERY_ARG={$SEARCH_QUERY_ARG}"
     const val SYNC = "sync"
     const val SYNC_SETTINGS = "sync-settings"
+    const val NOTIFICATION_LIST = "notification-list"
 
     const val NOTE_ARG = "noteId"
     const val NOTE_PATTERN = "note/{$NOTE_ARG}"
