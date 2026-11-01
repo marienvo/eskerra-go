@@ -9,7 +9,7 @@ import java.time.ZoneId
 /** Read-only port of the desktop daemon's live reminder token grammar. */
 object ReminderCandidates {
     private val token = Regex(
-        """(?U)(?:^|[\s\uFEFF])(@[0-9]{4}-[0-9]{2}-[0-9]{2}""" +
+        """(?:^|[\s\uFEFF\p{Z}])(@[0-9]{4}-[0-9]{2}-[0-9]{2}""" +
             """(?:_[0-9]{4}(?:-[0-9]{4})?)?)"""
     )
 

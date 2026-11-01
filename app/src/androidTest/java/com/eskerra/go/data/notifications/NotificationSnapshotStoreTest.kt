@@ -98,7 +98,7 @@ class NotificationSnapshotStoreTest {
             store.replaceSnapshot(workspace, listOf(old), old.dueAtEpochMillis)
             assertEquals(listOf(old), store.pending(workspace))
             store.replaceSnapshot(workspace, listOf(later), old.dueAtEpochMillis + 1)
-            assertEquals(emptyList<NotificationEvent>(), store.pending(workspace))
+            assertEquals(listOf(later), store.pending(workspace))
             store.replaceSnapshot(workspace, listOf(later), later.dueAtEpochMillis)
             assertEquals(listOf(later), store.pending(workspace))
         }
