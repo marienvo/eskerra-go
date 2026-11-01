@@ -10,6 +10,7 @@ import com.eskerra.go.core.model.SyncException
 import com.eskerra.go.core.model.SyncProgressStep
 import com.eskerra.go.core.model.SyncResult
 import com.eskerra.go.core.model.WorkspaceConfig
+import com.eskerra.go.data.notifications.PostSyncNotificationRefresh
 import java.io.File
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
@@ -24,12 +25,16 @@ class VaultSyncWorker(context: Context, params: WorkerParameters) :
         val runtimeProvider = applicationContext as? SyncRuntimeProvider ?: return Result.failure()
         return performSync(
             syncRuntime = runtimeProvider.syncRuntime,
-            setForegroundInfo = { setForeground(it) },
-            attempt = runAttemptCount
+            setForegroundInfo = {
+                if (!inputData.getBoolean(KEY_BACKGROUND, false)) setForeground(it)
+            },
+            attempt = runAttemptCount,
+            background = inputData.getBoolean(KEY_BACKGROUND, false)
         )
     }
 
     companion object {
+        const val KEY_BACKGROUND = "periodic_background"
         const val MAX_RETRY_ATTEMPTS = 10
         const val INITIAL_BACKOFF_MS = 10_000L
 
@@ -37,6 +42,7 @@ class VaultSyncWorker(context: Context, params: WorkerParameters) :
             syncRuntime: SyncRuntime,
             setForegroundInfo: suspend (ForegroundInfo) -> Unit,
             attempt: Int = 0,
+            background: Boolean = false,
             syncRunner: suspend (
                 WorkspaceConfig,
                 File,
@@ -64,6 +70,13 @@ class VaultSyncWorker(context: Context, params: WorkerParameters) :
             val snapshotGeneration = currentRecord.requestedGeneration
             val config = syncRuntime.workspaceStore.read()
             if (config == null || config.remoteUri.isNullOrBlank()) {
+                if (background) {
+                    syncRuntime.syncStateRepository.markGenerationCompleted(
+                        snapshotGeneration,
+                        System.currentTimeMillis()
+                    )
+                    return@coroutineScope Result.success()
+                }
                 val error = SyncError.MissingRemoteConfig
                 syncRuntime.syncStateRepository.updateStatus(
                     DurableSyncStatus.Blocked(error.message())
@@ -102,9 +115,6 @@ class VaultSyncWorker(context: Context, params: WorkerParameters) :
 
                 syncResult.fold(
                     onSuccess = { result: SyncResult ->
-                        result.updatedConfig?.let { updated ->
-                            syncRuntime.workspaceStore.save(updated)
-                        }
                         syncRuntime.recordLastSyncAttempt.recordSuccess(result)
                         val completedAt = System.currentTimeMillis()
                         syncRuntime.syncStateRepository.markGenerationCompleted(
@@ -112,10 +122,16 @@ class VaultSyncWorker(context: Context, params: WorkerParameters) :
                             completedAtEpochMs = completedAt
                         )
 
+                        PostSyncNotificationRefresh.run(
+                            syncRuntime,
+                            result.updatedConfig ?: config,
+                            result
+                        )
+
                         // If newer generations arrived while syncing, trigger next round
                         val latest = syncRuntime.syncStateRepository.getRecord()
                         if (latest.requestedGeneration > snapshotGeneration) {
-                            syncRuntime.vaultSyncScheduler.scheduleSync()
+                            syncRuntime.vaultSyncScheduler.scheduleBackgroundSync()
                         }
                         Result.success()
                     },

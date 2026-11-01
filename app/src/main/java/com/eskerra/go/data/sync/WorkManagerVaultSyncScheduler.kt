@@ -3,15 +3,20 @@ package com.eskerra.go.data.sync
 import android.content.Context
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
+import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequest
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.PeriodicWorkRequest
+import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import androidx.work.workDataOf
 import com.eskerra.go.core.model.DurableSyncStatus
 import com.eskerra.go.core.repository.SyncStateRepository
 import com.eskerra.go.core.repository.VaultSyncScheduler
+import com.eskerra.go.data.notifications.PostSyncNotificationRefresh
 import java.util.concurrent.TimeUnit
 
 class WorkManagerVaultSyncScheduler(
@@ -27,6 +32,17 @@ class WorkManagerVaultSyncScheduler(
     private val cancelWork: (name: String) -> Unit = { name ->
         WorkManager.getInstance(context).cancelUniqueWork(name)
     },
+    private val periodicEnabled: () -> Boolean = { PostSyncNotificationRefresh.enabled(context) },
+    private val cancelPeriodicWork: () -> Unit = {
+        WorkManager.getInstance(context).cancelUniqueWork("periodic_vault_sync")
+    },
+    private val enqueuePeriodicWork: (PeriodicWorkRequest) -> Unit = { request ->
+        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+            "periodic_vault_sync",
+            ExistingPeriodicWorkPolicy.KEEP,
+            request
+        )
+    },
     private val getActiveWorkInfos: suspend (name: String) -> List<WorkInfo> = { name ->
         try {
             WorkManager.getInstance(context).getWorkInfosForUniqueWork(name).get()
@@ -36,12 +52,17 @@ class WorkManagerVaultSyncScheduler(
     }
 ) : VaultSyncScheduler {
 
-    override fun scheduleSync() {
+    override fun scheduleSync() = enqueueSync(background = false)
+
+    override fun scheduleBackgroundSync() = enqueueSync(background = true)
+
+    private fun enqueueSync(background: Boolean) {
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
             .build()
 
         val request = OneTimeWorkRequestBuilder<VaultSyncWorker>()
+            .setInputData(workDataOf(VaultSyncWorker.KEY_BACKGROUND to background))
             .setConstraints(constraints)
             .setBackoffCriteria(
                 BackoffPolicy.EXPONENTIAL,
@@ -62,7 +83,12 @@ class WorkManagerVaultSyncScheduler(
         cancelWork(WORK_NAME_VAULT_SYNC)
     }
 
-    override suspend fun reconcile() {
+    override suspend fun reconcile() = reconcileInternal(background = false)
+
+    override suspend fun reconcileBackground() = reconcileInternal(background = true)
+
+    private suspend fun reconcileInternal(background: Boolean) {
+        schedulePeriodicSync()
         val record = syncStateRepository.getRecord()
         val workInfos = getActiveWorkInfos(WORK_NAME_VAULT_SYNC)
         val isWorkerActive = workInfos.any {
@@ -71,14 +97,28 @@ class WorkManagerVaultSyncScheduler(
         if (!isWorkerActive) {
             if (record.status is DurableSyncStatus.Running) {
                 syncStateRepository.updateStatus(DurableSyncStatus.Pending)
-                scheduleSync()
+                enqueueSync(background)
             } else if (record.requestedGeneration > record.completedGeneration) {
                 if (record.status !is DurableSyncStatus.Blocked) {
                     syncStateRepository.updateStatus(DurableSyncStatus.Pending)
-                    scheduleSync()
+                    enqueueSync(background)
                 }
             }
         }
+    }
+
+    private fun schedulePeriodicSync() {
+        if (!periodicEnabled()) {
+            cancelPeriodicWork()
+            return
+        }
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+        val request = PeriodicWorkRequestBuilder<PeriodicVaultSyncWorker>(15, TimeUnit.MINUTES)
+            .setConstraints(constraints)
+            .build()
+        enqueuePeriodicWork(request)
     }
 
     companion object {

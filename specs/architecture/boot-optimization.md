@@ -119,5 +119,5 @@ Implementation:
 
 ## Out of scope
 
-- WorkManager/AlarmManager scheduled sync
+- Periodic WorkManager sync is scheduled after launch settlement and must not delay first render.
 - Multi-workspace snapshot keys
