@@ -15,6 +15,7 @@ internal object SnapshotNoteJsonCodec {
     private const val SNIPPET_TOKEN = ",\"snippet\":\""
     private const val IS_INBOX_TOKEN = ",\"isInbox\":"
     private const val LAST_MODIFIED_TOKEN = ",\"lastModifiedEpochMillis\":"
+    private const val SNOOZED_UNTIL_TOKEN = ",\"snoozedUntilEpochMillis\":"
     private const val SIZE_BYTES_TOKEN = ",\"sizeBytes\":"
 
     fun readFingerprint(raw: String): GateFingerprint =
@@ -64,6 +65,7 @@ internal object SnapshotNoteJsonCodec {
         append(",\"isInbox\":").append(summary.isInbox)
         append(",\"lastModifiedEpochMillis\":").append(summary.lastModifiedEpochMillis)
         append(",\"sizeBytes\":").append(summary.sizeBytes)
+        append(SNOOZED_UNTIL_TOKEN).append(summary.snoozedUntilEpochMillis)
         append('}')
     }
 
@@ -154,6 +156,12 @@ internal object SnapshotNoteJsonCodec {
             } else {
                 0L
             }
+            val snoozedUntil = if (matches(SNOOZED_UNTIL_TOKEN)) {
+                index += SNOOZED_UNTIL_TOKEN.length
+                readLong()
+            } else {
+                Long.MIN_VALUE
+            }
             expect('}')
             return NoteSummary(
                 id = NoteId(id),
@@ -161,7 +169,8 @@ internal object SnapshotNoteJsonCodec {
                 snippet = snippet,
                 isInbox = isInbox,
                 lastModifiedEpochMillis = lastModified,
-                sizeBytes = sizeBytes
+                sizeBytes = sizeBytes,
+                snoozedUntilEpochMillis = snoozedUntil
             )
         }
 
