@@ -193,7 +193,7 @@ private fun NoteReaderContent(
         state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(
-            top = chrome.top,
+            top = chrome.top + if (datedHeader != null) 17.dp else 0.dp,
             bottom = chrome.bottom,
             start = 32.dp,
             end = 32.dp
