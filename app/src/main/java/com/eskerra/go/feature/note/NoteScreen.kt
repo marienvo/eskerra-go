@@ -121,8 +121,8 @@ private fun NoteReaderLoading() {
 }
 
 /**
- * A note's title/path/Edit button plus its body, all in one [LazyColumn] so title and body scroll
- * together under the floating back button/hamburger exactly as before — but only nearby items are
+ * A note's title and body, with Edit below the body for editable notes, all in one [LazyColumn] so
+ * they scroll together under the floating back button/hamburger — but only nearby items are
  * composed. [LazyNoteBlocks.split] breaks the pre-parsed body into small segments (splitting a long
  * bullet list into chunks), which is what actually shrinks first-frame cost for a long note: no
  * amount of caching helps once the whole body has to be composed and laid out in one non-lazy
@@ -252,24 +252,6 @@ private fun NoteReaderContent(
                 modifier = Modifier.padding(top = 10.dp, bottom = 4.dp)
             )
         }
-        item(key = "path") {
-            Column {
-                Text(
-                    text = path,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = 12.dp)
-                )
-                if (canEdit) {
-                    Button(
-                        onClick = onEdit,
-                        modifier = Modifier.padding(bottom = 12.dp)
-                    ) {
-                        Text("Edit")
-                    }
-                }
-            }
-        }
         itemsIndexed(
             items = blocks,
             key = { index, block -> noteSegmentKey(index, block.segment) }
@@ -283,10 +265,20 @@ private fun NoteReaderContent(
                 modifier = Modifier.fillMaxWidth()
             )
         }
+        if (canEdit) {
+            item(key = "edit") {
+                Button(
+                    onClick = onEdit,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                ) {
+                    Text("Edit")
+                }
+            }
+        }
     }
 }
 
-private const val NOTE_READER_HEADER_ITEM_COUNT = 3
+private const val NOTE_READER_HEADER_ITEM_COUNT = 2
 
 val LocalDatedHeader = staticCompositionLocalOf<DatedNoteHeader?> { null }
 
