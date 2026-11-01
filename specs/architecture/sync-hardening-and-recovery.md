@@ -4,7 +4,7 @@
 
 - Vault sync (`ManualSyncNow`) commits all safe local working-tree changes, fetches and fast-forwards when behind, and auto-merges divergence with conflict sidecars where the remote remains canonical.
 - It is triggered by the sync button, every note write, boot, and foreground return. Requests coalesce; automatic requests fail silently to the shell badge.
-- Boot sync is deferred until launch has settled and is never on the first-render path. No WorkManager or AlarmManager schedules sync.
+- Boot sync is deferred until launch has settled and is never on the first-render path. A unique network-constrained WorkManager job requests a vault sync every 15 minutes; Android may delay it. Existing pending work is reconciled instead of duplicated, and blocked sync is not automatically retried.
 - Every JGit mutation shares the process-wide `GitSyncMutex`.
 - Before syncing, an interrupted Git operation is recovered according to the vault-sync recovery policy. Unsafe paths fail closed and are never staged.
 - Sync uses 30-second transport timeouts and retries a rejected push through integrate-and-push cycles. It never exposes credentials or raw transport errors.

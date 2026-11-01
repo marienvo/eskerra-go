@@ -9,7 +9,7 @@ import com.eskerra.go.core.repository.PerformanceReporter
  * Records the cold start that just finished, reports the first five-sample window, then reports
  * subsequent windows weekly.
  *
- * There is no scheduler in this app (no WorkManager or AlarmManager, by design), so "weekly" is a
+ * Performance reporting has no dedicated scheduler, so "weekly" is a
  * check performed on launch: the first launch after the window elapses carries the report.
  */
 class ReportWeeklyPerformance(

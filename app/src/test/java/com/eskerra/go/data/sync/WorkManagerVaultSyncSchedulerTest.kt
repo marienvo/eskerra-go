@@ -45,6 +45,7 @@ class WorkManagerVaultSyncSchedulerTest {
             context = object : android.content.ContextWrapper(null) {},
             syncStateRepository = repo,
             enqueueWork = { _, _, _ -> enqueued = true },
+            enqueuePeriodicWork = {},
             getActiveWorkInfos = { emptyList() }
         )
 

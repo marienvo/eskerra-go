@@ -92,5 +92,4 @@ Configured sync branch, local checkout, and `origin/<branch>` must stay aligned 
 - Multi-workspace support.
 - Automatic merge/rebase/conflict-resolution UI.
 - SSH remotes.
-- WorkManager / AlarmManager scheduled background sync.
 - iOS.

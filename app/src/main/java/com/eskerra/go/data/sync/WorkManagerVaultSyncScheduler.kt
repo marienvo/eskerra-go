@@ -3,10 +3,13 @@ package com.eskerra.go.data.sync
 import android.content.Context
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
+import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequest
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.PeriodicWorkRequest
+import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.eskerra.go.core.model.DurableSyncStatus
@@ -26,6 +29,13 @@ class WorkManagerVaultSyncScheduler(
     },
     private val cancelWork: (name: String) -> Unit = { name ->
         WorkManager.getInstance(context).cancelUniqueWork(name)
+    },
+    private val enqueuePeriodicWork: (PeriodicWorkRequest) -> Unit = { request ->
+        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+            "periodic_vault_sync",
+            ExistingPeriodicWorkPolicy.KEEP,
+            request
+        )
     },
     private val getActiveWorkInfos: suspend (name: String) -> List<WorkInfo> = { name ->
         try {
@@ -63,6 +73,7 @@ class WorkManagerVaultSyncScheduler(
     }
 
     override suspend fun reconcile() {
+        schedulePeriodicSync()
         val record = syncStateRepository.getRecord()
         val workInfos = getActiveWorkInfos(WORK_NAME_VAULT_SYNC)
         val isWorkerActive = workInfos.any {
@@ -79,6 +90,16 @@ class WorkManagerVaultSyncScheduler(
                 }
             }
         }
+    }
+
+    private fun schedulePeriodicSync() {
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+        val request = PeriodicWorkRequestBuilder<PeriodicVaultSyncWorker>(15, TimeUnit.MINUTES)
+            .setConstraints(constraints)
+            .build()
+        enqueuePeriodicWork(request)
     }
 
     companion object {
