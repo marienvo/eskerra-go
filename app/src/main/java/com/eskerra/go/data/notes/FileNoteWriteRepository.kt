@@ -5,16 +5,20 @@ import com.eskerra.go.core.model.NoteWriteError
 import com.eskerra.go.core.model.NoteWriteException
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.NoteWriteRepository
+import com.eskerra.go.data.git.GitSyncMutex
 import com.eskerra.go.data.git.WorkspaceGitRepository
 import com.eskerra.go.data.workspace.WorkspacePaths
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.LinkOption
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
-class FileNoteWriteRepository(private val gitRepository: WorkspaceGitRepository) :
-    NoteWriteRepository {
+class FileNoteWriteRepository(
+    private val gitRepository: WorkspaceGitRepository,
+    private val syncMutex: GitSyncMutex = GitSyncMutex()
+) : NoteWriteRepository {
 
     override suspend fun listSiblingNames(
         config: WorkspaceConfig,
@@ -59,7 +63,10 @@ class FileNoteWriteRepository(private val gitRepository: WorkspaceGitRepository)
             return@withContext Result.failure(it)
         }
 
-        gitRepository.writeFile(workspaceDir, notePath.value, markdown).fold(
+        val result = syncMutex.mutex.withLock {
+            gitRepository.writeFile(workspaceDir, notePath.value, markdown)
+        }
+        result.fold(
             onSuccess = { Result.success(Unit) },
             onFailure = { error ->
                 Result.failure(
@@ -113,7 +120,7 @@ class FileNoteWriteRepository(private val gitRepository: WorkspaceGitRepository)
             return@withContext Result.failure(it)
         }
 
-        gitRepository.deleteFile(workspaceDir, notePath.value).fold(
+        syncMutex.mutex.withLock { gitRepository.deleteFile(workspaceDir, notePath.value) }.fold(
             onSuccess = { Result.success(Unit) },
             onFailure = { error ->
                 Result.failure(

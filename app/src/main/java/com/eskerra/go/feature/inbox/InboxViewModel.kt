@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.eskerra.go.core.inbox.InboxNotePath
+import com.eskerra.go.core.inbox.InboxSnooze
 import com.eskerra.go.core.model.DeleteInboxNoteError
 import com.eskerra.go.core.model.DeleteInboxNoteException
 import com.eskerra.go.core.model.NoteId
@@ -15,13 +16,19 @@ import com.eskerra.go.core.repository.ActiveTodayHubStore
 import com.eskerra.go.core.todayhub.TodayHubDiscovery
 import com.eskerra.go.core.usecase.DeleteInboxNotes
 import com.eskerra.go.core.usecase.LoadInboxSummariesCached
+import com.eskerra.go.core.usecase.SnoozeInboxNotes
 import com.eskerra.go.feature.inbox.InboxUiState
 import java.io.File
+import java.time.LocalDate
+import java.time.ZoneId
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class InboxViewModel(
     private val config: WorkspaceConfig,
@@ -44,8 +51,16 @@ class InboxViewModel(
     private val _deleteError = MutableStateFlow<String?>(null)
     val deleteError: StateFlow<String?> = _deleteError.asStateFlow()
 
+    private var snoozeInboxNotes: SnoozeInboxNotes? = null
+
+    fun configureSnooze(usecase: SnoozeInboxNotes) {
+        snoozeInboxNotes = usecase
+    }
+
     private var refreshJob: Job? = null
     private var deleteJob: Job? = null
+    private var snoozeWakeJob: Job? = null
+    private var snoozeActive = true
 
     /** All inbox notes across hubs from the last load; the UI shows only [activeHubFolder]'s slice. */
     private var rawSummaries: List<NoteSummary> = emptyList()
@@ -61,9 +76,13 @@ class InboxViewModel(
             val cached = loadInboxSummaries.readCached(config, filesDir)
             if (cached != null) {
                 rawSummaries = cached
+                scheduleSnoozeWake()
                 _uiState.value = visibleSummaries().toInboxUiState(isRefreshing = true)
             }
-            refresh(showFullScreenLoading = cached == null)
+            if (cached == null && loadInboxSummaries.isLaunchDeferred) {
+                _uiState.value = InboxUiState.Empty
+            }
+            refresh(showFullScreenLoading = cached == null && !loadInboxSummaries.isLaunchDeferred)
         }
         // Sync (and any other writer) refreshes NoteRegistryCache directly. Observe that shared
         // registry so a remote delete drops from the list even if the Compose inboxRefreshSignal
@@ -80,6 +99,7 @@ class InboxViewModel(
     /** Applies inbox summaries published by the shared registry without starting a new scan. */
     private fun applyExternalInboxSummaries(notes: List<NoteSummary>) {
         rawSummaries = notes
+        scheduleSnoozeWake()
         val visible = visibleSummaries()
         val isRefreshing = (_uiState.value as? InboxUiState.Content)?.isRefreshing ?: false
         val currentNotes = (_uiState.value as? InboxUiState.Content)?.notes
@@ -102,8 +122,32 @@ class InboxViewModel(
         _uiState.value = visibleSummaries().toInboxUiState(isRefreshing = isRefreshing)
     }
 
-    private fun visibleSummaries(): List<NoteSummary> =
-        rawSummaries.filter { InboxNotePath.inboxHubFolderOf(it.id.value) == activeHubFolder }
+    private fun visibleSummaries(): List<NoteSummary> = rawSummaries.filter {
+        InboxNotePath.inboxHubFolderOf(it.id.value) == activeHubFolder &&
+            it.snoozedUntilEpochMillis <= System.currentTimeMillis()
+    }
+
+    fun setSnoozeActive(active: Boolean) {
+        if (snoozeActive == active) return
+        snoozeActive = active
+        if (active) {
+            applyExternalInboxSummaries(rawSummaries)
+        } else {
+            snoozeWakeJob?.cancel()
+        }
+    }
+
+    private fun scheduleSnoozeWake() {
+        snoozeWakeJob?.cancel()
+        if (!snoozeActive) return
+        val now = System.currentTimeMillis()
+        val next = rawSummaries.map { it.snoozedUntilEpochMillis }
+            .filter { it > now }.minOrNull() ?: return
+        snoozeWakeJob = viewModelScope.launch {
+            delay((next - now).coerceAtMost(60_000L))
+            applyExternalInboxSummaries(rawSummaries)
+        }
+    }
 
     fun refresh() {
         refresh(showFullScreenLoading = _uiState.value !is InboxUiState.Content)
@@ -120,6 +164,47 @@ class InboxViewModel(
     fun clearSelection() {
         _deleteError.value = null
         _selectedNoteIds.value = emptySet()
+    }
+
+    fun snoozeSelected(date: LocalDate) {
+        val usecase = snoozeInboxNotes ?: return
+        if (date <= LocalDate.now()) {
+            _deleteError.value = "Choose a date from tomorrow onward."
+            return
+        }
+        if (_isDeleting.value || _selectedNoteIds.value.isEmpty()) return
+        val selected = _selectedNoteIds.value
+        val hubFolder = activeHubFolder
+        val ids = selected.toList()
+        val notes = (_uiState.value as? InboxUiState.Content)?.notes.orEmpty()
+        viewModelScope.launch {
+            _isDeleting.value = true
+            _deleteError.value = null
+            try {
+                val result = withContext(NonCancellable) {
+                    val outcome = usecase(
+                        config,
+                        filesDir,
+                        ids,
+                        notes,
+                        InboxSnooze.until(date, ZoneId.systemDefault())
+                    )
+                    if (outcome.succeeded.isNotEmpty()) {
+                        onInboxMutated(outcome.succeeded.map { it.value })
+                    }
+                    outcome
+                }
+                if (activeHubFolder == hubFolder && _selectedNoteIds.value == selected) {
+                    _selectedNoteIds.value = result.failed.toSet()
+                }
+                if (result.failed.isNotEmpty() || result.refreshFailed) {
+                    _deleteError.value = "Could not snooze all selected notes."
+                }
+                refresh(showFullScreenLoading = false)
+            } finally {
+                _isDeleting.value = false
+            }
+        }
     }
 
     fun deleteSelected() {
@@ -166,6 +251,7 @@ class InboxViewModel(
             loadInboxSummaries(config, filesDir).fold(
                 onSuccess = { notes ->
                     rawSummaries = notes
+                    scheduleSnoozeWake()
                     val visible = visibleSummaries()
                     val currentNotes = (_uiState.value as? InboxUiState.Content)?.notes
                     if (visible == currentNotes) {

@@ -87,13 +87,39 @@ class MarkdownNoteScanner : NoteWorkspaceScanner {
                             extractTitleAndSnippet(file)
                         }
 
+                        val snoozedUntil = if (!isInbox) {
+                            0L
+                        } else if (previous != null &&
+                            previous.lastModifiedEpochMillis == mtime &&
+                            previous.sizeBytes == size &&
+                            previous.snoozedUntilEpochMillis != Long.MIN_VALUE
+                        ) {
+                            previous.snoozedUntilEpochMillis
+                        } else {
+                            InboxSnoozeMetadataReader.read(file)
+                        }
+
+                        val contentHash = if (!isInbox) {
+                            null
+                        } else if (previous != null &&
+                            previous.lastModifiedEpochMillis == mtime &&
+                            previous.sizeBytes == size &&
+                            previous.inboxContentSha256 != null
+                        ) {
+                            previous.inboxContentSha256
+                        } else {
+                            InboxContentHash.of(file)
+                        }
+
                         summaries += NoteSummary(
                             id = NoteId(notePath.value),
                             title = title,
                             snippet = snippet,
                             isInbox = isInbox,
                             lastModifiedEpochMillis = mtime,
-                            sizeBytes = size
+                            sizeBytes = size,
+                            snoozedUntilEpochMillis = snoozedUntil,
+                            inboxContentSha256 = contentHash
                         )
                         return FileVisitResult.CONTINUE
                     }

@@ -54,6 +54,7 @@ import com.eskerra.go.ui.DatedFolderLinks
 import com.eskerra.go.ui.markdown.VaultMarkdownTokens
 import com.eskerra.go.ui.theme.EskerraChromeTokens
 import com.eskerra.go.ui.theme.EskerraHeadingH1
+import java.time.LocalDate
 
 /** Fixed height for the shared top row so switching in/out of selection never shifts the list. */
 private val InboxTopBarHeight = 56.dp
@@ -84,6 +85,7 @@ fun InboxScreen(
     onAvatarClick: (NoteId) -> Unit,
     onClearSelection: () -> Unit,
     onDeleteSelected: () -> Unit,
+    onSnoozeSelected: (LocalDate) -> Unit = {},
     onSelectHub: (NoteId) -> Unit,
     scrollToTopSignal: Int = 0,
     modifier: Modifier = Modifier,
@@ -150,7 +152,8 @@ fun InboxScreen(
                         selectedCount = selectedNoteIds.size,
                         isDeleting = isDeleting,
                         onClearSelection = onClearSelection,
-                        onDeleteSelected = onDeleteSelected
+                        onDeleteSelected = onDeleteSelected,
+                        onSnoozeSelected = onSnoozeSelected
                     )
                 } else {
                     TodayHubHeader(
@@ -261,7 +264,8 @@ private fun InboxSelectionBar(
     selectedCount: Int,
     isDeleting: Boolean,
     onClearSelection: () -> Unit,
-    onDeleteSelected: () -> Unit
+    onDeleteSelected: () -> Unit,
+    onSnoozeSelected: (LocalDate) -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -283,6 +287,7 @@ private fun InboxSelectionBar(
             color = Color.White,
             modifier = Modifier.weight(1f)
         )
+        InboxSnoozeButton(enabled = !isDeleting, onDateSelected = onSnoozeSelected)
         IconButton(onClick = onDeleteSelected, enabled = !isDeleting) {
             if (isDeleting) {
                 CircularProgressIndicator(
