@@ -5,6 +5,7 @@ import com.eskerra.go.core.model.NoteSummary
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.InboxSnapshotStore
 import java.io.File
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -20,13 +21,29 @@ class LoadInboxSummariesCached(
     val registryUpdates: StateFlow<NoteRegistry?> = MutableStateFlow(null)
 ) {
 
+    private var launchGate: CompletableDeferred<Unit>? = null
+
+    /** Called before the inbox ViewModel starts; repeated calls do not reset a released gate. */
+    fun deferUntilLaunchSettled() {
+        if (launchGate == null) launchGate = CompletableDeferred()
+    }
+
+    val isLaunchDeferred: Boolean get() = launchGate?.isCompleted == false
+
+    fun onLaunchSettled() {
+        launchGate?.complete(Unit)
+    }
+
     suspend fun readCached(config: WorkspaceConfig, filesDir: File): List<NoteSummary>? =
         snapshotStore.read(config, filesDir)
 
     suspend operator fun invoke(
         config: WorkspaceConfig,
         filesDir: File
-    ): Result<List<NoteSummary>> = delegate(config, filesDir).onSuccess { summaries ->
-        snapshotStore.save(config, filesDir, summaries)
+    ): Result<List<NoteSummary>> {
+        launchGate?.await()
+        return delegate(config, filesDir).onSuccess { summaries ->
+            snapshotStore.save(config, filesDir, summaries)
+        }
     }
 }

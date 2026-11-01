@@ -76,7 +76,10 @@ class InboxViewModel(
                 scheduleSnoozeWake()
                 _uiState.value = visibleSummaries().toInboxUiState(isRefreshing = true)
             }
-            refresh(showFullScreenLoading = cached == null)
+            if (cached == null && loadInboxSummaries.isLaunchDeferred) {
+                _uiState.value = InboxUiState.Empty
+            }
+            refresh(showFullScreenLoading = cached == null && !loadInboxSummaries.isLaunchDeferred)
         }
         // Sync (and any other writer) refreshes NoteRegistryCache directly. Observe that shared
         // registry so a remote delete drops from the list even if the Compose inboxRefreshSignal

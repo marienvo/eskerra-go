@@ -72,6 +72,7 @@ internal fun AppInboxRoute(
     var ambiguousCandidates by remember { mutableStateOf<List<NoteId>?>(null) }
     var scrollResetSignal by remember { mutableIntStateOf(0) }
 
+    loadInboxSummaries.deferUntilLaunchSettled()
     val inboxViewModel: InboxViewModel = viewModel(
         key = inboxViewModelKey(currentConfig.remoteUri),
         factory = InboxViewModel.factory(
@@ -107,6 +108,7 @@ internal fun AppInboxRoute(
     LaunchedEffect(launchSettled) {
         if (launchSettled) {
             androidx.compose.runtime.withFrameNanos { }
+            loadInboxSummaries.onLaunchSettled()
             todayHubViewModel.startDeferredRefresh()
         }
     }
