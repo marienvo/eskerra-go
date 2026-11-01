@@ -76,6 +76,7 @@ internal data class AppNavGraphContext(
     val navController: NavHostController,
     val scope: CoroutineScope,
     val noteOpenGate: NoteOpenGate,
+    val datedHeaderRetention: DatedNoteHeaderRetention,
     val appSyncViewModel: AppSyncViewModel,
     val syncState: SyncUiState,
     val homeReselectSignal: Int,

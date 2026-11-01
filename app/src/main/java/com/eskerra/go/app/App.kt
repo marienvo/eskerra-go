@@ -125,6 +125,7 @@ fun App(
     val navController = rememberNavController()
     val scope = rememberCoroutineScope()
     val noteOpenGate = remember { NoteOpenGate() }
+    val datedHeaderRetention = remember { DatedNoteHeaderRetention() }
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
     val currentRoute = currentDestination?.route
@@ -234,6 +235,7 @@ fun App(
             navController = navController,
             scope = scope,
             noteOpenGate = noteOpenGate,
+            datedHeaderRetention = datedHeaderRetention,
             appSyncViewModel = appSyncViewModel,
             syncState = syncState,
             homeReselectSignal = homeReselectSignal,

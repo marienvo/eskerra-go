@@ -3,10 +3,7 @@ package com.eskerra.go.app
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NoteReaderDocument
@@ -26,6 +23,10 @@ private data class LoadedLinks(
     val links: List<TodayHubDatedLink>
 )
 
+internal class DatedNoteHeaderRetention {
+    var previous: DatedNoteHeader? = null
+}
+
 @Composable
 internal fun datedNoteHeader(
     ctx: AppNavGraphContext,
@@ -37,7 +38,7 @@ internal fun datedNoteHeader(
     val targetIsDated = hub?.hubs?.any {
         NoteflowDatedNotes.neighbours(hub.registry, it.noteId, noteId) != null
     } == true
-    var previous by remember { mutableStateOf<DatedNoteHeader?>(null) }
+    val previous = ctx.datedHeaderRetention.previous
     val retained = datedHeaderForNavigation(resolved, previous, noteId, targetIsDated)
     SideEffect {
         NoteNavTrace.log(
@@ -46,7 +47,7 @@ internal fun datedNoteHeader(
                 "targetDated=$targetIsDated resolved=${resolved != null} " +
                 "previous=${previous?.current?.value} retained=${retained?.current?.value}"
         )
-        previous = retained
+        ctx.datedHeaderRetention.previous = retained
     }
     return retained
 }
