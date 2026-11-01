@@ -3,9 +3,13 @@ package com.eskerra.go.feature.note
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -20,8 +24,13 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.eskerra.go.app.LocalShellChromeInsets
+import com.eskerra.go.app.ShellChromeCenterFromStatusBar
+import com.eskerra.go.app.ShellTopChromeHeight
+import com.eskerra.go.app.ShellTopScrimReveal
+import com.eskerra.go.app.workspaceHeaderScrimRevealPx
 import com.eskerra.go.core.markdown.LazyNoteBlocks
 import com.eskerra.go.core.markdown.PreparedMarkdown
 import com.eskerra.go.core.markdown.PreparedSegment
@@ -30,6 +39,8 @@ import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NoteRegistry
 import com.eskerra.go.core.todayhub.DatedNoteHeader
 import com.eskerra.go.data.perf.NoteNavTrace
+import com.eskerra.go.feature.todayhub.TodayHubHeader
+import com.eskerra.go.feature.todayhub.TodayHubUiState
 import com.eskerra.go.ui.DateNavigationBar
 import com.eskerra.go.ui.DatedFolderLinks
 import com.eskerra.go.ui.markdown.VaultMarkdownAnnotator
@@ -110,8 +121,8 @@ private fun NoteReaderLoading() {
 }
 
 /**
- * A note's title/path/Edit button plus its body, all in one [LazyColumn] so title and body scroll
- * together under the floating back button/hamburger exactly as before — but only nearby items are
+ * A note's title and body, with Edit below the body for editable notes, all in one [LazyColumn] so
+ * they scroll together under the floating back button/hamburger — but only nearby items are
  * composed. [LazyNoteBlocks.split] breaks the pre-parsed body into small segments (splitting a long
  * bullet list into chunks), which is what actually shrinks first-frame cost for a long note: no
  * amount of caching helps once the whole body has to be composed and laid out in one non-lazy
@@ -135,7 +146,11 @@ private fun NoteReaderContent(
     onViewportChanged: (visibleStartOffset: Int, visibleEndOffset: Int) -> Unit
 ) {
     val datedHeader = LocalDatedHeader.current
+    val workspaceHeader = LocalNoteWorkspaceHeader.current
     val chrome = LocalShellChromeInsets.current
+    val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val headerTopPadding = statusBarTop + ShellChromeCenterFromStatusBar - ShellTopChromeHeight / 2
+    val headerHeightPx = with(LocalDensity.current) { ShellTopChromeHeight.toPx() }
     val listState = rememberLazyListState()
     val blocks = remember(preparedBody) { LazyNoteBlocks.splitWithSourceRanges(preparedBody) }
 
@@ -146,6 +161,13 @@ private fun NoteReaderContent(
     LaunchedEffect(sourceNoteId) {
         withFrameNanos { }
         NoteNavTrace.log("reader.firstFrame", "noteId=${sourceNoteId.value}")
+    }
+    ShellTopScrimReveal {
+        workspaceHeaderScrimRevealPx(
+            firstVisibleItemIndex = listState.firstVisibleItemIndex,
+            firstVisibleItemScrollOffsetPx = listState.firstVisibleItemScrollOffset,
+            headerHeightPx = headerHeightPx
+        )
     }
     // Reports the visible blocks' original markdown range so prefetch follows actual visible links.
     LaunchedEffect(listState, blocks) {
@@ -193,15 +215,26 @@ private fun NoteReaderContent(
         state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(
-            top = chrome.top,
+            top = headerTopPadding,
             bottom = chrome.bottom,
-            start = 16.dp,
-            end = 16.dp
+            start = 32.dp,
+            end = 32.dp
         )
     ) {
+        item(key = "workspace-header") {
+            TodayHubHeader(
+                state = workspaceHeader.state,
+                onSelectHub = workspaceHeader.onSelectHub,
+                modifier = Modifier
+                    .height(ShellTopChromeHeight)
+                    .padding(start = 72.dp, end = 72.dp)
+            )
+        }
         item(key = "title") {
             if (datedHeader != null) {
-                DatedFolderLinks(datedHeader.links, datedHeader.current, onOpenInternalNote)
+                Box(Modifier.padding(top = 8.dp)) {
+                    DatedFolderLinks(datedHeader.links, datedHeader.current, onOpenInternalNote)
+                }
                 DateNavigationBar(
                     label = datedHeader.dateLabel,
                     canGoPrev = datedHeader.previous != null,
@@ -219,24 +252,6 @@ private fun NoteReaderContent(
                 modifier = Modifier.padding(top = 10.dp, bottom = 4.dp)
             )
         }
-        item(key = "path") {
-            Column {
-                Text(
-                    text = path,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = 12.dp)
-                )
-                if (canEdit) {
-                    Button(
-                        onClick = onEdit,
-                        modifier = Modifier.padding(bottom = 12.dp)
-                    ) {
-                        Text("Edit")
-                    }
-                }
-            }
-        }
         itemsIndexed(
             items = blocks,
             key = { index, block -> noteSegmentKey(index, block.segment) }
@@ -250,12 +265,28 @@ private fun NoteReaderContent(
                 modifier = Modifier.fillMaxWidth()
             )
         }
+        if (canEdit) {
+            item(key = "edit") {
+                Button(
+                    onClick = onEdit,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                ) {
+                    Text("Edit")
+                }
+            }
+        }
     }
 }
 
 private const val NOTE_READER_HEADER_ITEM_COUNT = 2
 
 val LocalDatedHeader = staticCompositionLocalOf<DatedNoteHeader?> { null }
+
+data class NoteWorkspaceHeader(val state: TodayHubUiState, val onSelectHub: (NoteId) -> Unit)
+
+val LocalNoteWorkspaceHeader = staticCompositionLocalOf {
+    NoteWorkspaceHeader(state = TodayHubUiState.Loading, onSelectHub = { })
+}
 
 private fun noteSegmentKey(index: Int, segment: PreparedSegment): String {
     val offset = (segment as? PreparedSegment.Markdown)

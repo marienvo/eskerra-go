@@ -26,6 +26,18 @@ class ShellTopScrimTest {
     }
 
     @Test
+    fun workspaceHeaderScrimRevealPx_beforeHeaderLeaves_staysHidden() {
+        assertEquals(0f, workspaceHeaderScrimRevealPx(0, 0, 56f))
+        assertEquals(0f, workspaceHeaderScrimRevealPx(0, 40, 56f))
+    }
+
+    @Test
+    fun workspaceHeaderScrimRevealPx_afterHeaderLeaves_tracksRemainingScroll() {
+        assertEquals(14f, workspaceHeaderScrimRevealPx(0, 70, 56f))
+        assertEquals(Float.MAX_VALUE, workspaceHeaderScrimRevealPx(1, 0, 56f))
+    }
+
+    @Test
     fun controller_withNoProviders_isFullyRevealed() {
         val controller = ShellTopScrimController()
 

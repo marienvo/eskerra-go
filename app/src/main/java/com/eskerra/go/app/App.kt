@@ -3,6 +3,7 @@ package com.eskerra.go.app
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -15,6 +16,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.ActiveTodayHubStore
 import com.eskerra.go.core.repository.SyncStateRepository
@@ -56,6 +58,8 @@ import com.eskerra.go.core.usecase.UpdateSyncToken
 import com.eskerra.go.core.usecase.WarmNote
 import com.eskerra.go.data.workspace.WorkspacePaths
 import com.eskerra.go.feature.inbox.InboxUiState
+import com.eskerra.go.feature.note.LocalNoteWorkspaceHeader
+import com.eskerra.go.feature.note.NoteWorkspaceHeader
 import com.eskerra.go.feature.sync.AppSyncViewModel
 import com.eskerra.go.feature.todayhub.TodayHubUiState
 import java.io.File
@@ -121,6 +125,7 @@ fun App(
     val navController = rememberNavController()
     val scope = rememberCoroutineScope()
     val noteOpenGate = remember { NoteOpenGate() }
+    val datedHeaderRetention = remember { DatedNoteHeaderRetention() }
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
     val currentRoute = currentDestination?.route
@@ -128,6 +133,8 @@ fun App(
     // Hub state and decides whether to snap to the current week). A route change can't carry this
     // because re-tapping Home does not navigate.
     var homeReselectSignal by remember { mutableIntStateOf(0) }
+    var pendingHubSelection by remember { mutableStateOf<NoteId?>(null) }
+    var hubPickerVisible by remember { mutableStateOf(false) }
     var inboxRefreshSignal by remember { mutableIntStateOf(0) }
     // The hamburger menu is an overlay, not a NavHost destination: opening it must not navigate, so
     // the underlying route (wherever you were) stays put and closing it cannot jump back to Home.
@@ -196,6 +203,17 @@ fun App(
     )
     val onInbox = currentRoute == AppRoute.INBOX || currentRoute == null
     val pullRefreshing by appSyncViewModel.pullRefreshing.collectAsState()
+    val onSelectHub: (NoteId) -> Unit = { selected ->
+        val activeHubId = (todayHubUiState as? TodayHubUiState.Content)?.activeHubId
+        if (selected != activeHubId) {
+            pendingHubSelection = selected
+        }
+        if (onInbox) {
+            if (selected == activeHubId) homeReselectSignal++
+        } else {
+            navController.popBackStack(AppRoute.INBOX, inclusive = false)
+        }
+    }
     AppShell(
         syncIndicator = syncIndicator,
         pullToRefreshActive = onInbox && pullRefreshing,
@@ -203,6 +221,11 @@ fun App(
         onMenuClick = { menuOpen = true },
         onBack = if (AppRoute.isNoteReaderRoute(currentRoute)) {
             { navController.popBackStack() }
+        } else {
+            null
+        },
+        onWorkspaceSwitch = if (onInbox && todayHubUiState.canSwitchHub()) {
+            { hubPickerVisible = true }
         } else {
             null
         }
@@ -215,9 +238,13 @@ fun App(
             navController = navController,
             scope = scope,
             noteOpenGate = noteOpenGate,
+            datedHeaderRetention = datedHeaderRetention,
             appSyncViewModel = appSyncViewModel,
             syncState = syncState,
             homeReselectSignal = homeReselectSignal,
+            onSelectHub = onSelectHub,
+            pendingHubSelection = pendingHubSelection,
+            onHubSelectionHandled = { pendingHubSelection = null },
             inboxRefreshSignal = inboxRefreshSignal,
             launchSettled = launchSettled,
             todayHubUiState = todayHubUiState,
@@ -261,17 +288,24 @@ fun App(
             onInboxUiStateChanged = onInboxUiStateChanged,
             onTodayHubUiStateChanged = onTodayHubUiStateChanged
         )
-        NavHost(
-            navController = navController,
-            startDestination = AppRoute.HOME_GRAPH,
-            modifier = contentModifier,
-            enterTransition = { EnterTransition.None },
-            exitTransition = { ExitTransition.None },
-            popEnterTransition = { EnterTransition.None },
-            popExitTransition = { ExitTransition.None }
+        CompositionLocalProvider(
+            LocalNoteWorkspaceHeader provides NoteWorkspaceHeader(
+                state = todayHubUiState ?: TodayHubUiState.Loading,
+                onSelectHub = onSelectHub
+            )
         ) {
-            homeGraph(navGraphContext)
-            sharedDestinations(navGraphContext)
+            NavHost(
+                navController = navController,
+                startDestination = AppRoute.HOME_GRAPH,
+                modifier = contentModifier,
+                enterTransition = { EnterTransition.None },
+                exitTransition = { ExitTransition.None },
+                popEnterTransition = { EnterTransition.None },
+                popExitTransition = { ExitTransition.None }
+            ) {
+                homeGraph(navGraphContext)
+                sharedDestinations(navGraphContext)
+            }
         }
     }
 
@@ -283,6 +317,13 @@ fun App(
             navController.navigate(AppRoute.NOTIFICATION_LIST)
         }
     }
+
+    AppHubPicker(
+        visible = hubPickerVisible,
+        state = todayHubUiState,
+        onSelectHub = onSelectHub,
+        onDismiss = { hubPickerVisible = false }
+    )
 
     if (menuOpen) {
         AppMenuSheet(

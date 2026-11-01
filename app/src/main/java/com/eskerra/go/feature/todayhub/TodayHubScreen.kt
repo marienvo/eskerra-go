@@ -6,18 +6,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.UnfoldMore
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -33,7 +26,7 @@ import com.eskerra.go.ui.theme.EskerraHeadingH1
 import java.io.File
 
 /**
- * Top chrome row for the home screen (spec §11): hub folder title and hub switcher.
+ * Scrollable hub folder title. Tapping it returns to the active hub's home.
  */
 @Composable
 fun TodayHubHeader(
@@ -42,26 +35,12 @@ fun TodayHubHeader(
     modifier: Modifier = Modifier
 ) {
     val content = state as? TodayHubUiState.Content
-    var pickerVisible by remember { mutableStateOf(false) }
 
     HubHeader(
         folderLabel = content?.folderLabel.orEmpty(),
-        showPicker = content?.showHubPicker == true,
-        onOpenPicker = { pickerVisible = true },
+        onClick = { content?.activeHubId?.let(onSelectHub) },
         modifier = modifier
     )
-
-    if (pickerVisible && content != null) {
-        TodayHubPickerSheet(
-            hubs = content.hubs,
-            activeHubId = content.activeHubId,
-            onPickHub = { picked ->
-                pickerVisible = false
-                onSelectHub(picked)
-            },
-            onDismiss = { pickerVisible = false }
-        )
-    }
 }
 
 /**
@@ -206,22 +185,17 @@ private fun InlineStatusMessage(
 }
 
 @Composable
-private fun HubHeader(
-    folderLabel: String,
-    showPicker: Boolean,
-    onOpenPicker: () -> Unit,
-    modifier: Modifier = Modifier
-) {
+private fun HubHeader(folderLabel: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Row(
         modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // The active hub name doubles as the title and the hub switcher: tapping it opens the
-        // picker. With a single hub there is nowhere to switch, so it stays a plain, static title.
         Row(
             modifier = Modifier
                 .weight(1f)
-                .clickable(enabled = showPicker, onClick = onOpenPicker),
+                .clickable(onClick = onClick),
+            horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
@@ -234,14 +208,6 @@ private fun HubHeader(
                     .weight(1f, fill = false)
                     .padding(top = 2.dp)
             )
-            if (showPicker) {
-                Icon(
-                    imageVector = Icons.Filled.UnfoldMore,
-                    contentDescription = "Switch hub",
-                    tint = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(start = 4.dp)
-                )
-            }
         }
     }
 }

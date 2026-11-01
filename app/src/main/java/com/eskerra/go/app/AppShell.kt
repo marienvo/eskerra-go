@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.UnfoldMore
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
@@ -34,7 +35,8 @@ import com.eskerra.go.feature.sync.SyncSpinner
  * - a top-right hamburger Menu button carrying the sync count/attention badge; while a sync is
  *   spinning (and pull-to-refresh isn't already showing its own indicator), the Menu glyph itself
  *   is swapped for the rotating sync glyph, same color, same button — no separate badge dot
- * - an optional top-left floating Back button (note reader) sharing the hamburger's center line
+ * - an optional top-left floating Back button (note reader) or workspace switcher (home) sharing
+ *   the hamburger's center line
  *
  * The shell owns no app state. It reports the menu overlay through [onMenuClick], and renders the
  * active screen edge-to-edge via [content]. Scrollable screens
@@ -48,6 +50,7 @@ fun AppShell(
     shellInput: ShellInputPresentation? = null,
     onMenuClick: () -> Unit,
     onBack: (() -> Unit)? = null,
+    onWorkspaceSwitch: (() -> Unit)? = null,
     content: @Composable (contentModifier: Modifier) -> Unit
 ) {
     val chromeInsets = rememberShellChromeInsets(
@@ -66,15 +69,19 @@ fun AppShell(
                     .shellEdgeScrimOverlay()
             )
 
-            if (onBack != null) {
+            if (onBack != null || onWorkspaceSwitch != null) {
                 ShellChromeButton(
-                    onClick = onBack,
+                    onClick = onBack ?: onWorkspaceSwitch!!,
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .statusBarsPadding()
                         .padding(start = 16.dp, top = ShellChromeButtonTop)
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    if (onBack != null) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    } else {
+                        Icon(Icons.Filled.UnfoldMore, contentDescription = "Switch hub")
+                    }
                 }
             }
 

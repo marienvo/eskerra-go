@@ -39,11 +39,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.eskerra.go.app.LocalShellChromeInsets
 import com.eskerra.go.app.ShellChromeButtonSize
 import com.eskerra.go.app.ShellChromeCenterFromStatusBar
 import com.eskerra.go.app.ShellTopScrimReveal
+import com.eskerra.go.app.workspaceHeaderScrimRevealPx
 import com.eskerra.go.core.datetime.RelativeCalendarLabel
 import com.eskerra.go.core.inbox.InboxTileColor
 import com.eskerra.go.core.model.NoteId
@@ -60,9 +62,8 @@ import java.time.LocalDate
 private val InboxTopBarHeight = 56.dp
 
 /**
- * Keeps this row's trailing content clear of the floating hamburger, which now shares its
- * vertical center line. Applies to both the hub header (long hub name) and the selection bar
- * (delete button), which alternate in the same slot.
+ * Keeps the selection row's trailing content clear of the floating hamburger, which shares its
+ * vertical center line.
  */
 private val InboxTopRowEndPadding = 16.dp + ShellChromeButtonSize
 
@@ -98,6 +99,7 @@ fun InboxScreen(
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     // Aligns the hub header's vertical center with the floating hamburger's center line.
     val headerTopPadding = statusBarTop + ShellChromeCenterFromStatusBar - InboxTopBarHeight / 2
+    val headerHeightPx = with(LocalDensity.current) { InboxTopBarHeight.toPx() }
 
     // Home re-selection from a drill-down bumps the signal; jump the list back to the top.
     LaunchedEffect(scrollToTopSignal) {
@@ -106,15 +108,12 @@ fun InboxScreen(
         }
     }
 
-    // The hub header (item 0) is taller than the top scrim, so its scroll offset while item 0 is
-    // still the first visible item tracks the scrim's reveal distance 1:1; past that, it's fully
-    // revealed. This makes the scrim slide into place at exactly scroll speed, not on a timer.
     ShellTopScrimReveal {
-        if (listState.firstVisibleItemIndex > 0) {
-            Float.MAX_VALUE
-        } else {
-            listState.firstVisibleItemScrollOffset.toFloat()
-        }
+        workspaceHeaderScrimRevealPx(
+            firstVisibleItemIndex = listState.firstVisibleItemIndex,
+            firstVisibleItemScrollOffsetPx = listState.firstVisibleItemScrollOffset,
+            headerHeightPx = headerHeightPx
+        )
     }
 
     PullToRefreshBox(
@@ -142,10 +141,6 @@ fun InboxScreen(
                 bottom = chrome.bottom
             )
         ) {
-            // Top row shares one slot: selection actions while notes are selected, otherwise the hub
-            // chrome (title, hub switcher). Both branches share InboxTopBarHeight so toggling selection
-            // never shifts the list below. Its center line matches the floating hamburger's; the
-            // extra end padding keeps a long hub name from running under that button.
             item {
                 if (hasSelection) {
                     InboxSelectionBar(
@@ -161,7 +156,7 @@ fun InboxScreen(
                         onSelectHub = onSelectHub,
                         modifier = Modifier
                             .height(InboxTopBarHeight)
-                            .padding(start = 16.dp, end = InboxTopRowEndPadding)
+                            .padding(horizontal = 72.dp)
                     )
                 }
             }
