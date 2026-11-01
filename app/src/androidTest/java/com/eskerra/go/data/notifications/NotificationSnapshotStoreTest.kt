@@ -46,6 +46,21 @@ class NotificationSnapshotStoreTest {
     }
 
     @Test
+    fun futureReminderIsQueuedBeforeItsDeadline() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val workspace = "test-${UUID.randomUUID()}"
+        val event = ReminderCandidates.scan(
+            "Personal/2026-11-01.md",
+            "- 🐞 @2026-11-01_1520 Test mobiele reminder",
+            ZoneId.of("UTC")
+        ).single()
+        NotificationSnapshotStore(context).use { store ->
+            store.replaceSnapshot(workspace, listOf(event), event.dueAtEpochMillis - 1)
+            assertEquals(listOf(event), store.pending(workspace))
+        }
+    }
+
+    @Test
     fun pendingReminderSurvivesAContextEdit() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val workspace = "test-${UUID.randomUUID()}"

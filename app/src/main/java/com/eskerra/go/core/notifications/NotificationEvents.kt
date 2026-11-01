@@ -12,6 +12,11 @@ enum class NotificationEventType { INBOX, SNOOZE, DATED_NOTE, REMINDER }
 
 /** Computes candidates whose deadlines crossed since the last successful snapshot. */
 object NotificationEvents {
+    fun upcoming(current: List<NotificationEvent>, now: Long): List<NotificationEvent> =
+        current.distinctBy { it.key }.filter {
+            it.dueAtEpochMillis > now && it.dueAtEpochMillis != Long.MAX_VALUE
+        }
+
     fun newlyDue(
         previous: Map<String, NotificationEvent>?,
         previousScanAt: Long,

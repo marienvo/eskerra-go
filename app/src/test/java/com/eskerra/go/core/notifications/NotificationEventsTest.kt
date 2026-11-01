@@ -8,6 +8,25 @@ class NotificationEventsTest {
         NotificationEvent("reminder:a", "Inbox/a.md", NotificationEventType.REMINDER, 15)
 
     @Test
+    fun futureRemindersAreQueuedForAlarmScheduling() {
+        assertEquals(
+            listOf(reminder),
+            NotificationEvents.upcoming(listOf(reminder), 10)
+        )
+        assertEquals(
+            emptyList<NotificationEvent>(),
+            NotificationEvents.upcoming(listOf(reminder), 15)
+        )
+        assertEquals(
+            emptyList<NotificationEvent>(),
+            NotificationEvents.upcoming(
+                listOf(reminder.copy(dueAtEpochMillis = Long.MAX_VALUE)),
+                10
+            )
+        )
+    }
+
+    @Test
     fun firstScanDoesNotEmitHistoricalEvents() {
         assertEquals(
             emptyList<NotificationEvent>(),
