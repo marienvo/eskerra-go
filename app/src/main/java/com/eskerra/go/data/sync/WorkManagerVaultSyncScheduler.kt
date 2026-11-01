@@ -12,6 +12,7 @@ import androidx.work.PeriodicWorkRequest
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import androidx.work.workDataOf
 import com.eskerra.go.core.model.DurableSyncStatus
 import com.eskerra.go.core.repository.SyncStateRepository
 import com.eskerra.go.core.repository.VaultSyncScheduler
@@ -46,12 +47,17 @@ class WorkManagerVaultSyncScheduler(
     }
 ) : VaultSyncScheduler {
 
-    override fun scheduleSync() {
+    override fun scheduleSync() = enqueueSync(background = false)
+
+    override fun scheduleBackgroundSync() = enqueueSync(background = true)
+
+    private fun enqueueSync(background: Boolean) {
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
             .build()
 
         val request = OneTimeWorkRequestBuilder<VaultSyncWorker>()
+            .setInputData(workDataOf(VaultSyncWorker.KEY_BACKGROUND to background))
             .setConstraints(constraints)
             .setBackoffCriteria(
                 BackoffPolicy.EXPONENTIAL,
@@ -72,7 +78,11 @@ class WorkManagerVaultSyncScheduler(
         cancelWork(WORK_NAME_VAULT_SYNC)
     }
 
-    override suspend fun reconcile() {
+    override suspend fun reconcile() = reconcileInternal(background = false)
+
+    override suspend fun reconcileBackground() = reconcileInternal(background = true)
+
+    private suspend fun reconcileInternal(background: Boolean) {
         schedulePeriodicSync()
         val record = syncStateRepository.getRecord()
         val workInfos = getActiveWorkInfos(WORK_NAME_VAULT_SYNC)
@@ -82,11 +92,11 @@ class WorkManagerVaultSyncScheduler(
         if (!isWorkerActive) {
             if (record.status is DurableSyncStatus.Running) {
                 syncStateRepository.updateStatus(DurableSyncStatus.Pending)
-                scheduleSync()
+                enqueueSync(background)
             } else if (record.requestedGeneration > record.completedGeneration) {
                 if (record.status !is DurableSyncStatus.Blocked) {
                     syncStateRepository.updateStatus(DurableSyncStatus.Pending)
-                    scheduleSync()
+                    enqueueSync(background)
                 }
             }
         }

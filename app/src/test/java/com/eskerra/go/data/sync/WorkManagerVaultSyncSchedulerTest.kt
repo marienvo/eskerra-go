@@ -54,4 +54,16 @@ class WorkManagerVaultSyncSchedulerTest {
         assertTrue(enqueued)
         assertEquals(DurableSyncStatus.Pending, repo.getRecord().status)
     }
+
+    @Test
+    fun backgroundSyncRequestDoesNotUseForegroundPromotion() {
+        var captured: OneTimeWorkRequest? = null
+        val scheduler = WorkManagerVaultSyncScheduler(
+            context = object : android.content.ContextWrapper(null) {},
+            syncStateRepository = FakeSyncStateRepository(),
+            enqueueWork = { _, _, request -> captured = request }
+        )
+        scheduler.scheduleBackgroundSync()
+        assertTrue(captured!!.workSpec.input.getBoolean(VaultSyncWorker.KEY_BACKGROUND, false))
+    }
 }

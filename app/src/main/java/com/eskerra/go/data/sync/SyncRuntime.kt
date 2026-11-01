@@ -23,6 +23,7 @@ import com.eskerra.go.data.notes.FileNoteRegistryRepository
 import com.eskerra.go.data.notes.FileNoteRegistrySnapshotStore
 import com.eskerra.go.data.notes.NoteContentCache
 import com.eskerra.go.data.notes.NoteRegistryCache
+import com.eskerra.go.data.notifications.PostSyncNotificationRefresh
 import com.eskerra.go.data.workspace.DataStoreWorkspaceStore
 import com.eskerra.go.data.workspace.WorkspaceStore
 import java.io.File
@@ -103,7 +104,10 @@ class SyncRuntime(
                 contentCache = noteContentCache,
                 loadSyncStatus = loadSyncStatus,
                 reconcileWorkspaceSyncBranch = reconcileWorkspaceSyncBranch,
-                gitSyncMutex = gitSyncMutex
+                gitSyncMutex = gitSyncMutex,
+                recordLocalChanges = { config, paths ->
+                    PostSyncNotificationRefresh.recordLocalChanges(context, config, paths)
+                }
             )
 
             val vaultSyncScheduler = WorkManagerVaultSyncScheduler(

@@ -25,6 +25,17 @@ class DatedNoteNotificationCandidatesTest {
             LocalDate(2026, 11, 1),
             content
         )
-        assertEquals(listOf(current.value), actual.map { it.noteId })
+        assertEquals(
+            listOf(current.value),
+            actual.filter {
+                it.dueAtEpochMillis == 0L
+            }.map { it.noteId }
+        )
+        assertEquals(
+            Long.MAX_VALUE,
+            actual.single {
+                it.noteId == completed.value
+            }.dueAtEpochMillis
+        )
     }
 }

@@ -28,4 +28,18 @@ class ReminderCandidatesTest {
         assertEquals(2, actual.map { it.key }.toSet().size)
         assertEquals(actual, ReminderCandidates.scan("a.md", markdown, ZoneId.of("UTC")))
     }
+
+    @Test
+    fun recognizesUnicodeWhitespaceAndRejectsInvalidRanges() {
+        val actual = ReminderCandidates.scan(
+            "a.md",
+            "x\u00a0@2026-11-01_1000-2500 @2026-11-01_1100",
+            ZoneId.of("UTC")
+        )
+        assertEquals(1, actual.size)
+        assertEquals(
+            Instant.parse("2026-11-01T11:00:00Z").toEpochMilli(),
+            actual[0].dueAtEpochMillis
+        )
+    }
 }

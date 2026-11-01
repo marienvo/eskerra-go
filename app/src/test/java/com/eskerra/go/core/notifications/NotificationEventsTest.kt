@@ -43,6 +43,14 @@ class NotificationEventsTest {
     }
 
     @Test
+    fun newlyDiscoveredOverdueReminderIsNotReported() {
+        assertEquals(
+            emptyList<NotificationEvent>(),
+            NotificationEvents.newlyDue(emptyMap(), 10, listOf(reminder), 20)
+        )
+    }
+
+    @Test
     fun newInboxOccurrenceIsReportedOnlyOnce() {
         val inbox = reminder.copy(key = "inbox:a", type = NotificationEventType.INBOX)
         assertEquals(

@@ -27,5 +27,5 @@ internal suspend fun requestPeriodicSync(
     val record = state.getRecord()
     if (record.status is DurableSyncStatus.Blocked) return
     if (!record.isPending) state.markGenerationRequested()
-    scheduler.reconcile()
+    scheduler.reconcileBackground()
 }

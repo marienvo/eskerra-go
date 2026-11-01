@@ -19,6 +19,7 @@ import java.io.File
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -41,7 +42,8 @@ class ManualSyncNow(
     private val gitSyncMutex: GitSyncMutex = GitSyncMutex(),
     private val clock: () -> Instant = Instant::now,
     private val zoneId: ZoneId = ZoneId.systemDefault(),
-    private val dispatcher: CoroutineDispatcher = Dispatchers.IO
+    private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val recordLocalChanges: suspend (WorkspaceConfig, Set<String>) -> Unit = { _, _ -> }
 ) {
 
     suspend operator fun invoke(
@@ -124,6 +126,18 @@ class ManualSyncNow(
         // Everything else is committed and synced unconditionally.
         ensureNoUnsafePaths(workspaceStatus.changedPaths).getOrElse { error ->
             return Result.failure(error)
+        }
+
+        if (workspaceStatus.hasUncommittedChanges) {
+            try {
+                recordLocalChanges(config, workspaceStatus.changedPaths)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                return Result.failure(
+                    SyncException(SyncError.GitFailed("Notification state unavailable."))
+                )
+            }
         }
 
         val effectiveBranch = remoteSyncRepository

@@ -5,8 +5,10 @@ package com.eskerra.go.core.repository
  */
 interface VaultSyncScheduler {
     fun scheduleSync()
+    fun scheduleBackgroundSync() = scheduleSync()
     fun cancelSync()
     suspend fun reconcile()
+    suspend fun reconcileBackground() = reconcile()
 }
 
 class NoOpVaultSyncScheduler : VaultSyncScheduler {

@@ -23,10 +23,9 @@ object NotificationEvents {
             val old = previous[event.key]
             event.dueAtEpochMillis <= now &&
                 if (old != null) {
-                    old.dueAtEpochMillis > previousScanAt
+                    old.dueAtEpochMillis != Long.MAX_VALUE && old.dueAtEpochMillis > previousScanAt
                 } else {
-                    event.type != NotificationEventType.REMINDER ||
-                        event.dueAtEpochMillis > previousScanAt
+                    event.type != NotificationEventType.REMINDER
                 }
         }
     }

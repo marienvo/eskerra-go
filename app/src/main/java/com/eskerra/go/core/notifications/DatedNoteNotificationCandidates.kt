@@ -18,12 +18,19 @@ object DatedNoteNotificationCandidates {
             val date =
                 runCatching { LocalDate.parse(dateText) }.getOrNull() ?: return@mapNotNull null
             val markdown = content[target.noteId] ?: return@mapNotNull null
-            if (date > today || !NoteflowDatedNotes.isIncomplete(markdown)) return@mapNotNull null
+            if (date > today) return@mapNotNull null
             NotificationEvent(
                 key = "dated:${target.noteId.value}",
                 noteId = target.noteId.value,
                 type = NotificationEventType.DATED_NOTE,
-                dueAtEpochMillis = 0L
+                dueAtEpochMillis = if (NoteflowDatedNotes.isIncomplete(
+                        markdown
+                    )
+                ) {
+                    0L
+                } else {
+                    Long.MAX_VALUE
+                }
             )
         }
     }.distinctBy { it.key }

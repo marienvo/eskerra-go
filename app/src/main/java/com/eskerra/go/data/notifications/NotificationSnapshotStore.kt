@@ -7,10 +7,13 @@ import android.database.sqlite.SQLiteOpenHelper
 import com.eskerra.go.core.notifications.NotificationEvent
 import com.eskerra.go.core.notifications.NotificationEventType
 import com.eskerra.go.core.notifications.NotificationEvents
+import org.json.JSONArray
+import org.json.JSONObject
 
 /** Transactionally stores the last complete scan and queues newly due occurrences. */
 class NotificationSnapshotStore(context: Context) :
-    SQLiteOpenHelper(context.applicationContext, "notification-events.db", null, 1) {
+    SQLiteOpenHelper(context.applicationContext, "notification-events.db", null, 2),
+    NotificationSnapshotPersistence {
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
             "CREATE TABLE scan_meta (workspace TEXT PRIMARY KEY, scanned_at INTEGER NOT NULL)"
@@ -18,16 +21,21 @@ class NotificationSnapshotStore(context: Context) :
         db.execSQL(
             "CREATE TABLE snapshot (workspace TEXT NOT NULL, event_key TEXT NOT NULL, note_id TEXT NOT NULL, type TEXT NOT NULL, due_at INTEGER NOT NULL, PRIMARY KEY(workspace, event_key))"
         )
+        createReminderCache(db)
         db.execSQL(
             "CREATE TABLE pending (workspace TEXT NOT NULL, event_key TEXT NOT NULL, note_id TEXT NOT NULL, type TEXT NOT NULL, due_at INTEGER NOT NULL, PRIMARY KEY(workspace, event_key))"
         )
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        error("Unsupported notification database upgrade: $oldVersion to $newVersion")
+        if (oldVersion == 1 && newVersion == 2) {
+            createReminderCache(db)
+        } else {
+            error("Unsupported notification database upgrade: $oldVersion to $newVersion")
+        }
     }
 
-    fun replaceSnapshot(workspace: String, events: List<NotificationEvent>, now: Long) {
+    override fun replaceSnapshot(workspace: String, events: List<NotificationEvent>, now: Long) {
         val db = writableDatabase
         db.beginTransaction()
         try {
@@ -44,22 +52,96 @@ class NotificationSnapshotStore(context: Context) :
             }
             db.execSQL(
                 "DELETE FROM pending WHERE workspace = ? AND event_key NOT IN " +
-                    "(SELECT event_key FROM snapshot WHERE workspace = ?)",
+                    "(SELECT event_key FROM snapshot WHERE workspace = ? AND due_at != 9223372036854775807)",
                 arrayOf(workspace, workspace)
             )
             for (event in due) {
-                db.insertWithOnConflict(
-                    "pending",
-                    null,
-                    values(workspace, event),
-                    SQLiteDatabase.CONFLICT_IGNORE
-                )
+                insertIgnoringExisting(db, "pending", workspace, event)
             }
             val meta = ContentValues().apply {
                 put("workspace", workspace)
                 put("scanned_at", now)
             }
-            db.insertWithOnConflict("scan_meta", null, meta, SQLiteDatabase.CONFLICT_REPLACE)
+            check(
+                db.insertWithOnConflict("scan_meta", null, meta, SQLiteDatabase.CONFLICT_REPLACE) !=
+                    -1L
+            )
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+    }
+
+    override fun cachedReminders(
+        workspace: String,
+        noteId: String,
+        signature: String
+    ): List<NotificationEvent>? {
+        val json = readableDatabase.rawQuery(
+            "SELECT payload FROM reminder_cache WHERE workspace = ? AND note_id = ? AND signature = ?",
+            arrayOf(workspace, noteId, signature)
+        ).use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null } ?: return null
+        val entries = JSONArray(json)
+        return (0 until entries.length()).map { index ->
+            val item = entries.getJSONObject(index)
+            NotificationEvent(
+                item.getString("key"),
+                noteId,
+                NotificationEventType.REMINDER,
+                item.getLong("due")
+            )
+        }
+    }
+
+    override fun cacheReminders(
+        workspace: String,
+        noteId: String,
+        signature: String,
+        events: List<NotificationEvent>
+    ) {
+        val json = JSONArray()
+        for (event in events) {
+            json.put(JSONObject().put("key", event.key).put("due", event.dueAtEpochMillis))
+        }
+        val values = ContentValues().apply {
+            put("workspace", workspace)
+            put("note_id", noteId)
+            put("signature", signature)
+            put("payload", json.toString())
+        }
+        check(
+            writableDatabase.insertWithOnConflict(
+                "reminder_cache",
+                null,
+                values,
+                SQLiteDatabase.CONFLICT_REPLACE
+            ) != -1L
+        )
+    }
+
+    private fun createReminderCache(db: SQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE reminder_cache (workspace TEXT NOT NULL, note_id TEXT NOT NULL, " +
+                "signature TEXT NOT NULL, payload TEXT NOT NULL, PRIMARY KEY(workspace, note_id))"
+        )
+    }
+
+    /** Record local inbox writes before Git consumes the working-tree status. */
+    fun rememberLocalInboxPaths(workspace: String, paths: Set<String>) {
+        val db = writableDatabase
+        db.beginTransaction()
+        try {
+            val initialized = db.rawQuery(
+                "SELECT 1 FROM scan_meta WHERE workspace = ?",
+                arrayOf(workspace)
+            ).use { it.moveToFirst() }
+            if (initialized) {
+                for (path in paths) {
+                    val event =
+                        NotificationEvent("inbox:$path", path, NotificationEventType.INBOX, 0L)
+                    insertIgnoringExisting(db, "snapshot", workspace, event)
+                }
+            }
             db.setTransactionSuccessful()
         } finally {
             db.endTransaction()
@@ -109,6 +191,20 @@ class NotificationSnapshotStore(context: Context) :
                 }
             }
         return result
+    }
+
+    private fun insertIgnoringExisting(
+        db: SQLiteDatabase,
+        table: String,
+        workspace: String,
+        event: NotificationEvent
+    ) {
+        require(table == "snapshot" || table == "pending")
+        db.execSQL(
+            "INSERT OR IGNORE INTO $table (workspace, event_key, note_id, type, due_at) " +
+                "VALUES (?, ?, ?, ?, ?)",
+            arrayOf(workspace, event.key, event.noteId, event.type.name, event.dueAtEpochMillis)
+        )
     }
 
     private fun values(workspace: String, event: NotificationEvent) = ContentValues().apply {

@@ -10,6 +10,7 @@ import com.eskerra.go.core.model.SyncException
 import com.eskerra.go.core.model.SyncProgressStep
 import com.eskerra.go.core.model.SyncResult
 import com.eskerra.go.core.model.WorkspaceConfig
+import com.eskerra.go.data.notifications.PostSyncNotificationRefresh
 import java.io.File
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
@@ -24,12 +25,15 @@ class VaultSyncWorker(context: Context, params: WorkerParameters) :
         val runtimeProvider = applicationContext as? SyncRuntimeProvider ?: return Result.failure()
         return performSync(
             syncRuntime = runtimeProvider.syncRuntime,
-            setForegroundInfo = { setForeground(it) },
+            setForegroundInfo = {
+                if (!inputData.getBoolean(KEY_BACKGROUND, false)) setForeground(it)
+            },
             attempt = runAttemptCount
         )
     }
 
     companion object {
+        const val KEY_BACKGROUND = "periodic_background"
         const val MAX_RETRY_ATTEMPTS = 10
         const val INITIAL_BACKOFF_MS = 10_000L
 
@@ -112,10 +116,16 @@ class VaultSyncWorker(context: Context, params: WorkerParameters) :
                             completedAtEpochMs = completedAt
                         )
 
+                        PostSyncNotificationRefresh.run(
+                            syncRuntime,
+                            result.updatedConfig ?: config,
+                            result
+                        )
+
                         // If newer generations arrived while syncing, trigger next round
                         val latest = syncRuntime.syncStateRepository.getRecord()
                         if (latest.requestedGeneration > snapshotGeneration) {
-                            syncRuntime.vaultSyncScheduler.scheduleSync()
+                            syncRuntime.vaultSyncScheduler.scheduleBackgroundSync()
                         }
                         Result.success()
                     },
