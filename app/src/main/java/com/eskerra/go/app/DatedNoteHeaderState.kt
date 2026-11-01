@@ -14,6 +14,7 @@ import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.todayhub.DatedNoteHeader
 import com.eskerra.go.core.todayhub.NoteflowDatedNotes
 import com.eskerra.go.core.todayhub.TodayHubDatedLink
+import com.eskerra.go.data.perf.NoteNavTrace
 import com.eskerra.go.feature.todayhub.TodayHubUiState
 import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
@@ -38,7 +39,15 @@ internal fun datedNoteHeader(
     } == true
     var previous by remember { mutableStateOf<DatedNoteHeader?>(null) }
     val retained = datedHeaderForNavigation(resolved, previous, noteId, targetIsDated)
-    SideEffect { previous = retained }
+    SideEffect {
+        NoteNavTrace.log(
+            "dated.header",
+            "target=${noteId.value} document=${document != null} hub=${hub != null} " +
+                "targetDated=$targetIsDated resolved=${resolved != null} " +
+                "previous=${previous?.current?.value} retained=${retained?.current?.value}"
+        )
+        previous = retained
+    }
     return retained
 }
 
@@ -79,6 +88,13 @@ private fun resolveDatedNoteHeader(
             ).getOrNull()
             value = links?.let { LoadedLinks(ctx.currentConfig, marker, it) }
         }
+    }
+    SideEffect {
+        NoteNavTrace.log(
+            "dated.resolve",
+            "target=${noteId.value} marker=${marker?.value} activeHub=${hub?.activeHubId?.value} " +
+                "neighbours=${neighbours != null} otherLinks=${otherLinks?.marker?.value}"
+        )
     }
     if (marker == null || neighbours == null || hub == null) return null
     val links = if (marker == hub.activeHubId) {
