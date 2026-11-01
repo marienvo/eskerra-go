@@ -47,7 +47,13 @@ fun TodayHubHeader(
     HubHeader(
         folderLabel = content?.folderLabel.orEmpty(),
         showPicker = content?.showHubPicker == true,
-        onOpenPicker = { pickerVisible = true },
+        onClick = {
+            if (content?.showHubPicker == true) {
+                pickerVisible = true
+            } else {
+                content?.activeHubId?.let(onSelectHub)
+            }
+        },
         modifier = modifier
     )
 
@@ -209,19 +215,17 @@ private fun InlineStatusMessage(
 private fun HubHeader(
     folderLabel: String,
     showPicker: Boolean,
-    onOpenPicker: () -> Unit,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // The active hub name doubles as the title and the hub switcher: tapping it opens the
-        // picker. With a single hub there is nowhere to switch, so it stays a plain, static title.
         Row(
             modifier = Modifier
                 .weight(1f)
-                .clickable(enabled = showPicker, onClick = onOpenPicker),
+                .clickable(onClick = onClick),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(

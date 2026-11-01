@@ -48,7 +48,6 @@ import com.eskerra.go.core.datetime.RelativeCalendarLabel
 import com.eskerra.go.core.inbox.InboxTileColor
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NoteSummary
-import com.eskerra.go.feature.todayhub.TodayHubHeader
 import com.eskerra.go.feature.todayhub.TodayHubUiState
 import com.eskerra.go.ui.DatedFolderLinks
 import com.eskerra.go.ui.markdown.VaultMarkdownTokens
@@ -60,9 +59,8 @@ import java.time.LocalDate
 private val InboxTopBarHeight = 56.dp
 
 /**
- * Keeps this row's trailing content clear of the floating hamburger, which now shares its
- * vertical center line. Applies to both the hub header (long hub name) and the selection bar
- * (delete button), which alternate in the same slot.
+ * Keeps the selection row's trailing content clear of the floating hamburger, which shares its
+ * vertical center line.
  */
 private val InboxTopRowEndPadding = 16.dp + ShellChromeButtonSize
 
@@ -86,7 +84,6 @@ fun InboxScreen(
     onClearSelection: () -> Unit,
     onDeleteSelected: () -> Unit,
     onSnoozeSelected: (LocalDate) -> Unit = {},
-    onSelectHub: (NoteId) -> Unit,
     scrollToTopSignal: Int = 0,
     modifier: Modifier = Modifier,
     todayHubBody: (@Composable () -> Unit)? = null
@@ -142,10 +139,6 @@ fun InboxScreen(
                 bottom = chrome.bottom
             )
         ) {
-            // Top row shares one slot: selection actions while notes are selected, otherwise the hub
-            // chrome (title, hub switcher). Both branches share InboxTopBarHeight so toggling selection
-            // never shifts the list below. Its center line matches the floating hamburger's; the
-            // extra end padding keeps a long hub name from running under that button.
             item {
                 if (hasSelection) {
                     InboxSelectionBar(
@@ -154,14 +147,6 @@ fun InboxScreen(
                         onClearSelection = onClearSelection,
                         onDeleteSelected = onDeleteSelected,
                         onSnoozeSelected = onSnoozeSelected
-                    )
-                } else {
-                    TodayHubHeader(
-                        state = todayHubState,
-                        onSelectHub = onSelectHub,
-                        modifier = Modifier
-                            .height(InboxTopBarHeight)
-                            .padding(start = 16.dp, end = InboxTopRowEndPadding)
                     )
                 }
             }

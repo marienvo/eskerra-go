@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -24,8 +25,11 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.data.perf.ColdStartTrace
 import com.eskerra.go.feature.sync.SyncSpinner
+import com.eskerra.go.feature.todayhub.TodayHubHeader
+import com.eskerra.go.feature.todayhub.TodayHubUiState
 
 /**
  * Floating navigation shell. It overlays controls on top of the current screen:
@@ -35,6 +39,7 @@ import com.eskerra.go.feature.sync.SyncSpinner
  *   spinning (and pull-to-refresh isn't already showing its own indicator), the Menu glyph itself
  *   is swapped for the rotating sync glyph, same color, same button — no separate badge dot
  * - an optional top-left floating Back button (note reader) sharing the hamburger's center line
+ * - the hub title/switcher on every route, offset to the right when Back is visible
  *
  * The shell owns no app state. It reports the menu overlay through [onMenuClick], and renders the
  * active screen edge-to-edge via [content]. Scrollable screens
@@ -44,6 +49,8 @@ import com.eskerra.go.feature.sync.SyncSpinner
 @Composable
 fun AppShell(
     syncIndicator: ShellSyncIndicatorState?,
+    todayHubState: TodayHubUiState,
+    onSelectHub: (NoteId) -> Unit,
     pullToRefreshActive: Boolean = false,
     shellInput: ShellInputPresentation? = null,
     onMenuClick: () -> Unit,
@@ -64,6 +71,20 @@ fun AppShell(
                 Modifier
                     .fillMaxSize()
                     .shellEdgeScrimOverlay()
+            )
+
+            TodayHubHeader(
+                state = todayHubState,
+                onSelectHub = onSelectHub,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .statusBarsPadding()
+                    .padding(
+                        start = if (onBack != null) 72.dp else 16.dp,
+                        end = 72.dp,
+                        top = ShellChromeButtonTop
+                    )
+                    .height(ShellTopChromeHeight)
             )
 
             if (onBack != null) {

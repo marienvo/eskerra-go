@@ -79,6 +79,8 @@ internal data class AppNavGraphContext(
     val appSyncViewModel: AppSyncViewModel,
     val syncState: SyncUiState,
     val homeReselectSignal: Int,
+    val pendingHubSelection: NoteId?,
+    val onHubSelectionHandled: () -> Unit,
     val inboxRefreshSignal: Int,
     val launchSettled: Boolean,
     val todayHubUiState: TodayHubUiState?,
@@ -144,6 +146,8 @@ internal fun NavGraphBuilder.homeGraph(ctx: AppNavGraphContext) {
                 onInboxUiStateChanged = ctx.onInboxUiStateChanged,
                 onTodayHubUiStateChanged = ctx.onTodayHubUiStateChanged,
                 homeReselectSignal = ctx.homeReselectSignal,
+                pendingHubSelection = ctx.pendingHubSelection,
+                onHubSelectionHandled = ctx.onHubSelectionHandled,
                 inboxRefreshSignal = ctx.inboxRefreshSignal,
                 launchSettled = ctx.launchSettled
             )

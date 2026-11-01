@@ -64,6 +64,8 @@ internal fun AppInboxRoute(
     onInboxUiStateChanged: (InboxUiState) -> Unit,
     onTodayHubUiStateChanged: (TodayHubUiState) -> Unit,
     homeReselectSignal: Int,
+    pendingHubSelection: NoteId?,
+    onHubSelectionHandled: () -> Unit,
     inboxRefreshSignal: Int,
     launchSettled: Boolean
 ) {
@@ -205,6 +207,13 @@ internal fun AppInboxRoute(
         }
     }
 
+    LaunchedEffect(pendingHubSelection) {
+        pendingHubSelection?.let { selected ->
+            todayHubViewModel.selectHub(selected)
+            onHubSelectionHandled()
+        }
+    }
+
     InboxScreen(
         state = inboxState,
         todayHubState = todayHubState,
@@ -228,7 +237,6 @@ internal fun AppInboxRoute(
         onClearSelection = inboxViewModel::clearSelection,
         onDeleteSelected = inboxViewModel::deleteSelected,
         onSnoozeSelected = inboxViewModel::snoozeSelected,
-        onSelectHub = todayHubViewModel::selectHub,
         scrollToTopSignal = scrollResetSignal,
         todayHubBody = {
             TodayHubBody(

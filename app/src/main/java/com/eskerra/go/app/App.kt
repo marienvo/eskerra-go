@@ -15,6 +15,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.ActiveTodayHubStore
 import com.eskerra.go.core.repository.SyncStateRepository
@@ -128,6 +129,7 @@ fun App(
     // Hub state and decides whether to snap to the current week). A route change can't carry this
     // because re-tapping Home does not navigate.
     var homeReselectSignal by remember { mutableIntStateOf(0) }
+    var pendingHubSelection by remember { mutableStateOf<NoteId?>(null) }
     var inboxRefreshSignal by remember { mutableIntStateOf(0) }
     // The hamburger menu is an overlay, not a NavHost destination: opening it must not navigate, so
     // the underlying route (wherever you were) stays put and closing it cannot jump back to Home.
@@ -198,6 +200,21 @@ fun App(
     val pullRefreshing by appSyncViewModel.pullRefreshing.collectAsState()
     AppShell(
         syncIndicator = syncIndicator,
+        todayHubState = todayHubUiState ?: TodayHubUiState.Loading,
+        onSelectHub = { selected ->
+            val activeHubId = (todayHubUiState as? TodayHubUiState.Content)?.activeHubId
+            if (selected != activeHubId) {
+                pendingHubSelection = selected
+            }
+            if (onInbox) {
+                if (selected == activeHubId) homeReselectSignal++
+            } else {
+                navController.navigate(AppRoute.INBOX) {
+                    popUpTo(AppRoute.HOME_GRAPH)
+                    launchSingleTop = true
+                }
+            }
+        },
         pullToRefreshActive = onInbox && pullRefreshing,
         shellInput = shellInputState.presentation,
         onMenuClick = { menuOpen = true },
@@ -218,6 +235,8 @@ fun App(
             appSyncViewModel = appSyncViewModel,
             syncState = syncState,
             homeReselectSignal = homeReselectSignal,
+            pendingHubSelection = pendingHubSelection,
+            onHubSelectionHandled = { pendingHubSelection = null },
             inboxRefreshSignal = inboxRefreshSignal,
             launchSettled = launchSettled,
             todayHubUiState = todayHubUiState,
