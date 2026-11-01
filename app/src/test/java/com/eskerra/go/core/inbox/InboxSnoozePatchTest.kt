@@ -17,12 +17,35 @@ class InboxSnoozePatchTest {
     }
 
     @Test
+    fun replacesOnlyValueAfterUnicodeAndKeepsComment() {
+        val input = "---\ntitle: \"\uD83D\uDE00\"\n'snoozed_until': old # keep\n---\nBody"
+        val output = "---\ntitle: \"\uD83D\uDE00\"\n'snoozed_until': " +
+            "\"2026-11-02T08:00:00Z\" # keep\n---\nBody"
+        assertEquals(output, InboxSnoozePatch.apply(input, until).getOrThrow())
+    }
+
+    @Test
+    fun rejectsSnoozeAliasInsteadOfChangingTheAnchor() {
+        val input = "---\nbase: &value old\nsnoozed_until: *value\n---\nBody"
+        assertTrue(InboxSnoozePatch.apply(input, until).isFailure)
+        assertTrue(
+            InboxSnoozePatch.apply(
+                "---\nsnoozed_until: &value old\nother: *value\n---\nBody",
+                until
+            ).isFailure
+        )
+    }
+
+    @Test
     fun addsFrontmatterAndRejectsUnsafeShapes() {
         assertEquals(
             "---\nsnoozed_until: \"2026-11-02T08:00:00Z\"\n---\nBody",
             InboxSnoozePatch.apply("Body", until).getOrThrow()
         )
-        assertTrue(InboxSnoozePatch.apply("---\ntags:\n  - one\n---\nBody", until).isFailure)
+        assertEquals(
+            "---\ntags:\n  - one\nsnoozed_until: \"2026-11-02T08:00:00Z\"\n---\nBody",
+            InboxSnoozePatch.apply("---\ntags:\n  - one\n---\nBody", until).getOrThrow()
+        )
         assertTrue(InboxSnoozePatch.apply("---\na: 1\na: 2\n---\nBody", until).isFailure)
         assertTrue(InboxSnoozePatch.apply("---\na: 1\nBody", until).isFailure)
     }

@@ -120,7 +120,10 @@ class NoteRegistrySnapshotCodecTest {
         val decoded = NoteRegistrySnapshotCodec.decode(legacyRaw, fingerprint)
 
         assertEquals(0L, decoded.notes.single().sizeBytes)
-        assertEquals(inboxNote, decoded.notes.single())
+        assertEquals(
+            inboxNote.copy(snoozedUntilEpochMillis = Long.MIN_VALUE),
+            decoded.notes.single()
+        )
     }
 
     @Test

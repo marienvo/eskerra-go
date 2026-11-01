@@ -1,7 +1,6 @@
 package com.eskerra.go.data.notes
 
 import com.eskerra.go.core.inbox.InboxNotePath
-import com.eskerra.go.core.inbox.InboxSnoozeFrontmatter
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NoteIndexError
 import com.eskerra.go.core.model.NoteIndexException
@@ -97,7 +96,7 @@ class MarkdownNoteScanner : NoteWorkspaceScanner {
                         ) {
                             previous.snoozedUntilEpochMillis
                         } else {
-                            InboxSnoozeFrontmatter.read(file.readText())?.toEpochMilli() ?: 0L
+                            InboxSnoozeMetadataReader.read(file)
                         }
 
                         summaries += NoteSummary(

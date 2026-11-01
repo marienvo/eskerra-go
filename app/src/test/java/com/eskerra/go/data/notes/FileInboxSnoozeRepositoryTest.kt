@@ -36,7 +36,7 @@ class FileInboxSnoozeRepositoryTest {
     fun unsafeFrontmatterLeavesFileUnchanged() = runBlocking {
         val root = temp.newFolder()
         val inbox = File(root, "vault/Inbox").apply { mkdirs() }
-        val original = "---\ntags:\n  - work\n---\nBody"
+        val original = "---\ntags: [broken\n---\nBody"
         val note = File(inbox, "note.md").apply { writeText(original) }
         val repo = FileInboxSnoozeRepository(GitSyncMutex())
         assertTrue(repo.snooze(config, root, NoteId("Inbox/note.md"), until).isFailure)
