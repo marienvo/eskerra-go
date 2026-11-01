@@ -98,7 +98,7 @@ class MainActivity : ComponentActivity() {
         val noteRegistryRepository = syncRuntime.noteRegistryRepository
         val noteContentCache = syncRuntime.noteContentCache
         val parsedMarkdownCache = ParsedMarkdownCache()
-        val noteWriteRepository = FileNoteWriteRepository(gitRepository)
+        val noteWriteRepository = FileNoteWriteRepository(gitRepository, syncRuntime.gitSyncMutex)
         val loadGitStatusSummary = LoadGitStatusSummary(gitRepository)
 
         val noteRegistryCache = syncRuntime.noteRegistryCache
