@@ -9,7 +9,9 @@ import com.eskerra.go.data.notes.FileNoteContentRepository
 import com.eskerra.go.data.sync.SyncRuntime
 import com.eskerra.go.data.todayhub.FileNoteflowRepository
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 /** Keeps snapshot failures separate from a successfully completed Git sync. */
 object PostSyncNotificationRefresh {
@@ -19,12 +21,42 @@ object PostSyncNotificationRefresh {
     fun enabled(context: Context): Boolean =
         context.getSharedPreferences(SETTINGS, Context.MODE_PRIVATE).getBoolean(ENABLED, false)
 
-    fun setEnabled(context: Context, value: Boolean) {
-        context.getSharedPreferences(
-            SETTINGS,
-            Context.MODE_PRIVATE
-        ).edit().putBoolean(ENABLED, value).apply()
-    }
+    suspend fun setEnabled(runtime: SyncRuntime, value: Boolean): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            val context = runtime.context ?: return@withContext Result.failure(
+                IllegalStateException("Application context unavailable")
+            )
+            try {
+                var changed = false
+                var hasRemote = false
+                runtime.gitSyncMutex.mutex.withLock {
+                    val config = runtime.workspaceStore.read()
+                    changed = enabled(context) != value
+                    hasRemote = config?.remoteUri?.isNotBlank() == true
+                    if (changed && config != null) {
+                        NotificationSnapshotStore(context).use {
+                            it.clearWorkspace(notificationWorkspaceKey(config))
+                        }
+                    }
+                    check(
+                        context.getSharedPreferences(SETTINGS, Context.MODE_PRIVATE)
+                            .edit().putBoolean(ENABLED, value).commit()
+                    )
+                    if (changed &&
+                        value &&
+                        hasRemote
+                    ) {
+                        runtime.syncStateRepository.markGenerationRequested()
+                    }
+                }
+                runtime.vaultSyncScheduler.reconcile()
+                Result.success(Unit)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                Result.failure(error)
+            }
+        }
 
     fun recordLocalChanges(context: Context, config: WorkspaceConfig, paths: Set<String>) {
         if (!enabled(context)) return
@@ -50,7 +82,7 @@ object PostSyncNotificationRefresh {
         if (!result.registryRefreshed || !enabled(context)) return
         try {
             runtime.gitSyncMutex.mutex.withLock {
-                if (runtime.workspaceStore.read() != config) return
+                if (!enabled(context) || runtime.workspaceStore.read() != config) return
                 val registry = runtime.noteRegistryCache.refresh(
                     config,
                     runtime.filesDir

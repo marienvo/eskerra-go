@@ -28,7 +28,8 @@ class VaultSyncWorker(context: Context, params: WorkerParameters) :
             setForegroundInfo = {
                 if (!inputData.getBoolean(KEY_BACKGROUND, false)) setForeground(it)
             },
-            attempt = runAttemptCount
+            attempt = runAttemptCount,
+            background = inputData.getBoolean(KEY_BACKGROUND, false)
         )
     }
 
@@ -41,6 +42,7 @@ class VaultSyncWorker(context: Context, params: WorkerParameters) :
             syncRuntime: SyncRuntime,
             setForegroundInfo: suspend (ForegroundInfo) -> Unit,
             attempt: Int = 0,
+            background: Boolean = false,
             syncRunner: suspend (
                 WorkspaceConfig,
                 File,
@@ -68,6 +70,13 @@ class VaultSyncWorker(context: Context, params: WorkerParameters) :
             val snapshotGeneration = currentRecord.requestedGeneration
             val config = syncRuntime.workspaceStore.read()
             if (config == null || config.remoteUri.isNullOrBlank()) {
+                if (background) {
+                    syncRuntime.syncStateRepository.markGenerationCompleted(
+                        snapshotGeneration,
+                        System.currentTimeMillis()
+                    )
+                    return@coroutineScope Result.success()
+                }
                 val error = SyncError.MissingRemoteConfig
                 syncRuntime.syncStateRepository.updateStatus(
                     DurableSyncStatus.Blocked(error.message())
@@ -106,9 +115,6 @@ class VaultSyncWorker(context: Context, params: WorkerParameters) :
 
                 syncResult.fold(
                     onSuccess = { result: SyncResult ->
-                        result.updatedConfig?.let { updated ->
-                            syncRuntime.workspaceStore.save(updated)
-                        }
                         syncRuntime.recordLastSyncAttempt.recordSuccess(result)
                         val completedAt = System.currentTimeMillis()
                         syncRuntime.syncStateRepository.markGenerationCompleted(

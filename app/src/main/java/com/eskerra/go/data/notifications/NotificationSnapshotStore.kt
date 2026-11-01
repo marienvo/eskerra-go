@@ -5,6 +5,7 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import com.eskerra.go.core.notifications.NotificationEvent
+import com.eskerra.go.core.notifications.NotificationEventMatching
 import com.eskerra.go.core.notifications.NotificationEventType
 import com.eskerra.go.core.notifications.NotificationEvents
 import org.json.JSONArray
@@ -46,6 +47,7 @@ class NotificationSnapshotStore(context: Context) :
                 .use { cursor -> if (cursor.moveToFirst()) cursor.getLong(0) else null }
             val previous = if (lastScan == null) null else readSnapshot(db, workspace)
             val due = NotificationEvents.newlyDue(previous, lastScan ?: 0L, events, now)
+            if (previous != null) migratePending(db, workspace, previous, events)
             db.delete("snapshot", "workspace = ?", arrayOf(workspace))
             for (event in events.distinctBy { it.key }) {
                 db.insertOrThrow("snapshot", null, values(workspace, event))
@@ -55,6 +57,7 @@ class NotificationSnapshotStore(context: Context) :
                     "(SELECT event_key FROM snapshot WHERE workspace = ? AND due_at != 9223372036854775807)",
                 arrayOf(workspace, workspace)
             )
+            db.delete("pending", "workspace = ? AND due_at > ?", arrayOf(workspace, now.toString()))
             for (event in due) {
                 insertIgnoringExisting(db, "pending", workspace, event)
             }
@@ -148,6 +151,19 @@ class NotificationSnapshotStore(context: Context) :
         }
     }
 
+    fun clearWorkspace(workspace: String) {
+        val db = writableDatabase
+        db.beginTransaction()
+        try {
+            for (table in listOf("pending", "snapshot", "scan_meta", "reminder_cache")) {
+                db.delete(table, "workspace = ?", arrayOf(workspace))
+            }
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+    }
+
     fun pending(workspace: String): List<NotificationEvent> = readEvents(
         readableDatabase,
         "pending",
@@ -191,6 +207,45 @@ class NotificationSnapshotStore(context: Context) :
                 }
             }
         return result
+    }
+
+    private fun migratePending(
+        db: SQLiteDatabase,
+        workspace: String,
+        previous: Map<String, NotificationEvent>,
+        current: List<NotificationEvent>
+    ) {
+        val matches = NotificationEventMatching.match(previous, current)
+        val pendingEvents = readEvents(db, "pending", workspace)
+        val pendingKeys = pendingEvents.keys
+        val currentGroups = current.mapNotNull { event ->
+            NotificationEventMatching.reminderGroup(event)?.let { it to event }
+        }.groupBy({ it.first }, { it.second })
+        for (event in current) {
+            val group = NotificationEventMatching.reminderGroup(event)
+            val fallback = if (group != null && currentGroups[group]?.size == 1) {
+                pendingEvents.values.firstOrNull {
+                    NotificationEventMatching.reminderGroup(it) ==
+                        group
+                }
+            } else {
+                null
+            }
+            val oldKey = (matches[event.key] ?: fallback)?.key ?: continue
+            if (oldKey !in pendingKeys) continue
+            if (oldKey == event.key) {
+                val updated = ContentValues().apply { put("due_at", event.dueAtEpochMillis) }
+                db.update(
+                    "pending",
+                    updated,
+                    "workspace = ? AND event_key = ?",
+                    arrayOf(workspace, oldKey)
+                )
+                continue
+            }
+            insertIgnoringExisting(db, "pending", workspace, event)
+            db.delete("pending", "workspace = ? AND event_key = ?", arrayOf(workspace, oldKey))
+        }
     }
 
     private fun insertIgnoringExisting(

@@ -1,15 +1,19 @@
 package com.eskerra.go.data.notifications
 
+import com.eskerra.go.core.inbox.InboxSnoozeFrontmatter
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NoteRegistry
+import com.eskerra.go.core.model.NoteSummary
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.notifications.DatedNoteNotificationCandidates
 import com.eskerra.go.core.notifications.InboxNotificationCandidates
+import com.eskerra.go.core.notifications.NotificationEvent
 import com.eskerra.go.core.notifications.ReminderCandidates
 import com.eskerra.go.core.repository.NoteContentRepository
 import com.eskerra.go.core.repository.NoteflowRepository
 import com.eskerra.go.core.todayhub.NoteflowDatedNotes
 import java.io.File
+import java.security.MessageDigest
 import java.time.ZoneId
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -40,42 +44,29 @@ class RefreshNotificationSnapshot(
                 NoteflowDatedNotes.select(registry, marker, today).map { it.noteId }
             }.toSet()
             val content = mutableMapOf<NoteId, String>()
-            val events = InboxNotificationCandidates.fromRegistry(registry).toMutableList()
+            val events = mutableListOf<NotificationEvent>()
+            val inbox = mutableListOf<NoteSummary>()
             for (note in registry.notes) {
-                val signature = listOf(
-                    note.lastModifiedEpochMillis,
-                    note.sizeBytes,
-                    note.inboxContentSha256.orEmpty(),
-                    localZone.id
-                ).joinToString(":")
-                val cached = store.cachedReminders(
-                    workspace,
-                    note.id.value,
-                    signature
-                )
-                if (cached == null || note.id in datedIds) {
-                    val markdown = notes.load(config, filesDir, note.id).getOrThrow().markdown
-                    if (note.id in datedIds) content[note.id] = markdown
-                    if (cached == null) {
-                        val reminders = ReminderCandidates.scan(
-                            note.id.value,
-                            markdown,
-                            localZone
-                        )
-                        store.cacheReminders(
-                            workspace,
-                            note.id.value,
-                            signature,
-                            reminders
-                        )
-                        events.addAll(reminders)
-                    } else {
-                        events.addAll(cached)
-                    }
+                val markdown = notes.load(config, filesDir, note.id).getOrThrow().markdown
+                if (note.id in datedIds) content[note.id] = markdown
+                if (note.isInbox) {
+                    val deadline = InboxSnoozeFrontmatter.read(markdown)?.toEpochMilli() ?: 0L
+                    inbox += note.copy(snoozedUntilEpochMillis = deadline)
+                }
+                val digest = MessageDigest.getInstance("SHA-256")
+                    .digest(markdown.toByteArray(Charsets.UTF_8))
+                    .joinToString("") { "%02x".format(it) }
+                val signature = "v2:${localZone.id}:$digest"
+                val cached = store.cachedReminders(workspace, note.id.value, signature)
+                if (cached == null) {
+                    val reminders = ReminderCandidates.scan(note.id.value, markdown, localZone)
+                    store.cacheReminders(workspace, note.id.value, signature, reminders)
+                    events.addAll(reminders)
                 } else {
                     events.addAll(cached)
                 }
             }
+            events += InboxNotificationCandidates.fromRegistry(NoteRegistry(inbox))
             events += DatedNoteNotificationCandidates.select(registry, markers, today, content)
             store.replaceSnapshot(workspace, events, at)
         }.onFailure { if (it is CancellationException) throw it }

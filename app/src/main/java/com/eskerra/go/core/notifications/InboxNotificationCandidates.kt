@@ -2,25 +2,29 @@ package com.eskerra.go.core.notifications
 
 import com.eskerra.go.core.model.NoteRegistry
 
-/** Builds stable inbox and snooze occurrence identities from a registry snapshot. */
+/** Retains inbox identity independently of an optional snooze occurrence. */
 object InboxNotificationCandidates {
     fun fromRegistry(registry: NoteRegistry): List<NotificationEvent> =
-        registry.inboxSummaries.map { note ->
+        registry.inboxSummaries.flatMap { note ->
             val snoozedUntil = note.snoozedUntilEpochMillis
+            val inbox = NotificationEvent(
+                key = "inbox:${note.id.value}",
+                noteId = note.id.value,
+                type = NotificationEventType.INBOX,
+                dueAtEpochMillis = if (snoozedUntil > 0L) Long.MAX_VALUE else 0L
+            )
             if (snoozedUntil > 0L) {
-                NotificationEvent(
-                    key = "snooze:${note.id.value}:$snoozedUntil",
-                    noteId = note.id.value,
-                    type = NotificationEventType.SNOOZE,
-                    dueAtEpochMillis = snoozedUntil
+                listOf(
+                    inbox,
+                    NotificationEvent(
+                        key = "snooze:${note.id.value}:$snoozedUntil",
+                        noteId = note.id.value,
+                        type = NotificationEventType.SNOOZE,
+                        dueAtEpochMillis = snoozedUntil
+                    )
                 )
             } else {
-                NotificationEvent(
-                    key = "inbox:${note.id.value}",
-                    noteId = note.id.value,
-                    type = NotificationEventType.INBOX,
-                    dueAtEpochMillis = 0L
-                )
+                listOf(inbox)
             }
         }
 }

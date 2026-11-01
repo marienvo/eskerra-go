@@ -56,6 +56,23 @@ class ManualSyncNotificationBoundaryTest {
         assertTrue("Inbox/new.md" in recorded)
         assertEquals(body, File(workspace, "Inbox/new.md").readText())
 
+        val staleSync = ManualSyncNow(
+            remoteSyncRepository = repository,
+            credentialStore = FakeCredentialStore(),
+            registryCache = NoteRegistryCache(FileNoteRegistryRepository()),
+            loadSyncStatus = LoadSyncStatus(repository),
+            isCurrentWorkspace = { false }
+        )
+        assertTrue(staleSync(config, filesDir).isFailure)
+        val unreadableConfigSync = ManualSyncNow(
+            remoteSyncRepository = repository,
+            credentialStore = FakeCredentialStore(),
+            registryCache = NoteRegistryCache(FileNoteRegistryRepository()),
+            loadSyncStatus = LoadSyncStatus(repository),
+            isCurrentWorkspace = { error("storage unavailable") }
+        )
+        assertTrue(unreadableConfigSync(config, filesDir).isFailure)
+
         git.writeFile(workspace, "Inbox/fail.md", body).getOrThrow()
         val failingSync = ManualSyncNow(
             remoteSyncRepository = repository,

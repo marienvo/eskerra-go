@@ -92,7 +92,8 @@ class MainActivity : ComponentActivity() {
         val setupCompletion = DefaultWorkspaceSetupCompletion(
             setupRepository = DefaultWorkspaceSetupRepository(gitRepository),
             workspaceStore = workspaceStore,
-            credentialStore = credentialStore
+            credentialStore = credentialStore,
+            gitSyncMutex = syncRuntime.gitSyncMutex
         )
 
         val noteRegistryRepository = syncRuntime.noteRegistryRepository
@@ -180,7 +181,9 @@ class MainActivity : ComponentActivity() {
         val remoteSyncSettingsRepository = DefaultRemoteSyncSettingsRepository(
             workspaceStore = workspaceStore,
             credentialStore = credentialStore,
-            remoteSyncRepository = remoteSyncRepository
+            remoteSyncRepository = remoteSyncRepository,
+            gitSyncMutex = syncRuntime.gitSyncMutex,
+            isCurrentWorkspace = { config -> workspaceStore.read() == config }
         )
         val loadRemoteSyncSettings = LoadRemoteSyncSettings(remoteSyncSettingsRepository)
         val saveRemoteSyncSettings = SaveRemoteSyncSettings(remoteSyncSettingsRepository)

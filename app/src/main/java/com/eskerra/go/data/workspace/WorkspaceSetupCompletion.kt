@@ -2,6 +2,8 @@ package com.eskerra.go.data.workspace
 
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.data.credentials.CredentialStore
+import com.eskerra.go.data.git.GitSyncMutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Completes Git setup and persists workspace metadata plus optional credentials.
@@ -21,7 +23,8 @@ interface WorkspaceSetupCompletion {
 class DefaultWorkspaceSetupCompletion(
     private val setupRepository: WorkspaceSetupRepository,
     private val workspaceStore: WorkspaceStore,
-    private val credentialStore: CredentialStore
+    private val credentialStore: CredentialStore,
+    private val gitSyncMutex: GitSyncMutex = GitSyncMutex()
 ) : WorkspaceSetupCompletion {
 
     override suspend fun completeAndPersist(
@@ -31,7 +34,7 @@ class DefaultWorkspaceSetupCompletion(
         remoteUri: String?,
         credential: String?,
         filesDir: java.io.File
-    ): Result<WorkspaceConfig> {
+    ): Result<WorkspaceConfig> = gitSyncMutex.mutex.withLock {
         val config = setupRepository.completeSetup(
             mode = mode,
             name = name,
@@ -39,7 +42,7 @@ class DefaultWorkspaceSetupCompletion(
             remoteUri = remoteUri,
             credential = credential,
             filesDir = filesDir
-        ).getOrElse { return Result.failure(it) }
+        ).getOrElse { return@withLock Result.failure(it) }
 
         val trimmedCredential = if (mode == WorkspaceSetupMode.Clone) {
             credential?.trim().orEmpty()
@@ -50,7 +53,7 @@ class DefaultWorkspaceSetupCompletion(
         if (trimmedCredential.isNotEmpty()) {
             credentialStore.saveToken(config.relativePath, trimmedCredential).getOrElse { _ ->
                 rollbackWorkspace(filesDir, config)
-                return Result.failure(
+                return@withLock Result.failure(
                     WorkspaceSetupException(WorkspaceSetupError.CredentialSaveFailed)
                 )
             }
@@ -58,13 +61,13 @@ class DefaultWorkspaceSetupCompletion(
         } else {
             credentialStore.clear(config.relativePath).getOrElse { _ ->
                 rollbackWorkspace(filesDir, config)
-                return Result.failure(
+                return@withLock Result.failure(
                     WorkspaceSetupException(WorkspaceSetupError.CredentialSaveFailed)
                 )
             }
         }
 
-        return try {
+        try {
             workspaceStore.save(config)
             Result.success(config)
         } catch (error: Exception) {

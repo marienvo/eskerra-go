@@ -42,4 +42,27 @@ class ReminderCandidatesTest {
             actual[0].dueAtEpochMillis
         )
     }
+
+    @Test
+    fun removingAnEarlierDuplicateKeepsTheOtherLineIdentity() {
+        val before = ReminderCandidates.scan(
+            "a.md",
+            "First @2026-11-01\nSecond @2026-11-01",
+            ZoneId.of("UTC")
+        )
+        val after = ReminderCandidates.scan("a.md", "Second @2026-11-01", ZoneId.of("UTC"))
+        val matches = NotificationEventMatching.match(before.associateBy { it.key }, after)
+        assertEquals(before[1], matches[after.single().key])
+    }
+
+    @Test
+    fun ambiguousIdenticalLinesAreReidentifiedWhenCountChanges() {
+        val before = ReminderCandidates.scan(
+            "a.md",
+            "Same @2026-11-01\nSame @2026-11-01",
+            ZoneId.of("UTC")
+        )
+        val after = ReminderCandidates.scan("a.md", "Same @2026-11-01", ZoneId.of("UTC"))
+        assertEquals(false, before.any { it.key == after.single().key })
+    }
 }

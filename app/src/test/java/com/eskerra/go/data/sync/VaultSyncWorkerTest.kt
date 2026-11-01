@@ -179,6 +179,20 @@ class VaultSyncWorkerTest {
     }
 
     @Test
+    fun backgroundSyncAfterDisconnectCompletesWithoutError() = runTest {
+        val filesDir = temp.newFolder("disconnected")
+        val (runtime, stateRepo, _) = createTestRuntime(
+            filesDir = filesDir,
+            config = WorkspaceConfig("test", "vault", null, "main", 0L),
+            initialRecord = DurableSyncRecord(requestedGeneration = 1L, completedGeneration = 0L)
+        )
+        val result = VaultSyncWorker.performSync(runtime, setForegroundInfo = {}, background = true)
+        assertEquals(Result.success(), result)
+        assertFalse(stateRepo.getRecord().isPending)
+        assertTrue(stateRepo.getRecord().status is DurableSyncStatus.Synced)
+    }
+
+    @Test
     fun successfulSync_advancesCompletedGenerationAndSetsSynced() = runTest {
         val (runtime, stateRepo, scheduler) = cloneSeededWorkspace()
 

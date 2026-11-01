@@ -8,15 +8,20 @@ import com.eskerra.go.core.repository.RemoteSyncRepository
 import com.eskerra.go.core.repository.RemoteSyncSettingsRepository
 import com.eskerra.go.data.credentials.CredentialStore
 import com.eskerra.go.data.git.GitBranchNameValidator
+import com.eskerra.go.data.git.GitSyncMutex
 import com.eskerra.go.data.git.SyncGitErrorMapper
 import java.io.File
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 class DefaultRemoteSyncSettingsRepository(
     private val workspaceStore: WorkspaceStore,
     private val credentialStore: CredentialStore,
-    private val remoteSyncRepository: RemoteSyncRepository
+    private val remoteSyncRepository: RemoteSyncRepository,
+    private val gitSyncMutex: GitSyncMutex = GitSyncMutex(),
+    private val isCurrentWorkspace: suspend (WorkspaceConfig) -> Boolean = { true }
 ) : RemoteSyncSettingsRepository {
 
     override suspend fun readSettings(config: WorkspaceConfig): RemoteSyncSettings {
@@ -39,127 +44,142 @@ class DefaultRemoteSyncSettingsRepository(
         replacementToken: String?,
         filesDir: File
     ): Result<WorkspaceConfig> = withContext(Dispatchers.IO) {
-        val workspaceDir = resolveWorkspace(filesDir, config.relativePath).getOrElse {
-            return@withContext Result.failure(it)
-        }
-
-        val sanitizedUri = remoteUri.trim()
-        if (sanitizedUri.isBlank()) {
-            return@withContext Result.failure(
-                RemoteSyncSettingsException(RemoteSyncSettingsError.MissingRemoteUri)
-            )
-        }
-        if (RemoteUriSecurity.containsEmbeddedCredentials(sanitizedUri)) {
-            return@withContext Result.failure(
-                RemoteSyncSettingsException(RemoteSyncSettingsError.InvalidRemoteUri)
-            )
-        }
-        if (!RemoteUriSecurity.isSupportedRemoteScheme(sanitizedUri)) {
-            return@withContext Result.failure(
-                RemoteSyncSettingsException(RemoteSyncSettingsError.UnsupportedRemoteScheme)
-            )
-        }
-
-        val trimmedBranch = branch.trim()
-        if (GitBranchNameValidator.validate(trimmedBranch).isFailure) {
-            return@withContext Result.failure(
-                RemoteSyncSettingsException(RemoteSyncSettingsError.InvalidBranch)
-            )
-        }
-
-        val httpsToken = resolveHttpsToken(
-            relativePath = config.relativePath,
-            remoteUri = sanitizedUri,
-            previousRemoteUri = config.remoteUri,
-            replacementToken = replacementToken?.trim().orEmpty()
-        ).getOrElse { return@withContext Result.failure(it) }
-
-        val previousOriginUrl = remoteSyncRepository.readOriginUrl(workspaceDir).getOrNull()
-        val previousToken = credentialStore.readToken(config.relativePath).getOrNull()
-        val replacement = replacementToken?.trim().orEmpty()
-        val shouldPersistToken = httpsToken != null && replacement.isNotEmpty()
-
-        remoteSyncRepository
-            .configureSanitizedOrigin(workspaceDir, sanitizedUri)
-            .getOrElse { error ->
-                return@withContext Result.failure(mapGitFailure(error, trimmedBranch))
-            }
-
-        val effectiveBranch = remoteSyncRepository
-            .ensureLocalBranch(workspaceDir, trimmedBranch, httpsToken)
-            .getOrElse { error ->
-                restoreOrigin(workspaceDir, previousOriginUrl)
-                return@withContext Result.failure(mapGitFailure(error, trimmedBranch))
-            }
-
-        val updated = config.copy(
-            remoteUri = sanitizedUri,
-            branch = effectiveBranch
-        )
-        try {
-            workspaceStore.save(updated)
-        } catch (_: Exception) {
-            restoreOrigin(workspaceDir, previousOriginUrl)
-            return@withContext Result.failure(
-                RemoteSyncSettingsException(RemoteSyncSettingsError.MetadataSaveFailed)
-            )
-        }
-
-        if (shouldPersistToken) {
-            credentialStore.saveToken(config.relativePath, httpsToken).getOrElse {
-                rollbackSavedSettings(config, workspaceDir, previousOriginUrl, previousToken)
+        gitSyncMutex.mutex.withLock {
+            if (!isCurrentSafely(config)) {
                 return@withContext Result.failure(
-                    RemoteSyncSettingsException(RemoteSyncSettingsError.CredentialSaveFailed)
+                    RemoteSyncSettingsException(RemoteSyncSettingsError.WorkspaceUnavailable)
                 )
             }
-        }
+            val workspaceDir = resolveWorkspace(filesDir, config.relativePath).getOrElse {
+                return@withContext Result.failure(it)
+            }
 
-        Result.success(updated)
-    }
+            val sanitizedUri = remoteUri.trim()
+            if (sanitizedUri.isBlank()) {
+                return@withContext Result.failure(
+                    RemoteSyncSettingsException(RemoteSyncSettingsError.MissingRemoteUri)
+                )
+            }
+            if (RemoteUriSecurity.containsEmbeddedCredentials(sanitizedUri)) {
+                return@withContext Result.failure(
+                    RemoteSyncSettingsException(RemoteSyncSettingsError.InvalidRemoteUri)
+                )
+            }
+            if (!RemoteUriSecurity.isSupportedRemoteScheme(sanitizedUri)) {
+                return@withContext Result.failure(
+                    RemoteSyncSettingsException(RemoteSyncSettingsError.UnsupportedRemoteScheme)
+                )
+            }
 
-    override suspend fun replaceToken(relativePath: String, token: String): Result<Unit> {
-        val trimmed = token.trim()
-        if (trimmed.isBlank()) {
-            return Result.failure(
-                RemoteSyncSettingsException(RemoteSyncSettingsError.MissingCredential)
+            val trimmedBranch = branch.trim()
+            if (GitBranchNameValidator.validate(trimmedBranch).isFailure) {
+                return@withContext Result.failure(
+                    RemoteSyncSettingsException(RemoteSyncSettingsError.InvalidBranch)
+                )
+            }
+
+            val httpsToken = resolveHttpsToken(
+                relativePath = config.relativePath,
+                remoteUri = sanitizedUri,
+                previousRemoteUri = config.remoteUri,
+                replacementToken = replacementToken?.trim().orEmpty()
+            ).getOrElse { return@withContext Result.failure(it) }
+
+            val previousOriginUrl = remoteSyncRepository.readOriginUrl(workspaceDir).getOrNull()
+            val previousToken = credentialStore.readToken(config.relativePath).getOrNull()
+            val replacement = replacementToken?.trim().orEmpty()
+            val shouldPersistToken = httpsToken != null && replacement.isNotEmpty()
+
+            remoteSyncRepository
+                .configureSanitizedOrigin(workspaceDir, sanitizedUri)
+                .getOrElse { error ->
+                    return@withContext Result.failure(mapGitFailure(error, trimmedBranch))
+                }
+
+            val effectiveBranch = remoteSyncRepository
+                .ensureLocalBranch(workspaceDir, trimmedBranch, httpsToken)
+                .getOrElse { error ->
+                    restoreOrigin(workspaceDir, previousOriginUrl)
+                    return@withContext Result.failure(mapGitFailure(error, trimmedBranch))
+                }
+
+            val updated = config.copy(
+                remoteUri = sanitizedUri,
+                branch = effectiveBranch
             )
+            try {
+                workspaceStore.save(updated)
+            } catch (_: Exception) {
+                restoreOrigin(workspaceDir, previousOriginUrl)
+                return@withContext Result.failure(
+                    RemoteSyncSettingsException(RemoteSyncSettingsError.MetadataSaveFailed)
+                )
+            }
+
+            if (shouldPersistToken) {
+                credentialStore.saveToken(config.relativePath, httpsToken).getOrElse {
+                    rollbackSavedSettings(config, workspaceDir, previousOriginUrl, previousToken)
+                    return@withContext Result.failure(
+                        RemoteSyncSettingsException(RemoteSyncSettingsError.CredentialSaveFailed)
+                    )
+                }
+            }
+
+            Result.success(updated)
         }
-        return credentialStore.saveToken(relativePath, trimmed)
     }
+
+    override suspend fun replaceToken(relativePath: String, token: String): Result<Unit> =
+        gitSyncMutex.mutex.withLock {
+            val trimmed = token.trim()
+            if (trimmed.isBlank()) {
+                return@withLock Result.failure(
+                    RemoteSyncSettingsException(RemoteSyncSettingsError.MissingCredential)
+                )
+            }
+            credentialStore.saveToken(relativePath, trimmed)
+        }
 
     override suspend fun clearSettings(
         config: WorkspaceConfig,
         filesDir: File
     ): Result<WorkspaceConfig> = withContext(Dispatchers.IO) {
-        val workspaceDir = resolveWorkspace(filesDir, config.relativePath).getOrElse {
-            return@withContext Result.failure(it)
-        }
-        val cleared = config.copy(remoteUri = null)
-        val previousOriginUrl = remoteSyncRepository.readOriginUrl(workspaceDir).getOrNull()
-        val previousToken = credentialStore.readToken(config.relativePath).getOrNull()
-
-        remoteSyncRepository.clearSanitizedOrigin(workspaceDir).getOrElse {
-            return@withContext Result.failure(
-                RemoteSyncSettingsException(
-                    RemoteSyncSettingsError.GitFailed("Could not clear remote sync settings.")
+        gitSyncMutex.mutex.withLock {
+            if (!isCurrentSafely(config)) {
+                return@withContext Result.failure(
+                    RemoteSyncSettingsException(RemoteSyncSettingsError.WorkspaceUnavailable)
                 )
-            )
+            }
+            val workspaceDir = resolveWorkspace(filesDir, config.relativePath).getOrElse {
+                return@withContext Result.failure(it)
+            }
+            val cleared = config.copy(remoteUri = null)
+            val previousOriginUrl = remoteSyncRepository.readOriginUrl(workspaceDir).getOrNull()
+            val previousToken = credentialStore.readToken(config.relativePath).getOrNull()
+
+            remoteSyncRepository.clearSanitizedOrigin(workspaceDir).getOrElse {
+                return@withContext Result.failure(
+                    RemoteSyncSettingsException(
+                        RemoteSyncSettingsError.GitFailed("Could not clear remote sync settings.")
+                    )
+                )
+            }
+            credentialStore.clear(config.relativePath).getOrElse {
+                rollbackSavedSettings(config, workspaceDir, previousOriginUrl, previousToken)
+                return@withContext Result.failure(
+                    RemoteSyncSettingsException(RemoteSyncSettingsError.CredentialSaveFailed)
+                )
+            }
+            try {
+                workspaceStore.save(cleared)
+            } catch (_: Exception) {
+                rollbackSavedSettings(config, workspaceDir, previousOriginUrl, previousToken)
+                return@withContext Result.failure(
+                    RemoteSyncSettingsException(RemoteSyncSettingsError.MetadataSaveFailed)
+                )
+            }
+            Result.success(cleared)
         }
-        credentialStore.clear(config.relativePath).getOrElse {
-            rollbackSavedSettings(config, workspaceDir, previousOriginUrl, previousToken)
-            return@withContext Result.failure(
-                RemoteSyncSettingsException(RemoteSyncSettingsError.CredentialSaveFailed)
-            )
-        }
-        try {
-            workspaceStore.save(cleared)
-        } catch (_: Exception) {
-            rollbackSavedSettings(config, workspaceDir, previousOriginUrl, previousToken)
-            return@withContext Result.failure(
-                RemoteSyncSettingsException(RemoteSyncSettingsError.MetadataSaveFailed)
-            )
-        }
-        Result.success(cleared)
     }
 
     override suspend fun testConnection(
@@ -208,6 +228,14 @@ class DefaultRemoteSyncSettingsRepository(
                 }
             Result.success(Unit)
         }
+    }
+
+    private suspend fun isCurrentSafely(config: WorkspaceConfig): Boolean = try {
+        isCurrentWorkspace(config)
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: Exception) {
+        false
     }
 
     private suspend fun resolveHttpsToken(

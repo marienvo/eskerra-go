@@ -19,8 +19,9 @@ object NotificationEvents {
         now: Long
     ): List<NotificationEvent> {
         if (previous == null) return emptyList()
+        val matches = NotificationEventMatching.match(previous, current)
         return current.distinctBy { it.key }.filter { event ->
-            val old = previous[event.key]
+            val old = matches[event.key]
             event.dueAtEpochMillis <= now &&
                 if (old != null) {
                     old.dueAtEpochMillis != Long.MAX_VALUE && old.dueAtEpochMillis > previousScanAt

@@ -53,9 +53,59 @@ class RefreshNotificationSnapshotTest {
             )
         assertTrue(refresh.refresh(config, File("."), registry).isSuccess)
         assertTrue(refresh.refresh(config, File("."), registry).isSuccess)
-        assertEquals(1, reads)
+        assertEquals(2, reads)
         assertEquals(2, store.published.size)
         assertEquals(2, store.published.last().size)
+    }
+
+    @Test
+    fun changedContentWithSameMetadataRefreshesSnoozeAndReminders() = runTest {
+        val store = FakeStore()
+        var body = "---\nsnoozed_until: \"2026-11-02T08:00:00Z\"\n---\n@2026-11-02_0900"
+        val notes = object : NoteContentRepository {
+            override suspend fun load(
+                config: WorkspaceConfig,
+                filesDir: File,
+                noteId: NoteId
+            ): Result<NoteContent> = Result.success(
+                NoteContent(noteId, NotePath.fromRelativePath(noteId.value).getOrThrow(), body)
+            )
+        }
+        val refresh =
+            RefreshNotificationSnapshot(
+                notes,
+                NoteflowRepository { _, _ ->
+                    Result.success(emptyList())
+                },
+                store,
+                { 1L },
+                { ZoneId.of("UTC") }
+            )
+        assertTrue(refresh.refresh(config, File("."), registry).isSuccess)
+        val before = store.published.last()
+        body = body.replace("08:00", "09:00").replace("_0900", "_1000")
+        assertTrue(refresh.refresh(config, File("."), registry).isSuccess)
+        val after = store.published.last()
+        assertTrue(
+            before.single {
+                it.type ==
+                    com.eskerra.go.core.notifications.NotificationEventType.SNOOZE
+            }.key !=
+                after.single {
+                    it.type ==
+                        com.eskerra.go.core.notifications.NotificationEventType.SNOOZE
+                }.key
+        )
+        assertTrue(
+            before.single {
+                it.type ==
+                    com.eskerra.go.core.notifications.NotificationEventType.REMINDER
+            }.key !=
+                after.single {
+                    it.type ==
+                        com.eskerra.go.core.notifications.NotificationEventType.REMINDER
+                }.key
+        )
     }
 
     @Test

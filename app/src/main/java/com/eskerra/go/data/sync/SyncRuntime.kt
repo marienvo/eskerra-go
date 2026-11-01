@@ -107,7 +107,8 @@ class SyncRuntime(
                 gitSyncMutex = gitSyncMutex,
                 recordLocalChanges = { config, paths ->
                     PostSyncNotificationRefresh.recordLocalChanges(context, config, paths)
-                }
+                },
+                isCurrentWorkspace = { config -> workspaceStore.read() == config }
             )
 
             val vaultSyncScheduler = WorkManagerVaultSyncScheduler(

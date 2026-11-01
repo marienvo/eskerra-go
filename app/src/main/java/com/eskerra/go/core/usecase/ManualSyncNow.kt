@@ -43,7 +43,8 @@ class ManualSyncNow(
     private val clock: () -> Instant = Instant::now,
     private val zoneId: ZoneId = ZoneId.systemDefault(),
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
-    private val recordLocalChanges: suspend (WorkspaceConfig, Set<String>) -> Unit = { _, _ -> }
+    private val recordLocalChanges: suspend (WorkspaceConfig, Set<String>) -> Unit = { _, _ -> },
+    private val isCurrentWorkspace: suspend (WorkspaceConfig) -> Boolean = { true }
 ) {
 
     suspend operator fun invoke(
@@ -55,6 +56,18 @@ class ManualSyncNow(
             return@withContext Result.failure(SyncException(SyncError.SyncAlreadyRunning))
         }
         try {
+            val isCurrent = try {
+                isCurrentWorkspace(config)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                return@withContext Result.failure(
+                    SyncException(SyncError.GitFailed("Workspace configuration unavailable."))
+                )
+            }
+            if (!isCurrent) {
+                return@withContext Result.failure(SyncException(SyncError.SyncAlreadyRunning))
+            }
             val resolvedConfig = reconcileWorkspaceSyncBranch
                 ?.reconcileWithoutLock(config, filesDir)
                 ?.getOrElse { return@withContext Result.failure(it) }
