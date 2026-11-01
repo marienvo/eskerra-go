@@ -49,6 +49,7 @@ object PostSyncNotificationRefresh {
                         runtime.syncStateRepository.markGenerationRequested()
                     }
                 }
+                if (!value) NotificationAlarmScheduler(context).cancel()
                 runtime.vaultSyncScheduler.reconcile()
                 Result.success(Unit)
             } catch (cancelled: CancellationException) {
@@ -95,6 +96,7 @@ object PostSyncNotificationRefresh {
                     ).refresh(config, runtime.filesDir, registry).getOrThrow()
                 }
             }
+            runtime.notificationAlarmCoordinator?.reconcile(config)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {

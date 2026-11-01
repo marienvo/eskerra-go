@@ -17,13 +17,13 @@ class R2BinaryObjectClient(
     private val clock: () -> Instant = Instant::now
 ) {
 
-    /** Lists every object under [BINARIES_PREFIX], following `ListObjectsV2` pagination. */
-    fun list(config: R2Config): List<R2BinaryObject> {
+    /** Lists every object under [prefix], following `ListObjectsV2` pagination. */
+    fun list(config: R2Config, prefix: String = BINARIES_PREFIX): List<R2BinaryObject> {
         val collected = mutableListOf<R2BinaryObject>()
         var continuationToken: String? = null
         do {
             val request =
-                buildSignedListRequest(config, clock(), BINARIES_PREFIX, continuationToken)
+                buildSignedListRequest(config, clock(), prefix, continuationToken)
             httpClient.newCall(request).execute().use { response ->
                 val body = response.body?.string().orEmpty()
                 if (!response.isSuccessful) {
@@ -38,6 +38,19 @@ class R2BinaryObjectClient(
             }
         } while (continuationToken != null)
         return collected
+    }
+
+    fun readText(config: R2Config, key: String): String {
+        val request = buildSignedObjectRequest(config, "GET", key, clock())
+        httpClient.newCall(request).execute().use { response ->
+            val body = response.body?.string().orEmpty()
+            if (!response.isSuccessful) {
+                throw R2ObjectException(
+                    R2ErrorFormatter.format(R2Verb.READ, response.code, body, key)
+                )
+            }
+            return body
+        }
     }
 
     /** Downloads object [key] to [dest] via a temp file, then atomically renames it. */
