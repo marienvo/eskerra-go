@@ -106,13 +106,13 @@ or quiet placeholders while **launch settled** continues to gate deferred work.
 
 1. App gate is not `Loading` (`NeedsSetup` or `Ready`).
 2. When `Ready`, inbox UI is `Content`, `Empty`, or `Error` — not full-screen `Loading`.
-3. When `Ready`, Today Hub UI is `Content`, `Empty`, or `Error` — not `Loading` (wired via `onTodayHubUiStateChanged` from [AppInboxRoute.kt](app/src/main/java/com/eskerra/go/app/AppInboxRoute.kt) through [AppRoot.kt](app/src/main/java/com/eskerra/go/app/AppRoot.kt)).
+3. When `Ready`, Today Hub UI is `Content`, `Empty`, or `Error` — not `Loading` (wired via `onTodayHubUiStateChanged` from the shared Today Hub owner in [App.kt](app/src/main/java/com/eskerra/go/app/App.kt) through [AppRoot.kt](app/src/main/java/com/eskerra/go/app/AppRoot.kt)).
 4. At least one layout frame has passed (`awaitFrame()`), plus a minimum hold of ~150ms to avoid subliminal flicker on fast devices.
 
 Implementation:
 
 - [MainActivity.kt](app/src/main/java/com/eskerra/go/MainActivity.kt) — `setKeepOnScreenCondition` releases at the input-ready trace mark; setup still releases through launch settlement.
-- [TodayHubViewModel.restoreSnapshot()](app/src/main/java/com/eskerra/go/feature/todayhub/TodayHubViewModel.kt) paints a persisted Today Hub snapshot even when the note registry has not restored yet; it uses an empty temporary registry until background revalidation supplies link-resolution data.
+- [TodayHubViewModel.restoreSnapshot()](app/src/main/java/com/eskerra/go/feature/todayhub/TodayHubViewModel.kt) paints a persisted Today Hub snapshot even when the note registry has not restored yet; it uses an empty temporary registry until background revalidation supplies link-resolution data. A notification's resolved hub selection queues until `AppTodayHubEffects` starts the deferred refresh after settlement and a frame; a later selection cancels the older default load, so notification activation adds no pre-settlement registry or marker scan and cannot be overwritten by that older load.
 - Gate `Loading` renders an empty surface (no spinner); splash covers it.
 - Shell sync FAB maps `SyncUiState.Loading` to no indicator (quiet shell refresh per [sync-hardening-and-recovery.md](sync-hardening-and-recovery.md)).
 - Inbox background rescan uses debounced `showRefreshIndicator` (~300ms) so fast cache-hit refreshes stay silent. “No reflow” holds only when the relevant snapshots exist.

@@ -30,9 +30,12 @@ Future events use `AlarmManager` exact, idle-tolerant alarms when permission is 
 inexact idle-tolerant fallback otherwise. Boot, package replacement, clock and time-zone changes
 reconcile the persisted queue. Deliverable occurrences are acknowledged only after Android accepts
 their visible notification. A single occurrence opens its note directly through the existing note
-route. Simultaneous occurrences share one expandable notification whose content intent opens an
-in-app note picker; each picker row opens the corresponding note. If notification permission is
-missing, occurrences stay queued for a later reconciliation.
+route with an explicit notification source. Simultaneous occurrences share one expandable
+notification whose content intent opens an in-app note picker; each picker row opens the
+corresponding note with that same source. When the opened note is a dated note, the existing hub
+resolver activates its owning Noteflow; non-dated notes leave the active hub unchanged. This needs
+no notification event or database schema metadata. If notification permission is missing,
+occurrences stay queued for a later reconciliation.
 
 Sync and scanning share the Git mutex to avoid capturing partially integrated or locally written
 notes. The first scan reads every indexed note and `.flow` discovery walks the vault; later scans
