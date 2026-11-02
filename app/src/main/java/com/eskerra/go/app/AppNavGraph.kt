@@ -18,7 +18,6 @@ import androidx.navigation.navigation
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.ActiveTodayHubStore
-import com.eskerra.go.core.repository.TodayHubSnapshotStore
 import com.eskerra.go.core.usecase.ClearRemoteSyncSettings
 import com.eskerra.go.core.usecase.DeleteInboxNotes
 import com.eskerra.go.core.usecase.EnsureDeviceInstanceId
@@ -30,7 +29,6 @@ import com.eskerra.go.core.usecase.LoadLocalSettings
 import com.eskerra.go.core.usecase.LoadNoteForReading
 import com.eskerra.go.core.usecase.LoadRemoteSyncSettings
 import com.eskerra.go.core.usecase.LoadTodayHub
-import com.eskerra.go.core.usecase.LoadTodayHubRow
 import com.eskerra.go.core.usecase.LoadVaultSettings
 import com.eskerra.go.core.usecase.MaintainVaultSearchIndex
 import com.eskerra.go.core.usecase.NotePrefetchScheduler
@@ -62,6 +60,7 @@ import com.eskerra.go.feature.sync.SyncSettingsViewModel
 import com.eskerra.go.feature.sync.SyncUiState
 import com.eskerra.go.feature.sync.VaultSettingsViewModel
 import com.eskerra.go.feature.todayhub.TodayHubUiState
+import com.eskerra.go.feature.todayhub.TodayHubViewModel
 import com.eskerra.go.ui.markdown.AmbiguousWikiLinkSheet
 import com.eskerra.go.ui.markdown.LocalParsedMarkdownCache
 import java.io.File
@@ -81,11 +80,10 @@ internal data class AppNavGraphContext(
     val syncState: SyncUiState,
     val homeReselectSignal: Int,
     val onSelectHub: (NoteId) -> Unit,
-    val pendingHubSelection: NoteId?,
-    val onHubSelectionHandled: () -> Unit,
     val inboxRefreshSignal: Int,
     val launchSettled: Boolean,
-    val todayHubUiState: TodayHubUiState?,
+    val todayHubViewModel: TodayHubViewModel,
+    val todayHubUiState: TodayHubUiState,
     val loadInboxSummaries: LoadInboxSummariesCached,
     val loadNoteForReading: LoadNoteForReading,
     val notePrefetchScheduler: NotePrefetchScheduler,
@@ -96,9 +94,7 @@ internal data class AppNavGraphContext(
     val saveNote: SaveNote,
     val loadGitStatusSummary: LoadGitStatusSummary,
     val loadTodayHub: LoadTodayHub,
-    val loadTodayHubRow: LoadTodayHubRow,
     val activeTodayHubStore: ActiveTodayHubStore,
-    val todayHubSnapshotStore: TodayHubSnapshotStore,
     val loadRemoteSyncSettings: LoadRemoteSyncSettings,
     val saveRemoteSyncSettings: SaveRemoteSyncSettings,
     val clearRemoteSyncSettings: ClearRemoteSyncSettings,
@@ -120,8 +116,7 @@ internal data class AppNavGraphContext(
     val onNotificationsEnabledChange: (Boolean) -> Unit,
     val markInboxNotesChanged: () -> Unit,
     val onConfigUpdated: (WorkspaceConfig) -> Unit,
-    val onInboxUiStateChanged: (InboxUiState) -> Unit,
-    val onTodayHubUiStateChanged: (TodayHubUiState) -> Unit
+    val onInboxUiStateChanged: (InboxUiState) -> Unit
 )
 
 internal fun NavGraphBuilder.homeGraph(ctx: AppNavGraphContext) {
@@ -133,10 +128,9 @@ internal fun NavGraphBuilder.homeGraph(ctx: AppNavGraphContext) {
                 loadInboxSummaries = ctx.loadInboxSummaries,
                 deleteInboxNotes = ctx.deleteInboxNotes,
                 snoozeInboxNotes = ctx.snoozeInboxNotes,
-                loadTodayHub = ctx.loadTodayHub,
-                loadTodayHubRow = ctx.loadTodayHubRow,
+                todayHubViewModel = ctx.todayHubViewModel,
+                todayHubState = ctx.todayHubUiState,
                 activeTodayHubStore = ctx.activeTodayHubStore,
-                todayHubSnapshotStore = ctx.todayHubSnapshotStore,
                 warmNote = ctx.warmNote,
                 noteOpenGate = ctx.noteOpenGate,
                 workspaceRoot = ctx.workspaceRoot,
@@ -146,11 +140,8 @@ internal fun NavGraphBuilder.homeGraph(ctx: AppNavGraphContext) {
                 appSyncViewModel = ctx.appSyncViewModel,
                 touchVaultSearchPaths = ctx.touchVaultSearchPaths,
                 onInboxUiStateChanged = ctx.onInboxUiStateChanged,
-                onTodayHubUiStateChanged = ctx.onTodayHubUiStateChanged,
                 homeReselectSignal = ctx.homeReselectSignal,
                 onSelectHub = ctx.onSelectHub,
-                pendingHubSelection = ctx.pendingHubSelection,
-                onHubSelectionHandled = ctx.onHubSelectionHandled,
                 inboxRefreshSignal = ctx.inboxRefreshSignal,
                 launchSettled = ctx.launchSettled
             )
@@ -168,7 +159,6 @@ internal fun NavGraphBuilder.sharedDestinations(ctx: AppNavGraphContext) {
             }
         )
     ) { entry ->
-        // Seed the shared view model when the route carries a pre-filled query (deep links, back stack).
         AppSearchRoute(
             currentConfig = ctx.currentConfig,
             filesDir = ctx.filesDir,
@@ -254,21 +244,23 @@ internal fun NavGraphBuilder.sharedDestinations(ctx: AppNavGraphContext) {
     opaqueComposable(AppRoute.NOTIFICATION_LIST) {
         NotificationListScreen(
             noteIds = ctx.notificationOpenRequest.noteIds,
-            onOpenNote = { ctx.navController.navigate(AppRoute.note(NoteId(it))) }
+            onOpenNote = { ctx.navController.navigate(AppRoute.notificationNote(NoteId(it))) }
         )
     }
 
     opaqueComposable(
         route = AppRoute.NOTE_PATTERN,
         arguments = listOf(
-            navArgument(AppRoute.NOTE_ARG) { type = NavType.StringType }
+            navArgument(AppRoute.NOTE_ARG) { type = NavType.StringType },
+            navArgument(AppRoute.NOTE_SOURCE_ARG) {
+                type = NavType.StringType
+                defaultValue = NoteOpenSource.IN_APP.routeValue
+            }
         )
     ) { entry ->
         val noteRouteScope = rememberCoroutineScope()
         val raw = entry.arguments?.getString(AppRoute.NOTE_ARG).orEmpty()
         val noteId = AppRoute.decodeNoteId(raw)
-        // Same instance the shared markdown renderers read from (provided at the AppRoot level), so
-        // a warm parse (from a prior visit or from prefetch) is visible here too.
         val parsedMarkdownCache = LocalParsedMarkdownCache.current
         val noteReaderViewModel: NoteReaderViewModel = viewModel(
             factory = NoteReaderViewModel.factory(
@@ -290,11 +282,16 @@ internal fun NavGraphBuilder.sharedDestinations(ctx: AppNavGraphContext) {
 
         val noteReaderContext = LocalContext.current
         var ambiguousCandidates by remember { mutableStateOf<List<NoteId>?>(null) }
+        val notificationOpen = AppRoute.isNotificationNoteSource(
+            entry.arguments?.getString(AppRoute.NOTE_SOURCE_ARG)
+        )
         val datedHeader = datedNoteHeader(
             ctx,
             noteId,
             (readerState as? NoteReaderUiState.Content)?.document,
-            ctx.todayHubUiState as? TodayHubUiState.Content
+            ctx.todayHubUiState as? TodayHubUiState.Content,
+            notificationOpen,
+            ctx.todayHubViewModel::selectHubFromNotification
         )
 
         CompositionLocalProvider(LocalDatedHeader provides datedHeader) {

@@ -1,16 +1,19 @@
 package com.eskerra.go.app
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.withFrameNanos
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NoteReaderDocument
+import com.eskerra.go.core.model.NoteRegistry
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.todayhub.DatedNoteHeader
 import com.eskerra.go.core.todayhub.NoteflowDatedNotes
 import com.eskerra.go.core.todayhub.TodayHubDatedLink
+import com.eskerra.go.core.todayhub.TodayHubRef
 import com.eskerra.go.feature.todayhub.TodayHubUiState
 import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
@@ -31,14 +34,26 @@ internal fun datedNoteHeader(
     ctx: AppNavGraphContext,
     noteId: NoteId,
     document: NoteReaderDocument?,
-    hub: TodayHubUiState.Content?
+    hub: TodayHubUiState.Content?,
+    notificationOpen: Boolean,
+    onNotificationHub: (NoteId) -> Unit
 ): DatedNoteHeader? {
-    val resolved = resolveDatedNoteHeader(ctx, noteId, document, hub)
-    val targetIsDated = hub?.hubs?.any {
-        NoteflowDatedNotes.neighbours(hub.registry, it.noteId, noteId) != null
-    } == true
+    val marker = hub?.let {
+        datedNoteMarker(it.hubs, document?.registry ?: it.registry, noteId)
+    }
+    LaunchedEffect(notificationOpen, noteId, marker) {
+        if (notificationOpen && marker != null) onNotificationHub(marker)
+    }
+    val resolved = resolveDatedNoteHeader(ctx, noteId, document, hub, marker)
+    val targetIsDated = marker != null
     val previous = ctx.datedHeaderRetention.previous
-    val retained = datedHeaderForNavigation(resolved, previous, noteId, targetIsDated)
+    val retained = datedHeaderForNavigation(
+        resolved,
+        previous,
+        noteId,
+        targetIsDated,
+        retainPrevious = !notificationOpen
+    )
     SideEffect {
         ctx.datedHeaderRetention.previous = retained
     }
@@ -50,15 +65,9 @@ private fun resolveDatedNoteHeader(
     ctx: AppNavGraphContext,
     noteId: NoteId,
     document: NoteReaderDocument?,
-    hub: TodayHubUiState.Content?
+    hub: TodayHubUiState.Content?,
+    marker: NoteId?
 ): DatedNoteHeader? {
-    val marker = if (hub != null && document != null) {
-        hub.hubs.firstOrNull {
-            NoteflowDatedNotes.neighbours(document.registry, it.noteId, noteId) != null
-        }?.noteId
-    } else {
-        null
-    }
     val neighbours = if (marker != null && document != null) {
         NoteflowDatedNotes.neighbours(document.registry, marker, noteId)
     } else {
@@ -102,14 +111,27 @@ private fun resolveDatedNoteHeader(
     )
 }
 
+internal fun datedNoteMarker(
+    hubs: List<TodayHubRef>,
+    registry: NoteRegistry,
+    noteId: NoteId
+): NoteId? = hubs.firstOrNull {
+    NoteflowDatedNotes.neighbours(registry, it.noteId, noteId) != null
+}?.noteId
+
 internal fun datedHeaderForNavigation(
     resolved: DatedNoteHeader?,
     previous: DatedNoteHeader?,
     target: NoteId,
-    targetIsDated: Boolean = false
-): DatedNoteHeader? = resolved ?: previous?.takeIf {
-    targetIsDated ||
-        target == it.previous ||
-        target == it.next ||
-        it.links.any { link -> link.noteId == target }
+    targetIsDated: Boolean = false,
+    retainPrevious: Boolean = true
+): DatedNoteHeader? = if (!retainPrevious) {
+    resolved
+} else {
+    resolved ?: previous?.takeIf {
+        targetIsDated ||
+            target == it.previous ||
+            target == it.next ||
+            it.links.any { link -> link.noteId == target }
+    }
 }

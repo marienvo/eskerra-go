@@ -62,6 +62,7 @@ import com.eskerra.go.feature.note.LocalNoteWorkspaceHeader
 import com.eskerra.go.feature.note.NoteWorkspaceHeader
 import com.eskerra.go.feature.sync.AppSyncViewModel
 import com.eskerra.go.feature.todayhub.TodayHubUiState
+import com.eskerra.go.feature.todayhub.TodayHubViewModel
 import java.io.File
 
 /** Root composable. Owns the navigation graph and wires ViewModels to stateless feature screens. */
@@ -115,7 +116,6 @@ fun App(
     readConfig: suspend () -> WorkspaceConfig? = { null },
     onConfigUpdated: (WorkspaceConfig) -> Unit,
     onInboxUiStateChanged: (InboxUiState) -> Unit = {},
-    todayHubUiState: TodayHubUiState? = null,
     onTodayHubUiStateChanged: (TodayHubUiState) -> Unit = {}
 ) {
     var currentConfig by remember(config) { mutableStateOf(config) }
@@ -127,17 +127,10 @@ fun App(
     val noteOpenGate = remember { NoteOpenGate() }
     val datedHeaderRetention = remember { DatedNoteHeaderRetention() }
     val backStackEntry by navController.currentBackStackEntryAsState()
-    val currentDestination = backStackEntry?.destination
-    val currentRoute = currentDestination?.route
-    // Bumped on each Home tap while already on the inbox; the inbox route reacts (it owns the Today
-    // Hub state and decides whether to snap to the current week). A route change can't carry this
-    // because re-tapping Home does not navigate.
+    val currentRoute = backStackEntry?.destination?.route
     var homeReselectSignal by remember { mutableIntStateOf(0) }
-    var pendingHubSelection by remember { mutableStateOf<NoteId?>(null) }
     var hubPickerVisible by remember { mutableStateOf(false) }
     var inboxRefreshSignal by remember { mutableIntStateOf(0) }
-    // The hamburger menu is an overlay, not a NavHost destination: opening it must not navigate, so
-    // the underlying route (wherever you were) stays put and closing it cannot jump back to Home.
     var menuOpen by remember { mutableStateOf(false) }
     val markInboxNotesChanged: () -> Unit = {
         navController.markInboxNotesChanged()
@@ -163,12 +156,27 @@ fun App(
     )
     val syncState by appSyncViewModel.uiState.collectAsState()
     val remoteConfigured = !currentConfig.remoteUri.isNullOrBlank()
-
+    val todayHubViewModel: TodayHubViewModel = viewModel(
+        key = todayHubViewModelKey(currentConfig.remoteUri),
+        factory = TodayHubViewModel.factory(
+            config = currentConfig,
+            filesDir = filesDir,
+            loadTodayHub = loadTodayHub,
+            loadTodayHubRow = loadTodayHubRow,
+            activeTodayHubStore = activeTodayHubStore,
+            todayHubSnapshotStore = todayHubSnapshotStore
+        )
+    )
+    val todayHubState by todayHubViewModel.uiState.collectAsState()
+    LaunchedEffect(todayHubState) {
+        onTodayHubUiStateChanged(todayHubState)
+    }
+    AppTodayHubEffects(todayHubViewModel, launchSettled)
     AppBootEffects(
         config = currentConfig,
         filesDir = filesDir,
         launchSettled = launchSettled,
-        todayHubUiState = todayHubUiState,
+        todayHubUiState = todayHubState,
         notePrefetchScheduler = notePrefetchScheduler,
         reconcileWorkspaceSyncBranch = reconcileWorkspaceSyncBranch,
         appSyncViewModel = appSyncViewModel,
@@ -204,9 +212,9 @@ fun App(
     val onInbox = currentRoute == AppRoute.INBOX || currentRoute == null
     val pullRefreshing by appSyncViewModel.pullRefreshing.collectAsState()
     val onSelectHub: (NoteId) -> Unit = { selected ->
-        val activeHubId = (todayHubUiState as? TodayHubUiState.Content)?.activeHubId
+        val activeHubId = (todayHubState as? TodayHubUiState.Content)?.activeHubId
         if (selected != activeHubId) {
-            pendingHubSelection = selected
+            todayHubViewModel.selectHub(selected)
         }
         if (onInbox) {
             if (selected == activeHubId) homeReselectSignal++
@@ -224,7 +232,7 @@ fun App(
         } else {
             null
         },
-        onWorkspaceSwitch = if (onInbox && todayHubUiState.canSwitchHub()) {
+        onWorkspaceSwitch = if (onInbox && todayHubState.canSwitchHub()) {
             { hubPickerVisible = true }
         } else {
             null
@@ -243,11 +251,10 @@ fun App(
             syncState = syncState,
             homeReselectSignal = homeReselectSignal,
             onSelectHub = onSelectHub,
-            pendingHubSelection = pendingHubSelection,
-            onHubSelectionHandled = { pendingHubSelection = null },
             inboxRefreshSignal = inboxRefreshSignal,
             launchSettled = launchSettled,
-            todayHubUiState = todayHubUiState,
+            todayHubViewModel = todayHubViewModel,
+            todayHubUiState = todayHubState,
             loadInboxSummaries = loadInboxSummaries,
             loadNoteForReading = loadNoteForReading,
             notePrefetchScheduler = notePrefetchScheduler,
@@ -258,9 +265,7 @@ fun App(
             saveNote = saveNote,
             loadGitStatusSummary = loadGitStatusSummary,
             loadTodayHub = loadTodayHub,
-            loadTodayHubRow = loadTodayHubRow,
             activeTodayHubStore = activeTodayHubStore,
-            todayHubSnapshotStore = todayHubSnapshotStore,
             loadRemoteSyncSettings = loadRemoteSyncSettings,
             saveRemoteSyncSettings = saveRemoteSyncSettings,
             clearRemoteSyncSettings = clearRemoteSyncSettings,
@@ -285,12 +290,11 @@ fun App(
                 currentConfig = updated
                 onConfigUpdated(updated)
             },
-            onInboxUiStateChanged = onInboxUiStateChanged,
-            onTodayHubUiStateChanged = onTodayHubUiStateChanged
+            onInboxUiStateChanged = onInboxUiStateChanged
         )
         CompositionLocalProvider(
             LocalNoteWorkspaceHeader provides NoteWorkspaceHeader(
-                state = todayHubUiState ?: TodayHubUiState.Loading,
+                state = todayHubState,
                 onSelectHub = onSelectHub
             )
         ) {
@@ -312,7 +316,7 @@ fun App(
     LaunchedEffect(notificationOpenRequest) {
         val ids = notificationOpenRequest.noteIds
         if (ids.size == 1) {
-            navController.navigate(AppRoute.note(com.eskerra.go.core.model.NoteId(ids.single())))
+            navController.navigate(AppRoute.notificationNote(NoteId(ids.single())))
         } else if (ids.isNotEmpty()) {
             navController.navigate(AppRoute.NOTIFICATION_LIST)
         }
@@ -320,7 +324,7 @@ fun App(
 
     AppHubPicker(
         visible = hubPickerVisible,
-        state = todayHubUiState,
+        state = todayHubState,
         onSelectHub = onSelectHub,
         onDismiss = { hubPickerVisible = false }
     )

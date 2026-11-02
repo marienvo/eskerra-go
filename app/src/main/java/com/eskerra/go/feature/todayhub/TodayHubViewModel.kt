@@ -53,6 +53,8 @@ class TodayHubViewModel(
     private var loadJob: Job? = null
     private var rowJob: Job? = null
     private var loadedDay: LocalDate? = null
+    private var pendingNotificationHub: NoteId? = null
+    private var deferredRefreshStarted = false
 
     /** Resolved hub context plus the navigation window derived from it. */
     private data class Loaded(
@@ -70,11 +72,21 @@ class TodayHubViewModel(
         }
     }
 
-    fun startDeferredRefresh() = load(
-        preferredHubId = null,
-        restoreFromStore = true,
-        restoreSnapshotFirst = _uiState.value is TodayHubUiState.Loading
-    )
+    fun startDeferredRefresh() {
+        deferredRefreshStarted = true
+        val preferred = pendingNotificationHub
+        pendingNotificationHub = null
+        load(
+            preferredHubId = preferred,
+            restoreFromStore = preferred == null,
+            restoreSnapshotFirst = _uiState.value is TodayHubUiState.Loading
+        )
+    }
+
+    fun selectHubFromNotification(noteId: NoteId) {
+        if (deferredRefreshStarted) return selectHub(noteId)
+        pendingNotificationHub = noteId
+    }
 
     fun refreshOnDayChange() {
         if (loadedDay != null && loadedDay != today()) retry()

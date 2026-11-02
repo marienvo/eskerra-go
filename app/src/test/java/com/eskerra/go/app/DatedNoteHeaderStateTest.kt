@@ -1,8 +1,12 @@
 package com.eskerra.go.app
 
 import com.eskerra.go.core.model.NoteId
+import com.eskerra.go.core.model.NoteRegistry
+import com.eskerra.go.core.model.NoteSummary
 import com.eskerra.go.core.todayhub.DatedNoteHeader
 import com.eskerra.go.core.todayhub.TodayHubDatedLink
+import com.eskerra.go.core.todayhub.TodayHubRef
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Test
@@ -44,5 +48,33 @@ class DatedNoteHeaderStateTest {
         val resolved = header.copy(current = next, dateLabel = "2026-11-02")
 
         assertSame(resolved, datedHeaderForNavigation(resolved, header, next))
+    }
+
+    @Test
+    fun datedHeaderForNavigation_notificationOpen_doesNotRetainPreviousHub() {
+        assertNull(
+            datedHeaderForNavigation(
+                null,
+                header,
+                current,
+                targetIsDated = true,
+                retainPrevious = false
+            )
+        )
+    }
+
+    @Test
+    fun datedNoteMarker_resolvesOwningHubAndIgnoresNonDatedNotes() {
+        val work = NoteId("Work/.flow")
+        val home = NoteId("Home/.flow")
+        val dated = NoteId("Home/Daily/2026-11-01.md")
+        val registry = NoteRegistry.fromNotes(
+            listOf(NoteSummary(dated, "Daily", "", false))
+        )
+        val hubs = listOf(TodayHubRef(work, "Work"), TodayHubRef(home, "Home"))
+
+        assertEquals(home, datedNoteMarker(hubs, registry, dated))
+        assertNull(datedNoteMarker(hubs, registry, NoteId("Home/Inbox/note.md")))
+        assertNull(datedNoteMarker(hubs, registry, NoteId("Home/Daily/missing.md")))
     }
 }
