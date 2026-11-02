@@ -16,6 +16,20 @@ class AppRouteTest {
     }
 
     @Test
+    fun notificationNoteRouteCarriesItsSource() {
+        val noteId = NoteId("Flow/Work/2026-11-01.md")
+        val route = AppRoute.note(noteId, NoteOpenSource.NOTIFICATION)
+
+        assertEquals(
+            "note/${NoteRouteCodec.encode(noteId.value)}?source=notification",
+            route
+        )
+        assertTrue(AppRoute.isNotificationNoteSource(NoteOpenSource.NOTIFICATION.routeValue))
+        assertFalse(AppRoute.isNotificationNoteSource(NoteOpenSource.IN_APP.routeValue))
+        assertFalse(AppRoute.isNotificationNoteSource(null))
+    }
+
+    @Test
     fun editorRouteDelegatesToNoteRouteCodec() {
         val noteId = NoteId("Inbox/First.md")
         val expected = "editor/${NoteRouteCodec.encode(noteId.value)}"

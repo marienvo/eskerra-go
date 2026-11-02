@@ -168,7 +168,6 @@ internal fun NavGraphBuilder.sharedDestinations(ctx: AppNavGraphContext) {
             }
         )
     ) { entry ->
-        // Seed the shared view model when the route carries a pre-filled query (deep links, back stack).
         AppSearchRoute(
             currentConfig = ctx.currentConfig,
             filesDir = ctx.filesDir,
@@ -254,21 +253,23 @@ internal fun NavGraphBuilder.sharedDestinations(ctx: AppNavGraphContext) {
     opaqueComposable(AppRoute.NOTIFICATION_LIST) {
         NotificationListScreen(
             noteIds = ctx.notificationOpenRequest.noteIds,
-            onOpenNote = { ctx.navController.navigate(AppRoute.note(NoteId(it))) }
+            onOpenNote = { ctx.navController.navigate(AppRoute.notificationNote(NoteId(it))) }
         )
     }
 
     opaqueComposable(
         route = AppRoute.NOTE_PATTERN,
         arguments = listOf(
-            navArgument(AppRoute.NOTE_ARG) { type = NavType.StringType }
+            navArgument(AppRoute.NOTE_ARG) { type = NavType.StringType },
+            navArgument(AppRoute.NOTE_SOURCE_ARG) {
+                type = NavType.StringType
+                defaultValue = NoteOpenSource.IN_APP.routeValue
+            }
         )
     ) { entry ->
         val noteRouteScope = rememberCoroutineScope()
         val raw = entry.arguments?.getString(AppRoute.NOTE_ARG).orEmpty()
         val noteId = AppRoute.decodeNoteId(raw)
-        // Same instance the shared markdown renderers read from (provided at the AppRoot level), so
-        // a warm parse (from a prior visit or from prefetch) is visible here too.
         val parsedMarkdownCache = LocalParsedMarkdownCache.current
         val noteReaderViewModel: NoteReaderViewModel = viewModel(
             factory = NoteReaderViewModel.factory(

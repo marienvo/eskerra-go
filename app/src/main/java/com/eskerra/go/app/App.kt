@@ -312,7 +312,9 @@ fun App(
     LaunchedEffect(notificationOpenRequest) {
         val ids = notificationOpenRequest.noteIds
         if (ids.size == 1) {
-            navController.navigate(AppRoute.note(com.eskerra.go.core.model.NoteId(ids.single())))
+            navController.navigate(
+                AppRoute.notificationNote(com.eskerra.go.core.model.NoteId(ids.single()))
+            )
         } else if (ids.isNotEmpty()) {
             navController.navigate(AppRoute.NOTIFICATION_LIST)
         }
