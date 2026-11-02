@@ -282,11 +282,16 @@ internal fun NavGraphBuilder.sharedDestinations(ctx: AppNavGraphContext) {
 
         val noteReaderContext = LocalContext.current
         var ambiguousCandidates by remember { mutableStateOf<List<NoteId>?>(null) }
+        val notificationOpen = AppRoute.isNotificationNoteSource(
+            entry.arguments?.getString(AppRoute.NOTE_SOURCE_ARG)
+        )
         val datedHeader = datedNoteHeader(
             ctx,
             noteId,
             (readerState as? NoteReaderUiState.Content)?.document,
-            ctx.todayHubUiState as? TodayHubUiState.Content
+            ctx.todayHubUiState as? TodayHubUiState.Content,
+            notificationOpen,
+            ctx.todayHubViewModel::selectHubFromNotification
         )
 
         CompositionLocalProvider(LocalDatedHeader provides datedHeader) {
