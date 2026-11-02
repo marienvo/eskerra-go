@@ -23,12 +23,9 @@ import androidx.navigation.NavHostController
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.ActiveTodayHubStore
-import com.eskerra.go.core.repository.TodayHubSnapshotStore
 import com.eskerra.go.core.todayhub.TodayHubDiscovery
 import com.eskerra.go.core.usecase.DeleteInboxNotes
 import com.eskerra.go.core.usecase.LoadInboxSummariesCached
-import com.eskerra.go.core.usecase.LoadTodayHub
-import com.eskerra.go.core.usecase.LoadTodayHubRow
 import com.eskerra.go.core.usecase.SnoozeInboxNotes
 import com.eskerra.go.core.usecase.TouchVaultSearchPaths
 import com.eskerra.go.core.usecase.WarmNote
@@ -49,10 +46,9 @@ internal fun AppInboxRoute(
     loadInboxSummaries: LoadInboxSummariesCached,
     deleteInboxNotes: DeleteInboxNotes,
     snoozeInboxNotes: SnoozeInboxNotes,
-    loadTodayHub: LoadTodayHub,
-    loadTodayHubRow: LoadTodayHubRow,
+    todayHubViewModel: TodayHubViewModel,
+    todayHubState: TodayHubUiState,
     activeTodayHubStore: ActiveTodayHubStore,
-    todayHubSnapshotStore: TodayHubSnapshotStore,
     warmNote: WarmNote,
     noteOpenGate: NoteOpenGate,
     workspaceRoot: File?,
@@ -62,11 +58,8 @@ internal fun AppInboxRoute(
     appSyncViewModel: AppSyncViewModel,
     touchVaultSearchPaths: TouchVaultSearchPaths,
     onInboxUiStateChanged: (InboxUiState) -> Unit,
-    onTodayHubUiStateChanged: (TodayHubUiState) -> Unit,
     homeReselectSignal: Int,
     onSelectHub: (NoteId) -> Unit,
-    pendingHubSelection: NoteId?,
-    onHubSelectionHandled: () -> Unit,
     inboxRefreshSignal: Int,
     launchSettled: Boolean
 ) {
@@ -97,41 +90,11 @@ internal fun AppInboxRoute(
         )
     )
     inboxViewModel.configureSnooze(snoozeInboxNotes)
-    val todayHubViewModel: TodayHubViewModel = viewModel(
-        key = todayHubViewModelKey(currentConfig.remoteUri),
-        factory = TodayHubViewModel.factory(
-            config = currentConfig,
-            filesDir = filesDir,
-            loadTodayHub = loadTodayHub,
-            loadTodayHubRow = loadTodayHubRow,
-            activeTodayHubStore = activeTodayHubStore,
-            todayHubSnapshotStore = todayHubSnapshotStore
-        )
-    )
     LaunchedEffect(launchSettled) {
         if (launchSettled) {
             androidx.compose.runtime.withFrameNanos { }
             loadInboxSummaries.onLaunchSettled()
-            todayHubViewModel.startDeferredRefresh()
         }
-    }
-    LaunchedEffect(todayHubViewModel) {
-        while (true) {
-            kotlinx.coroutines.delay(60_000)
-            todayHubViewModel.refreshOnDayChange()
-        }
-    }
-    DisposableEffect(todayHubViewModel, launchSettled) {
-        var accepting = false
-        val observer = LifecycleEventObserver { _, event ->
-            if (accepting && launchSettled && event == Lifecycle.Event.ON_START) {
-                todayHubViewModel.retry()
-            }
-        }
-        val lifecycle = ProcessLifecycleOwner.get().lifecycle
-        lifecycle.addObserver(observer)
-        accepting = true
-        onDispose { lifecycle.removeObserver(observer) }
     }
 
     DisposableEffect(inboxViewModel, currentRoute) {
@@ -155,14 +118,10 @@ internal fun AppInboxRoute(
     val selectedNoteIds by inboxViewModel.selectedNoteIds.collectAsState()
     val isDeleting by inboxViewModel.isDeleting.collectAsState()
     val deleteError by inboxViewModel.deleteError.collectAsState()
-    val todayHubState by todayHubViewModel.uiState.collectAsState()
     val pullRefreshing by appSyncViewModel.pullRefreshing.collectAsState()
 
     LaunchedEffect(inboxState) {
         onInboxUiStateChanged(inboxState)
-    }
-    LaunchedEffect(todayHubState) {
-        onTodayHubUiStateChanged(todayHubState)
     }
 
     // Keep the inbox scoped to the hub currently shown below it: switching hubs via the picker
@@ -205,13 +164,6 @@ internal fun AppInboxRoute(
             if (todayHubViewModel.resetToCurrentWeek()) {
                 scrollResetSignal++
             }
-        }
-    }
-
-    LaunchedEffect(pendingHubSelection) {
-        pendingHubSelection?.let { selected ->
-            todayHubViewModel.selectHub(selected)
-            onHubSelectionHandled()
         }
     }
 

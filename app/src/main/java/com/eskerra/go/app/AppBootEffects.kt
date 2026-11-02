@@ -18,6 +18,7 @@ import com.eskerra.go.data.perf.NoteNavTrace
 import com.eskerra.go.feature.sync.AppSyncViewModel
 import com.eskerra.go.feature.todayhub.TodayHubPrefetchTargets
 import com.eskerra.go.feature.todayhub.TodayHubUiState
+import com.eskerra.go.feature.todayhub.TodayHubViewModel
 import com.eskerra.go.ui.markdown.LocalParsedMarkdownCache
 import java.io.File
 import kotlinx.coroutines.delay
@@ -151,3 +152,31 @@ internal fun shouldSubmitHomePrefetch(
     launchSettled: Boolean,
     todayHubContent: TodayHubUiState.Content?
 ): Boolean = launchSettled && todayHubContent != null
+
+@Composable
+internal fun AppTodayHubEffects(todayHubViewModel: TodayHubViewModel, launchSettled: Boolean) {
+    LaunchedEffect(launchSettled) {
+        if (launchSettled) {
+            withFrameNanos { }
+            todayHubViewModel.startDeferredRefresh()
+        }
+    }
+    LaunchedEffect(todayHubViewModel) {
+        while (true) {
+            delay(60_000)
+            todayHubViewModel.refreshOnDayChange()
+        }
+    }
+    DisposableEffect(todayHubViewModel, launchSettled) {
+        var accepting = false
+        val observer = LifecycleEventObserver { _, event ->
+            if (accepting && launchSettled && event == Lifecycle.Event.ON_START) {
+                todayHubViewModel.retry()
+            }
+        }
+        val lifecycle = ProcessLifecycleOwner.get().lifecycle
+        lifecycle.addObserver(observer)
+        accepting = true
+        onDispose { lifecycle.removeObserver(observer) }
+    }
+}
