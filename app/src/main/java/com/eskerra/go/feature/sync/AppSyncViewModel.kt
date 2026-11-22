@@ -263,7 +263,10 @@ class AppSyncViewModel(
     }
 
     /** Sole entry point for current and future foreground automatic sync triggers. */
-    fun requestAutoSync(onGenerationRequested: (Long) -> Unit = {}) {
+    fun requestAutoSync(
+        onGenerationRequested: (Long) -> Unit = {},
+        onUnavailable: () -> Unit = {}
+    ) {
         ensureObservingDurableState()
         viewModelScope.launch {
             if (config.remoteUri.isNullOrBlank()) {
@@ -272,6 +275,7 @@ class AppSyncViewModel(
             }
             val preflight = buildSyncPreflight(config)
             if (!preflight.canSync) {
+                onUnavailable()
                 refreshLocalStatusQuietly()
                 return@launch
             }

@@ -122,15 +122,25 @@ internal fun NavGraphBuilder.noteReaderGraph(ctx: AppNavGraphContext) {
                 },
                 onToggleDatedReadStatus = {
                     noteReaderViewModel.toggleDatedNoteReadStatus {
+                        ctx.todayHubViewModel.retry()
                         ctx.scope.touchVaultSearchPathsAsync(
                             ctx.touchVaultSearchPaths,
                             ctx.currentConfig,
                             ctx.filesDir,
                             listOf(noteId.value)
                         )
-                        ctx.appSyncViewModel.requestAutoSync { generation ->
-                            readStatusSyncGeneration = generation
-                        }
+                        ctx.appSyncViewModel.requestAutoSync(
+                            onGenerationRequested = { generation ->
+                                readStatusSyncGeneration = generation
+                            },
+                            onUnavailable = {
+                                Toast.makeText(
+                                    noteReaderContext,
+                                    "Read status is saved locally, but has not synced yet.",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        )
                     }
                 },
                 readStatusSyncing = readStatusSyncing,

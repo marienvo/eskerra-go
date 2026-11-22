@@ -14,8 +14,8 @@ process-wide mutex live in `data/git`, reached through `core/usecase`; see
 - `AppSyncViewModel.kt` — app-scoped sync state: runs vault sync, feeds the
   shell indicator, and owns `requestAutoSync()`, the single entry point for
   every automatic trigger (boot, foreground return, note write). Its optional
-  generation callback lets the dated-note reader track its own write through
-  durable sync completion without owning sync state itself.
+  generation and unavailable callbacks let the dated-note reader track its own
+  write through durable sync completion without owning sync state itself.
 - `BinariesViewModel.kt` — the "Downloaded binaries" tile: lists on-device
   binaries and runs their manual sync.
 - `SyncSettingsViewModel.kt` — remote URI, branch, and replacement token;

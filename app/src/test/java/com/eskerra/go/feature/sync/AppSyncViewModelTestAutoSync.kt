@@ -88,10 +88,12 @@ class AppSyncViewModelTestAutoSync {
             var observedGeneration = 0L
             var scheduledCountAtCallback = -1
 
-            viewModel.requestAutoSync { generation ->
-                observedGeneration = generation
-                scheduledCountAtCallback = scheduler.scheduledCount
-            }
+            viewModel.requestAutoSync(
+                onGenerationRequested = { generation ->
+                    observedGeneration = generation
+                    scheduledCountAtCallback = scheduler.scheduledCount
+                }
+            )
             advanceUntilIdle()
 
             assertEquals(1L, observedGeneration)
@@ -103,7 +105,7 @@ class AppSyncViewModelTestAutoSync {
     }
 
     @Test
-    fun blockedPreflight_doesNotSyncOrEmitError() = runTest {
+    fun blockedPreflight_reportsUnavailableWithoutSyncing() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         try {
             val syncStateRepo = FakeSyncStateRepository()
@@ -113,10 +115,12 @@ class AppSyncViewModelTestAutoSync {
                 syncStateRepository = syncStateRepo,
                 vaultSyncScheduler = scheduler
             )
+            var unavailable = 0
 
-            viewModel.requestAutoSync()
+            viewModel.requestAutoSync(onUnavailable = { unavailable++ })
             advanceUntilIdle()
 
+            assertEquals(1, unavailable)
             assertEquals(0, scheduler.scheduledCount)
             assertEquals(0L, syncStateRepo.getRecord().requestedGeneration)
             assertTrue(viewModel.uiState.value is SyncUiState.Ready)
