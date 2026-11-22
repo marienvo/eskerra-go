@@ -24,7 +24,7 @@ Architecture style (hybrid layering + feature slices) and placement rules for ne
 - ViewModels depend on repositories or use cases, not Android Context.
 - Git operations live only in `data/git`.
 - Markdown parsing and wiki-link resolution live outside UI.
-- Inbox editability is a domain rule: inbox notes editable, all other notes read-only.
+- Inbox editability is a domain rule: inbox notes editable, all other notes read-only except the dedicated dated-note first-H1 read-status toggle.
 - **Git sync channels** (see [`specs/architecture/sync-hardening-and-recovery.md`](specs/architecture/sync-hardening-and-recovery.md)):
   - Vault sync (`ManualSyncNow`): commits all safe local changes, auto-merges on divergence with conflict sidecars, recovers interrupted Git ops before proceeding. Triggered by the sync button **and by every note write** (create/save/delete), **on boot**, and **on every foreground return**, via `AppSyncViewModel.requestAutoSync()`, which coalesces concurrent requests and fails silently to the `"!"` badge.
   - All git mutations share one mutex.
