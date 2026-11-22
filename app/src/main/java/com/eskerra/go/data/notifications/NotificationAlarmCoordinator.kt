@@ -92,6 +92,10 @@ class NotificationAlarmCoordinator(
             schedules.any { it.dueAtEpochMillis <= now }
         if (hasNewDueWork && !desktopChecked) {
             activity = loadDesktopActivity(config, filesDir)
+            if (!canDeliver(config)) {
+                scheduler.cancel()
+                return
+            }
             now = clock()
             localZone = zone()
             today = java.time.Instant.ofEpochMilli(now).atZone(localZone).toLocalDate()
@@ -122,13 +126,23 @@ class NotificationAlarmCoordinator(
             deliverFirstDated(config, workspace, event, today.toString())
         }
         val bundled = deliverable.filterNot { it.type == NotificationEventType.DATED_NOTE }
-        if (bundled.isNotEmpty() && delivery.deliver(bundled)) {
-            for (event in bundled) acknowledge(workspace, event)
+        if (bundled.isNotEmpty()) {
+            if (!canDeliver(config)) {
+                scheduler.cancel()
+                return
+            }
+            if (delivery.deliver(bundled)) {
+                for (event in bundled) acknowledge(workspace, event)
+            }
         }
         if (activity.first != DesktopActivityStatus.Unavailable) {
             for (schedule in schedules.filter { it.dueAtEpochMillis <= now }) {
                 deliverDaily(config, workspace, schedule, activity.second)
             }
+        }
+        if (!canDeliver(config)) {
+            scheduler.cancel()
+            return
         }
         now = clock()
         localZone = zone()
