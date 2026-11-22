@@ -6,10 +6,10 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 
-class NotificationAlarmScheduler(private val context: Context) {
+class NotificationAlarmScheduler(private val context: Context) : NotificationAlarmScheduling {
     private val alarmManager = context.getSystemService(AlarmManager::class.java)
 
-    fun schedule(atEpochMillis: Long) {
+    override fun schedule(atEpochMillis: Long) {
         val intent = pendingIntent()
         try {
             if (Build.VERSION.SDK_INT < 31 || alarmManager.canScheduleExactAlarms()) {
@@ -26,7 +26,7 @@ class NotificationAlarmScheduler(private val context: Context) {
         }
     }
 
-    fun cancel() {
+    override fun cancel() {
         alarmManager.cancel(pendingIntent())
     }
 

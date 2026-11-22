@@ -1,44 +1,29 @@
 # Notification snapshots
 
-The notification pipeline stores candidate occurrences and a queue for delivery. It is disabled by default; the sync-settings toggle requests Android notification permission when enabling and performs its first complete scan after a
-successful sync when enabled. The settings adapter serializes enable/disable with vault mutations, clears the prior baseline and
-pending queue, requests an immediate sync on enabling, and reconciles the periodic scheduler. The first successful scan is a silent baseline. Later scans queue new
-inbox items, elapsed snoozes and newly available incomplete dated-folder notes; an already overdue
-reminder discovered for the first time is not queued. Known future reminders become due after their
-deadline. Dated notes initially marked complete stay known, so removing the completion mark alone
-does not create a new availability event.
+The notification pipeline stores candidate occurrences and a queue for delivery. Vault notifications are disabled by default; the sync-settings toggle requests Android notification permission when enabling and performs its first complete scan after a successful sync when enabled. The settings adapter serializes enable/disable with vault mutations, clears the prior baseline and pending queue on disabling, requests an immediate sync on enabling, and reconciles the periodic scheduler. Enabling resets only dated-note registration so existing notes are silent while valid pending notifications survive. The first successful scan, including the first dated-note scan after an upgrade, is a silent baseline. Later scans queue new inbox items, elapsed snoozes and newly available incomplete dated-folder notes; an already overdue date-token reminder discovered for the first time is not queued. Known future date-token reminders become due after their deadline.
 
-The snapshot and pending queue are stored transactionally outside the vault. Candidates missing
-from a successful replacement snapshot are removed from the queue. A failed discovery or note read
-does not replace the last complete snapshot. Local inbox changes are recorded while holding the Git
-mutex before staging, so the app does not announce its own newly created inbox item. If this local
-recording fails, notifications are disabled; if the disabled setting itself cannot be persisted,
-the sync stops before staging any changes.
+Every dated note in a Noteflow folder is registered, including future and initially completed notes. A future note becomes a first-notification candidate when a later complete scan finds it available and incomplete. Removing only the completion mark from a note that was already registered as completed does not create a first notification. Multiple newly available notes in one folder each receive their own Android notification and opening action. The message is the YAML string `notification` from frontmatter, or the current filename without `.md` when that value is missing, blank, non-string or invalid.
 
-Reminder parsing follows the desktop live date-token grammar; date-only reminders use 09:00 in the
-device time zone. Per-note reminder parsing is cached by a SHA-256 hash of decoded note content and time zone. Every scan
-reads each note to verify its hash, including rewrites that preserve size and mtime. No Markdown is
-modified.
+The snapshot and pending queue are stored transactionally outside the vault. Dated-note registration retains each note's first-scan instant and current message. Candidates missing from a successful replacement snapshot are removed from the queue. A failed discovery or note read does not replace the last complete snapshot. Local inbox changes are recorded while holding the Git mutex before staging, so the app does not announce its own newly created inbox item. If this local recording fails, notifications are disabled; if the disabled setting itself cannot be persisted, the sync stops before staging any changes.
 
-After each complete scan, due events are gated on the newest valid `lastActivityAt` across all
-`presence/desktop/<installationId>.json` R2 objects. Activity less than five minutes old discards
-those due occurrences permanently; future occurrences remain queued. Missing R2 configuration or
-presence allows delivery. An R2 or settings read failure keeps the queue intact and schedules a
-five-minute retry. The activity request runs outside the Git mutex.
+Date-token reminder parsing follows the desktop live date-token grammar; date-only reminders use 09:00 in the device time zone. Per-note parsing is cached by a SHA-256 hash of decoded note content and time zone. Every scan reads each note to verify its hash, including rewrites that preserve size and mtime. The scan reuses those same contents for dated-note registration. No Markdown is modified.
 
-Future events use `AlarmManager` exact, idle-tolerant alarms when permission is granted, with an
-inexact idle-tolerant fallback otherwise. Boot, package replacement, clock and time-zone changes
-reconcile the persisted queue. Deliverable occurrences are acknowledged only after Android accepts
-their visible notification. A single occurrence opens its note directly through the existing note
-route with an explicit notification source. Simultaneous occurrences share one expandable
-notification whose content intent opens an in-app note picker; each picker row opens the
-corresponding note with that same source. When the opened note is a dated note, the existing hub
-resolver activates its owning Noteflow; non-dated notes leave the active hub unchanged. This needs
-no notification event or database schema metadata. If notification permission is missing,
-occurrences stay queued for a later reconciliation.
+## Dated-note daily reminders
 
-Sync and scanning share the Git mutex to avoid capturing partially integrated or locally written
-notes. The first scan reads every indexed note and `.flow` discovery walks the vault; later scans
-still read note content and perform marker discovery, but reuse unchanged reminder parses. Neither
-scan is on the first-render path. Measure first-frame time, scan duration, number of notes reread,
-mutex hold duration and battery/network use on representative vaults before release.
+Daily repetition is enabled by default at **07:00 local time** and is stored per device in **Reminder settings** in the main menu. Its switch controls only repetition, not first notifications. Repetition runs only while vault notifications and Android notification permission are enabled. Changing the switch or local time reconciles the alarm through an application-scoped IO operation, so leaving the screen cannot cancel rescheduling.
+
+A registered note becomes eligible for daily repetition on the day after it first becomes available; this is distinct from an earlier future-note registration. For each folder the planner selects the newest note dated today or earlier, and only then checks its first H1 for `✅`; a completed newest note suppresses the whole folder rather than falling back to an older note. A previously registered future note starts daily repetition on the day after its own date. Missed calendar days expire without catch-up delivery.
+
+Delivery is recorded per note and local calendar day. A delayed first notification for the same note takes priority over that day's daily reminder. A repeated reminder uses the same stable Android notification ID and note-specific opening action as the first notification, replacing any still-visible notification for that note. IDs are allocated per note and persisted on the device outside the vault so different paths cannot collide; the mapping is read only during delivery, never on the startup path. Inbox notifications, snoozes and date-token reminders retain their existing expandable bundle and note picker.
+
+Boot, package replacement, clock and time-zone changes recompute the next occurrence from the persisted dated-note snapshot and handled-day ledger. Android exact, idle-tolerant alarms are used when permitted, with the existing inexact idle-tolerant fallback otherwise. Missing notification permission leaves the occurrence pending for reconciliation.
+
+## Delivery gates and reads
+
+After each complete scan, due events are gated on the newest valid `lastActivityAt` across all `presence/desktop/<installationId>.json` R2 objects. Activity less than five minutes old discards those due occurrences permanently; a daily reminder is marked handled for that day. Future occurrences remain queued. Missing R2 configuration or presence allows delivery. An R2 or settings read failure keeps the occurrence intact and schedules a five-minute retry on the same day. The activity request runs outside the Git mutex. If refreshed clock calculations reveal newly due work after an initial no-work result, the coordinator performs the activity request before delivery and revalidates the planning afterward rather than assuming inactivity.
+
+After every desktop request, including one started only after refreshed clock calculations find new due work, the coordinator revalidates the active workspace and vault-notification switch before queue processing or alarm changes; a mismatch cancels reconciliation without acknowledging the old queue. It then re-reads settings and latest candidates. Immediately before first or daily dated-note delivery, only the affected candidate is reread under the shared Git mutex, and the final status check plus Android delivery stay inside that mutex. Daily delivery also recomputes the current deadline there from the latest clock, time zone, settings and candidate, discarding an obsolete alarm deadline. This observes a local first-H1 completion toggle without requiring a successful sync and prevents a local write from landing between the check and delivery. A read failure leaves the occurrence unhandled for another attempt. Note bytes are never rewritten by notification delivery.
+
+Deliverable queued occurrences are acknowledged only after Android accepts their visible notification. A single bundled occurrence opens its note directly through the existing note route with an explicit notification source; multiple bundled occurrences open the in-app picker. Each dated-note notification always opens its own note directly. When the opened note is a dated note, the existing hub resolver activates its owning Noteflow; non-dated notes leave the active hub unchanged.
+
+Sync and scanning share the Git mutex to avoid capturing partially integrated or locally written notes. The first scan reads every indexed note and `.flow` discovery walks the vault; later scans still read note content and perform marker discovery, but reuse unchanged date-token parses. Neither scan is on the first-render path. Debug builds emit `BootTrace` breadcrumbs for notification scan duration, scan mutex hold time and atomic first/daily delivery mutex time; cold-start input-ready remains the first-screen measurement. Measure first-frame time, scan duration, number of notes reread, mutex hold duration and battery/network use on representative vaults before release.

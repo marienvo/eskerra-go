@@ -37,8 +37,15 @@ class NotificationEventsTest {
     @Test
     fun knownFutureReminderFiresWhenItsDeadlineCrosses() {
         assertEquals(
-            listOf(reminder),
-            NotificationEvents.newlyDue(mapOf(reminder.key to reminder), 10, listOf(reminder), 20)
+            listOf(
+                reminder
+            ),
+            NotificationEvents.newlyDue(
+                mapOf(reminder.key to reminder),
+                10,
+                listOf(reminder),
+                20
+            )
         )
     }
 
@@ -66,6 +73,24 @@ class NotificationEventsTest {
         assertEquals(
             emptyList<NotificationEvent>(),
             NotificationEvents.newlyDue(emptyMap(), 10, listOf(reminder), 20)
+        )
+    }
+
+    @Test
+    fun knownFutureDatedNoteIsAnnouncedWhenItBecomesAvailable() {
+        val available = reminder.copy(
+            key = "dated:Flow/Work/2026-11-01.md",
+            noteId = "Flow/Work/2026-11-01.md",
+            type = NotificationEventType.DATED_NOTE,
+            dueAtEpochMillis = 0
+        )
+        val future = available.copy(
+            type = NotificationEventType.FUTURE_DATED_NOTE,
+            dueAtEpochMillis = Long.MAX_VALUE
+        )
+        assertEquals(
+            listOf(available),
+            NotificationEvents.newlyDue(mapOf(future.key to future), 10, listOf(available), 20)
         )
     }
 

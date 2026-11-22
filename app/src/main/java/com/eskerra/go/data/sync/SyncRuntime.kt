@@ -34,6 +34,9 @@ import com.eskerra.go.data.vault.FileVaultSettingsRepository
 import com.eskerra.go.data.workspace.DataStoreWorkspaceStore
 import com.eskerra.go.data.workspace.WorkspaceStore
 import java.io.File
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import okhttp3.OkHttpClient
 
 interface SyncRuntimeProvider {
@@ -62,6 +65,8 @@ class SyncRuntime(
     val vaultSyncScheduler: VaultSyncScheduler,
     val notificationAlarmCoordinator: NotificationAlarmCoordinator? = null
 ) {
+    val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     companion object {
         fun create(context: Context, filesDir: File = context.filesDir): SyncRuntime {
             val workspaceStore = DataStoreWorkspaceStore(context)
@@ -130,8 +135,10 @@ class SyncRuntime(
                 loadDesktopActivity = LoadDesktopActivity(
                     R2DesktopActivityRepository(R2BinaryObjectClient(OkHttpClient())),
                     LoadVaultSettings(FileVaultSettingsRepository(context))
-                ),
-                scheduler = NotificationAlarmScheduler(context)
+                )::invoke,
+                scheduler = NotificationAlarmScheduler(context),
+                gitSyncMutex = gitSyncMutex,
+                isCurrentWorkspace = { current -> workspaceStore.read() == current }
             )
 
             return SyncRuntime(

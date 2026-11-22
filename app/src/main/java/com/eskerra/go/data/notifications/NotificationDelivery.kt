@@ -21,6 +21,16 @@ class NotificationDelivery(private val context: Context) : NotificationEventDeli
         val manager = NotificationManagerCompat.from(context)
         if (!manager.areNotificationsEnabled()) return false
         createChannel()
+        val dated = events.singleOrNull()?.let {
+            it.type == com.eskerra.go.core.notifications.NotificationEventType.DATED_NOTE ||
+                it.type == com.eskerra.go.core.notifications.NotificationEventType.DATED_REMINDER
+        } == true
+        val notificationId = if (dated) {
+            runCatching { DatedNotificationIdStore(context).idFor(events.single().noteId) }
+                .getOrElse { return false }
+        } else {
+            NOTIFICATION_ID
+        }
         val noteIds = events.map { it.noteId }.distinct()
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -28,12 +38,16 @@ class NotificationDelivery(private val context: Context) : NotificationEventDeli
         }
         val contentIntent = PendingIntent.getActivity(
             context,
-            REQUEST_CODE,
+            notificationId,
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val title = if (events.size == 1) title(events.single()) else "${events.size} notifications"
-        val text = if (events.size == 1) label(events.single().noteId) else "Choose a note to open"
+        val text = if (events.size == 1) {
+            events.single().message ?: label(events.single().noteId)
+        } else {
+            "Choose a note to open"
+        }
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
@@ -47,7 +61,7 @@ class NotificationDelivery(private val context: Context) : NotificationEventDeli
             builder.setStyle(style)
         }
         return try {
-            manager.notify(NOTIFICATION_ID, builder.build())
+            manager.notify(notificationId, builder.build())
             true
         } catch (_: SecurityException) {
             false
@@ -66,7 +80,11 @@ class NotificationDelivery(private val context: Context) : NotificationEventDeli
     private fun title(event: NotificationEvent) = when (event.type) {
         com.eskerra.go.core.notifications.NotificationEventType.INBOX -> "New inbox item"
         com.eskerra.go.core.notifications.NotificationEventType.SNOOZE -> "Snooze ended"
-        com.eskerra.go.core.notifications.NotificationEventType.DATED_NOTE -> "New dated note"
+        com.eskerra.go.core.notifications.NotificationEventType.DATED_NOTE,
+        com.eskerra.go.core.notifications.NotificationEventType.FUTURE_DATED_NOTE ->
+            "New dated note"
+        com.eskerra.go.core.notifications.NotificationEventType.DATED_REMINDER ->
+            "Dated note reminder"
         com.eskerra.go.core.notifications.NotificationEventType.REMINDER -> "Reminder"
     }
 
@@ -76,6 +94,5 @@ class NotificationDelivery(private val context: Context) : NotificationEventDeli
         const val EXTRA_NOTE_IDS = "com.eskerra.go.extra.NOTIFICATION_NOTE_IDS"
         private const val CHANNEL_ID = "vault_events"
         private const val NOTIFICATION_ID = 4200
-        private const val REQUEST_CODE = 4200
     }
 }

@@ -1,11 +1,13 @@
 package com.eskerra.go.data.notifications
 
 import android.content.Context
+import android.os.SystemClock
 import android.util.Log
 import com.eskerra.go.core.inbox.InboxNotePath
 import com.eskerra.go.core.model.SyncResult
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.data.notes.FileNoteContentRepository
+import com.eskerra.go.data.perf.ColdStartTrace
 import com.eskerra.go.data.sync.SyncRuntime
 import com.eskerra.go.data.todayhub.FileNoteflowRepository
 import kotlinx.coroutines.CancellationException
@@ -35,7 +37,11 @@ object PostSyncNotificationRefresh {
                     hasRemote = config?.remoteUri?.isNotBlank() == true
                     if (changed && config != null) {
                         NotificationSnapshotStore(context).use {
-                            it.clearWorkspace(notificationWorkspaceKey(config))
+                            if (value) {
+                                it.resetDatedRegistration(notificationWorkspaceKey(config))
+                            } else {
+                                it.clearWorkspace(notificationWorkspaceKey(config))
+                            }
                         }
                     }
                     check(
@@ -82,8 +88,10 @@ object PostSyncNotificationRefresh {
         val context = runtime.context ?: return
         if (!result.registryRefreshed || !enabled(context)) return
         try {
+            val mutexStartedAt = SystemClock.elapsedRealtime()
             runtime.gitSyncMutex.mutex.withLock {
                 if (!enabled(context) || runtime.workspaceStore.read() != config) return
+                val scanStartedAt = SystemClock.elapsedRealtime()
                 val registry = runtime.noteRegistryCache.refresh(
                     config,
                     runtime.filesDir
@@ -95,7 +103,15 @@ object PostSyncNotificationRefresh {
                         store
                     ).refresh(config, runtime.filesDir, registry).getOrThrow()
                 }
+                ColdStartTrace.log(
+                    "notification.scan",
+                    "took=${SystemClock.elapsedRealtime() - scanStartedAt}ms notes=${registry.notes.size}"
+                )
             }
+            ColdStartTrace.log(
+                "notification.mutex",
+                "took=${SystemClock.elapsedRealtime() - mutexStartedAt}ms"
+            )
             runtime.notificationAlarmCoordinator?.reconcile(config)
         } catch (cancelled: CancellationException) {
             throw cancelled

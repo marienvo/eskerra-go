@@ -3,6 +3,7 @@ package com.eskerra.go.app
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
@@ -38,10 +39,14 @@ import com.eskerra.go.core.usecase.SyncBinaries
 import com.eskerra.go.core.usecase.TestRemoteConnection
 import com.eskerra.go.core.usecase.TouchVaultSearchPaths
 import com.eskerra.go.core.usecase.WarmNote
+import com.eskerra.go.data.notifications.SharedPreferencesDatedReminderSettingsRepository
+import com.eskerra.go.data.sync.SyncRuntimeProvider
 import com.eskerra.go.feature.editor.NoteEditorScreen
 import com.eskerra.go.feature.editor.NoteEditorViewModel
 import com.eskerra.go.feature.inbox.InboxUiState
 import com.eskerra.go.feature.notifications.NotificationListScreen
+import com.eskerra.go.feature.reminders.ReminderSettingsScreen
+import com.eskerra.go.feature.reminders.ReminderSettingsViewModel
 import com.eskerra.go.feature.search.SearchViewModel
 import com.eskerra.go.feature.sync.AppSyncViewModel
 import com.eskerra.go.feature.sync.BinariesViewModel
@@ -54,6 +59,7 @@ import com.eskerra.go.feature.todayhub.TodayHubUiState
 import com.eskerra.go.feature.todayhub.TodayHubViewModel
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 
 /** Wiring passed from [App] into the NavHost route builders. */
 internal data class AppNavGraphContext(
@@ -228,6 +234,30 @@ internal fun NavGraphBuilder.sharedDestinations(ctx: AppNavGraphContext) {
             onSyncBinaries = binariesViewModel::syncNow,
             notificationsEnabled = ctx.notificationsEnabled,
             onNotificationsEnabledChange = ctx.onNotificationsEnabledChange
+        )
+    }
+
+    opaqueComposable(AppRoute.REMINDER_SETTINGS) {
+        val applicationContext = LocalContext.current.applicationContext
+        val runtime = (applicationContext as SyncRuntimeProvider).syncRuntime
+        val reminderViewModel: ReminderSettingsViewModel = viewModel(
+            key = "reminders-${ctx.currentConfig.syncViewModelKey()}",
+            factory = ReminderSettingsViewModel.factory(
+                repository = SharedPreferencesDatedReminderSettingsRepository(applicationContext),
+                onChanged = {
+                    runtime.applicationScope.launch {
+                        runtime.workspaceStore.read()?.let {
+                            runtime.notificationAlarmCoordinator?.reconcile(it)
+                        }
+                    }
+                }
+            )
+        )
+        val reminderState by reminderViewModel.uiState.collectAsState()
+        ReminderSettingsScreen(
+            state = reminderState,
+            onEnabledChange = reminderViewModel::onEnabledChange,
+            onTimeChange = reminderViewModel::onTimeChange
         )
     }
 

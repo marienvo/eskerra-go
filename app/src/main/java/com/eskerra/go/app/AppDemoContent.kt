@@ -6,11 +6,13 @@ import com.eskerra.go.feature.menu.MenuEntry
 
 internal const val MENU_SYNC_STATUS = "sync_status"
 internal const val MENU_SYNC_SETTINGS = "sync_settings"
+internal const val MENU_REMINDER_SETTINGS = "reminder_settings"
 
 /**
- * Builds the hamburger menu containing only "Sync status" and "Sync settings".
+ * Builds the hamburger menu for sync and reminder settings.
  */
 internal fun buildMenuEntries(): List<MenuEntry> = listOf(
     MenuEntry(MENU_SYNC_STATUS, "Sync status"),
-    MenuEntry(MENU_SYNC_SETTINGS, "Sync settings")
+    MenuEntry(MENU_SYNC_SETTINGS, "Sync settings"),
+    MenuEntry(MENU_REMINDER_SETTINGS, "Reminder settings")
 )

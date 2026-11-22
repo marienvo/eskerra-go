@@ -1,6 +1,7 @@
 package com.eskerra.go.data.notifications
 
 import android.content.Context
+import android.database.sqlite.SQLiteDatabase
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.eskerra.go.core.notifications.NotificationEvent
@@ -42,6 +43,168 @@ class NotificationSnapshotStoreTest {
             assertEquals(listOf(remote), reopened.pending(workspace))
             reopened.replaceSnapshot(workspace, listOf(local), 300)
             assertEquals(emptyList<NotificationEvent>(), reopened.pending(workspace))
+        }
+    }
+
+    @Test
+    fun upgradeFromVersionTwoPreservesPendingQueue() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val workspace = "test-${UUID.randomUUID()}"
+        context.deleteDatabase("notification-events.db")
+        val path = context.getDatabasePath("notification-events.db").absolutePath
+        SQLiteDatabase.openOrCreateDatabase(path, null).use { db ->
+            db.execSQL(
+                "CREATE TABLE scan_meta (workspace TEXT PRIMARY KEY, scanned_at INTEGER NOT NULL)"
+            )
+            db.execSQL(
+                "CREATE TABLE snapshot (workspace TEXT NOT NULL, event_key TEXT NOT NULL, " +
+                    "note_id TEXT NOT NULL, type TEXT NOT NULL, due_at INTEGER NOT NULL, " +
+                    "PRIMARY KEY(workspace, event_key))"
+            )
+            db.execSQL(
+                "CREATE TABLE pending (workspace TEXT NOT NULL, event_key TEXT NOT NULL, " +
+                    "note_id TEXT NOT NULL, type TEXT NOT NULL, due_at INTEGER NOT NULL, " +
+                    "PRIMARY KEY(workspace, event_key))"
+            )
+            db.execSQL(
+                "CREATE TABLE reminder_cache (workspace TEXT NOT NULL, note_id TEXT NOT NULL, " +
+                    "signature TEXT NOT NULL, payload TEXT NOT NULL, PRIMARY KEY(workspace, note_id))"
+            )
+            db.execSQL(
+                "INSERT INTO pending VALUES (?, ?, ?, ?, ?)",
+                arrayOf(workspace, "inbox:a", "Inbox/a.md", "INBOX", 0)
+            )
+            db.version = 2
+        }
+        NotificationSnapshotStore(context).use { store ->
+            assertEquals("inbox:a", store.pending(workspace).single().key)
+            assertEquals(emptyList<NotificationEvent>(), store.datedNotes(workspace))
+            val existingInbox = NotificationEvent(
+                "inbox:a",
+                "Inbox/a.md",
+                NotificationEventType.INBOX,
+                0
+            )
+            val existingDated = NotificationEvent(
+                "dated:Flow/Work/2026-11-01.md",
+                "Flow/Work/2026-11-01.md",
+                NotificationEventType.DATED_NOTE,
+                0
+            )
+            store.replaceSnapshot(workspace, listOf(existingInbox, existingDated), 300)
+            assertEquals(listOf("inbox:a"), store.pending(workspace).map { it.key })
+            assertEquals(1, store.datedNotes(workspace).size)
+        }
+    }
+
+    @Test
+    fun upgradeFromVersionFourAddsAvailabilityWithoutRecreatingHandledTable() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val workspace = "test-${UUID.randomUUID()}"
+        context.deleteDatabase("notification-events.db")
+        val path = context.getDatabasePath("notification-events.db").absolutePath
+        SQLiteDatabase.openOrCreateDatabase(path, null).use { db ->
+            db.execSQL(
+                "CREATE TABLE scan_meta (workspace TEXT PRIMARY KEY, scanned_at INTEGER NOT NULL)"
+            )
+            db.execSQL(
+                "CREATE TABLE snapshot (workspace TEXT NOT NULL, event_key TEXT NOT NULL, " +
+                    "note_id TEXT NOT NULL, type TEXT NOT NULL, due_at INTEGER NOT NULL, " +
+                    "message TEXT, PRIMARY KEY(workspace, event_key))"
+            )
+            db.execSQL(
+                "CREATE TABLE pending (workspace TEXT NOT NULL, event_key TEXT NOT NULL, " +
+                    "note_id TEXT NOT NULL, type TEXT NOT NULL, due_at INTEGER NOT NULL, " +
+                    "message TEXT, PRIMARY KEY(workspace, event_key))"
+            )
+            db.execSQL(
+                "CREATE TABLE reminder_cache (workspace TEXT NOT NULL, note_id TEXT NOT NULL, " +
+                    "signature TEXT NOT NULL, payload TEXT NOT NULL, PRIMARY KEY(workspace, note_id))"
+            )
+            db.execSQL(
+                "CREATE TABLE dated_notes (workspace TEXT NOT NULL, note_id TEXT NOT NULL, " +
+                    "folder TEXT NOT NULL, date TEXT NOT NULL, first_seen_at INTEGER NOT NULL, " +
+                    "message TEXT NOT NULL, PRIMARY KEY(workspace, note_id))"
+            )
+            db.execSQL("CREATE TABLE dated_baseline (workspace TEXT PRIMARY KEY)")
+            db.execSQL(
+                "CREATE TABLE dated_handled (workspace TEXT NOT NULL, note_id TEXT NOT NULL, " +
+                    "day TEXT NOT NULL, PRIMARY KEY(workspace, note_id, day))"
+            )
+            db.execSQL(
+                "INSERT INTO pending (workspace, event_key, note_id, type, due_at, message) " +
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                arrayOf(workspace, "inbox:a", "Inbox/a.md", "INBOX", 0, null)
+            )
+            db.execSQL(
+                "INSERT INTO dated_handled (workspace, note_id, day) VALUES (?, ?, ?)",
+                arrayOf(workspace, "Flow/Work/2026-11-01.md", "2026-11-01")
+            )
+            db.version = 4
+        }
+        NotificationSnapshotStore(context).use { store ->
+            assertEquals("inbox:a", store.pending(workspace).single().key)
+            val handled = store.datedReminderHandled(workspace).single()
+            assertEquals("Flow/Work/2026-11-01.md", handled.noteId)
+            assertEquals("2026-11-01", handled.day)
+            val event = NotificationEvent(
+                "dated:Flow/Work/2026-11-01.md",
+                "Flow/Work/2026-11-01.md",
+                NotificationEventType.DATED_NOTE,
+                0
+            )
+            store.replaceSnapshot(workspace, listOf(event), 300)
+            assertEquals(300L, store.datedNotes(workspace).single().firstAvailableAtEpochMillis)
+        }
+    }
+
+    @Test
+    fun datedNotesRetainFirstSeenAndQueueEveryNewNote() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val workspace = "test-${UUID.randomUUID()}"
+        val first = NotificationEvent(
+            "dated:Flow/Work/2026-11-01.md",
+            "Flow/Work/2026-11-01.md",
+            NotificationEventType.DATED_NOTE,
+            0,
+            "First"
+        )
+        val second = NotificationEvent(
+            "dated:Flow/Work/2026-11-02.md",
+            "Flow/Work/2026-11-02.md",
+            NotificationEventType.DATED_NOTE,
+            0,
+            "Second"
+        )
+        NotificationSnapshotStore(context).use { store ->
+            store.replaceSnapshot(workspace, listOf(first), 100)
+            store.replaceSnapshot(workspace, listOf(first.copy(message = "Updated"), second), 200)
+            assertEquals(listOf(second), store.pending(workspace))
+            val stored = store.datedNotes(workspace).single { it.noteId == first.noteId }
+            assertEquals(100L, stored.firstSeenAtEpochMillis)
+            assertEquals("Updated", stored.message)
+        }
+    }
+
+    @Test
+    fun firstAvailableTimestampIsSetOnceWhenFutureNoteBecomesAvailable() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val workspace = "test-${UUID.randomUUID()}"
+        val noteId = "Flow/Work/2026-11-25.md"
+        val future = NotificationEvent(
+            "dated:$noteId",
+            noteId,
+            NotificationEventType.FUTURE_DATED_NOTE,
+            Long.MAX_VALUE
+        )
+        val available = future.copy(type = NotificationEventType.DATED_NOTE, dueAtEpochMillis = 0)
+        NotificationSnapshotStore(context).use { store ->
+            store.replaceSnapshot(workspace, listOf(future), 100)
+            assertEquals(null, store.datedNotes(workspace).single().firstAvailableAtEpochMillis)
+            store.replaceSnapshot(workspace, listOf(available), 200)
+            assertEquals(200L, store.datedNotes(workspace).single().firstAvailableAtEpochMillis)
+            store.replaceSnapshot(workspace, listOf(available), 300)
+            assertEquals(200L, store.datedNotes(workspace).single().firstAvailableAtEpochMillis)
         }
     }
 

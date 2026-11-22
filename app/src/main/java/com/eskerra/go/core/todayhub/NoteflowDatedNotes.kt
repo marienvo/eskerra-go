@@ -40,9 +40,19 @@ object NoteflowDatedNotes {
         )
     }
 
-    fun select(registry: NoteRegistry, marker: NoteId, today: LocalDate): List<Target> {
+    fun select(registry: NoteRegistry, marker: NoteId, today: LocalDate): List<Target> =
+        all(registry, marker).groupBy { it.folder }.toSortedMap().map { (folder, notes) ->
+            val selected = notes.lastOrNull {
+                TodayHubWeeks.parseRowStem(
+                    it.noteId.value.substringAfterLast('/').removeSuffix(".md")
+                )!! <= today
+            } ?: notes.first()
+            Target(folder, selected.noteId)
+        }
+
+    fun all(registry: NoteRegistry, marker: NoteId): List<Target> {
         val hubDir = TodayHubDiscovery.directoryOf(marker.value)
-        val candidates = registry.notes.mapNotNull { note ->
+        return registry.notes.mapNotNull { note ->
             val folderPath = TodayHubDiscovery.directoryOf(note.id.value)
             if (TodayHubDiscovery.directoryOf(folderPath) != hubDir) return@mapNotNull null
             val folder = folderPath.substringAfterLast('/')
@@ -54,11 +64,8 @@ object NoteflowDatedNotes {
             val date = TodayHubWeeks.parseRowStem(name.removeSuffix(".md"))
                 ?: return@mapNotNull null
             Triple(folder, date, note.id)
-        }
-        return candidates.groupBy { it.first }.toSortedMap().map { (folder, notes) ->
-            val sorted = notes.sortedBy { it.second }
-            val selected = sorted.lastOrNull { it.second <= today } ?: sorted.first()
-            Target(folder, selected.third)
+        }.sortedWith(compareBy({ it.first }, { it.second })).map {
+            Target(it.first, it.third)
         }
     }
 

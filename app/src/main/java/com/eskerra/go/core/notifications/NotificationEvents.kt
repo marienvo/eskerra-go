@@ -5,10 +5,18 @@ data class NotificationEvent(
     val key: String,
     val noteId: String,
     val type: NotificationEventType,
-    val dueAtEpochMillis: Long
+    val dueAtEpochMillis: Long,
+    val message: String? = null
 )
 
-enum class NotificationEventType { INBOX, SNOOZE, DATED_NOTE, REMINDER }
+enum class NotificationEventType {
+    INBOX,
+    SNOOZE,
+    DATED_NOTE,
+    FUTURE_DATED_NOTE,
+    DATED_REMINDER,
+    REMINDER
+}
 
 /** Computes candidates whose deadlines crossed since the last successful snapshot. */
 object NotificationEvents {
@@ -29,7 +37,12 @@ object NotificationEvents {
             val old = matches[event.key]
             event.dueAtEpochMillis <= now &&
                 if (old != null) {
-                    old.dueAtEpochMillis != Long.MAX_VALUE && old.dueAtEpochMillis > previousScanAt
+                    (
+                        old.dueAtEpochMillis != Long.MAX_VALUE &&
+                            old.dueAtEpochMillis > previousScanAt
+                        ) ||
+                        old.type == NotificationEventType.FUTURE_DATED_NOTE &&
+                        event.type == NotificationEventType.DATED_NOTE
                 } else {
                     event.type != NotificationEventType.REMINDER
                 }

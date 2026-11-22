@@ -41,7 +41,7 @@ class RefreshNotificationSnapshot(
             val today = LocalDate(day.year, day.monthValue, day.dayOfMonth)
             val markers = noteflows.discover(config, filesDir).getOrThrow().map { it.id }
             val datedIds = markers.flatMap { marker ->
-                NoteflowDatedNotes.select(registry, marker, today).map { it.noteId }
+                NoteflowDatedNotes.all(registry, marker).map { it.noteId }
             }.toSet()
             val content = mutableMapOf<NoteId, String>()
             val events = mutableListOf<NotificationEvent>()
