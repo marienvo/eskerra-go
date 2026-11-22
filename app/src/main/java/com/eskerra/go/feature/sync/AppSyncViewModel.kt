@@ -14,6 +14,7 @@ import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.SyncStateRepository
 import com.eskerra.go.core.repository.VaultSyncScheduler
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -37,6 +38,7 @@ class AppSyncViewModel(
 
     private val _uiState = MutableStateFlow<SyncUiState>(SyncUiState.Loading)
     val uiState: StateFlow<SyncUiState> = _uiState.asStateFlow()
+    val durableSyncRecord: Flow<DurableSyncRecord> = syncStateRepository.record
 
     /** Shell-only spinner intent. */
     private val syncSpinnerRequested = MutableStateFlow(false)
@@ -261,7 +263,7 @@ class AppSyncViewModel(
     }
 
     /** Sole entry point for current and future foreground automatic sync triggers. */
-    fun requestAutoSync() {
+    fun requestAutoSync(onGenerationRequested: (Long) -> Unit = {}) {
         ensureObservingDurableState()
         viewModelScope.launch {
             if (config.remoteUri.isNullOrBlank()) {
@@ -273,7 +275,8 @@ class AppSyncViewModel(
                 refreshLocalStatusQuietly()
                 return@launch
             }
-            syncStateRepository.markGenerationRequested()
+            val generation = syncStateRepository.markGenerationRequested()
+            onGenerationRequested(generation)
             vaultSyncScheduler.scheduleSync()
         }
     }
