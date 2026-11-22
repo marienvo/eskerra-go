@@ -336,6 +336,7 @@ fun App(
                 when (id) {
                     MENU_SYNC_STATUS -> navController.navigate(AppRoute.SYNC)
                     MENU_SYNC_SETTINGS -> navController.navigate(AppRoute.SYNC_SETTINGS)
+                    MENU_REMINDER_SETTINGS -> navController.navigate(AppRoute.REMINDER_SETTINGS)
                 }
             }
         )
