@@ -83,6 +83,17 @@ class DatedNoteReadStatusTest {
     }
 
     @Test
+    fun htmlCommentHeadingsAreNotTitles() {
+        val source = "<!--\n# Commented-out heading\n-->\n# Actual title"
+
+        assertEquals(
+            "<!--\n# Commented-out heading\n-->\n# Actual title ✅",
+            DatedNoteReadStatus.setRead(source, true)
+        )
+        assertNull(DatedNoteReadStatus.setRead("<!--\n# Comment\n-->", read = true))
+    }
+
+    @Test
     fun titleMatchesReaderSummaryText() {
         assertEquals("Today ✅", DatedNoteReadStatus.title("# Today ✅\n\nBody"))
         assertEquals("Today", DatedNoteReadStatus.displayTitle("# Today ✅\n\nBody"))

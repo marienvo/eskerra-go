@@ -37,6 +37,7 @@ object DatedNoteReadStatus {
     private fun firstTitleLine(markdown: String): Line? {
         val bodyStart = bodyStartLine(markdown)
         var openFence: Fence? = null
+        var inHtmlComment = false
         for (
         line in bodyStart.lines
             .take(SCAN_LINE_CAP)
@@ -56,6 +57,14 @@ object DatedNoteReadStatus {
                 ) {
                     openFence = null
                 }
+                continue
+            }
+            if (inHtmlComment) {
+                if (text.contains("-->")) inHtmlComment = false
+                continue
+            }
+            if (trimmed.startsWith("<!--")) {
+                inHtmlComment = !text.contains("-->")
                 continue
             }
             if (marker != null && indentation <= 3) {
