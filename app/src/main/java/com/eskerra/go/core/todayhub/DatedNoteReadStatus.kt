@@ -31,8 +31,8 @@ object DatedNoteReadStatus {
         if (read) {
             val closingHashStart = closingHashStart(source)
             if (closingHashStart != null) {
-                val insertion = line.start + closingHashStart
-                return markdown.replaceRange(insertion, insertion, "$DONE_MARK ")
+                val insertion = line.start + closingHashStart - 1
+                return markdown.replaceRange(insertion, insertion, " $DONE_MARK")
             }
             return markdown.replaceRange(line.contentEnd, line.contentEnd, " $DONE_MARK")
         }

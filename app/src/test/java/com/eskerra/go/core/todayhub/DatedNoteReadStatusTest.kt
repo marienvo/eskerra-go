@@ -53,6 +53,15 @@ class DatedNoteReadStatusTest {
     }
 
     @Test
+    fun tabBeforeClosingHashesRoundTripsExactly() {
+        val source = "# Dagboek\t###"
+        val read = DatedNoteReadStatus.setRead(source, read = true)
+
+        assertEquals("# Dagboek ✅\t###", read)
+        assertEquals(source, DatedNoteReadStatus.setRead(read!!, read = false))
+    }
+
+    @Test
     fun missingTitleFailsClosed() {
         assertNull(DatedNoteReadStatus.setRead("Body only", read = true))
         assertFalse(DatedNoteReadStatus.hasTitle("## Subtitle"))
