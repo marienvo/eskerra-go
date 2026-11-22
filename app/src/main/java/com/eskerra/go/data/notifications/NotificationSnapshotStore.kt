@@ -13,27 +13,34 @@ import org.json.JSONObject
 
 /** Transactionally stores the last complete scan and queues newly due occurrences. */
 class NotificationSnapshotStore(context: Context) :
-    SQLiteOpenHelper(context.applicationContext, "notification-events.db", null, 2),
+    SQLiteOpenHelper(context.applicationContext, "notification-events.db", null, 3),
     NotificationSnapshotPersistence {
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
             "CREATE TABLE scan_meta (workspace TEXT PRIMARY KEY, scanned_at INTEGER NOT NULL)"
         )
         db.execSQL(
-            "CREATE TABLE snapshot (workspace TEXT NOT NULL, event_key TEXT NOT NULL, note_id TEXT NOT NULL, type TEXT NOT NULL, due_at INTEGER NOT NULL, PRIMARY KEY(workspace, event_key))"
+            "CREATE TABLE snapshot (workspace TEXT NOT NULL, event_key TEXT NOT NULL, " +
+                "note_id TEXT NOT NULL, type TEXT NOT NULL, due_at INTEGER NOT NULL, " +
+                "message TEXT, PRIMARY KEY(workspace, event_key))"
         )
         createReminderCache(db)
         db.execSQL(
-            "CREATE TABLE pending (workspace TEXT NOT NULL, event_key TEXT NOT NULL, note_id TEXT NOT NULL, type TEXT NOT NULL, due_at INTEGER NOT NULL, PRIMARY KEY(workspace, event_key))"
+            "CREATE TABLE pending (workspace TEXT NOT NULL, event_key TEXT NOT NULL, " +
+                "note_id TEXT NOT NULL, type TEXT NOT NULL, due_at INTEGER NOT NULL, " +
+                "message TEXT, PRIMARY KEY(workspace, event_key))"
         )
+        DatedNoteSnapshotStore.create(db)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        if (oldVersion == 1 && newVersion == 2) {
-            createReminderCache(db)
-        } else {
+        if (newVersion != 3 || oldVersion !in 1 until newVersion) {
             error("Unsupported notification database upgrade: $oldVersion to $newVersion")
         }
+        if (oldVersion < 2) createReminderCache(db)
+        db.execSQL("ALTER TABLE snapshot ADD COLUMN message TEXT")
+        db.execSQL("ALTER TABLE pending ADD COLUMN message TEXT")
+        DatedNoteSnapshotStore.create(db)
     }
 
     override fun replaceSnapshot(workspace: String, events: List<NotificationEvent>, now: Long) {
@@ -47,6 +54,7 @@ class NotificationSnapshotStore(context: Context) :
                 .use { cursor -> if (cursor.moveToFirst()) cursor.getLong(0) else null }
             val previous = if (lastScan == null) null else readSnapshot(db, workspace)
             val due = NotificationEvents.newlyDue(previous, lastScan ?: 0L, events, now)
+            DatedNoteSnapshotStore.replace(db, workspace, events, now)
             if (previous != null) migratePending(db, workspace, previous, events)
             db.delete("snapshot", "workspace = ?", arrayOf(workspace))
             for (event in events.distinctBy { it.key }) {
@@ -154,7 +162,13 @@ class NotificationSnapshotStore(context: Context) :
         val db = writableDatabase
         db.beginTransaction()
         try {
-            for (table in listOf("pending", "snapshot", "scan_meta", "reminder_cache")) {
+            for (table in listOf(
+                "pending",
+                "snapshot",
+                "scan_meta",
+                "reminder_cache",
+                "dated_notes"
+            )) {
                 db.delete(table, "workspace = ?", arrayOf(workspace))
             }
             db.setTransactionSuccessful()
@@ -190,7 +204,7 @@ class NotificationSnapshotStore(context: Context) :
         require(table == "snapshot" || table == "pending")
         val result = mutableMapOf<String, NotificationEvent>()
         db.rawQuery(
-            "SELECT event_key, note_id, type, due_at FROM $table WHERE workspace = ?",
+            "SELECT event_key, note_id, type, due_at, message FROM $table WHERE workspace = ?",
             arrayOf(workspace)
         )
             .use { cursor ->
@@ -200,7 +214,8 @@ class NotificationSnapshotStore(context: Context) :
                             cursor.getString(0),
                             cursor.getString(1),
                             NotificationEventType.valueOf(cursor.getString(2)),
-                            cursor.getLong(3)
+                            cursor.getLong(3),
+                            cursor.getString(4)
                         )
                     result[event.key] = event
                 }
@@ -233,7 +248,12 @@ class NotificationSnapshotStore(context: Context) :
             val oldKey = (matches[event.key] ?: fallback)?.key ?: continue
             if (oldKey !in pendingKeys) continue
             if (oldKey == event.key) {
-                val updated = ContentValues().apply { put("due_at", event.dueAtEpochMillis) }
+                val updated = ContentValues().apply {
+                    put("note_id", event.noteId)
+                    put("type", event.type.name)
+                    put("due_at", event.dueAtEpochMillis)
+                    put("message", event.message)
+                }
                 db.update(
                     "pending",
                     updated,
@@ -255,9 +275,16 @@ class NotificationSnapshotStore(context: Context) :
     ) {
         require(table == "snapshot" || table == "pending")
         db.execSQL(
-            "INSERT OR IGNORE INTO $table (workspace, event_key, note_id, type, due_at) " +
-                "VALUES (?, ?, ?, ?, ?)",
-            arrayOf(workspace, event.key, event.noteId, event.type.name, event.dueAtEpochMillis)
+            "INSERT OR IGNORE INTO $table (workspace, event_key, note_id, type, due_at, message) " +
+                "VALUES (?, ?, ?, ?, ?, ?)",
+            arrayOf(
+                workspace,
+                event.key,
+                event.noteId,
+                event.type.name,
+                event.dueAtEpochMillis,
+                event.message
+            )
         )
     }
 
@@ -267,5 +294,6 @@ class NotificationSnapshotStore(context: Context) :
         put("note_id", event.noteId)
         put("type", event.type.name)
         put("due_at", event.dueAtEpochMillis)
+        put("message", event.message)
     }
 }

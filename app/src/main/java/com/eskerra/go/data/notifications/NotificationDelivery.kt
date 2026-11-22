@@ -66,7 +66,11 @@ class NotificationDelivery(private val context: Context) : NotificationEventDeli
     private fun title(event: NotificationEvent) = when (event.type) {
         com.eskerra.go.core.notifications.NotificationEventType.INBOX -> "New inbox item"
         com.eskerra.go.core.notifications.NotificationEventType.SNOOZE -> "Snooze ended"
-        com.eskerra.go.core.notifications.NotificationEventType.DATED_NOTE -> "New dated note"
+        com.eskerra.go.core.notifications.NotificationEventType.DATED_NOTE,
+        com.eskerra.go.core.notifications.NotificationEventType.FUTURE_DATED_NOTE ->
+            "New dated note"
+        com.eskerra.go.core.notifications.NotificationEventType.DATED_REMINDER ->
+            "Dated note reminder"
         com.eskerra.go.core.notifications.NotificationEventType.REMINDER -> "Reminder"
     }
 
