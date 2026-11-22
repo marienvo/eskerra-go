@@ -109,16 +109,11 @@ class NotificationAlarmCoordinator(
         }
         if (activity.first != DesktopActivityStatus.Unavailable) {
             for (schedule in schedules.filter { it.dueAtEpochMillis <= now }) {
-                deliverDaily(
-                    config,
-                    workspace,
-                    schedule,
-                    activity.second,
-                    now,
-                    today.toString()
-                )
+                deliverDaily(config, workspace, schedule, activity.second)
             }
         }
+        now = clock()
+        localZone = zone()
         val finalState = loadState(workspace)
         val nextDaily = DatedReminderPlanner.schedules(
             finalState.records,
@@ -164,49 +159,60 @@ class NotificationAlarmCoordinator(
         config: WorkspaceConfig,
         workspace: String,
         schedule: DatedReminderSchedule,
-        lastActivityAtEpochMillis: Long?,
-        now: Long,
-        day: String
+        lastActivityAtEpochMillis: Long?
     ) {
         val startedAt = SystemClock.elapsedRealtime()
         gitSyncMutex.mutex.withLock {
-            if (!canDeliver(config, requireRepetition = true)) return@withLock
+            if (!canDeliver(config)) return@withLock
+            val settings = reminderSettings.load()
+            if (!settings.enabled) return@withLock
+            val now = clock()
+            val zone = zone()
+            val today = java.time.Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
             val state = loadState(workspace)
+            val currentSchedule = DatedReminderPlanner.schedules(
+                state.records,
+                state.handled,
+                settings,
+                now,
+                zone
+            ).singleOrNull { it.folder == schedule.folder } ?: return@withLock
+            if (currentSchedule.dueAtEpochMillis > now) return@withLock
             val record = DatedReminderPlanner.latestAvailable(
                 state.records,
                 schedule.folder,
-                java.time.LocalDate.parse(day)
+                today
             ) ?: return@withLock
-            val handled = DatedReminderHandled(record.noteId, day)
+            val handled = DatedReminderHandled(record.noteId, today.toString())
             if (handled in state.handled) return@withLock
             if (state.pending.any {
                     it.type == NotificationEventType.DATED_NOTE && it.noteId == record.noteId
                 }
             ) {
-                markHandled(workspace, record.noteId, day)
+                markHandled(workspace, record.noteId, today.toString())
                 return@withLock
             }
             if (lastActivityAtEpochMillis?.let {
                     DesktopActivityGate.isActive(it, now)
                 } == true
             ) {
-                markHandled(workspace, record.noteId, day)
+                markHandled(workspace, record.noteId, today.toString())
                 return@withLock
             }
             val markdown = readLatestLocked(config, record.noteId) ?: return@withLock
             if (!NoteflowDatedNotes.isIncomplete(markdown)) {
-                markHandled(workspace, record.noteId, day)
+                markHandled(workspace, record.noteId, today.toString())
                 return@withLock
             }
             val event = NotificationEvent(
                 "dated-reminder:${record.folder}",
                 record.noteId,
                 NotificationEventType.DATED_REMINDER,
-                schedule.dueAtEpochMillis,
+                currentSchedule.dueAtEpochMillis,
                 DatedNoteNotificationText.resolve(record.noteId, markdown)
             )
             if (delivery.deliver(listOf(event))) {
-                markHandled(workspace, record.noteId, day)
+                markHandled(workspace, record.noteId, today.toString())
             }
         }
         ColdStartTrace.log(
@@ -215,10 +221,8 @@ class NotificationAlarmCoordinator(
         )
     }
 
-    private suspend fun canDeliver(config: WorkspaceConfig, requireRepetition: Boolean = false) =
-        PostSyncNotificationRefresh.enabled(context) &&
-            isCurrentWorkspace(config) &&
-            (!requireRepetition || reminderSettings.load().enabled)
+    private suspend fun canDeliver(config: WorkspaceConfig) =
+        PostSyncNotificationRefresh.enabled(context) && isCurrentWorkspace(config)
 
     private suspend fun readLatestLocked(config: WorkspaceConfig, noteId: String): String? = try {
         notes.load(config, filesDir, NoteId(noteId)).getOrThrow().markdown

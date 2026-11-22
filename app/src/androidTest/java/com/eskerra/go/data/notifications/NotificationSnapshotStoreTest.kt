@@ -131,9 +131,22 @@ class NotificationSnapshotStoreTest {
                 "CREATE TABLE dated_handled (workspace TEXT NOT NULL, note_id TEXT NOT NULL, " +
                     "day TEXT NOT NULL, PRIMARY KEY(workspace, note_id, day))"
             )
+            db.execSQL(
+                "INSERT INTO pending (workspace, event_key, note_id, type, due_at, message) " +
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                arrayOf(workspace, "inbox:a", "Inbox/a.md", "INBOX", 0, null)
+            )
+            db.execSQL(
+                "INSERT INTO dated_handled (workspace, note_id, day) VALUES (?, ?, ?)",
+                arrayOf(workspace, "Flow/Work/2026-11-01.md", "2026-11-01")
+            )
             db.version = 4
         }
         NotificationSnapshotStore(context).use { store ->
+            assertEquals("inbox:a", store.pending(workspace).single().key)
+            val handled = store.datedReminderHandled(workspace).single()
+            assertEquals("Flow/Work/2026-11-01.md", handled.noteId)
+            assertEquals("2026-11-01", handled.day)
             val event = NotificationEvent(
                 "dated:Flow/Work/2026-11-01.md",
                 "Flow/Work/2026-11-01.md",
@@ -141,7 +154,7 @@ class NotificationSnapshotStoreTest {
                 0
             )
             store.replaceSnapshot(workspace, listOf(event), 300)
-            assertEquals(300, store.datedNotes(workspace).single().firstAvailableAtEpochMillis)
+            assertEquals(300L, store.datedNotes(workspace).single().firstAvailableAtEpochMillis)
         }
     }
 
@@ -168,7 +181,7 @@ class NotificationSnapshotStoreTest {
             store.replaceSnapshot(workspace, listOf(first.copy(message = "Updated"), second), 200)
             assertEquals(listOf(second), store.pending(workspace))
             val stored = store.datedNotes(workspace).single { it.noteId == first.noteId }
-            assertEquals(100, stored.firstSeenAtEpochMillis)
+            assertEquals(100L, stored.firstSeenAtEpochMillis)
             assertEquals("Updated", stored.message)
         }
     }
@@ -189,9 +202,9 @@ class NotificationSnapshotStoreTest {
             store.replaceSnapshot(workspace, listOf(future), 100)
             assertEquals(null, store.datedNotes(workspace).single().firstAvailableAtEpochMillis)
             store.replaceSnapshot(workspace, listOf(available), 200)
-            assertEquals(200, store.datedNotes(workspace).single().firstAvailableAtEpochMillis)
+            assertEquals(200L, store.datedNotes(workspace).single().firstAvailableAtEpochMillis)
             store.replaceSnapshot(workspace, listOf(available), 300)
-            assertEquals(200, store.datedNotes(workspace).single().firstAvailableAtEpochMillis)
+            assertEquals(200L, store.datedNotes(workspace).single().firstAvailableAtEpochMillis)
         }
     }
 

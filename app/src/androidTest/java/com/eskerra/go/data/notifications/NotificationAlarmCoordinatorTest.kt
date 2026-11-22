@@ -135,6 +135,21 @@ class NotificationAlarmCoordinatorTest {
     }
 
     @Test
+    fun reminderTimeChangeAfterPlanningIsRecheckedInsideGitMutex() = runTest {
+        val seven = DatedReminderSettings(minuteOfDay = 7 * 60)
+        val nine = seven.copy(minuteOfDay = 9 * 60)
+        val fixture = Fixture(
+            markdown = mapOf(OLDER to "# Open"),
+            settingsSequence = listOf(seven, seven, nine)
+        )
+        fixture.seed(listOf(event(OLDER)))
+        fixture.coordinator.reconcile(fixture.config)
+        assertTrue(fixture.deliveries.isEmpty())
+        assertTrue(fixture.reads.isEmpty())
+        assertEquals(at("2026-11-22T09:00:00"), fixture.scheduler.next)
+    }
+
+    @Test
     fun missingPermissionLeavesReminderForRetry() = runTest {
         val fixture = Fixture(markdown = mapOf(NEWEST to "# Open"), deliverResult = false)
         fixture.seed(listOf(event(NEWEST)))
@@ -220,7 +235,8 @@ class NotificationAlarmCoordinatorTest {
             DesktopActivityStatus.Inactive to null,
         private val deliverResult: Boolean = true,
         private val onDesktopCheck: () -> Unit = {},
-        private val currentTime: () -> Long = { NOW }
+        private val currentTime: () -> Long = { NOW },
+        private val settingsSequence: List<DatedReminderSettings> = emptyList()
     ) {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val config = WorkspaceConfig(
@@ -256,8 +272,15 @@ class NotificationAlarmCoordinatorTest {
             }
         }
         var repetitionEnabled = true
+        private var settingsReads = 0
         private val settings = object : DatedReminderSettingsRepository {
-            override fun load() = DatedReminderSettings(enabled = repetitionEnabled)
+            override fun load(): DatedReminderSettings {
+                if (settingsSequence.isNotEmpty()) {
+                    val index = settingsReads++.coerceAtMost(settingsSequence.lastIndex)
+                    return settingsSequence[index]
+                }
+                return DatedReminderSettings(enabled = repetitionEnabled)
+            }
             override fun save(settings: DatedReminderSettings) = Result.success(Unit)
         }
         val coordinator = newCoordinator()
