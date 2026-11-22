@@ -64,10 +64,6 @@ internal fun NavGraphBuilder.noteReaderGraph(ctx: AppNavGraphContext) {
         val durableSyncRecord by ctx.appSyncViewModel.durableSyncRecord.collectAsState(
             initial = null
         )
-        val readStatusSyncing = isDatedReadStatusSyncing(
-            readStatusSyncGeneration,
-            durableSyncRecord
-        )
         LaunchedEffect(durableSyncRecord, readStatusSyncGeneration) {
             val generation = readStatusSyncGeneration ?: return@LaunchedEffect
             val record = durableSyncRecord ?: return@LaunchedEffect
@@ -143,7 +139,6 @@ internal fun NavGraphBuilder.noteReaderGraph(ctx: AppNavGraphContext) {
                         )
                     }
                 },
-                readStatusSyncing = readStatusSyncing,
                 workspaceRoot = ctx.workspaceRoot,
                 onViewportChanged = noteReaderViewModel::onViewportChanged
             )

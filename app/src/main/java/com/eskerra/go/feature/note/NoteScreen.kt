@@ -71,7 +71,6 @@ fun NoteScreen(
     onAmbiguousWikiLink: (List<NoteId>, String) -> Unit,
     onNoteNotFound: (String) -> Unit = {},
     onToggleDatedReadStatus: () -> Unit = {},
-    readStatusSyncing: Boolean = false,
     workspaceRoot: File? = null,
     onViewportChanged: (
         visibleStartOffset: Int,
@@ -89,7 +88,6 @@ fun NoteScreen(
                 markdown = state.document.content.markdown,
                 readStatusMutationInProgress = state.readStatusMutationInProgress,
                 readStatusMessage = state.readStatusMessage,
-                readStatusSyncing = readStatusSyncing,
                 onToggleDatedReadStatus = onToggleDatedReadStatus,
                 preparedBody = state.preparedBody,
                 registry = state.document.registry,
@@ -145,7 +143,6 @@ private fun NoteReaderContent(
     markdown: String,
     readStatusMutationInProgress: Boolean,
     readStatusMessage: String?,
-    readStatusSyncing: Boolean,
     onToggleDatedReadStatus: () -> Unit,
     preparedBody: PreparedMarkdown,
     registry: NoteRegistry,
@@ -262,7 +259,7 @@ private fun NoteReaderContent(
                 DatedNoteTitle(
                     title = DatedNoteReadStatus.displayTitle(markdown) ?: title,
                     isRead = DatedNoteReadStatus.isRead(markdown),
-                    isLoading = readStatusMutationInProgress || readStatusSyncing,
+                    isLoading = readStatusMutationInProgress,
                     onToggleReadStatus = onToggleDatedReadStatus
                 )
                 if (readStatusMessage != null) {
