@@ -51,6 +51,28 @@ class DatedNoteReadStatusTest {
     }
 
     @Test
+    fun fencedCodeExamplesAreNeverMutatedAsTitles() {
+        val source = "```md\n# Example\n```\n\n# Today\n\nBody"
+
+        assertEquals(
+            "```md\n# Example\n```\n\n# Today ✅\n\nBody",
+            DatedNoteReadStatus.setRead(source, read = true)
+        )
+        assertNull(DatedNoteReadStatus.setRead("~~~\n# Example\n~~~", read = true))
+    }
+
+    @Test
+    fun indentedCodeExamplesAreNotTitles() {
+        val source = "    # Example\n\t# Also code\n# Today"
+
+        assertEquals(
+            "    # Example\n\t# Also code\n# Today ✅",
+            DatedNoteReadStatus.setRead(source, true)
+        )
+        assertNull(DatedNoteReadStatus.setRead("    # Example", read = true))
+    }
+
+    @Test
     fun titleMatchesReaderSummaryText() {
         assertEquals("Today ✅", DatedNoteReadStatus.title("# Today ✅\n\nBody"))
         assertEquals("Today", DatedNoteReadStatus.displayTitle("# Today ✅\n\nBody"))

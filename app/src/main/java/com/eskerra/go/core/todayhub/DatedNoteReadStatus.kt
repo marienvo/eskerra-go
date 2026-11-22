@@ -36,13 +36,47 @@ object DatedNoteReadStatus {
 
     private fun firstTitleLine(markdown: String): Line? {
         val bodyStart = bodyStartLine(markdown)
-        return bodyStart.lines
+        var openFence: Fence? = null
+        for (
+        line in bodyStart.lines
             .take(SCAN_LINE_CAP)
             .takeWhile { it.start - bodyStart.offset < SCAN_CHAR_CAP }
-            .firstOrNull { line ->
-                val trimmed = line.text(markdown).trim()
-                trimmed.startsWith("#") && !trimmed.startsWith("##") && trimmed.drop(1).isNotBlank()
+        ) {
+            val text = line.text(markdown)
+            val trimmed = text.trim()
+            val indentation = text.takeWhile { it == ' ' }.length
+            val marker = fenceMarker(trimmed)
+            val fence = openFence
+            if (fence != null) {
+                if (marker != null &&
+                    marker.character == fence.character &&
+                    marker.length >= fence.length &&
+                    trimmed.length == marker.length
+                ) {
+                    openFence = null
+                }
+                continue
             }
+            if (marker != null && indentation <= 3) {
+                openFence = marker
+                continue
+            }
+            if (indentation >= 4 || text.startsWith("\t")) continue
+            if (trimmed.startsWith("#") &&
+                !trimmed.startsWith("##") &&
+                trimmed.drop(1).isNotBlank()
+            ) {
+                return line
+            }
+        }
+        return null
+    }
+
+    private fun fenceMarker(trimmed: String): Fence? {
+        val character = trimmed.firstOrNull()
+        if (character != '`' && character != '~') return null
+        val length = trimmed.takeWhile { it == character }.length
+        return if (length >= 3) Fence(character, length) else null
     }
 
     private fun bodyStartLine(markdown: String): BodyStart {
@@ -76,6 +110,8 @@ object DatedNoteReadStatus {
     private data class Line(val start: Int, val contentEnd: Int, val nextStart: Int) {
         fun text(markdown: String): String = markdown.substring(start, contentEnd)
     }
+
+    private data class Fence(val character: Char, val length: Int)
 
     private data class BodyStart(val lines: Sequence<Line>, val offset: Int)
 }
