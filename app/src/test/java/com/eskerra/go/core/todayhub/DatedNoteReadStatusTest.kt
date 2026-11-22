@@ -63,13 +63,23 @@ class DatedNoteReadStatusTest {
 
     @Test
     fun indentedCodeExamplesAreNotTitles() {
-        val source = "    # Example\n\t# Also code\n# Today"
+        val source = "    # Example\n\t# Also code\n \t# Tab reaches column four\n# Today"
 
         assertEquals(
-            "    # Example\n\t# Also code\n# Today ✅",
+            "    # Example\n\t# Also code\n \t# Tab reaches column four\n# Today ✅",
             DatedNoteReadStatus.setRead(source, true)
         )
         assertNull(DatedNoteReadStatus.setRead("    # Example", read = true))
+    }
+
+    @Test
+    fun overIndentedFenceDoesNotCloseCodeBlock() {
+        val source = "```\n# Example\n    ```\n# Still code\n```\n# Today"
+
+        assertEquals(
+            "```\n# Example\n    ```\n# Still code\n```\n# Today ✅",
+            DatedNoteReadStatus.setRead(source, true)
+        )
     }
 
     @Test

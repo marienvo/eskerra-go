@@ -44,11 +44,12 @@ object DatedNoteReadStatus {
         ) {
             val text = line.text(markdown)
             val trimmed = text.trim()
-            val indentation = text.takeWhile { it == ' ' }.length
+            val indentation = indentationColumns(text)
             val marker = fenceMarker(trimmed)
             val fence = openFence
             if (fence != null) {
                 if (marker != null &&
+                    indentation <= 3 &&
                     marker.character == fence.character &&
                     marker.length >= fence.length &&
                     trimmed.length == marker.length
@@ -61,7 +62,7 @@ object DatedNoteReadStatus {
                 openFence = marker
                 continue
             }
-            if (indentation >= 4 || text.startsWith("\t")) continue
+            if (indentation >= 4) continue
             if (trimmed.startsWith("#") &&
                 !trimmed.startsWith("##") &&
                 trimmed.drop(1).isNotBlank()
@@ -70,6 +71,18 @@ object DatedNoteReadStatus {
             }
         }
         return null
+    }
+
+    private fun indentationColumns(text: String): Int {
+        var columns = 0
+        for (character in text) {
+            when (character) {
+                ' ' -> columns++
+                '\t' -> columns += 4 - columns % 4
+                else -> return columns
+            }
+        }
+        return columns
     }
 
     private fun fenceMarker(trimmed: String): Fence? {
