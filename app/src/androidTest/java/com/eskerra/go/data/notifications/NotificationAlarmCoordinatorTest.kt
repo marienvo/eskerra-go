@@ -68,6 +68,26 @@ class NotificationAlarmCoordinatorTest {
     }
 
     @Test
+    fun deadlineCrossingBeforeFirstDueCheckStillAppliesDesktopFilter() = runTest {
+        val deadline = at("2026-11-22T07:00:00")
+        var clockReads = 0
+        val fixture = Fixture(
+            markdown = mapOf(OLDER to "# Open"),
+            activity = DesktopActivityStatus.Inactive to deadline - 1,
+            currentTime = {
+                if (clockReads++ == 0) deadline - 1_000 else deadline
+            }
+        )
+        fixture.seed(listOf(event(OLDER)))
+        fixture.coordinator.reconcile(fixture.config)
+        assertEquals(listOf(true), fixture.desktopChecksOutsideMutex)
+        assertTrue(fixture.deliveries.isEmpty())
+        assertTrue(fixture.reads.isEmpty())
+        assertTrue(fixture.handled().contains(fixture.handledKey(OLDER)))
+        assertEquals(at("2026-11-23T07:00:00"), fixture.scheduler.next)
+    }
+
+    @Test
     fun temporaryDesktopFailureRetriesSameDay() = runTest {
         val fixture = Fixture(
             markdown = mapOf(NEWEST to "# Open"),

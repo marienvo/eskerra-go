@@ -66,7 +66,8 @@ class NotificationAlarmCoordinator(
         )
         val hasDue = initialState.pending.any { it.dueAtEpochMillis <= now } ||
             initialSchedules.any { it.dueAtEpochMillis <= now }
-        val activity = if (hasDue) {
+        val desktopChecked = hasDue
+        var activity = if (hasDue) {
             loadDesktopActivity(config, filesDir)
         } else {
             DesktopActivityStatus.Inactive to null
@@ -78,15 +79,32 @@ class NotificationAlarmCoordinator(
         now = clock()
         localZone = zone()
         today = java.time.Instant.ofEpochMilli(now).atZone(localZone).toLocalDate()
-        val state = loadState(workspace)
-        val settings = reminderSettings.load()
-        val schedules = DatedReminderPlanner.schedules(
+        var state = loadState(workspace)
+        var settings = reminderSettings.load()
+        var schedules = DatedReminderPlanner.schedules(
             state.records,
             state.handled,
             settings,
             now,
             localZone
         )
+        val hasNewDueWork = state.pending.any { it.dueAtEpochMillis <= now } ||
+            schedules.any { it.dueAtEpochMillis <= now }
+        if (hasNewDueWork && !desktopChecked) {
+            activity = loadDesktopActivity(config, filesDir)
+            now = clock()
+            localZone = zone()
+            today = java.time.Instant.ofEpochMilli(now).atZone(localZone).toLocalDate()
+            state = loadState(workspace)
+            settings = reminderSettings.load()
+            schedules = DatedReminderPlanner.schedules(
+                state.records,
+                state.handled,
+                settings,
+                now,
+                localZone
+            )
+        }
         val decision = DesktopActivityGate.decide(
             state.pending,
             activity.first,
