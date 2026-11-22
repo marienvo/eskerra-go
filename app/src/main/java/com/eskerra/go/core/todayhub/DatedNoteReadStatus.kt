@@ -90,12 +90,17 @@ object DatedNoteReadStatus {
             if (trimmed.startsWith("#") &&
                 trimmed.getOrNull(1)?.isWhitespace() == true &&
                 !trimmed.startsWith("##") &&
-                trimmed.drop(1).isNotBlank()
+                hasTitleContent(trimmed)
             ) {
                 return line
             }
         }
         return null
+    }
+
+    private fun hasTitleContent(source: String): Boolean {
+        val contentEnd = closingHashStart(source)?.let { it - 1 } ?: source.length
+        return source.substring(1, contentEnd).isNotBlank()
     }
 
     private fun indentationColumns(text: String): Int {

@@ -77,6 +77,14 @@ class DatedNoteReadStatusTest {
     }
 
     @Test
+    fun emptyHeadingWithClosingHashesIsSkipped() {
+        val source = "# ###\n# Dagboek"
+
+        assertFalse(DatedNoteReadStatus.hasTitle("# ###"))
+        assertEquals("# ###\n# Dagboek ✅", DatedNoteReadStatus.setRead(source, read = true))
+    }
+
+    @Test
     fun fencedCodeExamplesAreNeverMutatedAsTitles() {
         val source = "```md\n# Example\n```\n\n# Today\n\nBody"
 
