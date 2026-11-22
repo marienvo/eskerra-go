@@ -1,6 +1,7 @@
 package com.eskerra.go.data.notifications
 
 import android.content.Context
+import android.os.SystemClock
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.notifications.DatedNoteNotificationText
 import com.eskerra.go.core.notifications.DatedReminderHandled
@@ -16,6 +17,7 @@ import com.eskerra.go.core.repository.NoteContentRepository
 import com.eskerra.go.core.todayhub.NoteflowDatedNotes
 import com.eskerra.go.data.git.GitSyncMutex
 import com.eskerra.go.data.notes.FileNoteContentRepository
+import com.eskerra.go.data.perf.ColdStartTrace
 import java.io.File
 import java.time.ZoneId
 import kotlinx.coroutines.CancellationException
@@ -169,8 +171,9 @@ class NotificationAlarmCoordinator(
         }
     }
 
-    private suspend fun readLatest(config: WorkspaceConfig, noteId: String): String? =
-        gitSyncMutex.mutex.withLock {
+    private suspend fun readLatest(config: WorkspaceConfig, noteId: String): String? {
+        val startedAt = SystemClock.elapsedRealtime()
+        return gitSyncMutex.mutex.withLock {
             try {
                 notes.load(
                     config,
@@ -182,7 +185,13 @@ class NotificationAlarmCoordinator(
             } catch (_: Exception) {
                 null
             }
+        }.also {
+            ColdStartTrace.log(
+                "notification.alarmRead",
+                "took=${SystemClock.elapsedRealtime() - startedAt}ms"
+            )
         }
+    }
 
     private fun acknowledge(workspace: String, event: NotificationEvent) {
         NotificationSnapshotStore(context).use {

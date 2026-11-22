@@ -79,6 +79,21 @@ class NotificationSnapshotStoreTest {
         NotificationSnapshotStore(context).use { store ->
             assertEquals("inbox:a", store.pending(workspace).single().key)
             assertEquals(emptyList<NotificationEvent>(), store.datedNotes(workspace))
+            val existingInbox = NotificationEvent(
+                "inbox:a",
+                "Inbox/a.md",
+                NotificationEventType.INBOX,
+                0
+            )
+            val existingDated = NotificationEvent(
+                "dated:Flow/Work/2026-11-01.md",
+                "Flow/Work/2026-11-01.md",
+                NotificationEventType.DATED_NOTE,
+                0
+            )
+            store.replaceSnapshot(workspace, listOf(existingInbox, existingDated), 300)
+            assertEquals(listOf("inbox:a"), store.pending(workspace).map { it.key })
+            assertEquals(1, store.datedNotes(workspace).size)
         }
     }
 

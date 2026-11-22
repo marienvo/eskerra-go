@@ -110,6 +110,16 @@ class NotificationAlarmCoordinatorTest {
     }
 
     @Test
+    fun restartedCoordinatorDoesNotDeliverSameDayTwice() = runTest {
+        val fixture = Fixture(markdown = mapOf(NEWEST to "# Open"))
+        fixture.seed(listOf(event(NEWEST)))
+        fixture.coordinator.reconcile(fixture.config)
+        fixture.newCoordinator().reconcile(fixture.config)
+        assertEquals(1, fixture.deliveries.flatten().size)
+        assertEquals(1, fixture.reads.size)
+    }
+
+    @Test
     fun simultaneousFirstNotificationsAreDeliveredSeparately() = runTest {
         val other = "Flow/Home/2026-11-22.md"
         val fixture = Fixture(markdown = emptyMap())
@@ -125,8 +135,9 @@ class NotificationAlarmCoordinatorTest {
 
     private class Fixture(
         markdown: Map<String, String>,
-        activity: Pair<DesktopActivityStatus, Long?> = DesktopActivityStatus.Inactive to null,
-        deliverResult: Boolean = true
+        private val activity: Pair<DesktopActivityStatus, Long?> =
+            DesktopActivityStatus.Inactive to null,
+        private val deliverResult: Boolean = true
     ) {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val config = WorkspaceConfig("vault", "vault", "https://example.com", "main", 1)
@@ -158,7 +169,14 @@ class NotificationAlarmCoordinatorTest {
             override fun load() = DatedReminderSettings()
             override fun save(settings: DatedReminderSettings) = Result.success(Unit)
         }
-        val coordinator = NotificationAlarmCoordinator(
+        val coordinator = newCoordinator()
+
+        init {
+            context.getSharedPreferences("notification_settings", Context.MODE_PRIVATE)
+                .edit().putBoolean("enabled", true).commit()
+        }
+
+        fun newCoordinator() = NotificationAlarmCoordinator(
             context = context,
             filesDir = File("."),
             loadDesktopActivity = { _, _ ->
@@ -176,11 +194,6 @@ class NotificationAlarmCoordinatorTest {
             clock = { NOW },
             zone = { ZONE }
         )
-
-        init {
-            context.getSharedPreferences("notification_settings", Context.MODE_PRIVATE)
-                .edit().putBoolean("enabled", true).commit()
-        }
 
         fun seed(events: List<NotificationEvent>) {
             NotificationSnapshotStore(context).use {

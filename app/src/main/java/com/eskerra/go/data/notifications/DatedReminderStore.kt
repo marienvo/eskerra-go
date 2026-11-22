@@ -44,7 +44,7 @@ fun NotificationSnapshotStore.markDatedReminderHandled(
             "dated_handled",
             null,
             values,
-            SQLiteDatabase.CONFLICT_IGNORE
+            SQLiteDatabase.CONFLICT_REPLACE
         ) != -1L
     )
 }

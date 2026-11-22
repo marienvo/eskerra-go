@@ -13,7 +13,13 @@ internal object DatedNoteSnapshotStore {
                 "folder TEXT NOT NULL, date TEXT NOT NULL, first_seen_at INTEGER NOT NULL, " +
                 "message TEXT NOT NULL, PRIMARY KEY(workspace, note_id))"
         )
+        db.execSQL("CREATE TABLE dated_baseline (workspace TEXT PRIMARY KEY)")
     }
+
+    fun hasBaseline(db: SQLiteDatabase, workspace: String): Boolean = db.rawQuery(
+        "SELECT 1 FROM dated_baseline WHERE workspace = ?",
+        arrayOf(workspace)
+    ).use { it.moveToFirst() }
 
     fun replace(db: SQLiteDatabase, workspace: String, events: List<NotificationEvent>, now: Long) {
         val firstSeen = read(db, workspace).associate { it.noteId to it.firstSeenAtEpochMillis }
@@ -32,6 +38,15 @@ internal object DatedNoteSnapshotStore {
             }
             check(db.insertOrThrow("dated_notes", null, values) != -1L)
         }
+        val baseline = ContentValues().apply { put("workspace", workspace) }
+        check(
+            db.insertWithOnConflict(
+                "dated_baseline",
+                null,
+                baseline,
+                SQLiteDatabase.CONFLICT_REPLACE
+            ) != -1L
+        )
     }
 
     fun read(db: SQLiteDatabase, workspace: String): List<DatedNoteRecord> {
@@ -57,3 +72,14 @@ internal object DatedNoteSnapshotStore {
 
 fun NotificationSnapshotStore.datedNotes(workspace: String): List<DatedNoteRecord> =
     DatedNoteSnapshotStore.read(readableDatabase, workspace)
+
+fun NotificationSnapshotStore.resetDatedRegistration(workspace: String) {
+    writableDatabase.beginTransaction()
+    try {
+        writableDatabase.delete("dated_notes", "workspace = ?", arrayOf(workspace))
+        writableDatabase.delete("dated_baseline", "workspace = ?", arrayOf(workspace))
+        writableDatabase.setTransactionSuccessful()
+    } finally {
+        writableDatabase.endTransaction()
+    }
+}

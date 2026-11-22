@@ -57,7 +57,10 @@ class NotificationSnapshotStore(context: Context) :
             )
                 .use { cursor -> if (cursor.moveToFirst()) cursor.getLong(0) else null }
             val previous = if (lastScan == null) null else readSnapshot(db, workspace)
-            val due = NotificationEvents.newlyDue(previous, lastScan ?: 0L, events, now)
+            val due = NotificationEvents.newlyDue(previous, lastScan ?: 0L, events, now).filter {
+                it.type != NotificationEventType.DATED_NOTE ||
+                    DatedNoteSnapshotStore.hasBaseline(db, workspace)
+            }
             DatedNoteSnapshotStore.replace(db, workspace, events, now)
             if (previous != null) migratePending(db, workspace, previous, events)
             db.delete("snapshot", "workspace = ?", arrayOf(workspace))
@@ -172,6 +175,7 @@ class NotificationSnapshotStore(context: Context) :
                 "scan_meta",
                 "reminder_cache",
                 "dated_notes",
+                "dated_baseline",
                 "dated_handled"
             )) {
                 db.delete(table, "workspace = ?", arrayOf(workspace))
