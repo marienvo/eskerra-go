@@ -44,6 +44,15 @@ class DatedNoteReadStatusTest {
     }
 
     @Test
+    fun readMarkerBeforeClosingHashesRoundTripsExactly() {
+        val source = "# Dagboek ###  \r\n\r\nBody"
+        val read = DatedNoteReadStatus.setRead(source, read = true)
+
+        assertEquals("# Dagboek ✅ ###  \r\n\r\nBody", read)
+        assertEquals(source, DatedNoteReadStatus.setRead(read!!, read = false))
+    }
+
+    @Test
     fun missingTitleFailsClosed() {
         assertNull(DatedNoteReadStatus.setRead("Body only", read = true))
         assertFalse(DatedNoteReadStatus.hasTitle("## Subtitle"))

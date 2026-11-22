@@ -28,10 +28,25 @@ object DatedNoteReadStatus {
         val source = line.text(markdown)
         if (read == source.contains(DONE_MARK)) return markdown
 
-        if (read) return markdown.replaceRange(line.contentEnd, line.contentEnd, " $DONE_MARK")
+        if (read) {
+            val closingHashStart = closingHashStart(source)
+            if (closingHashStart != null) {
+                val insertion = line.start + closingHashStart
+                return markdown.replaceRange(insertion, insertion, "$DONE_MARK ")
+            }
+            return markdown.replaceRange(line.contentEnd, line.contentEnd, " $DONE_MARK")
+        }
 
         val updated = DONE_MARKS.replace(source, "")
         return markdown.replaceRange(line.start, line.contentEnd, updated)
+    }
+
+    private fun closingHashStart(source: String): Int? {
+        val contentEnd = source.trimEnd().length
+        var start = contentEnd
+        while (start > 0 && source[start - 1] == '#') start--
+        if (start == contentEnd || start == 0 || !source[start - 1].isWhitespace()) return null
+        return start
     }
 
     private fun firstTitleLine(markdown: String): Line? {
