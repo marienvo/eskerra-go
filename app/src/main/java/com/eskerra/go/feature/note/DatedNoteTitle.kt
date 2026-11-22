@@ -1,12 +1,9 @@
 package com.eskerra.go.feature.note
 
 import androidx.compose.animation.Crossfade
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -41,16 +38,8 @@ internal fun DatedNoteTitle(
             enabled = !isLoading,
             modifier = Modifier.semantics { contentDescription = actionLabel }
         ) {
-            Box(contentAlignment = Alignment.Center) {
-                Crossfade(targetState = isRead, label = "readStatusIcon") { read ->
-                    Text(text = if (read) "✅" else "⬜️", fontSize = 20.sp)
-                }
-                if (isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(32.dp),
-                        strokeWidth = 2.dp
-                    )
-                }
+            Crossfade(targetState = isRead, label = "readStatusIcon") { read ->
+                Text(text = if (read) "✅" else "⬜️", fontSize = 20.sp)
             }
         }
     }
