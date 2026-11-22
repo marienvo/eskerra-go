@@ -21,7 +21,9 @@ sealed interface NoteReaderUiState {
          * a warm hit. [com.eskerra.go.ui.markdown.VaultMarkdownView] renders it directly instead of
          * re-deriving it from the shared parse cache.
          */
-        val preparedBody: PreparedMarkdown
+        val preparedBody: PreparedMarkdown,
+        val readStatusMutationInProgress: Boolean = false,
+        val readStatusMessage: String? = null
     ) : NoteReaderUiState
 
     data object NotFound : NoteReaderUiState

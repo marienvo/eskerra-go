@@ -39,7 +39,8 @@ A change that cannot answer "which G is this?" in one type is mis-scoped.
   - `data/git/**` (JGit engine internals: `JGitRemoteSyncRepository`, `GitChangeStager`,
     `GitIndexLockRecovery`, `GitLocalBranchAlignment`, `SyncPathClassifier`, `GitSyncMutex`, …)
   - Markdown / vault write paths: `data/notes/FileNoteWriteRepository.kt`,
-    `core/usecase/SaveNote.kt`, `CreateInboxNote.kt`, `DeleteInboxNotes.kt`
+    `core/repository/DatedNoteReadStatusRepository.kt`, `core/usecase/SaveNote.kt`,
+    `SetDatedNoteReadStatus.kt`, `CreateInboxNote.kt`, `DeleteInboxNotes.kt`
   - FTS reconcile: `data/search/VaultSearchIndexer.kt`,
     `data/search/VaultSearchWorkspaceWalker.kt`, `data/search/SqliteVaultSearchRepository.kt`
   - Guardrail ratchets: `scripts/module-budget-baseline.json`, `app/archunit_store/**`

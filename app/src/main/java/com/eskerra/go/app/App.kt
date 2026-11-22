@@ -50,6 +50,7 @@ import com.eskerra.go.core.usecase.SaveNote
 import com.eskerra.go.core.usecase.SaveRemoteSyncSettings
 import com.eskerra.go.core.usecase.SaveVaultSettings
 import com.eskerra.go.core.usecase.SearchVault
+import com.eskerra.go.core.usecase.SetDatedNoteReadStatus
 import com.eskerra.go.core.usecase.SnoozeInboxNotes
 import com.eskerra.go.core.usecase.SyncBinaries
 import com.eskerra.go.core.usecase.TestRemoteConnection
@@ -80,6 +81,7 @@ fun App(
     snoozeInboxNotes: SnoozeInboxNotes,
     loadEditableNote: LoadEditableNote,
     saveNote: SaveNote,
+    setDatedNoteReadStatus: SetDatedNoteReadStatus,
     loadGitStatusSummary: LoadGitStatusSummary,
     loadTodayHub: LoadTodayHub,
     loadTodayHubRow: LoadTodayHubRow,
@@ -168,9 +170,7 @@ fun App(
         )
     )
     val todayHubState by todayHubViewModel.uiState.collectAsState()
-    LaunchedEffect(todayHubState) {
-        onTodayHubUiStateChanged(todayHubState)
-    }
+    LaunchedEffect(todayHubState) { onTodayHubUiStateChanged(todayHubState) }
     AppTodayHubEffects(todayHubViewModel, launchSettled)
     AppBootEffects(
         config = currentConfig,
@@ -213,9 +213,7 @@ fun App(
     val pullRefreshing by appSyncViewModel.pullRefreshing.collectAsState()
     val onSelectHub: (NoteId) -> Unit = { selected ->
         val activeHubId = (todayHubState as? TodayHubUiState.Content)?.activeHubId
-        if (selected != activeHubId) {
-            todayHubViewModel.selectHub(selected)
-        }
+        if (selected != activeHubId) todayHubViewModel.selectHub(selected)
         if (onInbox) {
             if (selected == activeHubId) homeReselectSignal++
         } else {
@@ -263,6 +261,7 @@ fun App(
             snoozeInboxNotes = snoozeInboxNotes,
             loadEditableNote = loadEditableNote,
             saveNote = saveNote,
+            setDatedNoteReadStatus = setDatedNoteReadStatus,
             loadGitStatusSummary = loadGitStatusSummary,
             loadTodayHub = loadTodayHub,
             activeTodayHubStore = activeTodayHubStore,

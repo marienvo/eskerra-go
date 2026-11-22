@@ -38,6 +38,7 @@ import com.eskerra.go.core.markdown.VaultReadonlyLink
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NoteRegistry
 import com.eskerra.go.core.todayhub.DatedNoteHeader
+import com.eskerra.go.core.todayhub.DatedNoteReadStatus
 import com.eskerra.go.data.perf.NoteNavTrace
 import com.eskerra.go.feature.todayhub.TodayHubHeader
 import com.eskerra.go.feature.todayhub.TodayHubUiState
@@ -69,6 +70,7 @@ fun NoteScreen(
     onOpenExternalUrl: (String) -> Unit,
     onAmbiguousWikiLink: (List<NoteId>, String) -> Unit,
     onNoteNotFound: (String) -> Unit = {},
+    onToggleDatedReadStatus: () -> Unit = {},
     workspaceRoot: File? = null,
     onViewportChanged: (
         visibleStartOffset: Int,
@@ -83,6 +85,10 @@ fun NoteScreen(
                 title = state.title,
                 path = state.path,
                 canEdit = state.canEdit,
+                markdown = state.document.content.markdown,
+                readStatusMutationInProgress = state.readStatusMutationInProgress,
+                readStatusMessage = state.readStatusMessage,
+                onToggleDatedReadStatus = onToggleDatedReadStatus,
                 preparedBody = state.preparedBody,
                 registry = state.document.registry,
                 sourceNoteId = state.document.note.id,
@@ -134,6 +140,10 @@ private fun NoteReaderContent(
     title: String,
     path: String,
     canEdit: Boolean,
+    markdown: String,
+    readStatusMutationInProgress: Boolean,
+    readStatusMessage: String?,
+    onToggleDatedReadStatus: () -> Unit,
     preparedBody: PreparedMarkdown,
     registry: NoteRegistry,
     sourceNoteId: NoteId,
@@ -245,12 +255,28 @@ private fun NoteReaderContent(
                     onNext = { datedHeader.next?.let(onOpenInternalNote) }
                 )
             }
-            Text(
-                text = title,
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(top = 10.dp, bottom = 4.dp)
-            )
+            if (datedHeader != null && DatedNoteReadStatus.hasTitle(markdown)) {
+                DatedNoteTitle(
+                    title = DatedNoteReadStatus.displayTitle(markdown) ?: title,
+                    isRead = DatedNoteReadStatus.isRead(markdown),
+                    isLoading = readStatusMutationInProgress,
+                    onToggleReadStatus = onToggleDatedReadStatus
+                )
+                if (readStatusMessage != null) {
+                    Text(
+                        text = readStatusMessage,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            } else {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(top = 10.dp, bottom = 4.dp)
+                )
+            }
         }
         itemsIndexed(
             items = blocks,

@@ -11,7 +11,7 @@
 
 ## Write boundary
 
-The app writes only Inbox notes through its note use cases. Other vault content is read-only in the UI; remote integration may update it during vault sync. Vault sync stages all safe changes and never has a special channel for individual generated files.
+The app writes Inbox notes through its note use cases. A dedicated dated-note use case may also add or remove `✅` in the first H1 to toggle read status; it re-reads the latest file while holding `GitSyncMutex`, preserves every other source character, and triggers the normal full sync after the local write. Other vault content is read-only in the UI; remote integration may update it during vault sync. Vault sync stages all safe changes and never has a special channel for individual generated files.
 
 ## Recovery and observability
 

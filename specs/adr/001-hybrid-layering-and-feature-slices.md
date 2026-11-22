@@ -43,7 +43,7 @@ Features vary mostly in UI and screen state. A single `presentation/` layer woul
 The note features (inbox, note, editor, add, sync) share one underlying model: a git-backed Markdown vault. Pure VSA would have each slice own its path to data, leading to either duplication of JGit calls, file I/O, and wiki-link parsing, or a de facto shared layer without explicit structure. Two properties force the shared core:
 
 1. **Fragile shared infrastructure.** The git working tree (locks, refs, checkout state) is one shared resource; independent per-feature access leads to sync corruption (see [`sync-hardening-and-recovery.md`](../architecture/sync-hardening-and-recovery.md)). Hence: "Git operations live only in `data/git`".
-2. **Cross-cutting domain rules.** "Inbox notes editable, all other notes read-only" spans multiple slices and must live in one place (`core`), not be copied and allowed to drift.
+2. **Cross-cutting domain rules.** "Inbox notes editable, all other notes read-only except the dated-note first-H1 read-status toggle" spans multiple slices and must live in one place (`core`), not be copied and allowed to drift.
 
 Layering also enables JVM unit tests for domain/data logic (`testDebugUnitTest` quality gate) without instrumented tests — enforced via the AGENTS.md rules "UI must not read files", "ViewModels must not depend on Android Context".
 

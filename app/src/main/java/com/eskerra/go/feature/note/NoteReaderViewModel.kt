@@ -13,15 +13,19 @@ import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NoteReaderDocument
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.repository.ParsedMarkdownCachePort
+import com.eskerra.go.core.todayhub.DatedNoteReadStatus
 import com.eskerra.go.core.usecase.LoadNoteForReading
 import com.eskerra.go.core.usecase.NotePrefetchScheduler
+import com.eskerra.go.core.usecase.SetDatedNoteReadStatus
 import com.eskerra.go.data.notes.ParsedMarkdownCache
 import com.eskerra.go.data.perf.NoteNavTrace
 import java.io.File
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class NoteReaderViewModel(
@@ -30,7 +34,9 @@ class NoteReaderViewModel(
     private val noteId: NoteId,
     private val loadNoteForReading: LoadNoteForReading,
     private val parsedMarkdownCache: ParsedMarkdownCachePort = ParsedMarkdownCache(),
-    private val notePrefetchScheduler: NotePrefetchScheduler? = null
+    private val notePrefetchScheduler: NotePrefetchScheduler? = null,
+    private val setDatedNoteReadStatus: SetDatedNoteReadStatus? = null,
+    private val operationScope: CoroutineScope? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<NoteReaderUiState>(NoteReaderUiState.Loading)
@@ -47,6 +53,72 @@ class NoteReaderViewModel(
     fun retry() {
         _uiState.value = NoteReaderUiState.Loading
         load()
+    }
+
+    fun toggleDatedNoteReadStatus(onPersisted: () -> Unit = {}) {
+        val setReadStatus = setDatedNoteReadStatus ?: return
+        val content = _uiState.value as? NoteReaderUiState.Content ?: return
+        if (content.readStatusMutationInProgress ||
+            !DatedNoteReadStatus.hasTitle(content.document.content.markdown)
+        ) {
+            return
+        }
+        val read = !DatedNoteReadStatus.isRead(content.document.content.markdown)
+        _uiState.update {
+            it.asContentFor(noteId)?.copy(
+                readStatusMutationInProgress = true,
+                readStatusMessage = null
+            ) ?: it
+        }
+
+        (operationScope ?: viewModelScope).launch {
+            setReadStatus(config, filesDir, noteId, read).fold(
+                onSuccess = { result ->
+                    try {
+                        val current = _uiState.value.asContentFor(noteId)
+                        if (current != null) {
+                            val bodyMarkdown = VaultMarkdownPreprocess.stripTitleHeading(
+                                result.markdown
+                            )
+                            val preparedBody = parsedMarkdownCache.get(bodyMarkdown)
+                            val latest = _uiState.value.asContentFor(noteId) ?: return@fold
+                            val title = DatedNoteReadStatus.title(result.markdown) ?: latest.title
+                            val document = latest.document.copy(
+                                note = latest.document.note.copy(title = title),
+                                content = latest.document.content.copy(markdown = result.markdown),
+                                registry = result.registry
+                            )
+                            currentDocument = document
+                            currentPreparedBody = preparedBody
+                            _uiState.update {
+                                it.asContentFor(noteId)?.copy(
+                                    title = title,
+                                    document = document,
+                                    bodyMarkdown = bodyMarkdown,
+                                    preparedBody = preparedBody,
+                                    readStatusMutationInProgress = false,
+                                    readStatusMessage = if (result.registryRefreshFailed) {
+                                        READ_STATUS_REFRESH_WARNING
+                                    } else {
+                                        null
+                                    }
+                                ) ?: it
+                            }
+                        }
+                    } finally {
+                        onPersisted()
+                    }
+                },
+                onFailure = {
+                    _uiState.update {
+                        it.asContentFor(noteId)?.copy(
+                            readStatusMutationInProgress = false,
+                            readStatusMessage = READ_STATUS_WRITE_ERROR
+                        ) ?: it
+                    }
+                }
+            )
+        }
     }
 
     private fun load() {
@@ -146,6 +218,9 @@ class NoteReaderViewModel(
         scheduler.submit(config, filesDir, ordered)
     }
 
+    private fun NoteReaderUiState.asContentFor(target: NoteId): NoteReaderUiState.Content? =
+        (this as? NoteReaderUiState.Content)?.takeIf { it.noteId == target }
+
     private fun mapFailure(error: Throwable): NoteReaderUiState {
         val contentError = (error as? NoteContentException)?.error
         return when (contentError) {
@@ -164,6 +239,9 @@ class NoteReaderViewModel(
         const val READ_ERROR_MESSAGE = "Could not open this note."
         const val WORKSPACE_UNAVAILABLE_MESSAGE = "Workspace is not available."
         const val WORKSPACE_MISSING_MESSAGE = "Workspace files are missing."
+        const val READ_STATUS_WRITE_ERROR = "Could not update read status."
+        const val READ_STATUS_REFRESH_WARNING =
+            "Read status saved, but the note list could not be refreshed."
 
         fun factory(
             config: WorkspaceConfig,
@@ -171,7 +249,9 @@ class NoteReaderViewModel(
             noteId: NoteId,
             loadNoteForReading: LoadNoteForReading,
             parsedMarkdownCache: ParsedMarkdownCachePort = ParsedMarkdownCache(),
-            notePrefetchScheduler: NotePrefetchScheduler? = null
+            notePrefetchScheduler: NotePrefetchScheduler? = null,
+            setDatedNoteReadStatus: SetDatedNoteReadStatus? = null,
+            operationScope: CoroutineScope? = null
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T = NoteReaderViewModel(
@@ -180,7 +260,9 @@ class NoteReaderViewModel(
                 noteId,
                 loadNoteForReading,
                 parsedMarkdownCache,
-                notePrefetchScheduler
+                notePrefetchScheduler,
+                setDatedNoteReadStatus,
+                operationScope
             ) as T
         }
     }
