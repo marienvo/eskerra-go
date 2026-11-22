@@ -26,7 +26,8 @@ class NotificationDelivery(private val context: Context) : NotificationEventDeli
                 it.type == com.eskerra.go.core.notifications.NotificationEventType.DATED_REMINDER
         } == true
         val notificationId = if (dated) {
-            datedNotificationId(events.single().noteId)
+            runCatching { DatedNotificationIdStore(context).idFor(events.single().noteId) }
+                .getOrElse { return false }
         } else {
             NOTIFICATION_ID
         }
@@ -94,9 +95,4 @@ class NotificationDelivery(private val context: Context) : NotificationEventDeli
         private const val CHANNEL_ID = "vault_events"
         private const val NOTIFICATION_ID = 4200
     }
-}
-
-internal fun datedNotificationId(noteId: String): Int {
-    val id = noteId.hashCode() and Int.MAX_VALUE
-    return if (id == 4200) 4201 else id
 }

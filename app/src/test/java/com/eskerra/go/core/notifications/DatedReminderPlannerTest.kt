@@ -57,8 +57,8 @@ class DatedReminderPlannerTest {
     }
 
     @Test
-    fun futureNoteBecomesDueOnItsOwnDate() {
-        val record = record("Flow/Work/2026-11-25.md")
+    fun futureNoteStartsDailyRemindersTheDayAfterItsDate() {
+        val record = record("Flow/Work/2026-11-25.md", firstAvailable = null)
         val schedules = DatedReminderPlanner.schedules(
             listOf(record),
             emptySet(),
@@ -66,7 +66,7 @@ class DatedReminderPlannerTest {
             now,
             zone
         )
-        assertEquals(at("2026-11-25T07:00:00"), schedules.single().dueAtEpochMillis)
+        assertEquals(at("2026-11-26T07:00:00"), schedules.single().dueAtEpochMillis)
     }
 
     @Test
@@ -137,14 +137,18 @@ class DatedReminderPlannerTest {
         assertEquals(at("2026-11-22T07:00:00"), winter)
     }
 
-    private fun record(noteId: String, firstSeen: Long = at("2026-11-01T08:00:00")) =
-        DatedNoteRecord(
-            noteId,
-            noteId.substringBeforeLast('/'),
-            noteId.substringAfterLast('/').removeSuffix(".md"),
-            firstSeen,
-            "Reminder"
-        )
+    private fun record(
+        noteId: String,
+        firstSeen: Long = at("2026-11-01T08:00:00"),
+        firstAvailable: Long? = firstSeen
+    ) = DatedNoteRecord(
+        noteId,
+        noteId.substringBeforeLast('/'),
+        noteId.substringAfterLast('/').removeSuffix(".md"),
+        firstSeen,
+        "Reminder",
+        firstAvailable
+    )
 
     private fun at(value: String): Long = LocalDateTime.parse(value).atZone(zone)
         .toInstant().toEpochMilli()

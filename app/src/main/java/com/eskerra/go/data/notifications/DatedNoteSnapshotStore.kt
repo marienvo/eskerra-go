@@ -11,7 +11,8 @@ internal object DatedNoteSnapshotStore {
         db.execSQL(
             "CREATE TABLE dated_notes (workspace TEXT NOT NULL, note_id TEXT NOT NULL, " +
                 "folder TEXT NOT NULL, date TEXT NOT NULL, first_seen_at INTEGER NOT NULL, " +
-                "message TEXT NOT NULL, PRIMARY KEY(workspace, note_id))"
+                "message TEXT NOT NULL, first_available_at INTEGER, " +
+                "PRIMARY KEY(workspace, note_id))"
         )
         db.execSQL("CREATE TABLE dated_baseline (workspace TEXT PRIMARY KEY)")
     }
@@ -22,7 +23,7 @@ internal object DatedNoteSnapshotStore {
     ).use { it.moveToFirst() }
 
     fun replace(db: SQLiteDatabase, workspace: String, events: List<NotificationEvent>, now: Long) {
-        val firstSeen = read(db, workspace).associate { it.noteId to it.firstSeenAtEpochMillis }
+        val previous = read(db, workspace).associateBy { it.noteId }
         db.delete("dated_notes", "workspace = ?", arrayOf(workspace))
         events.filter {
             it.type == NotificationEventType.DATED_NOTE ||
@@ -33,8 +34,12 @@ internal object DatedNoteSnapshotStore {
                 put("note_id", event.noteId)
                 put("folder", event.noteId.substringBeforeLast('/'))
                 put("date", event.noteId.substringAfterLast('/').removeSuffix(".md"))
-                put("first_seen_at", firstSeen[event.noteId] ?: now)
+                put("first_seen_at", previous[event.noteId]?.firstSeenAtEpochMillis ?: now)
                 put("message", event.message.orEmpty())
+                val firstAvailable = previous[event.noteId]?.firstAvailableAtEpochMillis
+                if (event.type == NotificationEventType.DATED_NOTE || firstAvailable != null) {
+                    put("first_available_at", firstAvailable ?: now)
+                }
             }
             check(db.insertOrThrow("dated_notes", null, values) != -1L)
         }
@@ -52,7 +57,8 @@ internal object DatedNoteSnapshotStore {
     fun read(db: SQLiteDatabase, workspace: String): List<DatedNoteRecord> {
         val result = mutableListOf<DatedNoteRecord>()
         db.rawQuery(
-            "SELECT note_id, folder, date, first_seen_at, message FROM dated_notes " +
+            "SELECT note_id, folder, date, first_seen_at, message, first_available_at " +
+                "FROM dated_notes " +
                 "WHERE workspace = ?",
             arrayOf(workspace)
         ).use { cursor ->
@@ -62,7 +68,8 @@ internal object DatedNoteSnapshotStore {
                     cursor.getString(1),
                     cursor.getString(2),
                     cursor.getLong(3),
-                    cursor.getString(4)
+                    cursor.getString(4),
+                    if (cursor.isNull(5)) null else cursor.getLong(5)
                 )
             }
         }

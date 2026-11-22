@@ -59,6 +59,7 @@ import com.eskerra.go.feature.todayhub.TodayHubUiState
 import com.eskerra.go.feature.todayhub.TodayHubViewModel
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 
 /** Wiring passed from [App] into the NavHost route builders. */
 internal data class AppNavGraphContext(
@@ -244,8 +245,10 @@ internal fun NavGraphBuilder.sharedDestinations(ctx: AppNavGraphContext) {
             factory = ReminderSettingsViewModel.factory(
                 repository = SharedPreferencesDatedReminderSettingsRepository(applicationContext),
                 onChanged = {
-                    runtime.workspaceStore.read()?.let {
-                        runtime.notificationAlarmCoordinator?.reconcile(it)
+                    runtime.applicationScope.launch {
+                        runtime.workspaceStore.read()?.let {
+                            runtime.notificationAlarmCoordinator?.reconcile(it)
+                        }
                     }
                 }
             )

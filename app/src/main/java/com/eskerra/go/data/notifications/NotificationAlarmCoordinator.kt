@@ -2,8 +2,10 @@ package com.eskerra.go.data.notifications
 
 import android.content.Context
 import android.os.SystemClock
+import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.WorkspaceConfig
 import com.eskerra.go.core.notifications.DatedNoteNotificationText
+import com.eskerra.go.core.notifications.DatedNoteRecord
 import com.eskerra.go.core.notifications.DatedReminderHandled
 import com.eskerra.go.core.notifications.DatedReminderPlanner
 import com.eskerra.go.core.notifications.DatedReminderSchedule
@@ -37,6 +39,7 @@ class NotificationAlarmCoordinator(
     private val reminderSettings: DatedReminderSettingsRepository =
         SharedPreferencesDatedReminderSettingsRepository(context),
     private val delivery: NotificationEventDelivery = NotificationDelivery(context),
+    private val isCurrentWorkspace: suspend (WorkspaceConfig) -> Boolean = { true },
     private val clock: () -> Long = System::currentTimeMillis,
     private val zone: () -> ZoneId = ZoneId::systemDefault
 ) {
@@ -53,13 +56,26 @@ class NotificationAlarmCoordinator(
         val now = clock()
         val localZone = zone()
         val today = java.time.Instant.ofEpochMilli(now).atZone(localZone).toLocalDate()
-        val state = NotificationSnapshotStore(context).use { store ->
-            AlarmState(
-                store.pending(workspace),
-                store.datedNotes(workspace),
-                store.datedReminderHandled(workspace).toMutableSet()
-            )
+        val initialState = loadState(workspace)
+        val initialSchedules = DatedReminderPlanner.schedules(
+            initialState.records,
+            initialState.handled,
+            reminderSettings.load(),
+            now,
+            localZone
+        )
+        val hasDue = initialState.pending.any { it.dueAtEpochMillis <= now } ||
+            initialSchedules.any { it.dueAtEpochMillis <= now }
+        val activity = if (hasDue) {
+            loadDesktopActivity(config, filesDir)
+        } else {
+            DesktopActivityStatus.Inactive to null
         }
+        if (!PostSyncNotificationRefresh.enabled(context) || !isCurrentWorkspace(config)) {
+            scheduler.cancel()
+            return
+        }
+        val state = loadState(workspace)
         val settings = reminderSettings.load()
         val schedules = DatedReminderPlanner.schedules(
             state.records,
@@ -68,129 +84,153 @@ class NotificationAlarmCoordinator(
             now,
             localZone
         )
-        val hasDue = state.pending.any { it.dueAtEpochMillis <= now } ||
-            schedules.any { it.dueAtEpochMillis <= now }
-        val activity = if (hasDue) {
-            loadDesktopActivity(config, filesDir)
-        } else {
-            DesktopActivityStatus.Inactive to null
-        }
         val decision = DesktopActivityGate.decide(
             state.pending,
             activity.first,
             activity.second,
             now
         )
-        val acknowledged = mutableSetOf<String>()
         for (event in state.pending.filter { it.key in decision.skippedEventKeys }) {
             acknowledge(workspace, event)
-            acknowledged += event.key
             if (event.type == NotificationEventType.DATED_NOTE) {
-                markHandled(workspace, state.handled, event.noteId, today.toString())
+                markHandled(workspace, event.noteId, today.toString())
             }
         }
         val deliverable = state.pending.filter { it.key in decision.deliverableEventKeys }
-        for (batch in deliveryBatches(deliverable)) {
-            if (!delivery.deliver(batch)) continue
-            for (event in batch) {
-                acknowledge(workspace, event)
-                acknowledged += event.key
-                if (event.type == NotificationEventType.DATED_NOTE) {
-                    markHandled(workspace, state.handled, event.noteId, today.toString())
-                }
+        for (event in deliverable.filter { it.type == NotificationEventType.DATED_NOTE }) {
+            deliverFirstDated(config, workspace, event, today.toString())
+        }
+        val bundled = deliverable.filterNot { it.type == NotificationEventType.DATED_NOTE }
+        if (bundled.isNotEmpty() && delivery.deliver(bundled)) {
+            for (event in bundled) acknowledge(workspace, event)
+        }
+        if (activity.first != DesktopActivityStatus.Unavailable) {
+            for (schedule in schedules.filter { it.dueAtEpochMillis <= now }) {
+                deliverDaily(
+                    config,
+                    workspace,
+                    schedule,
+                    activity.second,
+                    now,
+                    today.toString()
+                )
             }
         }
-        for (schedule in schedules.filter { it.dueAtEpochMillis <= now }) {
-            deliverDaily(
-                config,
-                workspace,
-                schedule,
-                state,
-                activity.first,
-                activity.second,
-                now,
-                today.toString()
-            )
-        }
-        val remaining = state.pending.filter { it.key !in acknowledged }
+        val finalState = loadState(workspace)
         val nextDaily = DatedReminderPlanner.schedules(
-            state.records,
-            state.handled,
-            settings,
+            finalState.records,
+            finalState.handled,
+            reminderSettings.load(),
             now,
             localZone
         )
-        val next = NotificationAlarmTiming.next(remaining, nextDaily, now)
+        val next = NotificationAlarmTiming.next(finalState.pending, nextDaily, now)
         if (next == null) scheduler.cancel() else scheduler.schedule(next)
+    }
+
+    private suspend fun deliverFirstDated(
+        config: WorkspaceConfig,
+        workspace: String,
+        event: NotificationEvent,
+        day: String
+    ) {
+        val startedAt = SystemClock.elapsedRealtime()
+        gitSyncMutex.mutex.withLock {
+            if (!canDeliver(config)) return@withLock
+            val markdown = readLatestLocked(config, event.noteId) ?: return@withLock
+            if (!NoteflowDatedNotes.isIncomplete(markdown)) {
+                acknowledge(workspace, event)
+                markHandled(workspace, event.noteId, day)
+                return@withLock
+            }
+            val fresh = event.copy(
+                message = DatedNoteNotificationText.resolve(event.noteId, markdown)
+            )
+            if (delivery.deliver(listOf(fresh))) {
+                acknowledge(workspace, event)
+                markHandled(workspace, event.noteId, day)
+            }
+        }
+        ColdStartTrace.log(
+            "notification.firstMutex",
+            "took=${SystemClock.elapsedRealtime() - startedAt}ms"
+        )
     }
 
     private suspend fun deliverDaily(
         config: WorkspaceConfig,
         workspace: String,
         schedule: DatedReminderSchedule,
-        state: AlarmState,
-        desktopActivity: DesktopActivityStatus,
         lastActivityAtEpochMillis: Long?,
         now: Long,
         day: String
     ) {
-        val today = java.time.LocalDate.parse(day)
-        val record = DatedReminderPlanner.latestAvailable(state.records, schedule.folder, today)
-            ?: return
-        val handled = DatedReminderHandled(record.noteId, day)
-        if (handled in state.handled) return
-        if (state.pending.any {
-                it.type == NotificationEventType.DATED_NOTE && it.noteId == record.noteId
+        val startedAt = SystemClock.elapsedRealtime()
+        gitSyncMutex.mutex.withLock {
+            if (!canDeliver(config, requireRepetition = true)) return@withLock
+            val state = loadState(workspace)
+            val record = DatedReminderPlanner.latestAvailable(
+                state.records,
+                schedule.folder,
+                java.time.LocalDate.parse(day)
+            ) ?: return@withLock
+            val handled = DatedReminderHandled(record.noteId, day)
+            if (handled in state.handled) return@withLock
+            if (state.pending.any {
+                    it.type == NotificationEventType.DATED_NOTE && it.noteId == record.noteId
+                }
+            ) {
+                markHandled(workspace, record.noteId, day)
+                return@withLock
             }
-        ) {
-            markHandled(workspace, state.handled, record.noteId, day)
-            return
+            if (lastActivityAtEpochMillis?.let {
+                    DesktopActivityGate.isActive(it, now)
+                } == true
+            ) {
+                markHandled(workspace, record.noteId, day)
+                return@withLock
+            }
+            val markdown = readLatestLocked(config, record.noteId) ?: return@withLock
+            if (!NoteflowDatedNotes.isIncomplete(markdown)) {
+                markHandled(workspace, record.noteId, day)
+                return@withLock
+            }
+            val event = NotificationEvent(
+                "dated-reminder:${record.folder}",
+                record.noteId,
+                NotificationEventType.DATED_REMINDER,
+                schedule.dueAtEpochMillis,
+                DatedNoteNotificationText.resolve(record.noteId, markdown)
+            )
+            if (delivery.deliver(listOf(event))) {
+                markHandled(workspace, record.noteId, day)
+            }
         }
-        if (desktopActivity == DesktopActivityStatus.Unavailable) return
-        if (lastActivityAtEpochMillis?.let {
-                DesktopActivityGate.isActive(it, now)
-            } == true
-        ) {
-            markHandled(workspace, state.handled, record.noteId, day)
-            return
-        }
-        val markdown = readLatest(config, record.noteId) ?: return
-        if (!NoteflowDatedNotes.isIncomplete(markdown)) {
-            markHandled(workspace, state.handled, record.noteId, day)
-            return
-        }
-        val event = NotificationEvent(
-            "dated-reminder:${record.folder}",
-            record.noteId,
-            NotificationEventType.DATED_REMINDER,
-            schedule.dueAtEpochMillis,
-            DatedNoteNotificationText.resolve(record.noteId, markdown)
+        ColdStartTrace.log(
+            "notification.dailyMutex",
+            "took=${SystemClock.elapsedRealtime() - startedAt}ms"
         )
-        if (delivery.deliver(listOf(event))) {
-            markHandled(workspace, state.handled, record.noteId, day)
-        }
     }
 
-    private suspend fun readLatest(config: WorkspaceConfig, noteId: String): String? {
-        val startedAt = SystemClock.elapsedRealtime()
-        return gitSyncMutex.mutex.withLock {
-            try {
-                notes.load(
-                    config,
-                    filesDir,
-                    com.eskerra.go.core.model.NoteId(noteId)
-                ).getOrThrow().markdown
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (_: Exception) {
-                null
-            }
-        }.also {
-            ColdStartTrace.log(
-                "notification.alarmRead",
-                "took=${SystemClock.elapsedRealtime() - startedAt}ms"
-            )
-        }
+    private suspend fun canDeliver(config: WorkspaceConfig, requireRepetition: Boolean = false) =
+        PostSyncNotificationRefresh.enabled(context) &&
+            isCurrentWorkspace(config) &&
+            (!requireRepetition || reminderSettings.load().enabled)
+
+    private suspend fun readLatestLocked(config: WorkspaceConfig, noteId: String): String? = try {
+        notes.load(config, filesDir, NoteId(noteId)).getOrThrow().markdown
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: Exception) {
+        null
+    }
+
+    private fun loadState(workspace: String): AlarmState = NotificationSnapshotStore(context).use {
+        AlarmState(
+            it.pending(workspace),
+            it.datedNotes(workspace),
+            it.datedReminderHandled(workspace)
+        )
     }
 
     private fun acknowledge(workspace: String, event: NotificationEvent) {
@@ -199,34 +239,16 @@ class NotificationAlarmCoordinator(
         }
     }
 
-    private fun markHandled(
-        workspace: String,
-        handled: MutableSet<DatedReminderHandled>,
-        noteId: String,
-        day: String
-    ) {
+    private fun markHandled(workspace: String, noteId: String, day: String) {
         NotificationSnapshotStore(context).use {
             it.markDatedReminderHandled(workspace, noteId, day)
         }
-        handled += DatedReminderHandled(noteId, day)
-    }
-
-    private fun deliveryBatches(events: List<NotificationEvent>): List<List<NotificationEvent>> {
-        val dated = events.filter {
-            it.type == NotificationEventType.DATED_NOTE ||
-                it.type == NotificationEventType.DATED_REMINDER
-        }.map(::listOf)
-        val bundled = events.filterNot {
-            it.type == NotificationEventType.DATED_NOTE ||
-                it.type == NotificationEventType.DATED_REMINDER
-        }
-        return if (bundled.isEmpty()) dated else dated + listOf(bundled)
     }
 
     private data class AlarmState(
         val pending: List<NotificationEvent>,
-        val records: List<com.eskerra.go.core.notifications.DatedNoteRecord>,
-        val handled: MutableSet<DatedReminderHandled>
+        val records: List<DatedNoteRecord>,
+        val handled: Set<DatedReminderHandled>
     )
 
     private companion object {

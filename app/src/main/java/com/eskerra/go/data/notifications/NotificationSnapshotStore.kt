@@ -13,7 +13,7 @@ import org.json.JSONObject
 
 /** Transactionally stores the last complete scan and queues newly due occurrences. */
 class NotificationSnapshotStore(context: Context) :
-    SQLiteOpenHelper(context.applicationContext, "notification-events.db", null, 4),
+    SQLiteOpenHelper(context.applicationContext, "notification-events.db", null, 5),
     NotificationSnapshotPersistence {
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
@@ -35,7 +35,7 @@ class NotificationSnapshotStore(context: Context) :
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        if (newVersion != 4 || oldVersion !in 1 until newVersion) {
+        if (newVersion != 5 || oldVersion !in 1 until newVersion) {
             error("Unsupported notification database upgrade: $oldVersion to $newVersion")
         }
         if (oldVersion < 2) createReminderCache(db)
@@ -45,6 +45,9 @@ class NotificationSnapshotStore(context: Context) :
             DatedNoteSnapshotStore.create(db)
         }
         DatedReminderStore.create(db)
+        if (oldVersion in 3 until 5) {
+            db.execSQL("ALTER TABLE dated_notes ADD COLUMN first_available_at INTEGER")
+        }
     }
 
     override fun replaceSnapshot(workspace: String, events: List<NotificationEvent>, now: Long) {

@@ -19,8 +19,9 @@ object DatedReminderPlanner {
             val candidate = sorted.lastOrNull {
                 LocalDate.parse(it.date) <= today
             } ?: sorted.first()
-            val firstReminderDay = Instant.ofEpochMilli(candidate.firstSeenAtEpochMillis)
-                .atZone(zone).toLocalDate().plusDays(1)
+            val firstReminderDay = candidate.firstAvailableAtEpochMillis?.let {
+                Instant.ofEpochMilli(it).atZone(zone).toLocalDate().plusDays(1)
+            } ?: LocalDate.parse(candidate.date).plusDays(1)
             var day = maxOf(today, LocalDate.parse(candidate.date), firstReminderDay)
             if (DatedReminderHandled(candidate.noteId, day.toString()) in handled) {
                 day = day.plusDays(1)

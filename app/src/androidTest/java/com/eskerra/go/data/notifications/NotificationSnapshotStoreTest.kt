@@ -126,6 +126,28 @@ class NotificationSnapshotStoreTest {
     }
 
     @Test
+    fun firstAvailableTimestampIsSetOnceWhenFutureNoteBecomesAvailable() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val workspace = "test-${UUID.randomUUID()}"
+        val noteId = "Flow/Work/2026-11-25.md"
+        val future = NotificationEvent(
+            "dated:$noteId",
+            noteId,
+            NotificationEventType.FUTURE_DATED_NOTE,
+            Long.MAX_VALUE
+        )
+        val available = future.copy(type = NotificationEventType.DATED_NOTE, dueAtEpochMillis = 0)
+        NotificationSnapshotStore(context).use { store ->
+            store.replaceSnapshot(workspace, listOf(future), 100)
+            assertEquals(null, store.datedNotes(workspace).single().firstAvailableAtEpochMillis)
+            store.replaceSnapshot(workspace, listOf(available), 200)
+            assertEquals(200, store.datedNotes(workspace).single().firstAvailableAtEpochMillis)
+            store.replaceSnapshot(workspace, listOf(available), 300)
+            assertEquals(200, store.datedNotes(workspace).single().firstAvailableAtEpochMillis)
+        }
+    }
+
+    @Test
     fun futureReminderIsQueuedBeforeItsDeadline() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val workspace = "test-${UUID.randomUUID()}"

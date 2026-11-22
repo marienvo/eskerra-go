@@ -96,8 +96,9 @@ class MainActivity : ComponentActivity() {
         )
         val syncRuntime = (applicationContext as SyncRuntimeProvider).syncRuntime
         notificationsEnabled = PostSyncNotificationRefresh.enabled(this)
-        notificationOpenRequest = NotificationOpenRequest(
-            intent.getStringArrayListExtra(NotificationDelivery.EXTRA_NOTE_IDS).orEmpty()
+        notificationOpenRequest = NotificationOpenRequest.next(
+            intent.getStringArrayListExtra(NotificationDelivery.EXTRA_NOTE_IDS).orEmpty(),
+            notificationOpenRequest
         )
         val workspaceStore = syncRuntime.workspaceStore
         val bootCacheStore = syncRuntime.bootCacheStore
@@ -318,8 +319,9 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        notificationOpenRequest = NotificationOpenRequest(
-            intent.getStringArrayListExtra(NotificationDelivery.EXTRA_NOTE_IDS).orEmpty()
+        notificationOpenRequest = NotificationOpenRequest.next(
+            intent.getStringArrayListExtra(NotificationDelivery.EXTRA_NOTE_IDS).orEmpty(),
+            notificationOpenRequest
         )
         shareConsumer.consume(intent)
     }

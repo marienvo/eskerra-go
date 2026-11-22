@@ -5,5 +5,6 @@ data class DatedNoteRecord(
     val folder: String,
     val date: String,
     val firstSeenAtEpochMillis: Long,
-    val message: String
+    val message: String,
+    val firstAvailableAtEpochMillis: Long? = firstSeenAtEpochMillis
 )

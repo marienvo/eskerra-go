@@ -51,13 +51,14 @@ class NotificationAlarmCoordinatorTest {
         )
         assertTrue(fixture.desktopChecksOutsideMutex.all { it })
         assertTrue(fixture.noteReadsInsideMutex.all { it })
+        assertTrue(fixture.deliveriesInsideMutex.all { it })
     }
 
     @Test
     fun activeDesktopSkipsDayWithoutReadingNote() = runTest {
         val fixture = Fixture(
             markdown = mapOf(NEWEST to "# Open"),
-            activity = DesktopActivityStatus.Inactive to 1L
+            activity = DesktopActivityStatus.Inactive to NOW - 1
         )
         fixture.seed(listOf(event(NEWEST)))
         fixture.coordinator.reconcile(fixture.config)
@@ -79,6 +80,41 @@ class NotificationAlarmCoordinatorTest {
     }
 
     @Test
+    fun disablingRepetitionDuringDesktopCheckPreventsStaleDelivery() = runTest {
+        lateinit var fixture: Fixture
+        fixture = Fixture(
+            markdown = mapOf(NEWEST to "# Open"),
+            onDesktopCheck = { fixture.repetitionEnabled = false }
+        )
+        fixture.seed(listOf(event(NEWEST)))
+        fixture.coordinator.reconcile(fixture.config)
+        assertTrue(fixture.deliveries.isEmpty())
+        assertTrue(fixture.reads.isEmpty())
+        assertTrue(fixture.handled().isEmpty())
+    }
+
+    @Test
+    fun newerCompletedNoteDuringDesktopCheckReplacesStaleCandidate() = runTest {
+        lateinit var fixture: Fixture
+        fixture = Fixture(
+            markdown = mapOf(OLDER to "# Open", NEWEST to "# ✅ Done"),
+            onDesktopCheck = {
+                NotificationSnapshotStore(fixture.context).use { store ->
+                    store.replaceSnapshot(
+                        fixture.workspace,
+                        listOf(event(OLDER), event(NEWEST, Long.MAX_VALUE)),
+                        NOW
+                    )
+                }
+            }
+        )
+        fixture.seed(listOf(event(OLDER)))
+        fixture.coordinator.reconcile(fixture.config)
+        assertTrue(fixture.deliveries.isEmpty())
+        assertEquals(listOf(NEWEST), fixture.reads)
+    }
+
+    @Test
     fun missingPermissionLeavesReminderForRetry() = runTest {
         val fixture = Fixture(markdown = mapOf(NEWEST to "# Open"), deliverResult = false)
         fixture.seed(listOf(event(NEWEST)))
@@ -89,14 +125,18 @@ class NotificationAlarmCoordinatorTest {
 
     @Test
     fun delayedFirstNotificationWinsOverDailyReminder() = runTest {
-        val fixture = Fixture(markdown = mapOf(NEWEST to "# Open"))
+        val fixture = Fixture(markdown = mapOf(OLDER to "# Open"))
         NotificationSnapshotStore(fixture.context).use { store ->
             store.replaceSnapshot(
                 fixture.workspace,
-                listOf(event(NEWEST, Long.MAX_VALUE, NotificationEventType.FUTURE_DATED_NOTE)),
+                listOf(event(OLDER, Long.MAX_VALUE, NotificationEventType.FUTURE_DATED_NOTE)),
                 FIRST_SEEN
             )
-            store.replaceSnapshot(fixture.workspace, listOf(event(NEWEST)), NOW - 1)
+            store.replaceSnapshot(
+                fixture.workspace,
+                listOf(event(OLDER)),
+                at("2026-11-21T08:00:00")
+            )
         }
         fixture.coordinator.reconcile(fixture.config)
         assertEquals(
@@ -105,8 +145,29 @@ class NotificationAlarmCoordinatorTest {
                 it.type
             }
         )
-        assertTrue(fixture.reads.isEmpty())
-        assertTrue(fixture.handled().contains(fixture.handledKey(NEWEST)))
+        assertEquals(listOf(OLDER), fixture.reads)
+        assertTrue(fixture.handled().contains(fixture.handledKey(OLDER)))
+    }
+
+    @Test
+    fun delayedFirstNotificationStopsWhenNoteWasCheckedLocally() = runTest {
+        val fixture = Fixture(markdown = mapOf(OLDER to "# ✅ Done"))
+        NotificationSnapshotStore(fixture.context).use { store ->
+            store.replaceSnapshot(
+                fixture.workspace,
+                listOf(event(OLDER, Long.MAX_VALUE, NotificationEventType.FUTURE_DATED_NOTE)),
+                FIRST_SEEN
+            )
+            store.replaceSnapshot(
+                fixture.workspace,
+                listOf(event(OLDER)),
+                at("2026-11-21T08:00:00")
+            )
+        }
+        fixture.coordinator.reconcile(fixture.config)
+        assertTrue(fixture.deliveries.isEmpty())
+        assertEquals(listOf(OLDER), fixture.reads)
+        assertTrue(fixture.pending().isEmpty())
     }
 
     @Test
@@ -122,7 +183,7 @@ class NotificationAlarmCoordinatorTest {
     @Test
     fun simultaneousFirstNotificationsAreDeliveredSeparately() = runTest {
         val other = "Flow/Home/2026-11-22.md"
-        val fixture = Fixture(markdown = emptyMap())
+        val fixture = Fixture(markdown = mapOf(NEWEST to "# Work", other to "# Home"))
         NotificationSnapshotStore(fixture.context).use { store ->
             store.replaceSnapshot(fixture.workspace, emptyList(), FIRST_SEEN)
             store.replaceSnapshot(fixture.workspace, listOf(event(NEWEST), event(other)), NOW - 1)
@@ -137,13 +198,21 @@ class NotificationAlarmCoordinatorTest {
         markdown: Map<String, String>,
         private val activity: Pair<DesktopActivityStatus, Long?> =
             DesktopActivityStatus.Inactive to null,
-        private val deliverResult: Boolean = true
+        private val deliverResult: Boolean = true,
+        private val onDesktopCheck: () -> Unit = {}
     ) {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        val config = WorkspaceConfig("vault", "vault", "https://example.com", "main", 1)
-        val workspace = "test-${UUID.randomUUID()}"
+        val config = WorkspaceConfig(
+            "vault",
+            "vault",
+            "https://example.com",
+            "main",
+            UUID.randomUUID().mostSignificantBits
+        )
+        val workspace = notificationWorkspaceKey(config)
         val scheduler = FakeScheduler()
         val deliveries = mutableListOf<List<NotificationEvent>>()
+        val deliveriesInsideMutex = mutableListOf<Boolean>()
         val reads = mutableListOf<String>()
         val desktopChecksOutsideMutex = mutableListOf<Boolean>()
         val noteReadsInsideMutex = mutableListOf<Boolean>()
@@ -165,8 +234,9 @@ class NotificationAlarmCoordinatorTest {
                 )
             }
         }
+        var repetitionEnabled = true
         private val settings = object : DatedReminderSettingsRepository {
-            override fun load() = DatedReminderSettings()
+            override fun load() = DatedReminderSettings(enabled = repetitionEnabled)
             override fun save(settings: DatedReminderSettings) = Result.success(Unit)
         }
         val coordinator = newCoordinator()
@@ -181,6 +251,7 @@ class NotificationAlarmCoordinatorTest {
             filesDir = File("."),
             loadDesktopActivity = { _, _ ->
                 desktopChecksOutsideMutex += !mutex.mutex.isLocked
+                onDesktopCheck()
                 activity
             },
             scheduler = scheduler,
@@ -189,6 +260,7 @@ class NotificationAlarmCoordinatorTest {
             reminderSettings = settings,
             delivery = { events ->
                 deliveries += events
+                deliveriesInsideMutex += mutex.mutex.isLocked
                 deliverResult
             },
             clock = { NOW },
@@ -204,6 +276,8 @@ class NotificationAlarmCoordinatorTest {
         fun handled() = NotificationSnapshotStore(context).use {
             it.datedReminderHandled(workspace)
         }
+
+        fun pending() = NotificationSnapshotStore(context).use { it.pending(workspace) }
 
         fun handledKey(noteId: String) =
             com.eskerra.go.core.notifications.DatedReminderHandled(noteId, "2026-11-22")
