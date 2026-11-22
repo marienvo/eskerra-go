@@ -53,5 +53,7 @@ class DatedNoteReadStatusTest {
     @Test
     fun titleMatchesReaderSummaryText() {
         assertEquals("Today ✅", DatedNoteReadStatus.title("# Today ✅\n\nBody"))
+        assertEquals("Today", DatedNoteReadStatus.displayTitle("# Today ✅\n\nBody"))
+        assertEquals("Today", DatedNoteReadStatus.displayTitle("# Today"))
     }
 }

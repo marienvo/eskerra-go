@@ -1,14 +1,8 @@
 package com.eskerra.go.app
 
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
@@ -38,6 +32,7 @@ import com.eskerra.go.core.usecase.SaveNote
 import com.eskerra.go.core.usecase.SaveRemoteSyncSettings
 import com.eskerra.go.core.usecase.SaveVaultSettings
 import com.eskerra.go.core.usecase.SearchVault
+import com.eskerra.go.core.usecase.SetDatedNoteReadStatus
 import com.eskerra.go.core.usecase.SnoozeInboxNotes
 import com.eskerra.go.core.usecase.SyncBinaries
 import com.eskerra.go.core.usecase.TestRemoteConnection
@@ -46,10 +41,6 @@ import com.eskerra.go.core.usecase.WarmNote
 import com.eskerra.go.feature.editor.NoteEditorScreen
 import com.eskerra.go.feature.editor.NoteEditorViewModel
 import com.eskerra.go.feature.inbox.InboxUiState
-import com.eskerra.go.feature.note.LocalDatedHeader
-import com.eskerra.go.feature.note.NoteReaderUiState
-import com.eskerra.go.feature.note.NoteReaderViewModel
-import com.eskerra.go.feature.note.NoteScreen
 import com.eskerra.go.feature.notifications.NotificationListScreen
 import com.eskerra.go.feature.search.SearchViewModel
 import com.eskerra.go.feature.sync.AppSyncViewModel
@@ -61,8 +52,6 @@ import com.eskerra.go.feature.sync.SyncUiState
 import com.eskerra.go.feature.sync.VaultSettingsViewModel
 import com.eskerra.go.feature.todayhub.TodayHubUiState
 import com.eskerra.go.feature.todayhub.TodayHubViewModel
-import com.eskerra.go.ui.markdown.AmbiguousWikiLinkSheet
-import com.eskerra.go.ui.markdown.LocalParsedMarkdownCache
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 
@@ -92,6 +81,7 @@ internal data class AppNavGraphContext(
     val snoozeInboxNotes: SnoozeInboxNotes,
     val loadEditableNote: LoadEditableNote,
     val saveNote: SaveNote,
+    val setDatedNoteReadStatus: SetDatedNoteReadStatus,
     val loadGitStatusSummary: LoadGitStatusSummary,
     val loadTodayHub: LoadTodayHub,
     val activeTodayHubStore: ActiveTodayHubStore,
@@ -248,101 +238,7 @@ internal fun NavGraphBuilder.sharedDestinations(ctx: AppNavGraphContext) {
         )
     }
 
-    opaqueComposable(
-        route = AppRoute.NOTE_PATTERN,
-        arguments = listOf(
-            navArgument(AppRoute.NOTE_ARG) { type = NavType.StringType },
-            navArgument(AppRoute.NOTE_SOURCE_ARG) {
-                type = NavType.StringType
-                defaultValue = NoteOpenSource.IN_APP.routeValue
-            }
-        )
-    ) { entry ->
-        val noteRouteScope = rememberCoroutineScope()
-        val raw = entry.arguments?.getString(AppRoute.NOTE_ARG).orEmpty()
-        val noteId = AppRoute.decodeNoteId(raw)
-        val parsedMarkdownCache = LocalParsedMarkdownCache.current
-        val noteReaderViewModel: NoteReaderViewModel = viewModel(
-            factory = NoteReaderViewModel.factory(
-                config = ctx.currentConfig,
-                filesDir = ctx.filesDir,
-                noteId = noteId,
-                loadNoteForReading = ctx.loadNoteForReading,
-                parsedMarkdownCache = parsedMarkdownCache,
-                notePrefetchScheduler = ctx.notePrefetchScheduler
-            )
-        )
-        val readerState by noteReaderViewModel.uiState.collectAsState()
-
-        LaunchedEffect(ctx.currentRoute) {
-            if (consumeNoteReaderChanged(ctx.currentRoute, noteId, entry.savedStateHandle)) {
-                noteReaderViewModel.retry()
-            }
-        }
-
-        val noteReaderContext = LocalContext.current
-        var ambiguousCandidates by remember { mutableStateOf<List<NoteId>?>(null) }
-        val notificationOpen = AppRoute.isNotificationNoteSource(
-            entry.arguments?.getString(AppRoute.NOTE_SOURCE_ARG)
-        )
-        val datedHeader = datedNoteHeader(
-            ctx,
-            noteId,
-            (readerState as? NoteReaderUiState.Content)?.document,
-            ctx.todayHubUiState as? TodayHubUiState.Content,
-            notificationOpen,
-            ctx.todayHubViewModel::selectHubFromNotification
-        )
-
-        CompositionLocalProvider(LocalDatedHeader provides datedHeader) {
-            NoteScreen(
-                state = readerState,
-                onRetry = noteReaderViewModel::retry,
-                onEdit = { ctx.navController.navigate(AppRoute.editor(noteId)) },
-                onOpenInternalNote = { targetId: NoteId ->
-                    ctx.noteOpenGate.openNoteWithWarmBudget(
-                        noteRouteScope,
-                        ctx.warmNote,
-                        ctx.currentConfig,
-                        ctx.filesDir,
-                        ctx.navController,
-                        targetId
-                    )
-                },
-                onOpenExternalUrl = { url: String ->
-                    openExternalUrl(noteReaderContext, url)
-                },
-                onAmbiguousWikiLink = { candidates: List<NoteId>, _: String ->
-                    ambiguousCandidates = candidates
-                },
-                onNoteNotFound = { message: String ->
-                    showNoteNotFoundToast(noteReaderContext, message)
-                },
-                workspaceRoot = ctx.workspaceRoot,
-                onViewportChanged = noteReaderViewModel::onViewportChanged
-            )
-        }
-
-        val registry = (readerState as? NoteReaderUiState.Content)?.document?.registry
-        if (ambiguousCandidates != null && registry != null) {
-            AmbiguousWikiLinkSheet(
-                candidates = ambiguousCandidates!!,
-                registry = registry,
-                onPickNote = { picked ->
-                    ambiguousCandidates = null
-                    ctx.noteOpenGate.openNoteWithWarmBudget(
-                        noteRouteScope,
-                        ctx.warmNote,
-                        ctx.currentConfig,
-                        ctx.filesDir,
-                        ctx.navController,
-                        picked
-                    )
-                },
-                onDismiss = { ambiguousCandidates = null }
-            )
-        }
-    }
+    noteReaderGraph(ctx)
 
     opaqueComposable(
         route = AppRoute.EDITOR_PATTERN,

@@ -19,6 +19,9 @@ object DatedNoteReadStatus {
         ?.removePrefix("#")
         ?.trim()
 
+    fun displayTitle(markdown: String): String? = title(markdown)
+        ?.let { DONE_MARKS.replace(it, "").trimEnd() }
+
     /** Returns null without a first H1, and otherwise changes only that source line. */
     fun setRead(markdown: String, read: Boolean): String? {
         val line = firstTitleLine(markdown) ?: return null
