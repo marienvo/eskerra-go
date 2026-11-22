@@ -98,6 +98,54 @@ class NotificationSnapshotStoreTest {
     }
 
     @Test
+    fun upgradeFromVersionFourAddsAvailabilityWithoutRecreatingHandledTable() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val workspace = "test-${UUID.randomUUID()}"
+        context.deleteDatabase("notification-events.db")
+        val path = context.getDatabasePath("notification-events.db").absolutePath
+        SQLiteDatabase.openOrCreateDatabase(path, null).use { db ->
+            db.execSQL(
+                "CREATE TABLE scan_meta (workspace TEXT PRIMARY KEY, scanned_at INTEGER NOT NULL)"
+            )
+            db.execSQL(
+                "CREATE TABLE snapshot (workspace TEXT NOT NULL, event_key TEXT NOT NULL, " +
+                    "note_id TEXT NOT NULL, type TEXT NOT NULL, due_at INTEGER NOT NULL, " +
+                    "message TEXT, PRIMARY KEY(workspace, event_key))"
+            )
+            db.execSQL(
+                "CREATE TABLE pending (workspace TEXT NOT NULL, event_key TEXT NOT NULL, " +
+                    "note_id TEXT NOT NULL, type TEXT NOT NULL, due_at INTEGER NOT NULL, " +
+                    "message TEXT, PRIMARY KEY(workspace, event_key))"
+            )
+            db.execSQL(
+                "CREATE TABLE reminder_cache (workspace TEXT NOT NULL, note_id TEXT NOT NULL, " +
+                    "signature TEXT NOT NULL, payload TEXT NOT NULL, PRIMARY KEY(workspace, note_id))"
+            )
+            db.execSQL(
+                "CREATE TABLE dated_notes (workspace TEXT NOT NULL, note_id TEXT NOT NULL, " +
+                    "folder TEXT NOT NULL, date TEXT NOT NULL, first_seen_at INTEGER NOT NULL, " +
+                    "message TEXT NOT NULL, PRIMARY KEY(workspace, note_id))"
+            )
+            db.execSQL("CREATE TABLE dated_baseline (workspace TEXT PRIMARY KEY)")
+            db.execSQL(
+                "CREATE TABLE dated_handled (workspace TEXT NOT NULL, note_id TEXT NOT NULL, " +
+                    "day TEXT NOT NULL, PRIMARY KEY(workspace, note_id, day))"
+            )
+            db.version = 4
+        }
+        NotificationSnapshotStore(context).use { store ->
+            val event = NotificationEvent(
+                "dated:Flow/Work/2026-11-01.md",
+                "Flow/Work/2026-11-01.md",
+                NotificationEventType.DATED_NOTE,
+                0
+            )
+            store.replaceSnapshot(workspace, listOf(event), 300)
+            assertEquals(300, store.datedNotes(workspace).single().firstAvailableAtEpochMillis)
+        }
+    }
+
+    @Test
     fun datedNotesRetainFirstSeenAndQueueEveryNewNote() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val workspace = "test-${UUID.randomUUID()}"

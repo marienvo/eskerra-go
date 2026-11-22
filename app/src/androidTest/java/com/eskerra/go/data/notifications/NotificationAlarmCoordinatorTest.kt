@@ -94,15 +94,15 @@ class NotificationAlarmCoordinatorTest {
     }
 
     @Test
-    fun newerCompletedNoteDuringDesktopCheckReplacesStaleCandidate() = runTest {
+    fun newerNoteDuringDesktopCheckGetsFirstNotificationInsteadOfStaleReminder() = runTest {
         lateinit var fixture: Fixture
         fixture = Fixture(
-            markdown = mapOf(OLDER to "# Open", NEWEST to "# ✅ Done"),
+            markdown = mapOf(OLDER to "# Open", NEWEST to "# Open"),
             onDesktopCheck = {
                 NotificationSnapshotStore(fixture.context).use { store ->
                     store.replaceSnapshot(
                         fixture.workspace,
-                        listOf(event(OLDER), event(NEWEST, Long.MAX_VALUE)),
+                        listOf(event(OLDER), event(NEWEST)),
                         NOW
                     )
                 }
@@ -110,8 +110,28 @@ class NotificationAlarmCoordinatorTest {
         )
         fixture.seed(listOf(event(OLDER)))
         fixture.coordinator.reconcile(fixture.config)
-        assertTrue(fixture.deliveries.isEmpty())
+        assertEquals(listOf(NEWEST), fixture.deliveries.flatten().map { it.noteId })
+        assertEquals(
+            listOf(NotificationEventType.DATED_NOTE),
+            fixture.deliveries.flatten().map { it.type }
+        )
         assertEquals(listOf(NEWEST), fixture.reads)
+    }
+
+    @Test
+    fun desktopCheckAcrossMidnightLetsPreviousDayExpire() = runTest {
+        var currentTime = at("2026-11-22T23:59:00")
+        val fixture = Fixture(
+            markdown = mapOf(OLDER to "# Open"),
+            onDesktopCheck = { currentTime = at("2026-11-23T00:01:00") },
+            currentTime = { currentTime }
+        )
+        fixture.seed(listOf(event(OLDER)))
+        fixture.coordinator.reconcile(fixture.config)
+        assertTrue(fixture.deliveries.isEmpty())
+        assertTrue(fixture.reads.isEmpty())
+        assertTrue(fixture.handled().isEmpty())
+        assertEquals(at("2026-11-23T07:00:00"), fixture.scheduler.next)
     }
 
     @Test
@@ -199,7 +219,8 @@ class NotificationAlarmCoordinatorTest {
         private val activity: Pair<DesktopActivityStatus, Long?> =
             DesktopActivityStatus.Inactive to null,
         private val deliverResult: Boolean = true,
-        private val onDesktopCheck: () -> Unit = {}
+        private val onDesktopCheck: () -> Unit = {},
+        private val currentTime: () -> Long = { NOW }
     ) {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val config = WorkspaceConfig(
@@ -263,7 +284,7 @@ class NotificationAlarmCoordinatorTest {
                 deliveriesInsideMutex += mutex.mutex.isLocked
                 deliverResult
             },
-            clock = { NOW },
+            clock = currentTime,
             zone = { ZONE }
         )
 

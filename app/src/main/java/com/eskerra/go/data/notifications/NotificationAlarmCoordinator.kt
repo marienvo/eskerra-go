@@ -53,9 +53,9 @@ class NotificationAlarmCoordinator(
             return
         }
         val workspace = notificationWorkspaceKey(config)
-        val now = clock()
-        val localZone = zone()
-        val today = java.time.Instant.ofEpochMilli(now).atZone(localZone).toLocalDate()
+        var now = clock()
+        var localZone = zone()
+        var today = java.time.Instant.ofEpochMilli(now).atZone(localZone).toLocalDate()
         val initialState = loadState(workspace)
         val initialSchedules = DatedReminderPlanner.schedules(
             initialState.records,
@@ -75,6 +75,9 @@ class NotificationAlarmCoordinator(
             scheduler.cancel()
             return
         }
+        now = clock()
+        localZone = zone()
+        today = java.time.Instant.ofEpochMilli(now).atZone(localZone).toLocalDate()
         val state = loadState(workspace)
         val settings = reminderSettings.load()
         val schedules = DatedReminderPlanner.schedules(

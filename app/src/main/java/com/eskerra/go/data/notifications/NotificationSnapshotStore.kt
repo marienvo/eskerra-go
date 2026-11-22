@@ -44,7 +44,7 @@ class NotificationSnapshotStore(context: Context) :
             db.execSQL("ALTER TABLE pending ADD COLUMN message TEXT")
             DatedNoteSnapshotStore.create(db)
         }
-        DatedReminderStore.create(db)
+        if (oldVersion < 4) DatedReminderStore.create(db)
         if (oldVersion in 3 until 5) {
             db.execSQL("ALTER TABLE dated_notes ADD COLUMN first_available_at INTEGER")
         }
