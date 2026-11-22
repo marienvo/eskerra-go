@@ -47,7 +47,15 @@ class DatedNoteReadStatusTest {
     fun missingTitleFailsClosed() {
         assertNull(DatedNoteReadStatus.setRead("Body only", read = true))
         assertFalse(DatedNoteReadStatus.hasTitle("## Subtitle"))
+        assertFalse(DatedNoteReadStatus.hasTitle("#tag"))
         assertTrue(DatedNoteReadStatus.hasTitle("# Title"))
+    }
+
+    @Test
+    fun hashTagAboveTitleIsNotMutated() {
+        val source = "#tag\n# Dagboek"
+
+        assertEquals("#tag\n# Dagboek ✅", DatedNoteReadStatus.setRead(source, read = true))
     }
 
     @Test

@@ -73,6 +73,7 @@ object DatedNoteReadStatus {
             }
             if (indentation >= 4) continue
             if (trimmed.startsWith("#") &&
+                trimmed.getOrNull(1)?.isWhitespace() == true &&
                 !trimmed.startsWith("##") &&
                 trimmed.drop(1).isNotBlank()
             ) {
