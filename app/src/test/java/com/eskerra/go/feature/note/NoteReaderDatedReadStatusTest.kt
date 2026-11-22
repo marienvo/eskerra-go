@@ -1,5 +1,6 @@
 package com.eskerra.go.feature.note
 
+import androidx.lifecycle.ViewModelStore
 import com.eskerra.go.core.markdown.PreparedMarkdown
 import com.eskerra.go.core.model.NoteId
 import com.eskerra.go.core.model.NotePath
@@ -15,6 +16,7 @@ import com.eskerra.go.data.notes.NoteRegistryCache
 import com.eskerra.go.data.notes.ParsedMarkdownCache
 import com.eskerra.go.data.workspace.WorkspacePaths
 import java.io.File
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -111,9 +113,58 @@ class NoteReaderDatedReadStatusTest {
         assertEquals(1, repository.calls)
     }
 
+    @Test
+    fun successfulToggleReparsesLatestExternalBody() = runTest {
+        val parsedBodies = mutableListOf<String>()
+        val parsedCache = ParsedMarkdownCache(
+            prepare = { body ->
+                parsedBodies += body
+                PreparedMarkdown(emptyList())
+            }
+        )
+        val repository = FakeDatedRepository(Result.success("# Today ✅\n\nNew external body"))
+        val viewModel = createViewModel(
+            repository,
+            "# Today\n\nOld body",
+            parsedMarkdownCache = parsedCache
+        )
+
+        viewModel.toggleDatedNoteReadStatus()
+
+        val state = viewModel.uiState.value as NoteReaderUiState.Content
+        assertEquals("New external body", state.bodyMarkdown)
+        assertEquals("New external body", parsedBodies.last())
+    }
+
+    @Test
+    fun readerClearAfterWriteStillPublishesPersistedCallback() = runTest {
+        val operationScope = CoroutineScope(StandardTestDispatcher(testScheduler))
+        val store = ViewModelStore()
+        val repository = FakeDatedRepository(
+            Result.success("# Today ✅\n\nBody"),
+            onWrite = { store.clear() }
+        )
+        val viewModel = createViewModel(
+            repository,
+            "# Today\n\nBody",
+            operationScope = operationScope
+        )
+        store.put("reader", viewModel)
+        var persisted = 0
+
+        viewModel.toggleDatedNoteReadStatus { persisted++ }
+        advanceUntilIdle()
+
+        assertEquals(1, persisted)
+    }
+
     private fun createViewModel(
         repository: FakeDatedRepository,
-        markdown: String
+        markdown: String,
+        parsedMarkdownCache: ParsedMarkdownCache = ParsedMarkdownCache(
+            prepare = { PreparedMarkdown(emptyList()) }
+        ),
+        operationScope: CoroutineScope? = null
     ): NoteReaderViewModel {
         val registryCache = NoteRegistryCache(
             FakeNoteRegistryRepository.withInboxNotes(
@@ -128,16 +179,16 @@ class NoteReaderDatedReadStatusTest {
                 registryCache,
                 FakeNoteContentRepository.withContent(noteId, markdown)
             ),
-            parsedMarkdownCache = ParsedMarkdownCache(
-                prepare = { PreparedMarkdown(emptyList()) }
-            ),
-            setDatedNoteReadStatus = SetDatedNoteReadStatus(repository, registryCache)
+            parsedMarkdownCache = parsedMarkdownCache,
+            setDatedNoteReadStatus = SetDatedNoteReadStatus(repository, registryCache),
+            operationScope = operationScope
         )
     }
 
     private class FakeDatedRepository(
         private val result: Result<String>,
-        private val delayMs: Long = 0L
+        private val delayMs: Long = 0L,
+        private val onWrite: () -> Unit = {}
     ) : DatedNoteReadStatusRepository {
         var calls = 0
             private set
@@ -150,6 +201,7 @@ class NoteReaderDatedReadStatusTest {
         ): Result<String> {
             calls++
             if (delayMs > 0L) delay(delayMs)
+            onWrite()
             return result
         }
     }

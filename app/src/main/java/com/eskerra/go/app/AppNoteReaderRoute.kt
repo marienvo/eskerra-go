@@ -46,7 +46,8 @@ internal fun NavGraphBuilder.noteReaderGraph(ctx: AppNavGraphContext) {
                 loadNoteForReading = ctx.loadNoteForReading,
                 parsedMarkdownCache = parsedMarkdownCache,
                 notePrefetchScheduler = ctx.notePrefetchScheduler,
-                setDatedNoteReadStatus = ctx.setDatedNoteReadStatus
+                setDatedNoteReadStatus = ctx.setDatedNoteReadStatus,
+                operationScope = ctx.scope
             )
         )
         val readerState by noteReaderViewModel.uiState.collectAsState()

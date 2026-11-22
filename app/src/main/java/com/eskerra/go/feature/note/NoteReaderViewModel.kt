@@ -20,6 +20,7 @@ import com.eskerra.go.core.usecase.SetDatedNoteReadStatus
 import com.eskerra.go.data.notes.ParsedMarkdownCache
 import com.eskerra.go.data.perf.NoteNavTrace
 import java.io.File
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -34,7 +35,8 @@ class NoteReaderViewModel(
     private val loadNoteForReading: LoadNoteForReading,
     private val parsedMarkdownCache: ParsedMarkdownCachePort = ParsedMarkdownCache(),
     private val notePrefetchScheduler: NotePrefetchScheduler? = null,
-    private val setDatedNoteReadStatus: SetDatedNoteReadStatus? = null
+    private val setDatedNoteReadStatus: SetDatedNoteReadStatus? = null,
+    private val operationScope: CoroutineScope? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<NoteReaderUiState>(NoteReaderUiState.Loading)
@@ -69,30 +71,43 @@ class NoteReaderViewModel(
             ) ?: it
         }
 
-        viewModelScope.launch {
+        (operationScope ?: viewModelScope).launch {
             setReadStatus(config, filesDir, noteId, read).fold(
                 onSuccess = { result ->
-                    val current = _uiState.value.asContentFor(noteId) ?: return@fold
-                    val title = DatedNoteReadStatus.title(result.markdown) ?: current.title
-                    val document = current.document.copy(
-                        note = current.document.note.copy(title = title),
-                        content = current.document.content.copy(markdown = result.markdown),
-                        registry = result.registry
-                    )
-                    currentDocument = document
-                    _uiState.update {
-                        it.asContentFor(noteId)?.copy(
-                            title = title,
-                            document = document,
-                            readStatusMutationInProgress = false,
-                            readStatusMessage = if (result.registryRefreshFailed) {
-                                READ_STATUS_REFRESH_WARNING
-                            } else {
-                                null
+                    try {
+                        val current = _uiState.value.asContentFor(noteId)
+                        if (current != null) {
+                            val bodyMarkdown = VaultMarkdownPreprocess.stripTitleHeading(
+                                result.markdown
+                            )
+                            val preparedBody = parsedMarkdownCache.get(bodyMarkdown)
+                            val latest = _uiState.value.asContentFor(noteId) ?: return@fold
+                            val title = DatedNoteReadStatus.title(result.markdown) ?: latest.title
+                            val document = latest.document.copy(
+                                note = latest.document.note.copy(title = title),
+                                content = latest.document.content.copy(markdown = result.markdown),
+                                registry = result.registry
+                            )
+                            currentDocument = document
+                            currentPreparedBody = preparedBody
+                            _uiState.update {
+                                it.asContentFor(noteId)?.copy(
+                                    title = title,
+                                    document = document,
+                                    bodyMarkdown = bodyMarkdown,
+                                    preparedBody = preparedBody,
+                                    readStatusMutationInProgress = false,
+                                    readStatusMessage = if (result.registryRefreshFailed) {
+                                        READ_STATUS_REFRESH_WARNING
+                                    } else {
+                                        null
+                                    }
+                                ) ?: it
                             }
-                        ) ?: it
+                        }
+                    } finally {
+                        onPersisted()
                     }
-                    onPersisted()
                 },
                 onFailure = {
                     _uiState.update {
@@ -235,7 +250,8 @@ class NoteReaderViewModel(
             loadNoteForReading: LoadNoteForReading,
             parsedMarkdownCache: ParsedMarkdownCachePort = ParsedMarkdownCache(),
             notePrefetchScheduler: NotePrefetchScheduler? = null,
-            setDatedNoteReadStatus: SetDatedNoteReadStatus? = null
+            setDatedNoteReadStatus: SetDatedNoteReadStatus? = null,
+            operationScope: CoroutineScope? = null
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T = NoteReaderViewModel(
@@ -245,7 +261,8 @@ class NoteReaderViewModel(
                 loadNoteForReading,
                 parsedMarkdownCache,
                 notePrefetchScheduler,
-                setDatedNoteReadStatus
+                setDatedNoteReadStatus,
+                operationScope
             ) as T
         }
     }
