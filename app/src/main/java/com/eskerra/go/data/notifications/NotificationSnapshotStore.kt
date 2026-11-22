@@ -13,7 +13,7 @@ import org.json.JSONObject
 
 /** Transactionally stores the last complete scan and queues newly due occurrences. */
 class NotificationSnapshotStore(context: Context) :
-    SQLiteOpenHelper(context.applicationContext, "notification-events.db", null, 3),
+    SQLiteOpenHelper(context.applicationContext, "notification-events.db", null, 4),
     NotificationSnapshotPersistence {
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
@@ -31,16 +31,20 @@ class NotificationSnapshotStore(context: Context) :
                 "message TEXT, PRIMARY KEY(workspace, event_key))"
         )
         DatedNoteSnapshotStore.create(db)
+        DatedReminderStore.create(db)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        if (newVersion != 3 || oldVersion !in 1 until newVersion) {
+        if (newVersion != 4 || oldVersion !in 1 until newVersion) {
             error("Unsupported notification database upgrade: $oldVersion to $newVersion")
         }
         if (oldVersion < 2) createReminderCache(db)
-        db.execSQL("ALTER TABLE snapshot ADD COLUMN message TEXT")
-        db.execSQL("ALTER TABLE pending ADD COLUMN message TEXT")
-        DatedNoteSnapshotStore.create(db)
+        if (oldVersion < 3) {
+            db.execSQL("ALTER TABLE snapshot ADD COLUMN message TEXT")
+            db.execSQL("ALTER TABLE pending ADD COLUMN message TEXT")
+            DatedNoteSnapshotStore.create(db)
+        }
+        DatedReminderStore.create(db)
     }
 
     override fun replaceSnapshot(workspace: String, events: List<NotificationEvent>, now: Long) {
@@ -167,7 +171,8 @@ class NotificationSnapshotStore(context: Context) :
                 "snapshot",
                 "scan_meta",
                 "reminder_cache",
-                "dated_notes"
+                "dated_notes",
+                "dated_handled"
             )) {
                 db.delete(table, "workspace = ?", arrayOf(workspace))
             }

@@ -130,8 +130,9 @@ class SyncRuntime(
                 loadDesktopActivity = LoadDesktopActivity(
                     R2DesktopActivityRepository(R2BinaryObjectClient(OkHttpClient())),
                     LoadVaultSettings(FileVaultSettingsRepository(context))
-                ),
-                scheduler = NotificationAlarmScheduler(context)
+                )::invoke,
+                scheduler = NotificationAlarmScheduler(context),
+                gitSyncMutex = gitSyncMutex
             )
 
             return SyncRuntime(
