@@ -312,13 +312,8 @@ fun App(
         }
     }
 
-    LaunchedEffect(notificationOpenRequest) {
-        val ids = notificationOpenRequest.noteIds
-        if (ids.size == 1) {
-            navController.navigate(AppRoute.notificationNote(NoteId(ids.single())))
-        } else if (ids.isNotEmpty()) {
-            navController.navigate(AppRoute.NOTIFICATION_LIST)
-        }
+    NotificationOpenEffect(notificationOpenRequest, launchSettled) { destination ->
+        navController.navigate(destination)
     }
 
     AppHubPicker(
